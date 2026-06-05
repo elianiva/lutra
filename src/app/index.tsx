@@ -1,9 +1,11 @@
-import { Text, View } from "react-native";
+import { Editor } from "../components/Editor";
+import { Stack } from "expo-router";
 
 export default function Home() {
   return (
-    <View className="flex-1 items-center justify-center bg-white">
-      <Text className="text-2xl text-black">hello world</Text>
-    </View>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <Editor />
+    </>
   );
 }

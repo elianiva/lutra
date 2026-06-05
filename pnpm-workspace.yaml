@@ -1,4 +1,5 @@
 allowBuilds:
+  '@shopify/react-native-skia': true
   msgpackr-extract: true
 
 overrides:
