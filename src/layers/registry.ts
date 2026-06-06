@@ -1,14 +1,22 @@
 import { type ComponentType } from "react";
 
+import { ClarityParams } from "./clarity/params";
+import { ClarityFilter } from "./clarity/view";
 import { ContrastParams } from "./contrast/params";
 import { ContrastFilter } from "./contrast/view";
 import { ExposureParams } from "./exposure/params";
 import { ExposureFilter } from "./exposure/view";
+import { GrainParams } from "./grain/params";
+import { GrainFilter } from "./grain/view";
+import { ChromaticAberrationParams } from "./chromatic-aberration/params";
+import { ChromaticAberrationFilter } from "./chromatic-aberration/view";
 import { SaturationParams } from "./saturation/params";
 import { SaturationFilter } from "./saturation/view";
 import { ShadowsParams } from "./shadows/params";
 import { ShadowsFilter } from "./shadows/view";
 import { type Layer, type LayerType, type LayerFor, type PatchFor, type SVsFor } from "./types";
+import { VignetteParams } from "./vignette/params";
+import { VignetteFilter } from "./vignette/view";
 import { WhiteBalanceParams } from "./white-balance/params";
 import { WhiteBalanceFilter } from "./white-balance/view";
 
@@ -80,6 +88,39 @@ export const layerRegistry: { [K in LayerType]: Entry<K> } = {
 			formatValue: (l) => `${l.amount >= 0 ? "+" : ""}${l.amount.toFixed(2)}`,
 		},
 	},
+	grain: {
+		filter: GrainFilter,
+		params: GrainParams,
+		meta: {
+			label: "Grain",
+			formatValue: (l) => `${Math.round(l.amount * 100)}%`,
+		},
+	},
+	vignette: {
+		filter: VignetteFilter,
+		params: VignetteParams,
+		meta: {
+			label: "Vignette",
+			formatValue: (l) =>
+				`A ${l.amount >= 0 ? "+" : ""}${l.amount.toFixed(2)} · S ${Math.round(l.size * 100)}%`,
+		},
+	},
+	chromaticAberration: {
+		filter: ChromaticAberrationFilter,
+		params: ChromaticAberrationParams,
+		meta: {
+			label: "Chromatic Aberration",
+			formatValue: (l) => `${l.amount >= 0 ? "+" : ""}${l.amount.toFixed(2)}`,
+		},
+	},
+	clarity: {
+		filter: ClarityFilter,
+		params: ClarityParams,
+		meta: {
+			label: "Clarity",
+			formatValue: (l) => `${l.amount >= 0 ? "+" : ""}${l.amount.toFixed(2)}`,
+		},
+	},
 };
 
 // Helper: format a layer's current value, dispatching to its meta.
@@ -96,5 +137,13 @@ export function formatLayerValue(layer: Layer): string {
 			return layerRegistry.whiteBalance.meta.formatValue(layer);
 		case "saturation":
 			return layerRegistry.saturation.meta.formatValue(layer);
+		case "grain":
+			return layerRegistry.grain.meta.formatValue(layer);
+		case "vignette":
+			return layerRegistry.vignette.meta.formatValue(layer);
+		case "chromaticAberration":
+			return layerRegistry.chromaticAberration.meta.formatValue(layer);
+		case "clarity":
+			return layerRegistry.clarity.meta.formatValue(layer);
 	}
 }

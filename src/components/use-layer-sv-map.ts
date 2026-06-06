@@ -32,6 +32,17 @@ function createSVs(layer: Layer): SVsByType[LayerType] {
 			};
 		case "saturation":
 			return { amount: makeMutable(layer.amount) };
+		case "grain":
+			return { amount: makeMutable(layer.amount) };
+		case "vignette":
+			return {
+				amount: makeMutable(layer.amount),
+				size: makeMutable(layer.size),
+			};
+		case "chromaticAberration":
+			return { amount: makeMutable(layer.amount) };
+		case "clarity":
+			return { amount: makeMutable(layer.amount) };
 	}
 }
 

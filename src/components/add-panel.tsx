@@ -1,27 +1,36 @@
-import { Pressable, View } from "react-native";
+import { FlatList, Pressable } from "react-native";
 
 import { layerRegistry } from "../layers/registry";
 import { type LayerType } from "../layers/types";
 import { Text } from "./ui/text";
 
-const GRID: LayerType[] = ["exposure", "contrast", "shadows", "whiteBalance", "saturation"];
+const GRID: LayerType[] = [
+  "exposure",
+  "contrast",
+  "shadows",
+  "whiteBalance",
+  "saturation",
+  "grain",
+  "vignette",
+  "chromaticAberration",
+  "clarity",
+];
 
 export function AddPanel({ onAdd }: { onAdd: (type: LayerType) => void }) {
-	return (
-		<View className="p-4 flex-1 justify-center">
-			<View className="flex-row flex-wrap gap-3 justify-center">
-				{GRID.map((type) => (
-					<Pressable
-						key={type}
-						onPress={() => onAdd(type)}
-						className="bg-secondary active:bg-accent rounded-xl py-5 items-center"
-						style={{ width: "47%" }}>
-						<Text className="font-medium">
-							{layerRegistry[type].meta.label}
-						</Text>
-					</Pressable>
-				))}
-			</View>
-		</View>
-	);
+  return (
+    <FlatList
+      data={GRID}
+      numColumns={2}
+      keyExtractor={(item) => item}
+      renderItem={({ item: type }) => (
+        <Pressable
+          onPress={() => onAdd(type)}
+          style={{ flex: 1 }}
+          className="p-4 justify-center border-r border-border border-b"
+        >
+          <Text className="text-sm font-medium">{layerRegistry[type].meta.label}</Text>
+        </Pressable>
+      )}
+    />
+  );
 }

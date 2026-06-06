@@ -16,5 +16,13 @@ export function createLayer(type: LayerType): Layer {
 			return { type, id, temp: 0, tint: 0, visible: true };
 		case "saturation":
 			return { type, id, amount: 0, visible: true };
+		case "grain":
+			return { type, id, amount: 0, visible: true };
+		case "vignette":
+			return { type, id, amount: 0, size: 0.6, visible: true };
+		case "chromaticAberration":
+			return { type, id, amount: 0, visible: true };
+		case "clarity":
+			return { type, id, amount: 0, visible: true };
 	}
 }

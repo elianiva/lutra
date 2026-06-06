@@ -74,6 +74,56 @@ export function EditPanel({ layer, sv, onCommit, onRemove }: Props) {
 							/>
 						);
 					}
+					case "grain": {
+						const P = layerRegistry.grain.params;
+						return (
+							<P
+								layer={layer}
+								sv={sv as SVsFor<"grain">}
+								onCommit={(p) => onCommit(layer.id, { type: "grain", patch: p })}
+								onRemove={() => onRemove(layer.id)}
+							/>
+						);
+					}
+					case "vignette": {
+						const P = layerRegistry.vignette.params;
+						return (
+							<P
+								layer={layer}
+								sv={sv as SVsFor<"vignette">}
+								onCommit={(p) =>
+									onCommit(layer.id, { type: "vignette", patch: p })
+								}
+								onRemove={() => onRemove(layer.id)}
+							/>
+						);
+					}
+					case "chromaticAberration": {
+						const P = layerRegistry.chromaticAberration.params;
+						return (
+							<P
+								layer={layer}
+								sv={sv as SVsFor<"chromaticAberration">}
+								onCommit={(p) =>
+									onCommit(layer.id, { type: "chromaticAberration", patch: p })
+								}
+								onRemove={() => onRemove(layer.id)}
+							/>
+						);
+					}
+					case "clarity": {
+						const P = layerRegistry.clarity.params;
+						return (
+							<P
+								layer={layer}
+								sv={sv as SVsFor<"clarity">}
+								onCommit={(p) =>
+									onCommit(layer.id, { type: "clarity", patch: p })
+								}
+								onRemove={() => onRemove(layer.id)}
+							/>
+						);
+					}
 				}
 			})()}
 		</View>
