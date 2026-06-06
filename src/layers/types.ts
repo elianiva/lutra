@@ -1,6 +1,6 @@
 import { type SharedValue } from "react-native-reanimated";
 
-import { type LayerRegistry, type LayerType } from "./registry";
+import { layerRegistry, type LayerRegistry, type LayerType } from "./registry";
 
 // All shapes below are derived from `layerRegistry` — adding a new layer or
 // a new field on a layer updates these unions automatically. The
@@ -38,3 +38,16 @@ export type SVsFor<K extends LayerType> = K extends LayerType
 	: never;
 
 export type LayerSVs = SVsFor<LayerType>;
+
+// Format a layer's current value for the Layers panel. Dispatches to the
+// entry's per-layer `formatValue`; each entry composes its field formatters
+// into the panel's one-line summary. Lives here next to `Layer` (not in
+// `registry.ts`) to keep the import graph one-way: types derive from the
+// registry, the registry never imports from types. The cast is one place;
+// per-entry functions are still type-safe against their narrow field shapes.
+export function formatLayerValue(layer: Layer): string {
+	const fn = layerRegistry[layer.type].formatValue as (
+		l: Layer,
+	) => string;
+	return fn(layer);
+}

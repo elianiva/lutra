@@ -4,8 +4,8 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { type SharedValue, useAnimatedStyle } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
-import { formatLayerValue, layerRegistry } from "../../layers/registry";
-import { type Layer } from "../../layers/types";
+import { layerRegistry } from "../../layers/registry";
+import { type Layer, formatLayerValue } from "../../layers/types";
 import { Icon } from "../ui/icon";
 import { Text } from "../ui/text";
 

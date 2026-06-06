@@ -1,16 +1,17 @@
 import * as ImagePicker from "expo-image-picker";
-import { Image as ImageIcon } from "lucide-react-native";
-import { useState } from "react";
-import { ActivityIndicator, Alert, Pressable } from "react-native";
+import { useCallback, useState } from "react";
+import { Alert } from "react-native";
 
-import { resampleForPreview } from "../lib/resample-image";
+import { resampleForPreview } from "./resample-image";
 import { imageStore } from "../state/image-store";
-import { Text } from "./ui/text";
 
-export function ImagePickerButton() {
-	const [loading, setLoading] = useState(false);
+// `isPicking` covers the resample step only. Permission prompt and
+// picker sheet are system modals that already block the user, so the
+// hook doesn't need to expose a "true" state during those.
+export function useImagePicker() {
+	const [isPicking, setIsPicking] = useState(false);
 
-	const pickImage = async () => {
+	const pick = useCallback(async () => {
 		const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 		if (status !== "granted") {
 			Alert.alert(
@@ -32,29 +33,16 @@ export function ImagePickerButton() {
 		if (result.canceled) return;
 		const asset = result.assets[0];
 
-		setLoading(true);
+		setIsPicking(true);
 		try {
 			const previewUri = await resampleForPreview(asset.uri, asset.width, asset.height);
 			imageStore.trigger.setImage({ originalUri: asset.uri, previewUri });
 		} catch (err) {
 			Alert.alert("Could not load image", (err as Error).message);
 		} finally {
-			setLoading(false);
+			setIsPicking(false);
 		}
-	};
+	}, []);
 
-	return (
-		<Pressable
-			onPress={pickImage}
-			disabled={loading}
-			className="flex-row items-center gap-2 rounded-xl bg-muted px-4 py-3 active:opacity-70"
-		>
-			{loading ? (
-				<ActivityIndicator size="small" />
-			) : (
-				<ImageIcon size={20} className="text-muted-foreground" />
-			)}
-			<Text variant="muted">{loading ? "Preparing preview…" : "Pick Image"}</Text>
-		</Pressable>
-	);
+	return { pick, isPicking };
 }

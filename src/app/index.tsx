@@ -1,12 +1,5 @@
-import { Stack } from "expo-router";
-
-import { Editor } from "../components/editor";
+import { MainMenu } from "../components/main-menu";
 
 export default function Home() {
-  return (
-    <>
-      <Stack.Screen options={{ headerShown: false }} />
-      <Editor />
-    </>
-  );
+	return <MainMenu />;
 }

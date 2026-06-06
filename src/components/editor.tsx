@@ -1,7 +1,8 @@
 import { useImage } from "@shopify/react-native-skia";
 import { useMachine } from "@xstate/react";
 import { useSelector } from "@xstate/store-react";
-import { useState, type ReactNode } from "react";
+import { router } from "expo-router";
+import { useEffect, useState, type ReactNode } from "react";
 import { View, useWindowDimensions, type LayoutChangeEvent } from "react-native";
 
 import { createLayer } from "../layers/defaults";
@@ -11,10 +12,10 @@ import { chainStore } from "../state/chain-store";
 import { imageStore } from "../state/image-store";
 import { uiMachine, type PanelMode } from "../state/ui-machine";
 import { AddPanel } from "./add-panel";
+import { BackButton } from "./back-button";
 import { EditPanel } from "./edit-panel";
 import { EmptyEdit } from "./empty-edit";
 import { ExportPanel } from "./export-panel";
-import { ImagePickerButton } from "./image-picker-button";
 import { LayersPanel } from "./layers/layers-panel";
 import { PanelTabs } from "./panel-tabs";
 import { Pipeline } from "./pipeline";
@@ -33,6 +34,16 @@ export function Editor(): ReactNode {
 	const [canvasH, setCanvasH] = useState(0);
 
 	const svMap = useLayerSVMap(layers);
+
+	// "Back = cancel" lives here so every exit path (back button, OS
+	// gesture, hot reload) clears the session automatically. See
+	// CONTEXT.md → Screens → Back behavior.
+	useEffect(() => {
+		return () => {
+			imageStore.trigger.clear();
+			chainStore.trigger.clear();
+		};
+	}, []);
 
 	const selectedLayer: Layer | null = layers.find((l) => l.id === selectedLayerId) ?? null;
 	const selectedSVs = selectedLayer ? svMap.get(selectedLayer.id) : undefined;
@@ -74,20 +85,17 @@ export function Editor(): ReactNode {
 
 	return (
 		<View className="flex-1 bg-background">
+			<BackButton onPress={() => router.back()} />
 			<View className="flex-1 items-center justify-center" onLayout={onCanvasLayout}>
-				{image ? (
-					canvasH > 0 ? (
-						<Pipeline
-							layers={layers}
-							svMap={svMap}
-							image={image}
-							width={screenW}
-							height={canvasH}
-						/>
-					) : null
-				) : (
-					<ImagePickerButton />
-				)}
+				{image && canvasH > 0 ? (
+					<Pipeline
+						layers={layers}
+						svMap={svMap}
+						image={image}
+						width={screenW}
+						height={canvasH}
+					/>
+				) : null}
 			</View>
 			<View className="bg-card" style={{ height: PANEL_HEIGHT }}>
 				<PanelTabs

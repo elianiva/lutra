@@ -38,7 +38,8 @@
 						"imageWidth": 76
 					}
 				}
-			]
+			],
+			"expo-image"
 		],
 		"experiments": {
 			"typedRoutes": true,

@@ -30,12 +30,31 @@ The v1 palette — nine **adjustment layer** types the user can add to the **edi
 8. **Chromatic aberration** — radial R/B channel split (-1 to +1, default 0 = no-op).
 9. **Clarity** — midtone contrast / structure enhancement (-1 to +1, default 0 = no-op).
 
+### Screens
+
+**Main menu**:
+The app's entry screen. Shows the app name and the two top-level actions: **Edit Image** (open the picker, then jump to the **editor**) and **Options** (jump to the **options screen**). Reached at launch and on back from any other screen.
+_Avoid_: "home" (iOS-centric, ambiguous with system home), "start screen" (ambiguous), "landing" (web jargon).
+
+**Editor**:
+The color-grading screen that renders an **edit chain** for one image. Reached only from **main menu** → Edit Image → picker → image selected. Always has an image in v1; the no-image empty state on the editor is dead code once the main menu exists.
+_Avoid_: "color grading menu" (the menu is the main menu, not this), "workspace" (overloaded), "canvas" (only the top half is a canvas).
+
+**Options screen**:
+The forward-loaded settings surface. Reached from **main menu** → Options. Holds future preferences (LUT packs, export options, recent files, theme). In v1 the surface is intentionally empty; the route exists to make the **main menu** honest about the button, not to ship settings.
+_Avoid_: "settings" (Android-centric), "preferences" (macOS-centric), "config".
+
+### Back behavior
+
+In v1, leaving the **editor** (back button, gesture) **discards the current edit session** — `imageStore` and `chainStore` are cleared. The **main menu** is always a fresh "Edit Image / Options" prompt, never a "resume" screen. See the "edits gallery" item in Future.
+
 ### Future (not in v1)
 
 Captured so they aren't lost:
 
 - **LUT layer** — a layer type that applies a 3D color cube (`.cube` format) as a shader pass. Reference architecture: [YahiaAngelo/Film-Simulator](https://github.com/YahiaAngelo/Film-Simulator) (KMP + Skiko, bundles `.cube` files in resources). Our variant will **download LUTs at runtime** (not bundled), per product decision.
 - Lift / gain / gamma (lifted blacks), masks, blend modes per layer.
+- **Edits gallery** — a Snapseed-Mobile-style list of saved **edit sessions** on the **main menu**. In v1 back discards; in the future back returns to a gallery where the user can resume, duplicate, or delete a session. This is the reason the v1 main menu has two actions (Edit Image, Options) and not a "Resume" affordance — the gallery will grow into that slot.
 
 ## Flagged ambiguities
 

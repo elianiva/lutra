@@ -40,5 +40,6 @@ export const chainStore = createStore({
 				l.id === event.id ? { ...l, visible: !l.visible } : l,
 			),
 		}),
+		clear: () => ({ layers: [] }),
 	},
 });

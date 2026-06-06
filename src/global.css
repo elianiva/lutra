@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "uniwind";
 
+@theme {
+	--font-sans: "Electrolize_400Regular";
+}
+
 @layer theme {
 	:root {
 		@variant dark {

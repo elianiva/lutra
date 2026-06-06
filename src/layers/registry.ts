@@ -8,7 +8,6 @@ import { vignetteEffect } from "./vignette/shader";
 import { chromaticAberrationEffect } from "./chromatic-aberration/shader";
 import { clarityEffect } from "./clarity/shader";
 import { formatEV, formatPercent, formatSigned, type LayerEntry } from "./format";
-import { type Layer } from "./types";
 
 // Adding a new adjustment layer = adding one entry below. The Layer / Patch /
 // SVs types, the filter, the params UI, the createLayer/createSVs
@@ -113,14 +112,3 @@ export const layerRegistry = {
 
 export type LayerRegistry = typeof layerRegistry;
 export type LayerType = keyof LayerRegistry;
-
-// Format a layer's current value for the Layers panel. Dispatches to the
-// entry's per-layer `formatValue`; each entry composes its field formatters
-// into the panel's one-line summary. The cast is one place; per-entry
-// functions are still type-safe against their narrow field shapes.
-export function formatLayerValue(layer: Layer): string {
-	const fn = layerRegistry[layer.type].formatValue as (
-		l: Layer,
-	) => string;
-	return fn(layer);
-}
