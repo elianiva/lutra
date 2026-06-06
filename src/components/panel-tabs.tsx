@@ -8,29 +8,31 @@ const TABS: { key: PanelMode; label: string }[] = [
 	{ key: "add", label: "Add" },
 	{ key: "edit", label: "Edit" },
 	{ key: "layers", label: "Layers" },
+	{ key: "export", label: "Export" },
 ];
 
-export function PanelTabs({
-	mode,
-	canEdit,
-	onSwitch,
-}: {
+type Props = {
 	mode: PanelMode;
 	canEdit: boolean;
+	canExport: boolean;
 	onSwitch: (mode: PanelMode) => void;
-}) {
+};
+
+export function PanelTabs({ mode, canEdit, canExport, onSwitch }: Props) {
 	return (
 		<View>
 			<View className="flex-row">
 				{TABS.map((t) => {
 					const active = mode === t.key;
-					const disabled = t.key === "edit" && !canEdit;
+					const disabled =
+						(t.key === "edit" && !canEdit) || (t.key === "export" && !canExport);
 					return (
 						<Pressable
 							key={t.key}
 							onPress={() => !disabled && onSwitch(t.key)}
 							className={`flex-1 py-3 items-center ${active ? "border-b-2 border-primary" : ""}`}
-							disabled={disabled}>
+							disabled={disabled}
+						>
 							<Text
 								variant="small"
 								className={
@@ -39,7 +41,8 @@ export function PanelTabs({
 										: active
 											? "text-primary font-medium"
 											: "text-muted-foreground"
-								}>
+								}
+							>
 								{t.label}
 							</Text>
 						</Pressable>

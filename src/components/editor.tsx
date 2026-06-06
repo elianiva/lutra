@@ -13,6 +13,7 @@ import { uiMachine, type PanelMode } from "../state/ui-machine";
 import { AddPanel } from "./add-panel";
 import { EditPanel } from "./edit-panel";
 import { EmptyEdit } from "./empty-edit";
+import { ExportPanel } from "./export-panel";
 import { ImagePickerButton } from "./image-picker-button";
 import { LayersPanel } from "./layers/layers-panel";
 import { PanelTabs } from "./panel-tabs";
@@ -23,10 +24,11 @@ const PANEL_HEIGHT = 360;
 
 export function Editor(): ReactNode {
 	const layers = useSelector(chainStore, (s) => s.context.layers);
-	const imageUri = useSelector(imageStore, (s) => s.context.uri);
+	const previewUri = useSelector(imageStore, (s) => s.context.previewUri);
+	const originalUri = useSelector(imageStore, (s) => s.context.originalUri);
 	const [uiState, uiSend] = useMachine(uiMachine);
 	const { mode, selectedLayerId } = uiState.context;
-	const image = useImage(imageUri);
+	const image = useImage(previewUri);
 	const { width: screenW } = useWindowDimensions();
 	const [canvasH, setCanvasH] = useState(0);
 
@@ -88,7 +90,12 @@ export function Editor(): ReactNode {
 				)}
 			</View>
 			<View className="bg-card" style={{ height: PANEL_HEIGHT }}>
-				<PanelTabs mode={mode} canEdit={selectedLayer !== null} onSwitch={onSwitch} />
+				<PanelTabs
+					mode={mode}
+					canEdit={selectedLayer !== null}
+					canExport={originalUri !== null}
+					onSwitch={onSwitch}
+				/>
 				<View className="flex-1">
 					{mode === "add" && <AddPanel onAdd={onAdd} />}
 					{mode === "edit" &&
@@ -112,6 +119,7 @@ export function Editor(): ReactNode {
 							onToggleVisible={onToggleVisible}
 						/>
 					)}
+					{mode === "export" && <ExportPanel layers={layers} svMap={svMap} />}
 				</View>
 			</View>
 		</View>

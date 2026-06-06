@@ -1,6 +1,6 @@
 import { assign, setup } from "xstate";
 
-export type PanelMode = "add" | "edit" | "layers";
+export type PanelMode = "add" | "edit" | "layers" | "export";
 
 type UiContext = {
 	mode: PanelMode;
@@ -11,9 +11,7 @@ type UiContext = {
 // mode. Mode + selection transitions that would otherwise need their own
 // event (e.g. "add then auto-select the new one") are expressed by the
 // editor sending SELECT_LAYER { id } after SWITCH_TO / chain mutations.
-type UiEvent =
-	| { type: "SELECT_LAYER"; id: string | null }
-	| { type: "SWITCH_TO"; mode: PanelMode };
+type UiEvent = { type: "SELECT_LAYER"; id: string | null } | { type: "SWITCH_TO"; mode: PanelMode };
 
 // Single-state FSM. The "states" are really modes held in context. We
 // keep xstate for: (a) a clean place to express the model + transitions
