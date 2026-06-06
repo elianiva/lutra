@@ -1,6 +1,6 @@
 import { Canvas, Image, type SkImage } from "@shopify/react-native-skia";
-import { type ReactNode } from "react";
 
+import { LayerFilter } from "../layers/filter";
 import { layerRegistry } from "../layers/registry";
 import { type Layer } from "../layers/types";
 import { type LayerSVMap } from "./use-layer-sv-map";
@@ -19,8 +19,15 @@ export function Pipeline({ layers, svMap, image, width, height }: PipelineProps)
 		.map((layer) => {
 			const sv = svMap.get(layer.id);
 			if (!sv) return null;
-			const Filter = layerRegistry[layer.type].filter;
-			return <Filter key={layer.id} sv={sv as never} />;
+			const entry = layerRegistry[layer.type];
+			return (
+				<LayerFilter
+					key={layer.id}
+					sv={sv}
+					effect={entry.effect}
+					keys={Object.keys(entry.fields)}
+				/>
+			);
 		});
 
 	return (

@@ -7,18 +7,22 @@ type UiContext = {
 	selectedLayerId: string | null;
 };
 
+// Two events: select a layer (or clear with null), and switch the panel
+// mode. Mode + selection transitions that would otherwise need their own
+// event (e.g. "add then auto-select the new one") are expressed by the
+// editor sending SELECT_LAYER { id } after SWITCH_TO / chain mutations.
 type UiEvent =
-	| { type: "SWITCH_TO_ADD" }
-	| { type: "SWITCH_TO_EDIT" }
-	| { type: "SWITCH_TO_LAYERS" }
 	| { type: "SELECT_LAYER"; id: string | null }
-	| { type: "LAYER_ADDED"; id: string }
-	| { type: "LAYER_REMOVED" };
+	| { type: "SWITCH_TO"; mode: PanelMode };
 
-// Single-state FSM. The "states" are really modes held in context, since
-// there are no real workflow transitions — every event just rewrites
-// context. Keeps the editor's mode-switched panel authoritative without
-// turning every tab change into a state machine transition.
+// Single-state FSM. The "states" are really modes held in context. We
+// keep xstate for: (a) a clean place to express the model + transitions
+// as the editor grows, (b) action logging / inspection if we add dev
+// tooling, (c) the future workflow when we add things like "saving",
+// "exporting", or "modal layers panel" that genuinely are FSM-shaped
+// (multiple states, guards, history). Today the guards are just default
+// transitions; the value of the machine is the schema, not the
+// enforcement.
 export const uiMachine = setup({
 	types: {
 		context: {} as UiContext,
@@ -31,29 +35,18 @@ export const uiMachine = setup({
 		selectedLayerId: null,
 	},
 	on: {
-		SWITCH_TO_ADD: {
-			actions: assign({ mode: "add" }),
-		},
-		SWITCH_TO_EDIT: {
-			actions: assign({ mode: "edit" }),
-		},
-		SWITCH_TO_LAYERS: {
-			actions: assign({ mode: "layers" }),
-		},
 		SELECT_LAYER: {
-			actions: assign({
-				selectedLayerId: ({ event }) => event.id,
-				mode: "edit",
-			}),
+			actions: assign(({ context, event }) => ({
+				selectedLayerId: event.id,
+				// Selecting a layer opens the edit panel. Deselecting
+				// (id === null, e.g. after removal) leaves the mode
+				// untouched; the EmptyEdit placeholder handles
+				// "edit mode with no selection".
+				mode: event.id !== null ? ("edit" as const) : context.mode,
+			})),
 		},
-		LAYER_ADDED: {
-			actions: assign({
-				selectedLayerId: ({ event }) => event.id,
-				mode: "edit",
-			}),
-		},
-		LAYER_REMOVED: {
-			actions: assign({ selectedLayerId: null }),
+		SWITCH_TO: {
+			actions: assign({ mode: ({ event }) => event.mode }),
 		},
 	},
 });

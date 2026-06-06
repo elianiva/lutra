@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useState } from "react";
 import { View, type LayoutChangeEvent } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -42,20 +42,12 @@ export function Slider({
 	onCommit,
 }: SliderProps): ReactNode {
 	const trackWidth = useSharedValue(0);
-	// `displayValue` is updated by `useAnimatedReaction` (post-render, on the
-	// RN thread). We seed it with an empty string and let the reaction set
-	// the real value after mount — reading `value.value` during render
-	// would trip Reanimated 4's strict-mode warning and confuse the
-	// worklet babel plugin's dependency analysis on sibling `useDerivedValue`
-	// hooks that subscribe to the same SV.
-	const [displayValue, setDisplayValue] = useState("");
-	const seeded = useRef(false);
-
-	useEffect(() => {
-		if (seeded.current) return;
-		seeded.current = true;
-		setDisplayValue(format(value.value, formatValue));
-	}, [formatValue]);
+	// `displayValue` is updated by `useAnimatedReaction` (post-render, on
+	// the RN thread). We seed it with "0.00" as a placeholder — reading
+	// `value.value` during render would trip Reanimated 4's strict-mode
+	// warning. The reaction fires on mount and replaces the placeholder
+	// with the real value shortly after.
+	const [displayValue, setDisplayValue] = useState(() => format(0, formatValue));
 
 	const updateDisplay = useCallback(
 		(v: number) => setDisplayValue(format(v, formatValue)),

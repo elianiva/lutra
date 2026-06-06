@@ -1,149 +1,126 @@
-import { type ComponentType } from "react";
+import { exposureEffect } from "./exposure/shader";
+import { contrastEffect } from "./contrast/shader";
+import { shadowsEffect } from "./shadows/shader";
+import { whiteBalanceEffect } from "./white-balance/shader";
+import { saturationEffect } from "./saturation/shader";
+import { grainEffect } from "./grain/shader";
+import { vignetteEffect } from "./vignette/shader";
+import { chromaticAberrationEffect } from "./chromatic-aberration/shader";
+import { clarityEffect } from "./clarity/shader";
+import { formatEV, formatPercent, formatSigned, type LayerEntry } from "./format";
+import { type Layer } from "./types";
 
-import { ClarityParams } from "./clarity/params";
-import { ClarityFilter } from "./clarity/view";
-import { ContrastParams } from "./contrast/params";
-import { ContrastFilter } from "./contrast/view";
-import { ExposureParams } from "./exposure/params";
-import { ExposureFilter } from "./exposure/view";
-import { GrainParams } from "./grain/params";
-import { GrainFilter } from "./grain/view";
-import { ChromaticAberrationParams } from "./chromatic-aberration/params";
-import { ChromaticAberrationFilter } from "./chromatic-aberration/view";
-import { SaturationParams } from "./saturation/params";
-import { SaturationFilter } from "./saturation/view";
-import { ShadowsParams } from "./shadows/params";
-import { ShadowsFilter } from "./shadows/view";
-import { type Layer, type LayerType, type LayerFor, type PatchFor, type SVsFor } from "./types";
-import { VignetteParams } from "./vignette/params";
-import { VignetteFilter } from "./vignette/view";
-import { WhiteBalanceParams } from "./white-balance/params";
-import { WhiteBalanceFilter } from "./white-balance/view";
-
-type FilterComponent<K extends LayerType> = ComponentType<{ sv: SVsFor<K> }>;
-
-type ParamsComponent<K extends LayerType> = ComponentType<{
-	layer: LayerFor<K>;
-	sv: SVsFor<K>;
-	onCommit: (patch: PatchFor<K>) => void;
-	onRemove: () => void;
-}>;
-
-type LayerMeta<K extends LayerType> = {
-	label: string;
-	formatValue: (layer: LayerFor<K>) => string;
-};
-
-type Entry<K extends LayerType> = {
-	filter: FilterComponent<K>;
-	params: ParamsComponent<K>;
-	meta: LayerMeta<K>;
-};
-
-export const layerRegistry: { [K in LayerType]: Entry<K> } = {
+// Adding a new adjustment layer = adding one entry below. The Layer / Patch /
+// SVs types, the filter, the params UI, the createLayer/createSVs
+// factories, and the Add panel grid all derive from this map. `as const
+// satisfies` gives us narrow literal types so the derived unions keep their
+// per-entry precision.
+export const layerRegistry = {
 	exposure: {
-		filter: ExposureFilter,
-		params: ExposureParams,
-		meta: {
-			label: "Exposure",
-			formatValue: (l) => `${l.stops >= 0 ? "+" : ""}${l.stops.toFixed(2)} EV`,
+		effect: exposureEffect,
+		label: "Exposure",
+		fields: {
+			stops: { default: 0, min: -3, max: 3, label: "EV", format: "ev" },
 		},
+		formatValue: (l) => formatEV(l.stops),
 	},
 	contrast: {
-		filter: ContrastFilter,
-		params: ContrastParams,
-		meta: {
-			label: "Contrast",
-			formatValue: (l) => `${l.amount >= 0 ? "+" : ""}${l.amount.toFixed(2)}`,
+		effect: contrastEffect,
+		label: "Contrast",
+		fields: {
+			amount: { default: 0, min: -1, max: 1, label: "Amount", format: "signed" },
 		},
+		formatValue: (l) => formatSigned(l.amount),
 	},
 	shadows: {
-		filter: ShadowsFilter,
-		params: ShadowsParams,
-		meta: {
-			label: "Shadows & Highlights",
-			formatValue: (l) =>
-				`S ${l.shadows >= 0 ? "+" : ""}${l.shadows.toFixed(2)} · H ${l.highlights >= 0 ? "+" : ""}${l.highlights.toFixed(2)}`,
+		effect: shadowsEffect,
+		label: "Shadows & Highlights",
+		fields: {
+			shadows: { default: 0, min: -1, max: 1, label: "Shadows", format: "signed" },
+			highlights: { default: 0, min: -1, max: 1, label: "Highlights", format: "signed" },
 		},
+		formatValue: (l) => `S ${formatSigned(l.shadows)} · H ${formatSigned(l.highlights)}`,
 	},
 	whiteBalance: {
-		filter: WhiteBalanceFilter,
-		params: WhiteBalanceParams,
-		meta: {
-			label: "White Balance",
-			formatValue: (l) => {
-				const k =
-					l.temp < 0
-						? Math.round(6500 - (1 + l.temp) * 4500)
-						: Math.round(6500 + l.temp * 5500);
-				return `${k} K · T ${l.tint >= 0 ? "+" : ""}${l.tint.toFixed(2)}`;
+		effect: whiteBalanceEffect,
+		label: "White Balance",
+		fields: {
+			temp: {
+				default: 0,
+				min: -1,
+				max: 1,
+				label: "Temp",
+				format: (v) => {
+					const k =
+						v < 0
+							? Math.round(6500 - (1 + v) * 4500)
+							: Math.round(6500 + v * 5500);
+					return `${k} K`;
+				},
 			},
+			tint: { default: 0, min: -1, max: 1, label: "Tint", format: "signed" },
+		},
+		formatValue: (l) => {
+			const k =
+				l.temp < 0
+					? Math.round(6500 - (1 + l.temp) * 4500)
+					: Math.round(6500 + l.temp * 5500);
+			return `${k} K · ${formatSigned(l.tint)}`;
 		},
 	},
 	saturation: {
-		filter: SaturationFilter,
-		params: SaturationParams,
-		meta: {
-			label: "Saturation",
-			formatValue: (l) => `${l.amount >= 0 ? "+" : ""}${l.amount.toFixed(2)}`,
+		effect: saturationEffect,
+		label: "Saturation",
+		fields: {
+			amount: { default: 0, min: -1, max: 1, label: "Amount", format: "signed" },
 		},
+		formatValue: (l) => formatSigned(l.amount),
 	},
 	grain: {
-		filter: GrainFilter,
-		params: GrainParams,
-		meta: {
-			label: "Grain",
-			formatValue: (l) => `${Math.round(l.amount * 100)}%`,
+		effect: grainEffect,
+		label: "Grain",
+		fields: {
+			amount: { default: 0, min: 0, max: 1, label: "Amount", format: "percent" },
 		},
+		formatValue: (l) => formatPercent(l.amount),
 	},
 	vignette: {
-		filter: VignetteFilter,
-		params: VignetteParams,
-		meta: {
-			label: "Vignette",
-			formatValue: (l) =>
-				`A ${l.amount >= 0 ? "+" : ""}${l.amount.toFixed(2)} · S ${Math.round(l.size * 100)}%`,
+		effect: vignetteEffect,
+		label: "Vignette",
+		fields: {
+			amount: { default: 0, min: -1, max: 1, label: "Amount", format: "signed" },
+			size: { default: 0.6, min: 0.2, max: 1, label: "Size", format: "percent" },
 		},
+		formatValue: (l) => `A ${formatSigned(l.amount)} · ${formatPercent(l.size)}`,
 	},
 	chromaticAberration: {
-		filter: ChromaticAberrationFilter,
-		params: ChromaticAberrationParams,
-		meta: {
-			label: "Chromatic Aberration",
-			formatValue: (l) => `${l.amount >= 0 ? "+" : ""}${l.amount.toFixed(2)}`,
+		effect: chromaticAberrationEffect,
+		label: "Chromatic Aberration",
+		fields: {
+			amount: { default: 0, min: -1, max: 1, label: "Amount", format: "signed" },
 		},
+		formatValue: (l) => formatSigned(l.amount),
 	},
 	clarity: {
-		filter: ClarityFilter,
-		params: ClarityParams,
-		meta: {
-			label: "Clarity",
-			formatValue: (l) => `${l.amount >= 0 ? "+" : ""}${l.amount.toFixed(2)}`,
+		effect: clarityEffect,
+		label: "Clarity",
+		fields: {
+			amount: { default: 0, min: -1, max: 1, label: "Amount", format: "signed" },
 		},
+		formatValue: (l) => formatSigned(l.amount),
 	},
-};
+} as const satisfies Record<string, LayerEntry>;
 
-// Helper: format a layer's current value, dispatching to its meta.
-// Switches on `layer.type` so each call site has the narrowed type.
+export type LayerRegistry = typeof layerRegistry;
+export type LayerType = keyof LayerRegistry;
+
+// Format a layer's current value for the Layers panel. Dispatches to the
+// entry's per-layer `formatValue`; each entry composes its field formatters
+// into the panel's one-line summary. The cast is one place; per-entry
+// functions are still type-safe against their narrow field shapes.
 export function formatLayerValue(layer: Layer): string {
-	switch (layer.type) {
-		case "exposure":
-			return layerRegistry.exposure.meta.formatValue(layer);
-		case "contrast":
-			return layerRegistry.contrast.meta.formatValue(layer);
-		case "shadows":
-			return layerRegistry.shadows.meta.formatValue(layer);
-		case "whiteBalance":
-			return layerRegistry.whiteBalance.meta.formatValue(layer);
-		case "saturation":
-			return layerRegistry.saturation.meta.formatValue(layer);
-		case "grain":
-			return layerRegistry.grain.meta.formatValue(layer);
-		case "vignette":
-			return layerRegistry.vignette.meta.formatValue(layer);
-		case "chromaticAberration":
-			return layerRegistry.chromaticAberration.meta.formatValue(layer);
-		case "clarity":
-			return layerRegistry.clarity.meta.formatValue(layer);
-	}
+	const fn = layerRegistry[layer.type].formatValue as (
+		l: Layer,
+	) => string;
+	return fn(layer);
 }

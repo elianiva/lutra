@@ -1,169 +1,40 @@
 import { type SharedValue } from "react-native-reanimated";
 
-export type LayerType =
-	| "exposure"
-	| "contrast"
-	| "shadows"
-	| "whiteBalance"
-	| "saturation"
-	| "grain"
-	| "vignette"
-	| "chromaticAberration"
-	| "clarity";
+import { type LayerRegistry, type LayerType } from "./registry";
 
-export type ExposureLayer = {
-	type: "exposure";
-	id: string;
-	stops: number;
-	visible: boolean;
-};
+// All shapes below are derived from `layerRegistry` — adding a new layer or
+// a new field on a layer updates these unions automatically. The
+// `K extends LayerType ? ... : never` shape makes each helper
+// distributive: `LayerFor<LayerType>` distributes over the union and gives
+// us the full Layer union, not a single object with a union of fields.
 
-export type ContrastLayer = {
-	type: "contrast";
-	id: string;
-	amount: number;
-	visible: boolean;
-};
+type Entry<K extends LayerType> = LayerRegistry[K];
 
-export type ShadowsLayer = {
-	type: "shadows";
-	id: string;
-	shadows: number;
-	highlights: number;
-	visible: boolean;
-};
+// The per-layer concrete shape: discriminant + common fields + every
+// registry field typed as number.
+export type LayerFor<K extends LayerType> = K extends LayerType
+	? { type: K; id: string; visible: boolean } & { [F in keyof Entry<K>["fields"]]: number }
+	: never;
 
-export type WhiteBalanceLayer = {
-	type: "whiteBalance";
-	id: string;
-	temp: number;
-	tint: number;
-	visible: boolean;
-};
+export type Layer = LayerFor<LayerType>;
 
-export type SaturationLayer = {
-	type: "saturation";
-	id: string;
-	amount: number;
-	visible: boolean;
-};
+// The per-layer patch: which fields the consumer is allowed to update.
+// The store reducer relies on the patch discriminator matching the layer
+// type to apply a safe spread.
+export type PatchFor<K extends LayerType> = K extends LayerType
+	? {
+			type: K;
+			patch: Partial<{ [F in keyof Entry<K>["fields"]]: number }>;
+		}
+	: never;
 
-export type GrainLayer = {
-	type: "grain";
-	id: string;
-	amount: number;
-	visible: boolean;
-};
+export type LayerPatch = PatchFor<LayerType>;
 
-export type VignetteLayer = {
-	type: "vignette";
-	id: string;
-	amount: number;
-	size: number;
-	visible: boolean;
-};
+// Live shared values, one per registry field. The renderer (Pipeline)
+// reads these inside `useDerivedValue`; the editor (Slider) writes them on
+// drag; the store commits the final value on release.
+export type SVsFor<K extends LayerType> = K extends LayerType
+	? { [F in keyof Entry<K>["fields"]]: SharedValue<number> }
+	: never;
 
-export type ChromaticAberrationLayer = {
-	type: "chromaticAberration";
-	id: string;
-	amount: number;
-	visible: boolean;
-};
-
-export type ClarityLayer = {
-	type: "clarity";
-	id: string;
-	amount: number;
-	visible: boolean;
-};
-
-export type Layer =
-	| ExposureLayer
-	| ContrastLayer
-	| ShadowsLayer
-	| WhiteBalanceLayer
-	| SaturationLayer
-	| GrainLayer
-	| VignetteLayer
-	| ChromaticAberrationLayer
-	| ClarityLayer;
-
-// Per-type param patches (Partial<Pick<...>>).
-export type ExposurePatch = Partial<Pick<ExposureLayer, "stops">>;
-export type ContrastPatch = Partial<Pick<ContrastLayer, "amount">>;
-export type ShadowsPatch = Partial<Pick<ShadowsLayer, "shadows" | "highlights">>;
-export type WhiteBalancePatch = Partial<Pick<WhiteBalanceLayer, "temp" | "tint">>;
-export type SaturationPatch = Partial<Pick<SaturationLayer, "amount">>;
-export type GrainPatch = Partial<Pick<GrainLayer, "amount">>;
-export type VignettePatch = Partial<Pick<VignetteLayer, "amount" | "size">>;
-export type ChromaticAberrationPatch = Partial<Pick<ChromaticAberrationLayer, "amount">>;
-export type ClarityPatch = Partial<Pick<ClarityLayer, "amount">>;
-
-// Discriminated patch for the chain store's updateParams event. The store
-// reducer checks `event.patch.type === layer.type` before merging.
-export type LayerPatch =
-	| { type: "exposure"; patch: ExposurePatch }
-	| { type: "contrast"; patch: ContrastPatch }
-	| { type: "shadows"; patch: ShadowsPatch }
-	| { type: "whiteBalance"; patch: WhiteBalancePatch }
-	| { type: "saturation"; patch: SaturationPatch }
-	| { type: "grain"; patch: GrainPatch }
-	| { type: "vignette"; patch: VignettePatch }
-	| { type: "chromaticAberration"; patch: ChromaticAberrationPatch }
-	| { type: "clarity"; patch: ClarityPatch };
-
-// Per-type live shared values. Used by both the renderer (Pipeline view) and
-// the editor (Slider). One map, one source of truth.
-export type ExposureSVs = { stops: SharedValue<number> };
-export type ContrastSVs = { amount: SharedValue<number> };
-export type ShadowsSVs = {
-	shadows: SharedValue<number>;
-	highlights: SharedValue<number>;
-};
-export type WhiteBalanceSVs = {
-	temp: SharedValue<number>;
-	tint: SharedValue<number>;
-};
-export type SaturationSVs = { amount: SharedValue<number> };
-export type GrainSVs = { amount: SharedValue<number> };
-export type VignetteSVs = {
-	amount: SharedValue<number>;
-	size: SharedValue<number>;
-};
-export type ChromaticAberrationSVs = { amount: SharedValue<number> };
-export type ClaritySVs = { amount: SharedValue<number> };
-
-// Type helpers. SVsFor<K> resolves to the bare shape (no discriminator) so
-// view/params components don't see a phantom `type` field.
-export type LayerFor<K extends LayerType> = Extract<Layer, { type: K }>;
-export type PatchFor<K extends LayerType> = Extract<LayerPatch, { type: K }>["patch"];
-export type SVsFor<K extends LayerType> = K extends "exposure"
-	? ExposureSVs
-	: K extends "contrast"
-		? ContrastSVs
-		: K extends "shadows"
-			? ShadowsSVs
-			: K extends "whiteBalance"
-				? WhiteBalanceSVs
-				: K extends "saturation"
-					? SaturationSVs
-					: K extends "grain"
-						? GrainSVs
-						: K extends "vignette"
-							? VignetteSVs
-							: K extends "chromaticAberration"
-								? ChromaticAberrationSVs
-								: K extends "clarity"
-									? ClaritySVs
-									: never;
-
-export const isExposure = (l: Layer): l is ExposureLayer => l.type === "exposure";
-export const isContrast = (l: Layer): l is ContrastLayer => l.type === "contrast";
-export const isShadows = (l: Layer): l is ShadowsLayer => l.type === "shadows";
-export const isWhiteBalance = (l: Layer): l is WhiteBalanceLayer => l.type === "whiteBalance";
-export const isSaturation = (l: Layer): l is SaturationLayer => l.type === "saturation";
-export const isGrain = (l: Layer): l is GrainLayer => l.type === "grain";
-export const isVignette = (l: Layer): l is VignetteLayer => l.type === "vignette";
-export const isChromaticAberration = (l: Layer): l is ChromaticAberrationLayer =>
-	l.type === "chromaticAberration";
-export const isClarity = (l: Layer): l is ClarityLayer => l.type === "clarity";
+export type LayerSVs = SVsFor<LayerType>;

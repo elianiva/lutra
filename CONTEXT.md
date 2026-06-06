@@ -18,22 +18,24 @@ _Avoid_: "Stack" (Snapseed uses this word but it suggests LIFO; the chain is ord
 
 ### Adjustments
 
-The v1 palette — five **adjustment layer** types the user can add to the **edit chain**. No LUT yet (see Future). Order is significant.
+The v1 palette — nine **adjustment layer** types the user can add to the **edit chain**. No LUT yet (see Future). Order is significant.
 
 1. **Exposure** — stops (-3 to +3, default 0). Multiplicative gain.
 2. **Contrast** — S-curve amount (-1 to +1, default 0). Anchored at mid-gray.
 3. **Shadows / Highlights** — single layer with two sliders (a.k.a. Snapseed's "Ambiance"). Shadows lifts dark tones; Highlights compresses bright tones.
 4. **White balance** — temperature (K) + tint. Default 6500K / 0.
 5. **Saturation** — multiplier (-1 to +1, default 0 = no-op).
-
-### Future (not in v1)
+6. **Grain** — film-grain noise overlay (0 to 1, default 0 = no-op). Hash-based, no texture.
+7. **Vignette** — radial darkening from edges. Two sliders: amount (-1 to +1, default 0 = no-op) + size (0.2 to 1, default 0.6).
+8. **Chromatic aberration** — radial R/B channel split (-1 to +1, default 0 = no-op).
+9. **Clarity** — midtone contrast / structure enhancement (-1 to +1, default 0 = no-op).
 
 ### Future (not in v1)
 
 Captured so they aren't lost:
 
 - **LUT layer** — a layer type that applies a 3D color cube (`.cube` format) as a shader pass. Reference architecture: [YahiaAngelo/Film-Simulator](https://github.com/YahiaAngelo/Film-Simulator) (KMP + Skiko, bundles `.cube` files in resources). Our variant will **download LUTs at runtime** (not bundled), per product decision.
-- Lift / gain / gamma (lifted blacks), grain, vignette, sharpening, masks, blend modes per layer.
+- Lift / gain / gamma (lifted blacks), masks, blend modes per layer.
 
 ## Flagged ambiguities
 
@@ -45,5 +47,5 @@ Captured so they aren't lost:
 > Dev: "The user added a saturation layer — where does it go in the edit chain?"
 > Expert: "Wherever they put it. If it's after the channel mix, it tints the whole shifted image. If it's before, it tints the pre-look image. Order is part of the look."
 >
-> Dev: "Should we add a grain adjustment?"
-> Expert: "Not in v1. Grain is a future addition — capture it so we don't forget, but it doesn't go in the v1 palette."
+> Dev: "Should we add a LUT layer?"
+> Expert: "Not in v1. LUTs are a future addition — capture it so we don't forget, but it doesn't go in the v1 palette."
