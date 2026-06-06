@@ -6,23 +6,25 @@ import { View, useWindowDimensions, type LayoutChangeEvent } from "react-native"
 
 import { type LayerType, type Layer, type SVsFor, type LayerPatch } from "../layers/types";
 import { chainStore } from "../state/chain-store";
+import { imageStore } from "../state/image-store";
 import { uiMachine, type PanelMode } from "../state/ui-machine";
 import { AddPanel } from "./add-panel";
 import { EditPanel } from "./edit-panel";
 import { EmptyEdit } from "./empty-edit";
+import { ImagePickerButton } from "./image-picker-button";
 import { LayersPanel } from "./layers/layers-panel";
 import { PanelTabs } from "./panel-tabs";
 import { Pipeline } from "./pipeline";
-import { Text } from "./ui/text";
 import { useLayerSVMap } from "./use-layer-sv-map";
 
 const PANEL_HEIGHT = 360;
 
 export function Editor(): ReactNode {
   const layers = useSelector(chainStore, (s) => s.context.layers);
+  const imageUri = useSelector(imageStore, (s) => s.context.uri);
   const [uiState, uiSend] = useMachine(uiMachine);
   const { mode, selectedLayerId } = uiState.context;
-  const image = useImage(require("../../assets/images/sample.jpg"));
+  const image = useImage(imageUri);
   const { width: screenW } = useWindowDimensions();
   const [canvasH, setCanvasH] = useState(0);
 
@@ -70,26 +72,22 @@ export function Editor(): ReactNode {
     chainStore.trigger.toggleVisible({ id });
   };
 
-  if (!image) {
-    return (
-      <View className="flex-1 items-center justify-center bg-background">
-        <Text variant="muted">Loading…</Text>
-      </View>
-    );
-  }
-
   return (
     <View className="flex-1 bg-background">
-      <View className="flex-1" onLayout={onCanvasLayout}>
-        {canvasH > 0 ? (
-          <Pipeline
-            layers={layers}
-            svMap={svMap}
-            image={image}
-            width={screenW}
-            height={canvasH}
-          />
-        ) : null}
+      <View className="flex-1 items-center justify-center" onLayout={onCanvasLayout}>
+        {image ? (
+          canvasH > 0 ? (
+            <Pipeline
+              layers={layers}
+              svMap={svMap}
+              image={image}
+              width={screenW}
+              height={canvasH}
+            />
+          ) : null
+        ) : (
+          <ImagePickerButton />
+        )}
       </View>
       <View className="bg-card" style={{ height: PANEL_HEIGHT }}>
         <PanelTabs mode={mode} canEdit={selectedLayer !== null} onSwitch={onSwitch} />
