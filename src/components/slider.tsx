@@ -1,5 +1,5 @@
-import { type ReactNode, useCallback, useState } from "react";
-import { Text, View, type LayoutChangeEvent } from "react-native";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { View, type LayoutChangeEvent } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
 	type SharedValue,
@@ -9,6 +9,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
+import { Text } from "./ui/text";
+
 const TRACK_HEIGHT = 4;
 const THUMB_SIZE = 20;
 
@@ -16,6 +18,9 @@ const clamp = (min: number, x: number, max: number) => {
 	"worklet";
 	return Math.max(min, Math.min(max, x));
 };
+
+const format = (v: number, fmt?: (v: number) => string) =>
+	fmt ? fmt(v) : v.toFixed(2);
 
 type SliderProps = {
 	value: SharedValue<number>;
@@ -37,12 +42,23 @@ export function Slider({
 	onCommit,
 }: SliderProps): ReactNode {
 	const trackWidth = useSharedValue(0);
-	const [displayValue, setDisplayValue] = useState(
-		formatValue ? formatValue(value.value) : value.value.toFixed(2),
-	);
+	// `displayValue` is updated by `useAnimatedReaction` (post-render, on the
+	// RN thread). We seed it with an empty string and let the reaction set
+	// the real value after mount — reading `value.value` during render
+	// would trip Reanimated 4's strict-mode warning and confuse the
+	// worklet babel plugin's dependency analysis on sibling `useDerivedValue`
+	// hooks that subscribe to the same SV.
+	const [displayValue, setDisplayValue] = useState("");
+	const seeded = useRef(false);
+
+	useEffect(() => {
+		if (seeded.current) return;
+		seeded.current = true;
+		setDisplayValue(format(value.value, formatValue));
+	}, [formatValue]);
 
 	const updateDisplay = useCallback(
-		(v: number) => setDisplayValue(formatValue ? formatValue(v) : v.toFixed(2)),
+		(v: number) => setDisplayValue(format(v, formatValue)),
 		[formatValue],
 	);
 
@@ -64,10 +80,11 @@ export function Slider({
 		.activeOffsetX([-2, 2])
 		.onBegin((e) => {
 			setValueFromX(e.x);
-			scheduleOnRN(onCommit, value.value);
 		})
 		.onChange((e) => {
 			setValueFromX(e.x);
+		})
+		.onFinalize(() => {
 			scheduleOnRN(onCommit, value.value);
 		});
 
@@ -90,14 +107,18 @@ export function Slider({
 	return (
 		<View>
 			<View className="flex-row items-center justify-between mb-1">
-				<Text className="text-zinc-300 text-sm">{label}</Text>
-				<Text className="text-zinc-400 text-sm w-20 text-right">{displayValue}</Text>
+				<Text variant="small" className="text-muted-foreground">
+					{label}
+				</Text>
+				<Text variant="small" className="text-muted-foreground w-20 text-right">
+					{displayValue}
+				</Text>
 			</View>
 			<GestureDetector gesture={gesture}>
 				<View className="h-12 justify-center" onLayout={onTrackLayout} collapsable={false}>
-					<View className="bg-zinc-700 rounded-full" style={{ height: TRACK_HEIGHT }} />
+					<View className="bg-border rounded-full" style={{ height: TRACK_HEIGHT }} />
 					<Animated.View
-						className="absolute bg-white rounded-full"
+						className="absolute bg-primary rounded-full"
 						style={[thumbStyle, { width: THUMB_SIZE, height: THUMB_SIZE }]}
 					/>
 				</View>

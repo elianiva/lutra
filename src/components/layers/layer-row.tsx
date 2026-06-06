@@ -1,10 +1,13 @@
-import { Pressable, Text, View } from "react-native";
+import { Eye, EyeOff, GripVertical, Trash2 } from "lucide-react-native";
+import { View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { type SharedValue, useAnimatedStyle } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
 import { formatLayerValue, layerRegistry } from "../../layers/registry";
 import { type Layer } from "../../layers/types";
+import { Icon } from "../ui/icon";
+import { Text } from "../ui/text";
 
 export const ROW_HEIGHT = 56;
 const ROW_GAP = 8;
@@ -23,6 +26,7 @@ export function LayerRow({
   onSelect,
   onRemove,
   onReorder,
+  onToggleVisible,
   draggedIndex,
   dragOffset,
 }: {
@@ -33,6 +37,7 @@ export function LayerRow({
   onSelect: (id: string) => void;
   onRemove: (id: string) => void;
   onReorder: (from: number, to: number) => void;
+  onToggleVisible: (id: string) => void;
   draggedIndex: SharedValue<number | null>;
   dragOffset: SharedValue<number>;
 }) {
@@ -105,24 +110,53 @@ export function LayerRow({
       }
     });
 
-  const gesture = Gesture.Exclusive(dragPan, tap);
+  const toggleVisible = Gesture.Tap().onEnd(() => {
+    "worklet";
+    scheduleOnRN(onToggleVisible, layer.id);
+  });
+
+  const remove = Gesture.Tap().onEnd(() => {
+    "worklet";
+    scheduleOnRN(onRemove, layer.id);
+  });
+
+  const gesture = tap.requireExternalGestureToFail(toggleVisible, remove);
 
   return (
     <Animated.View style={animatedStyle}>
       <GestureDetector gesture={gesture}>
         <View
-          className={`rounded-lg p-3 flex-row items-center justify-between ${isSelected ? "bg-zinc-700" : "bg-zinc-800"}`}
+          className={`rounded-lg p-3 flex-row items-center justify-between ${isSelected ? "bg-accent" : "bg-secondary"}`}
           style={{ height: ROW_HEIGHT }}
         >
-          <View className="flex-1">
-            <Text className="text-white font-medium">
-              {layerRegistry[layer.type].meta.label}
-            </Text>
-            <Text className="text-zinc-400 text-xs">{formatLayerValue(layer)}</Text>
+          <View className="flex-row items-center gap-2 flex-1">
+            <Icon as={GripVertical} className="text-muted-foreground size-4" />
+            <View className="flex-1">
+              <Text className="font-medium">
+                {layerRegistry[layer.type].meta.label}
+              </Text>
+              <Text variant="muted">{formatLayerValue(layer)}</Text>
+            </View>
           </View>
-          <Pressable onPress={() => onRemove(layer.id)} hitSlop={8} className="px-2 py-1">
-            <Text className="text-zinc-500 text-lg">Delete</Text>
-          </Pressable>
+          <View className="flex-row items-center gap-1">
+            <GestureDetector gesture={toggleVisible}>
+              <View hitSlop={8} className="p-1">
+                <Icon
+                  as={layer.visible ? Eye : EyeOff}
+                  className={
+                    layer.visible
+                      ? "text-foreground size-5"
+                      : "text-muted-foreground size-5"
+                  }
+                />
+              </View>
+            </GestureDetector>
+            <GestureDetector gesture={remove}>
+              <View hitSlop={8} className="p-1">
+                <Icon as={Trash2} className="text-destructive size-5" />
+              </View>
+            </GestureDetector>
+          </View>
         </View>
       </GestureDetector>
     </Animated.View>

@@ -1,11 +1,15 @@
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Trash2 } from "lucide-react-native";
+
+import { Icon } from "./ui/icon";
+import { Text } from "./ui/text";
 
 export function ParamHeader({ label, onRemove }: { label: string; onRemove: () => void }) {
 	return (
 		<View className="flex-row items-center justify-between">
-			<Text className="text-white font-medium">{label}</Text>
-			<Pressable onPress={onRemove} className="px-2 py-1 active:bg-zinc-800 rounded">
-				<Text className="text-zinc-400 text-sm">Remove</Text>
+			<Text className="font-medium">{label}</Text>
+			<Pressable onPress={onRemove} className="px-2 py-1 active:bg-accent rounded">
+				<Icon as={Trash2} className="text-destructive size-4" />
 			</Pressable>
 		</View>
 	);

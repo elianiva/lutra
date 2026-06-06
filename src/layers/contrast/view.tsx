@@ -1,17 +1,13 @@
 import { RuntimeShader } from "@shopify/react-native-skia";
-import { type ReactNode } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 
 import { type ContrastSVs } from "../types";
 import { contrastEffect } from "./shader";
 
-type Props = { sv: ContrastSVs; children: ReactNode };
+type Props = { sv: ContrastSVs };
 
-export function ContrastLayerView({ sv, children }: Props) {
-	const uniforms = useDerivedValue(() => ({ amount: sv.amount.value }));
-	return (
-		<RuntimeShader source={contrastEffect} uniforms={uniforms}>
-			{children}
-		</RuntimeShader>
-	);
+export function ContrastFilter({ sv }: Props) {
+	const amount = sv.amount;
+	const uniforms = useDerivedValue(() => ({ amount: amount.value }));
+	return <RuntimeShader source={contrastEffect} uniforms={uniforms} />;
 }

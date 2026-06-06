@@ -3,8 +3,6 @@ import { createStore } from "@xstate/store";
 import { createLayer } from "../layers/defaults";
 import { type Layer, type LayerPatch, type LayerType } from "../layers/types";
 
-type ChainContext = { layers: Layer[] };
-
 export const chainStore = createStore({
 	context: { layers: [] as Layer[] },
 	on: {
@@ -30,5 +28,10 @@ export const chainStore = createStore({
 			next.splice(event.to, 0, moved);
 			return { layers: next };
 		},
+		toggleVisible: (context, event: { id: string }) => ({
+			layers: context.layers.map((l) =>
+				l.id === event.id ? { ...l, visible: !l.visible } : l,
+			),
+		}),
 	},
 });

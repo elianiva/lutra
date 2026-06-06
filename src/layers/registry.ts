@@ -1,21 +1,18 @@
-import { type ComponentType, type ReactNode } from "react";
+import { type ComponentType } from "react";
 
 import { ContrastParams } from "./contrast/params";
-import { ContrastLayerView } from "./contrast/view";
+import { ContrastFilter } from "./contrast/view";
 import { ExposureParams } from "./exposure/params";
-import { ExposureLayerView } from "./exposure/view";
+import { ExposureFilter } from "./exposure/view";
 import { SaturationParams } from "./saturation/params";
-import { SaturationLayerView } from "./saturation/view";
+import { SaturationFilter } from "./saturation/view";
 import { ShadowsParams } from "./shadows/params";
-import { ShadowsLayerView } from "./shadows/view";
+import { ShadowsFilter } from "./shadows/view";
 import { type Layer, type LayerType, type LayerFor, type PatchFor, type SVsFor } from "./types";
 import { WhiteBalanceParams } from "./white-balance/params";
-import { WhiteBalanceLayerView } from "./white-balance/view";
+import { WhiteBalanceFilter } from "./white-balance/view";
 
-type ViewComponent<K extends LayerType> = ComponentType<{
-	sv: SVsFor<K>;
-	children: ReactNode;
-}>;
+type FilterComponent<K extends LayerType> = ComponentType<{ sv: SVsFor<K> }>;
 
 type ParamsComponent<K extends LayerType> = ComponentType<{
 	layer: LayerFor<K>;
@@ -30,14 +27,14 @@ type LayerMeta<K extends LayerType> = {
 };
 
 type Entry<K extends LayerType> = {
-	view: ViewComponent<K>;
+	filter: FilterComponent<K>;
 	params: ParamsComponent<K>;
 	meta: LayerMeta<K>;
 };
 
 export const layerRegistry: { [K in LayerType]: Entry<K> } = {
 	exposure: {
-		view: ExposureLayerView,
+		filter: ExposureFilter,
 		params: ExposureParams,
 		meta: {
 			label: "Exposure",
@@ -45,7 +42,7 @@ export const layerRegistry: { [K in LayerType]: Entry<K> } = {
 		},
 	},
 	contrast: {
-		view: ContrastLayerView,
+		filter: ContrastFilter,
 		params: ContrastParams,
 		meta: {
 			label: "Contrast",
@@ -53,7 +50,7 @@ export const layerRegistry: { [K in LayerType]: Entry<K> } = {
 		},
 	},
 	shadows: {
-		view: ShadowsLayerView,
+		filter: ShadowsFilter,
 		params: ShadowsParams,
 		meta: {
 			label: "Shadows & Highlights",
@@ -62,7 +59,7 @@ export const layerRegistry: { [K in LayerType]: Entry<K> } = {
 		},
 	},
 	whiteBalance: {
-		view: WhiteBalanceLayerView,
+		filter: WhiteBalanceFilter,
 		params: WhiteBalanceParams,
 		meta: {
 			label: "White Balance",
@@ -76,7 +73,7 @@ export const layerRegistry: { [K in LayerType]: Entry<K> } = {
 		},
 	},
 	saturation: {
-		view: SaturationLayerView,
+		filter: SaturationFilter,
 		params: SaturationParams,
 		meta: {
 			label: "Saturation",

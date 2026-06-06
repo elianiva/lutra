@@ -1,4 +1,4 @@
-import { Canvas, Image, RuntimeShader, type SkImage } from "@shopify/react-native-skia";
+import { Canvas, Image, type SkImage } from "@shopify/react-native-skia";
 import { type ReactNode } from "react";
 
 import { layerRegistry } from "../layers/registry";
@@ -14,19 +14,20 @@ type PipelineProps = {
 };
 
 export function Pipeline({ layers, svMap, image, width, height }: PipelineProps) {
-	// `reduce` (left-to-right) makes index 0 the innermost (closest to the
-	// source Image) — i.e. the first array element is the first shader to
-	// see the raw pixels, matching the Layers panel's "top = first" mental
-	// model.
-	const wrapped = layers.reduce<ReactNode>(
-		(child, layer) => {
+	const filters = layers
+		.filter((l) => l.visible)
+		.map((layer) => {
 			const sv = svMap.get(layer.id);
-			if (!sv) return child;
-			const View = layerRegistry[layer.type].view;
-			return <View sv={sv as never}>{child}</View>;
-		},
-		<Image image={image} x={0} y={0} width={width} height={height} fit="contain" />,
-	);
+			if (!sv) return null;
+			const Filter = layerRegistry[layer.type].filter;
+			return <Filter key={layer.id} sv={sv as never} />;
+		});
 
-	return <Canvas style={{ width, height }}>{wrapped}</Canvas>;
+	return (
+		<Canvas style={{ width, height }}>
+			<Image image={image} x={0} y={0} width={width} height={height} fit="contain">
+				{filters}
+			</Image>
+		</Canvas>
+	);
 }

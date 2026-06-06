@@ -2,7 +2,7 @@ import { useImage } from "@shopify/react-native-skia";
 import { useMachine } from "@xstate/react";
 import { useSelector } from "@xstate/store-react";
 import { useState, type ReactNode } from "react";
-import { Text, View, useWindowDimensions, type LayoutChangeEvent } from "react-native";
+import { View, useWindowDimensions, type LayoutChangeEvent } from "react-native";
 
 import { type LayerType, type Layer, type SVsFor, type LayerPatch } from "../layers/types";
 import { chainStore } from "../state/chain-store";
@@ -13,6 +13,7 @@ import { EmptyEdit } from "./empty-edit";
 import { LayersPanel } from "./layers/layers-panel";
 import { PanelTabs } from "./panel-tabs";
 import { Pipeline } from "./pipeline";
+import { Text } from "./ui/text";
 import { useLayerSVMap } from "./use-layer-sv-map";
 
 const PANEL_HEIGHT = 360;
@@ -65,16 +66,20 @@ export function Editor(): ReactNode {
 		chainStore.trigger.reorder({ from, to });
 	};
 
+	const onToggleVisible = (id: string) => {
+		chainStore.trigger.toggleVisible({ id });
+	};
+
 	if (!image) {
 		return (
-			<View className="flex-1 items-center justify-center bg-black">
-				<Text className="text-zinc-400">Loading…</Text>
+			<View className="flex-1 items-center justify-center bg-background">
+				<Text variant="muted">Loading…</Text>
 			</View>
 		);
 	}
 
 	return (
-		<View className="flex-1 bg-black">
+		<View className="flex-1 bg-background">
 			<View className="flex-1" onLayout={onCanvasLayout}>
 				{canvasH > 0 ? (
 					<Pipeline
@@ -86,7 +91,7 @@ export function Editor(): ReactNode {
 					/>
 				) : null}
 			</View>
-			<View className="bg-zinc-900" style={{ height: PANEL_HEIGHT }}>
+			<View className="bg-card" style={{ height: PANEL_HEIGHT }}>
 				<PanelTabs mode={mode} canEdit={selectedLayer !== null} onSwitch={onSwitch} />
 				<View className="flex-1">
 					{mode === "add" && <AddPanel onAdd={onAdd} />}
@@ -108,6 +113,7 @@ export function Editor(): ReactNode {
 							onSelect={onSelect}
 							onRemove={onRemove}
 							onReorder={onReorder}
+							onToggleVisible={onToggleVisible}
 						/>
 					)}
 				</View>

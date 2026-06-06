@@ -1,7 +1,8 @@
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import { layerRegistry } from "../layers/registry";
 import { type LayerType } from "../layers/types";
+import { Text } from "./ui/text";
 
 const GRID: LayerType[] = ["exposure", "contrast", "shadows", "whiteBalance", "saturation"];
 
@@ -13,10 +14,9 @@ export function AddPanel({ onAdd }: { onAdd: (type: LayerType) => void }) {
 					<Pressable
 						key={type}
 						onPress={() => onAdd(type)}
-						className="bg-zinc-800 active:bg-zinc-700 rounded-xl py-5 items-center"
-						style={{ width: "47%" }}
-					>
-						<Text className="text-white font-medium">
+						className="bg-secondary active:bg-accent rounded-xl py-5 items-center"
+						style={{ width: "47%" }}>
+						<Text className="font-medium">
 							{layerRegistry[type].meta.label}
 						</Text>
 					</Pressable>

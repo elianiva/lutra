@@ -1,20 +1,17 @@
 import { RuntimeShader } from "@shopify/react-native-skia";
-import { type ReactNode } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 
 import { type ShadowsSVs } from "../types";
 import { shadowsEffect } from "./shader";
 
-type Props = { sv: ShadowsSVs; children: ReactNode };
+type Props = { sv: ShadowsSVs };
 
-export function ShadowsLayerView({ sv, children }: Props) {
+export function ShadowsFilter({ sv }: Props) {
+	const shadows = sv.shadows;
+	const highlights = sv.highlights;
 	const uniforms = useDerivedValue(() => ({
-		shadows: sv.shadows.value,
-		highlights: sv.highlights.value,
+		shadows: shadows.value,
+		highlights: highlights.value,
 	}));
-	return (
-		<RuntimeShader source={shadowsEffect} uniforms={uniforms}>
-			{children}
-		</RuntimeShader>
-	);
+	return <RuntimeShader source={shadowsEffect} uniforms={uniforms} />;
 }

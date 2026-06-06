@@ -1,20 +1,17 @@
 import { RuntimeShader } from "@shopify/react-native-skia";
-import { type ReactNode } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 
 import { type WhiteBalanceSVs } from "../types";
 import { whiteBalanceEffect } from "./shader";
 
-type Props = { sv: WhiteBalanceSVs; children: ReactNode };
+type Props = { sv: WhiteBalanceSVs };
 
-export function WhiteBalanceLayerView({ sv, children }: Props) {
+export function WhiteBalanceFilter({ sv }: Props) {
+	const temp = sv.temp;
+	const tint = sv.tint;
 	const uniforms = useDerivedValue(() => ({
-		temp: sv.temp.value,
-		tint: sv.tint.value,
+		temp: temp.value,
+		tint: tint.value,
 	}));
-	return (
-		<RuntimeShader source={whiteBalanceEffect} uniforms={uniforms}>
-			{children}
-		</RuntimeShader>
-	);
+	return <RuntimeShader source={whiteBalanceEffect} uniforms={uniforms} />;
 }

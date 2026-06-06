@@ -6,12 +6,14 @@ export type ExposureLayer = {
 	type: "exposure";
 	id: string;
 	stops: number;
+	visible: boolean;
 };
 
 export type ContrastLayer = {
 	type: "contrast";
 	id: string;
 	amount: number;
+	visible: boolean;
 };
 
 export type ShadowsLayer = {
@@ -19,6 +21,7 @@ export type ShadowsLayer = {
 	id: string;
 	shadows: number;
 	highlights: number;
+	visible: boolean;
 };
 
 export type WhiteBalanceLayer = {
@@ -26,12 +29,14 @@ export type WhiteBalanceLayer = {
 	id: string;
 	temp: number;
 	tint: number;
+	visible: boolean;
 };
 
 export type SaturationLayer = {
 	type: "saturation";
 	id: string;
 	amount: number;
+	visible: boolean;
 };
 
 export type Layer =

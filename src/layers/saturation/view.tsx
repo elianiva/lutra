@@ -1,17 +1,13 @@
 import { RuntimeShader } from "@shopify/react-native-skia";
-import { type ReactNode } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 
 import { type SaturationSVs } from "../types";
 import { saturationEffect } from "./shader";
 
-type Props = { sv: SaturationSVs; children: ReactNode };
+type Props = { sv: SaturationSVs };
 
-export function SaturationLayerView({ sv, children }: Props) {
-	const uniforms = useDerivedValue(() => ({ amount: sv.amount.value }));
-	return (
-		<RuntimeShader source={saturationEffect} uniforms={uniforms}>
-			{children}
-		</RuntimeShader>
-	);
+export function SaturationFilter({ sv }: Props) {
+	const amount = sv.amount;
+	const uniforms = useDerivedValue(() => ({ amount: amount.value }));
+	return <RuntimeShader source={saturationEffect} uniforms={uniforms} />;
 }
