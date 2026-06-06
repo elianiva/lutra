@@ -1,10 +1,9 @@
 {
-  "build": {
-    "development": {
-      "ios": {
-        "simulator": true
-      }
-    }
-  }
+	"build": {
+		"development": {
+			"ios": {
+				"simulator": true
+			}
+		}
+	}
 }
-
