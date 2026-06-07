@@ -1,10 +1,10 @@
-import { Image, ImageFormat, Skia, drawAsImage, loadData } from "@shopify/react-native-skia";
+import { Canvas, Fill, ImageFormat, ImageShader, Shader, Skia, drawAsImage, loadData } from "@shopify/react-native-skia";
 import { File, Paths } from "expo-file-system";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { Asset } from "expo-media-library";
 
 import { type LayerSVMap } from "../components/use-layer-sv-map";
-import { LayerFilter } from "../layers/filter";
+import { chainCache } from "../layers/chain-cache";
 import { layerRegistry } from "../layers/registry";
 import { type Layer } from "../layers/types";
 
@@ -48,25 +48,29 @@ export async function exportImage(
 	}
 
 	onProgress("rendering");
-	const filters = layers
-		.filter((l) => l.visible)
-		.map((layer) => {
-			const sv = svMap.get(layer.id);
-			if (!sv) return null;
-			const entry = layerRegistry[layer.type];
-			return (
-				<LayerFilter
-					key={layer.id}
-					sv={sv}
-					effect={entry.effect}
-					keys={Object.keys(entry.fields)}
-				/>
-			);
-		});
+	const activeLayers = layers.filter((l) => l.visible);
+	const { effect } = chainCache.get(activeLayers);
+	const uniforms: Record<string, number> = {};
+	activeLayers.forEach((layer, i) => {
+		const sv = svMap.get(layer.id);
+		if (!sv) return;
+		const entry = layerRegistry[layer.type];
+		for (const key of Object.keys(entry.fields)) {
+			uniforms[`l${i}_${key}`] = sv[key].value;
+		}
+	});
 	const rendered = await drawAsImage(
-		<Image image={skImage} x={0} y={0} width={width} height={height} fit="contain">
-			{filters}
-		</Image>,
+		<Canvas style={{ width, height }}>
+			<Fill>
+				<Shader source={effect} uniforms={uniforms}>
+					<ImageShader
+						image={skImage}
+						fit="contain"
+						rect={{ x: 0, y: 0, width, height }}
+					/>
+				</Shader>
+			</Fill>
+		</Canvas>,
 		{ width, height },
 	);
 	if (!rendered) {

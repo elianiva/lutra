@@ -6,7 +6,7 @@ import { Slider } from "../components/slider";
 import { type FieldDef } from "./format";
 import { layerRegistry } from "./registry";
 import { resolveFormat } from "./format";
-import { type Layer, type LayerPatch, type LayerSVs } from "./types";
+import { type Layer, type LayerPatch } from "./types";
 
 // Generic params UI. Reads field shape (label, min/max/step, format) from
 // the registry and renders one Slider per field. Replaces the nine
@@ -14,7 +14,7 @@ import { type Layer, type LayerPatch, type LayerSVs } from "./types";
 // when a layer adds/removes/renames a field.
 type ParamsProps = {
 	layer: Layer;
-	sv: LayerSVs;
+	sv: Record<string, SharedValue<number>>;
 	onCommit: (patch: LayerPatch) => void;
 	onRemove: () => void;
 };
@@ -22,7 +22,7 @@ type ParamsProps = {
 export function Params({ layer, onCommit, onRemove, sv }: ParamsProps) {
 	const entry = layerRegistry[layer.type];
 	const fields = entry.fields as Record<string, FieldDef>;
-	const values = sv as Record<string, SharedValue<number>>;
+	const values = sv;
 	return (
 		<View className="gap-3">
 			<ParamHeader label={entry.label} onRemove={onRemove} />

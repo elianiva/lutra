@@ -1,22 +1,23 @@
-import { exposureEffect } from "./exposure/shader";
-import { contrastEffect } from "./contrast/shader";
-import { shadowsEffect } from "./shadows/shader";
-import { whiteBalanceEffect } from "./white-balance/shader";
-import { saturationEffect } from "./saturation/shader";
-import { grainEffect } from "./grain/shader";
-import { vignetteEffect } from "./vignette/shader";
-import { chromaticAberrationEffect } from "./chromatic-aberration/shader";
-import { clarityEffect } from "./clarity/shader";
+import { renderExposure } from "./bodies/exposure";
+import { renderContrast } from "./bodies/contrast";
+import { renderShadows } from "./bodies/shadows";
+import { renderWhiteBalance } from "./bodies/white-balance";
+import { renderSaturation } from "./bodies/saturation";
+import { renderGrain } from "./bodies/grain";
+import { renderVignette } from "./bodies/vignette";
+import { renderChromaticAberration } from "./bodies/chromatic-aberration";
+import { renderClarity } from "./bodies/clarity";
 import { formatEV, formatPercent, formatSigned, type LayerEntry } from "./format";
 
 // Adding a new adjustment layer = adding one entry below. The Layer / Patch /
-// SVs types, the filter, the params UI, the createLayer/createSVs
-// factories, and the Add panel grid all derive from this map. `as const
-// satisfies` gives us narrow literal types so the derived unions keep their
-// per-entry precision.
+// SVs types, the params UI, the createLayer/createSVs factories, and the
+// Add panel grid all derive from this map. `as const satisfies` gives us
+// narrow literal types so the derived unions keep their per-entry
+// precision. The body renderer emits the SkSL for that layer; the chain
+// source generator inlines all active bodies into one RuntimeEffect.
 export const layerRegistry = {
 	exposure: {
-		effect: exposureEffect,
+		body: renderExposure,
 		label: "Exposure",
 		fields: {
 			stops: { default: 0, min: -3, max: 3, label: "EV", format: "ev" },
@@ -24,7 +25,7 @@ export const layerRegistry = {
 		formatValue: (l) => formatEV(l.stops),
 	},
 	contrast: {
-		effect: contrastEffect,
+		body: renderContrast,
 		label: "Contrast",
 		fields: {
 			amount: { default: 0, min: -1, max: 1, label: "Amount", format: "signed" },
@@ -32,7 +33,7 @@ export const layerRegistry = {
 		formatValue: (l) => formatSigned(l.amount),
 	},
 	shadows: {
-		effect: shadowsEffect,
+		body: renderShadows,
 		label: "Shadows & Highlights",
 		fields: {
 			shadows: { default: 0, min: -1, max: 1, label: "Shadows", format: "signed" },
@@ -41,7 +42,7 @@ export const layerRegistry = {
 		formatValue: (l) => `S ${formatSigned(l.shadows)} · H ${formatSigned(l.highlights)}`,
 	},
 	whiteBalance: {
-		effect: whiteBalanceEffect,
+		body: renderWhiteBalance,
 		label: "White Balance",
 		fields: {
 			temp: {
@@ -68,7 +69,7 @@ export const layerRegistry = {
 		},
 	},
 	saturation: {
-		effect: saturationEffect,
+		body: renderSaturation,
 		label: "Saturation",
 		fields: {
 			amount: { default: 0, min: -1, max: 1, label: "Amount", format: "signed" },
@@ -76,7 +77,7 @@ export const layerRegistry = {
 		formatValue: (l) => formatSigned(l.amount),
 	},
 	grain: {
-		effect: grainEffect,
+		body: renderGrain,
 		label: "Grain",
 		fields: {
 			amount: { default: 0, min: 0, max: 1, label: "Amount", format: "percent" },
@@ -84,7 +85,7 @@ export const layerRegistry = {
 		formatValue: (l) => formatPercent(l.amount),
 	},
 	vignette: {
-		effect: vignetteEffect,
+		body: renderVignette,
 		label: "Vignette",
 		fields: {
 			amount: { default: 0, min: -1, max: 1, label: "Amount", format: "signed" },
@@ -93,7 +94,7 @@ export const layerRegistry = {
 		formatValue: (l) => `A ${formatSigned(l.amount)} · ${formatPercent(l.size)}`,
 	},
 	chromaticAberration: {
-		effect: chromaticAberrationEffect,
+		body: renderChromaticAberration,
 		label: "Chromatic Aberration",
 		fields: {
 			amount: { default: 0, min: -1, max: 1, label: "Amount", format: "signed" },
@@ -101,7 +102,7 @@ export const layerRegistry = {
 		formatValue: (l) => formatSigned(l.amount),
 	},
 	clarity: {
-		effect: clarityEffect,
+		body: renderClarity,
 		label: "Clarity",
 		fields: {
 			amount: { default: 0, min: -1, max: 1, label: "Amount", format: "signed" },

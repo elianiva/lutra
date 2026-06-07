@@ -3,22 +3,28 @@ import { makeMutable, type SharedValue } from "react-native-reanimated";
 
 import { type FieldDef } from "../layers/format";
 import { layerRegistry } from "../layers/registry";
-import { type Layer, type LayerSVs } from "../layers/types";
+import { type Layer } from "../layers/types";
 
 // Editor-owned map of layerId → live shared values. One source of truth
 // shared by Pipeline (renderer) and Params (slider). The map is held in a
 // ref so the Editor doesn't re-render when SVs are touched. Each entry is
 // created once (when the layer is added) and discarded when the layer is
 // removed — Reanimated GC handles the SV lifetime.
-export type LayerSVMap = Map<string, LayerSVs>;
+//
+// The value type is a string-indexed SV record rather than the narrow
+// `LayerSVs` union: callers (Pipeline uniforms binder, export image
+// renderer) iterate field keys at runtime and need a uniform record
+// shape. The narrow per-layer shape is still derivable from the
+// registry when a type-checked narrow view is needed.
+export type LayerSVMap = Map<string, Record<string, SharedValue<number>>>;
 
-function createSVs(layer: Layer): LayerSVs {
+function createSVs(layer: Layer): Record<string, SharedValue<number>> {
 	const entry = layerRegistry[layer.type];
-	const svs = {} as Record<string, SharedValue<number>>;
+	const svs: Record<string, SharedValue<number>> = {};
 	for (const [key] of Object.entries(entry.fields) as [string, FieldDef][]) {
 		svs[key] = makeMutable((layer as unknown as Record<string, number>)[key]);
 	}
-	return svs as LayerSVs;
+	return svs;
 }
 
 export function useLayerSVMap(layers: Layer[]): LayerSVMap {

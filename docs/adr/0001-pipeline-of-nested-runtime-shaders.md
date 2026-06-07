@@ -1,5 +1,5 @@
-# Render chain is a nested tree of per-adjustment RuntimeShaders
+# Render chain is a single chain-compiled RuntimeEffect (superseded)
 
-The **edit chain** renders as a nested JSX tree where each **adjustment layer** is a `RuntimeShader` whose child is the previous layer's output. Considered the alternative of one big composite shader that always runs all 5 adjustments. Picked the nested form so only the adjustments the user actually added execute; the alternative would have always paid for absent stages. The nesting is hidden behind a single `<Pipeline>` component so consumers never see it.
+> **Superseded by [0006](./0006-single-dispatch-chain-compilation.md).** The nested per-layer `RuntimeShader` model is replaced by a single `RuntimeEffect` generated from the active layer bodies. The chain-compilation model gets us one GPU pass regardless of layer count and a single sRGB<->linear round-trip for the whole chain.
 
-_See also: [0004](./0004-registry-as-source-of-truth.md) — the per-layer effect, field keys, and shared-value wiring come from `layerRegistry`; this ADR describes the render shape, that one describes where each layer's per-entry data lives._
+The original ADR (kept below for history) described the nested per-layer shape. The pipeline now uses a single `<Shader>` whose source is generated from the ordered layer bodies. The chain-config cache keeps the regen cost off the slider drag path. See 0006 for the current model.

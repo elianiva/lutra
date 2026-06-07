@@ -1,11 +1,12 @@
 import { View } from "react-native";
+import { type SharedValue } from "react-native-reanimated";
 
 import { Params } from "../layers/params";
-import { type Layer, type LayerSVs, type LayerPatch } from "../layers/types";
+import { type Layer, type LayerPatch } from "../layers/types";
 
 type Props = {
 	layer: Layer;
-	sv: LayerSVs;
+	sv: Record<string, SharedValue<number>>;
 	onCommit: (id: string, patch: LayerPatch) => void;
 	onRemove: (id: string) => void;
 };
