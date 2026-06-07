@@ -1,6 +1,11 @@
 import { type ReactNode, useCallback, useState } from "react";
 import { View, type LayoutChangeEvent } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import {
+	GestureDetector,
+	useCompetingGestures,
+	usePanGesture,
+	useTapGesture,
+} from "react-native-gesture-handler";
 import Animated, {
 	type SharedValue,
 	useAnimatedReaction,
@@ -68,24 +73,28 @@ export function Slider({
 		value.value = clamp(min, snapped, max);
 	};
 
-	const pan = Gesture.Pan()
-		.activeOffsetX([-2, 2])
-		.onBegin((e) => {
+	const pan = usePanGesture({
+		activeOffsetX: [-2, 2],
+		onBegin: (e) => {
 			setValueFromX(e.x);
-		})
-		.onChange((e) => {
+		},
+		onUpdate: (e) => {
 			setValueFromX(e.x);
-		})
-		.onFinalize(() => {
+		},
+		onFinalize: () => {
 			scheduleOnRN(onCommit, value.value);
-		});
-
-	const tap = Gesture.Tap().onEnd((e) => {
-		setValueFromX(e.x);
-		scheduleOnRN(onCommit, value.value);
+		},
 	});
 
-	const gesture = Gesture.Race(pan, tap);
+	const tap = useTapGesture({
+		onDeactivate: (e) => {
+			if (e.canceled) return;
+			setValueFromX(e.x);
+			scheduleOnRN(onCommit, value.value);
+		},
+	});
+
+	const gesture = useCompetingGestures(pan, tap);
 
 	const thumbStyle = useAnimatedStyle(() => {
 		const ratio = (value.value - min) / (max - min);

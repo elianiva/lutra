@@ -1,6 +1,11 @@
 import { Eye, EyeOff, GripVertical, Trash2 } from "lucide-react-native";
 import { View } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import {
+	GestureDetector,
+	useCompetingGestures,
+	usePanGesture,
+	useTapGesture,
+} from "react-native-gesture-handler";
 import Animated, { type SharedValue, useAnimatedStyle } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
@@ -72,23 +77,39 @@ export function LayerRow({
 		};
 	});
 
+	// Define the button taps first — the row tap references them via
+	// `requireToFail` so the eye/trash icons can preempt row selection.
+	const toggleVisible = useTapGesture({
+		onDeactivate: () => {
+			"worklet";
+			scheduleOnRN(onToggleVisible, layer.id);
+		},
+	});
+
+	const remove = useTapGesture({
+		onDeactivate: () => {
+			"worklet";
+			scheduleOnRN(onRemove, layer.id);
+		},
+	});
+
 	// Long-press (300ms) starts a drag. Translation is fed straight into
 	// `dragOffset` so the animated style follows the finger; on release we
 	// round to a slot and dispatch the reorder to the RN thread.
-	const dragPan = Gesture.Pan()
-		.activateAfterLongPress(300)
-		.onStart(() => {
+	const dragPan = usePanGesture({
+		activateAfterLongPress: 300,
+		onActivate: () => {
 			"worklet";
 			draggedIndex.value = index;
 			dragOffset.value = 0;
-		})
-		.onChange((e) => {
+		},
+		onUpdate: (e) => {
 			"worklet";
 			if (draggedIndex.value === index) {
 				dragOffset.value = e.translationY;
 			}
-		})
-		.onEnd(() => {
+		},
+		onDeactivate: () => {
 			"worklet";
 			if (draggedIndex.value === index) {
 				const newIndex = clamp(
@@ -102,35 +123,23 @@ export function LayerRow({
 					scheduleOnRN(onReorder, index, newIndex);
 				}
 			}
-		});
-
-	const tap = Gesture.Tap()
-		.maxDuration(280)
-		.onEnd((_e, success) => {
-			"worklet";
-			if (success) {
-				scheduleOnRN(onSelect, layer.id);
-			}
-		});
-
-	const toggleVisible = Gesture.Tap().onEnd(() => {
-		"worklet";
-		scheduleOnRN(onToggleVisible, layer.id);
-	});
-
-	const remove = Gesture.Tap().onEnd(() => {
-		"worklet";
-		scheduleOnRN(onRemove, layer.id);
+		},
 	});
 
 	// Race the drag and the row tap. Tap (maxDuration 280) wins for short
 	// taps; drag wins for long-presses. The button taps cancel the row tap
-	// via requireExternalGestureToFail so eye/trash taps don't also
-	// select the row.
-	const rowGesture = Gesture.Race(
-		dragPan,
-		tap.requireExternalGestureToFail(toggleVisible, remove),
-	);
+	// via requireToFail so eye/trash taps don't also select the row.
+	const tap = useTapGesture({
+		maxDuration: 280,
+		requireToFail: [toggleVisible, remove],
+		onDeactivate: (e) => {
+			"worklet";
+			if (e.canceled) return;
+			scheduleOnRN(onSelect, layer.id);
+		},
+	});
+
+	const rowGesture = useCompetingGestures(dragPan, tap);
 
 	return (
 		<Animated.View style={animatedStyle}>
