@@ -1,9 +1,9 @@
 import { useRef } from "react";
 import { makeMutable, type SharedValue } from "react-native-reanimated";
 
-import { type FieldDef } from "../layers/format";
-import { layerRegistry } from "../layers/registry";
-import { type Layer } from "../layers/types";
+import { type FieldDef } from "../chain/format";
+import { layerRegistry } from "../chain/registry";
+import { type Layer } from "../chain/types";
 
 // Editor-owned map of layerId → live shared values. One source of truth
 // shared by Pipeline (renderer) and Params (slider). The map is held in a

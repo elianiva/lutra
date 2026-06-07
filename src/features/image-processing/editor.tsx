@@ -5,21 +5,21 @@ import { router } from "expo-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { View, useWindowDimensions, type LayoutChangeEvent } from "react-native";
 
-import { createLayer } from "../layers/defaults";
-import { type LayerType } from "../layers/registry";
-import { type Layer, type LayerPatch } from "../layers/types";
-import { chainStore } from "../state/chain-store";
-import { imageStore } from "../state/image-store";
-import { uiMachine, type PanelMode } from "../state/ui-machine";
-import { AddPanel } from "./add-panel";
-import { BackButton } from "./back-button";
-import { EditPanel } from "./edit-panel";
-import { EmptyEdit } from "./empty-edit";
-import { ExportPanel } from "./export-panel";
-import { LayersPanel } from "./layers/layers-panel";
-import { PanelTabs } from "./panel-tabs";
-import { Pipeline } from "./pipeline";
-import { useLayerSVMap } from "./use-layer-sv-map";
+import { BackButton } from "../../components/back-button";
+import { ExportPanel } from "../image-encoding/export-panel";
+import { imageStore } from "../image-encoding/image-store";
+import { createLayer } from "./chain/defaults";
+import { type LayerType } from "./chain/registry";
+import { type Layer, type LayerPatch } from "./chain/types";
+import { chainStore } from "./state/chain-store";
+import { uiMachine, type PanelMode } from "./state/ui-machine";
+import { AddPanel } from "./ui/add-panel";
+import { EditPanel } from "./ui/edit-panel";
+import { EmptyEdit } from "./ui/empty-edit";
+import { LayersPanel } from "./ui/layers-panel";
+import { PanelTabs } from "./ui/panel-tabs";
+import { Pipeline } from "./ui/pipeline";
+import { useLayerSVMap } from "./ui/use-layer-sv-map";
 
 const PANEL_HEIGHT = 360;
 

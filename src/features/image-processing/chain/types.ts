@@ -46,8 +46,6 @@ export type LayerSVs = SVsFor<LayerType>;
 // registry, the registry never imports from types. The cast is one place;
 // per-entry functions are still type-safe against their narrow field shapes.
 export function formatLayerValue(layer: Layer): string {
-	const fn = layerRegistry[layer.type].formatValue as (
-		l: Layer,
-	) => string;
+	const fn = layerRegistry[layer.type].formatValue as (l: Layer) => string;
 	return fn(layer);
 }

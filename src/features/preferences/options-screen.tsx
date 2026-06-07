@@ -2,8 +2,8 @@ import Constants from "expo-constants";
 import { router } from "expo-router";
 import { Linking, Pressable, ScrollView, View } from "react-native";
 
-import { BackButton } from "./back-button";
-import { Text } from "./ui/text";
+import { BackButton } from "../../components/back-button";
+import { Text } from "../../components/ui/text";
 
 // v1 surface is intentionally about-style: real content (version,
 // repo, license) instead of fake settings rows that would age into
@@ -34,9 +34,7 @@ export function OptionsScreen() {
 							Source
 						</Text>
 						<Pressable
-							onPress={() =>
-								Linking.openURL("https://github.com/elianiva/lutra")
-							}
+							onPress={() => Linking.openURL("https://github.com/elianiva/lutra")}
 						>
 							<Text className="text-primary">github.com/elianiva/lutra</Text>
 						</Pressable>

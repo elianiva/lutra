@@ -14,7 +14,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
-import { Text } from "./ui/text";
+import { Text } from "../../../components/ui/text";
 
 const TRACK_HEIGHT = 4;
 const THUMB_SIZE = 20;
@@ -24,8 +24,7 @@ const clamp = (min: number, x: number, max: number) => {
 	return Math.max(min, Math.min(max, x));
 };
 
-const format = (v: number, fmt?: (v: number) => string) =>
-	fmt ? fmt(v) : v.toFixed(2);
+const format = (v: number, fmt?: (v: number) => string) => (fmt ? fmt(v) : v.toFixed(2));
 
 type SliderProps = {
 	value: SharedValue<number>;

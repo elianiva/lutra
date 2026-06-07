@@ -1,4 +1,4 @@
-import { Editor } from "../components/editor";
+import { Editor } from "../features/image-processing/editor";
 
 export default function EditorRoute() {
 	return <Editor />;

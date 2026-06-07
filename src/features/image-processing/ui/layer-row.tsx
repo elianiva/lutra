@@ -9,10 +9,10 @@ import {
 import Animated, { type SharedValue, useAnimatedStyle } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
-import { layerRegistry } from "../../layers/registry";
-import { type Layer, formatLayerValue } from "../../layers/types";
-import { Icon } from "../ui/icon";
-import { Text } from "../ui/text";
+import { Icon } from "../../../components/ui/icon";
+import { Text } from "../../../components/ui/text";
+import { layerRegistry } from "../chain/registry";
+import { type Layer, formatLayerValue } from "../chain/types";
 
 export const ROW_HEIGHT = 56;
 const ROW_GAP = 8;

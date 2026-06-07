@@ -1,6 +1,6 @@
+import { type FieldDef } from "./format";
 import { layerRegistry, type LayerType } from "./registry";
 import { type Layer, type LayerFor } from "./types";
-import { type FieldDef } from "./format";
 
 // Counter-based id is fine for v1 (no persistence yet). When persistence
 // lands, swap this for a uuid.

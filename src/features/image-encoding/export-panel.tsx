@@ -3,11 +3,11 @@ import * as MediaLibrary from "expo-media-library";
 import { useState } from "react";
 import { ActivityIndicator, Alert, Pressable, View } from "react-native";
 
-import { type Layer } from "../layers/types";
-import { type ExportPhase, exportImage } from "../lib/export-image";
-import { imageStore } from "../state/image-store";
-import { Text } from "./ui/text";
-import { type LayerSVMap } from "./use-layer-sv-map";
+import { Text } from "../../components/ui/text";
+import { type Layer } from "../image-processing/chain/types";
+import { type LayerSVMap } from "../image-processing/ui/use-layer-sv-map";
+import { type ExportPhase, exportImage } from "./export-image";
+import { imageStore } from "./image-store";
 
 // Coarse-grained status. The user only needs to know "preparing",
 // "rendering", "done", or "something went wrong". The `working` state

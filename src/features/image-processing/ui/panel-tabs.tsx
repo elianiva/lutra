@@ -1,8 +1,8 @@
 import { Pressable, View } from "react-native";
 
+import { Separator } from "../../../components/ui/separator";
+import { Text } from "../../../components/ui/text";
 import { type PanelMode } from "../state/ui-machine";
-import { Separator } from "./ui/separator";
-import { Text } from "./ui/text";
 
 const TABS: { key: PanelMode; label: string }[] = [
 	{ key: "add", label: "Add" },

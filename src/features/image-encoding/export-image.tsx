@@ -1,12 +1,21 @@
-import { Canvas, Fill, ImageFormat, ImageShader, Shader, Skia, drawAsImage, loadData } from "@shopify/react-native-skia";
+import {
+	Canvas,
+	Fill,
+	ImageFormat,
+	ImageShader,
+	Shader,
+	Skia,
+	drawAsImage,
+	loadData,
+} from "@shopify/react-native-skia";
 import { File, Paths } from "expo-file-system";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { Asset } from "expo-media-library";
 
-import { type LayerSVMap } from "../components/use-layer-sv-map";
-import { chainCache } from "../layers/chain-cache";
-import { layerRegistry } from "../layers/registry";
-import { type Layer } from "../layers/types";
+import { chainCache } from "../image-processing/chain/chain-cache";
+import { layerRegistry } from "../image-processing/chain/registry";
+import { type Layer } from "../image-processing/chain/types";
+import { type LayerSVMap } from "../image-processing/ui/use-layer-sv-map";
 
 // Fixed for v1: full source resolution, JPEG, no quality slider. The
 // deliberate simplification is documented in ADR 0005.

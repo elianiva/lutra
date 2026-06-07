@@ -1,6 +1,6 @@
 import { createStore } from "@xstate/store";
 
-import { type Layer, type LayerPatch } from "../layers/types";
+import { type Layer, type LayerPatch } from "../chain/types";
 
 // The chain store holds the canonical edit chain. The renderer reads
 // shared values (per-layer) on the UI thread; this store is the source of
@@ -36,9 +36,7 @@ export const chainStore = createStore({
 			return { layers: next };
 		},
 		toggleVisible: (_ctx, event: { id: string }) => ({
-			layers: _ctx.layers.map((l) =>
-				l.id === event.id ? { ...l, visible: !l.visible } : l,
-			),
+			layers: _ctx.layers.map((l) => (l.id === event.id ? { ...l, visible: !l.visible } : l)),
 		}),
 		clear: () => ({ layers: [] }),
 	},

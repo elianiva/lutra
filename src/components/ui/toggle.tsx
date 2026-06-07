@@ -1,10 +1,11 @@
-import { Icon } from "@/components/ui/icon";
-import { TextClassContext } from "@/components/ui/text";
-import { cn } from "@/lib/utils";
 import * as TogglePrimitive from "@rn-primitives/toggle";
 import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
 import { Platform } from "react-native";
+
+import { Icon } from "@/components/ui/icon";
+import { TextClassContext } from "@/components/ui/text";
+import { cn } from "@/lib/utils";
 
 const toggleVariants = cva(
 	cn(
@@ -51,7 +52,8 @@ function Toggle({
 					? "text-accent-foreground"
 					: Platform.select({ web: "group-hover:text-muted-foreground" }),
 				className,
-			)}>
+			)}
+		>
 			<TogglePrimitive.Root
 				className={cn(
 					toggleVariants({ variant, size }),

@@ -1,8 +1,8 @@
-import { Pressable, View } from "react-native";
 import { Trash2 } from "lucide-react-native";
+import { Pressable, View } from "react-native";
 
-import { Icon } from "./ui/icon";
-import { Text } from "./ui/text";
+import { Icon } from "../../../components/ui/icon";
+import { Text } from "../../../components/ui/text";
 
 export function ParamHeader({ label, onRemove }: { label: string; onRemove: () => void }) {
 	return (

@@ -1,7 +1,7 @@
 import { FlatList, Pressable } from "react-native";
 
-import { layerRegistry, type LayerType } from "../layers/registry";
-import { Text } from "./ui/text";
+import { Text } from "../../../components/ui/text";
+import { layerRegistry, type LayerType } from "../chain/registry";
 
 const GRID = Object.keys(layerRegistry) as LayerType[];
 

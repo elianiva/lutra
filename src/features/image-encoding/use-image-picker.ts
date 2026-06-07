@@ -2,8 +2,8 @@ import * as ImagePicker from "expo-image-picker";
 import { useCallback, useState } from "react";
 import { Alert } from "react-native";
 
+import { imageStore } from "./image-store";
 import { resampleForPreview } from "./resample-image";
-import { imageStore } from "../state/image-store";
 
 // `isPicking` covers the resample step only. Permission prompt and
 // picker sheet are system modals that already block the user, so the

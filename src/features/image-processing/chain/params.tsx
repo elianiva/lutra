@@ -1,11 +1,11 @@
 import { View } from "react-native";
 import { type SharedValue } from "react-native-reanimated";
 
-import { ParamHeader } from "../components/param-header";
-import { Slider } from "../components/slider";
+import { ParamHeader } from "../ui/param-header";
+import { Slider } from "../ui/slider";
 import { type FieldDef } from "./format";
-import { layerRegistry } from "./registry";
 import { resolveFormat } from "./format";
+import { layerRegistry } from "./registry";
 import { type Layer, type LayerPatch } from "./types";
 
 // Generic params UI. Reads field shape (label, min/max/step, format) from

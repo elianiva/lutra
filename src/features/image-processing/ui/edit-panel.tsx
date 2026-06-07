@@ -1,8 +1,8 @@
 import { View } from "react-native";
 import { type SharedValue } from "react-native-reanimated";
 
-import { Params } from "../layers/params";
-import { type Layer, type LayerPatch } from "../layers/types";
+import { Params } from "../chain/params";
+import { type Layer, type LayerPatch } from "../chain/types";
 
 type Props = {
 	layer: Layer;

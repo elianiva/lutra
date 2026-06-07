@@ -7,8 +7,7 @@ import { type SharedValue } from "react-native-reanimated";
 // the index (l0_stops, l1_amount, ...).
 export type BodyRenderer = (layerIndex: number) => string;
 
-export const formatSigned = (v: number): string =>
-	`${v >= 0 ? "+" : ""}${v.toFixed(2)}`;
+export const formatSigned = (v: number): string => `${v >= 0 ? "+" : ""}${v.toFixed(2)}`;
 
 export const formatEV = (v: number): string => `${formatSigned(v)} EV`;
 

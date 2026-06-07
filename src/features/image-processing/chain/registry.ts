@@ -1,12 +1,12 @@
-import { renderExposure } from "./bodies/exposure";
-import { renderContrast } from "./bodies/contrast";
-import { renderShadows } from "./bodies/shadows";
-import { renderWhiteBalance } from "./bodies/white-balance";
-import { renderSaturation } from "./bodies/saturation";
-import { renderGrain } from "./bodies/grain";
-import { renderVignette } from "./bodies/vignette";
 import { renderChromaticAberration } from "./bodies/chromatic-aberration";
 import { renderClarity } from "./bodies/clarity";
+import { renderContrast } from "./bodies/contrast";
+import { renderExposure } from "./bodies/exposure";
+import { renderGrain } from "./bodies/grain";
+import { renderSaturation } from "./bodies/saturation";
+import { renderShadows } from "./bodies/shadows";
+import { renderVignette } from "./bodies/vignette";
+import { renderWhiteBalance } from "./bodies/white-balance";
 import { formatEV, formatPercent, formatSigned, type LayerEntry } from "./format";
 
 // Adding a new adjustment layer = adding one entry below. The Layer / Patch /
@@ -52,9 +52,7 @@ export const layerRegistry = {
 				label: "Temp",
 				format: (v) => {
 					const k =
-						v < 0
-							? Math.round(6500 - (1 + v) * 4500)
-							: Math.round(6500 + v * 5500);
+						v < 0 ? Math.round(6500 - (1 + v) * 4500) : Math.round(6500 + v * 5500);
 					return `${k} K`;
 				},
 			},

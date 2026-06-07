@@ -2,9 +2,9 @@ import { Canvas, Fill, ImageShader, Shader, type SkImage } from "@shopify/react-
 import { useMemo } from "react";
 import { useDerivedValue, type SharedValue } from "react-native-reanimated";
 
-import { chainCache } from "../layers/chain-cache";
-import { layerRegistry } from "../layers/registry";
-import { type Layer } from "../layers/types";
+import { chainCache } from "../chain/chain-cache";
+import { layerRegistry } from "../chain/registry";
+import { type Layer } from "../chain/types";
 import { type LayerSVMap } from "./use-layer-sv-map";
 
 type PipelineProps = {
@@ -35,10 +35,7 @@ export function Pipeline({ layers, svMap, image, width, height }: PipelineProps)
 	const bindings = useMemo<UniformBinding[]>(() => {
 		const out: UniformBinding[] = [];
 		let i = 0;
-		for (const layer of layers) {
-			if (!layer.visible) {
-				continue;
-			}
+		for (const layer of activeLayers) {
 			const sv = svMap.get(layer.id);
 			if (sv) {
 				const entry = layerRegistry[layer.type];
@@ -49,7 +46,7 @@ export function Pipeline({ layers, svMap, image, width, height }: PipelineProps)
 			i++;
 		}
 		return out;
-	}, [layers, svMap]);
+	}, [activeLayers, svMap]);
 
 	const uniforms = useDerivedValue(() => {
 		const u: Record<string, number> = {};
@@ -63,11 +60,7 @@ export function Pipeline({ layers, svMap, image, width, height }: PipelineProps)
 		<Canvas style={{ width, height }}>
 			<Fill>
 				<Shader source={effect} uniforms={uniforms}>
-					<ImageShader
-						image={image}
-						fit="contain"
-						rect={{ x: 0, y: 0, width, height }}
-					/>
+					<ImageShader image={image} fit="contain" rect={{ x: 0, y: 0, width, height }} />
 				</Shader>
 			</Fill>
 		</Canvas>

@@ -1,4 +1,4 @@
-import { OptionsScreen } from "../components/options-screen";
+import { OptionsScreen } from "../features/preferences/options-screen";
 
 export default function OptionsRoute() {
 	return <OptionsScreen />;

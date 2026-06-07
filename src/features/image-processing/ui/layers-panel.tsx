@@ -1,8 +1,8 @@
 import { ScrollView, View } from "react-native";
 import { useSharedValue } from "react-native-reanimated";
 
-import { type Layer } from "../../layers/types";
-import { Text } from "../ui/text";
+import { Text } from "../../../components/ui/text";
+import { type Layer } from "../chain/types";
 import { LayerRow } from "./layer-row";
 
 export function LayersPanel({

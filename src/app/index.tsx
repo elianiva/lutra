@@ -1,4 +1,4 @@
-import { MainMenu } from "../components/main-menu";
+import { MainMenu } from "../features/image-encoding/main-menu";
 
 export default function Home() {
 	return <MainMenu />;
