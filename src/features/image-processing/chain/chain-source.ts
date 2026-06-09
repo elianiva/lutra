@@ -8,7 +8,7 @@ import { type Layer } from "./types";
 // effect). Same key for the same chain shape, regardless of how the
 // user dragged the sliders.
 export function chainKey(layers: Layer[]): string {
-	return layers.map((l) => l.type).join("|");
+  return layers.map((l) => l.type).join("|");
 }
 
 // Concatenate the per-layer body templates into one SkSL source. The
@@ -24,33 +24,33 @@ export function chainKey(layers: Layer[]): string {
 // (l0_stops, l1_amount, ...) so two layers of the same type never
 // collide.
 export function generateChainSource(layers: Layer[]): string {
-	console.log("[chain-source] generateChainSource called with", layers.length, "layers");
-	layers.forEach((l, i) => console.log(`  [${i}] type=${l.type} visible=${l.visible}`));
+  console.log("[chain-source] generateChainSource called with", layers.length, "layers");
+  layers.forEach((l, i) => console.log(`  [${i}] type=${l.type} visible=${l.visible}`));
 
-	if (layers.length === 0) {
-		return `
+  if (layers.length === 0) {
+    return `
 uniform shader image;
 
 half4 main(vec2 coord) {
   return image.eval(coord);
 }
 `;
-	}
+  }
 
-	const uniforms: string[] = ["uniform shader image;"];
-	const bodies: string[] = [];
+  const uniforms: string[] = ["uniform shader image;", "uniform float2 u_resolution;"];
+  const bodies: string[] = [];
 
-	layers.forEach((layer, i) => {
-		const entry = layerRegistry[layer.type];
-		for (const key of Object.keys(entry.fields)) {
-			const uniformName = `l${i}_${key}`;
-			console.log("  [chain-source] declaring uniform:", uniformName);
-			uniforms.push(`uniform half ${uniformName};`);
-		}
-		bodies.push(entry.body(i));
-	});
+  layers.forEach((layer, i) => {
+    const entry = layerRegistry[layer.type];
+    for (const key of Object.keys(entry.fields)) {
+      const uniformName = `l${i}_${key}`;
+      console.log("  [chain-source] declaring uniform:", uniformName);
+      uniforms.push(`uniform half ${uniformName};`);
+    }
+    bodies.push(entry.body(i));
+  });
 
-	const source = `
+  const source = `
 ${uniforms.join("\n")}
 
 ${SRGB_TO_LINEAR}
@@ -66,6 +66,6 @@ ${bodies.join("\n")}
 }
 `;
 
-	console.log("[chain-source] generated source:", source.substring(0, 500));
-	return source;
+  console.log("[chain-source] generated source:", source.substring(0, 500));
+  return source;
 }

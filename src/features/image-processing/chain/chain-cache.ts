@@ -1,6 +1,6 @@
 import { Skia, type SkRuntimeEffect } from "@shopify/react-native-skia";
 
-import { chainKey, generateChainSource } from "./chain-source";
+import { generateChainSource } from "./chain-source";
 import { type Layer } from "./types";
 
 type ChainEntry = { source: string; effect: SkRuntimeEffect };
@@ -11,9 +11,11 @@ type ChainEntry = { source: string; effect: SkRuntimeEffect };
 // every layer add/remove/reorder/visibility-toggle would pay a fresh
 // parse on the JS thread (~5-30 ms on a phone).
 //
-// Key: the ordered type list. Two chains with the same order and same
-// type set share an effect, even if their SV values differ. Slider
-// drags do not touch the cache \u2014 they only update uniforms.
+// Key: full generated SkSL source. Two chains with the same source
+// (same body templates, same uniform layout) share an effect. Using
+// the full source as the key ensures body template changes
+// invalidate the cache automatically. Slider drags do not touch the
+// cache — they only update uniforms.
 //
 // Storage: unbounded Map. In practice users accumulate tens of distinct
 // chain configs, not thousands; the theoretical ceiling (every
@@ -29,15 +31,15 @@ class ChainEffectCache {
 	private map = new Map<string, ChainEntry>();
 
 	get(layers: Layer[]): ChainEntry {
-		const key = chainKey(layers);
-		console.log("[chain-cache] get() key=", key, "layers=", layers.length);
+		const source = generateChainSource(layers);
+		const key = source;
+		console.log("[chain-cache] get() key=", key.substring(0, 100), "layers=", layers.length);
 		const hit = this.map.get(key);
 		if (hit) {
 			console.log("[chain-cache] cache HIT");
 			return hit;
 		}
 		console.log("[chain-cache] cache MISS - compiling new effect");
-		const source = generateChainSource(layers);
 		const effect = Skia.RuntimeEffect.Make(source);
 		if (!effect) {
 			throw new Error(`Failed to compile chain shader:\n${source}`);

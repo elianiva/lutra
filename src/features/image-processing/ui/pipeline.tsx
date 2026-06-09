@@ -20,6 +20,8 @@ type UniformEntry = {
 	sv: SharedValue<number>;
 };
 
+type Uniforms = Record<string, number | number[]>;
+
 // Build a flat array of (uniform name, SharedValue) pairs. Re-computed only
 // when layer composition changes.
 function buildUniformEntries(layers: Layer[], svMap: LayerSVMap): UniformEntry[] {
@@ -37,8 +39,8 @@ function buildUniformEntries(layers: Layer[], svMap: LayerSVMap): UniformEntry[]
 }
 
 // Compute the uniform record from uniform entries — runs on either thread.
-function buildUniforms(entries: UniformEntry[]): Record<string, number> {
-	const u: Record<string, number> = {};
+function buildUniforms(entries: UniformEntry[], width: number, height: number): Uniforms {
+	const u: Uniforms = { u_resolution: [width, height] };
 	for (const { name, sv } of entries) {
 		u[name] = sv.value;
 	}
@@ -62,19 +64,19 @@ export function Pipeline({ layers, svMap, image, width, height }: PipelineProps)
 	// uniform error. We side-step this by building the SharedValue ourselves
 	// and synchronously setting .value during render so it's correct *before*
 	// Skia's picture is played.
-	const uniformsRef = useRef<SharedValue<Record<string, number>> | null>(null);
+	const uniformsRef = useRef<SharedValue<Uniforms> | null>(null);
 	if (uniformsRef.current === null) {
-		uniformsRef.current = makeMutable<Record<string, number>>({});
+		uniformsRef.current = makeMutable<Uniforms>({});
 	}
 	const uniforms = uniformsRef.current;
-	uniforms.value = buildUniforms(uniformEntries);
+	uniforms.value = buildUniforms(uniformEntries, width, height);
 
 	// Reactive updates on the UI thread for slider drags (individual SVs
 	// change → mapper re-runs → uniforms.value updated).
 	useEffect(() => {
 		const fun = () => {
 			"worklet";
-			const u: Record<string, number> = {};
+			const u: Uniforms = { u_resolution: [width, height] };
 			for (const { name, sv } of uniformEntries) {
 				u[name] = sv.value;
 			}
@@ -82,7 +84,7 @@ export function Pipeline({ layers, svMap, image, width, height }: PipelineProps)
 		};
 		const mapperId = startMapper(fun, uniformEntries.map((e) => e.sv) as unknown[], [uniforms as SharedValue<unknown>]);
 		return () => stopMapper(mapperId);
-	}, [uniformEntries]);
+	}, [uniformEntries, width, height]);
 
 	return (
 		<Canvas style={{ width, height }}>
