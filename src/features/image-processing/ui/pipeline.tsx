@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useDerivedValue, type SharedValue } from "react-native-reanimated";
 import { Canvas, Fill, ImageShader, Shader, type SkImage } from "@shopify/react-native-skia";
 
 import { chainCache } from "../chain/chain-cache";
@@ -14,44 +15,46 @@ type PipelineProps = {
 	height: number;
 };
 
-// Build a plain uniform record from the committed layer values. The
-// C++ Uniforms parser (getPropertyValue<Uniforms> in Convertor.h)
-// correctly enumerates plain object properties but fails to enumerate
-// the inner Record when it's wrapped in a SharedValue HostObject on
-// the worklet thread (the mapper's applyUpdates path). Passing a
-// plain object avoids that issue entirely.
-//
-// Real-time preview during slider drag is deferred: committed values
-// are read on the JS thread via sv[key].value and the component
-// re-renders when layers change (on slider commit). A follow-up can
-// restore real-time updates by switching to a worklet-based approach
-// that builds the uniform float array directly instead of going
-// through the C++ Uniforms parser.
-function buildUniforms(layers: Layer[], svMap: LayerSVMap): Record<string, number> {
-	const u: Record<string, number> = {};
+type UniformEntry = {
+	name: string;
+	sv: SharedValue<number>;
+};
+
+// Build a flat array of (uniform name, SharedValue) pairs. Iterating this
+// on the UI thread via useDerivedValue avoids any C++ Uniforms-parser
+// issue — each SharedValue is accessed directly by reference, not wrapped
+// in a HostObject record. Re-computed only when layer composition changes.
+function buildUniformEntries(layers: Layer[], svMap: LayerSVMap): UniformEntry[] {
+	const entries: UniformEntry[] = [];
 	let i = 0;
 	for (const layer of layers) {
-		const sv = svMap.get(layer.id);
+		const sv = svMap.get(layer.id)!;
 		const entry = layerRegistry[layer.type];
 		for (const key of Object.keys(entry.fields)) {
-			const def = (entry.fields as Record<string, { default: number }>)[key].default;
-			u[`l${i}_${key}`] = sv ? sv[key].value : def;
+			entries.push({ name: `l${i}_${key}`, sv: sv[key] });
 		}
 		i++;
 	}
-	return u;
+	return entries;
 }
 
 // One shader for the whole chain. The active (visible) layer list is
-// compiled to a single SkRuntimeEffect by chainCache, then the
-// committed values are bound to the namespaced uniforms (l0_stops,
-// l1_amount, ...). Reorder / add / remove / visibility-toggle
-// invalidates the cache key and triggers a regen; slider drags do not
-// update the preview until commit (see buildUniforms comment above).
+// compiled to a single SkRuntimeEffect by chainCache, then the live
+// shared values are bound to the namespaced uniforms (l0_stops,
+// l1_amount, ...) via useDerivedValue on the UI thread. Every slider
+// drag updates the SharedValues → the derived value recomputes → Skia
+// re-renders. No JS-thread round-trip during scrubbing.
 export function Pipeline({ layers, svMap, image, width, height }: PipelineProps) {
 	const activeLayers = layers.filter((l) => l.visible);
 	const { effect } = chainCache.get(activeLayers);
-	const uniforms = useMemo(() => buildUniforms(activeLayers, svMap), [activeLayers, svMap]);
+	const uniformEntries = useMemo(() => buildUniformEntries(activeLayers, svMap), [activeLayers, svMap]);
+	const uniforms = useDerivedValue(() => {
+		const u: Record<string, number> = {};
+		for (const { name, sv } of uniformEntries) {
+			u[name] = sv.value;
+		}
+		return u;
+	}, [uniformEntries]);
 
 	return (
 		<Canvas style={{ width, height }}>
