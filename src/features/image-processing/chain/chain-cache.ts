@@ -30,13 +30,19 @@ class ChainEffectCache {
 
 	get(layers: Layer[]): ChainEntry {
 		const key = chainKey(layers);
+		console.log("[chain-cache] get() key=", key, "layers=", layers.length);
 		const hit = this.map.get(key);
-		if (hit) return hit;
+		if (hit) {
+			console.log("[chain-cache] cache HIT");
+			return hit;
+		}
+		console.log("[chain-cache] cache MISS - compiling new effect");
 		const source = generateChainSource(layers);
 		const effect = Skia.RuntimeEffect.Make(source);
 		if (!effect) {
 			throw new Error(`Failed to compile chain shader:\n${source}`);
 		}
+		console.log("[chain-cache] effect compiled successfully");
 		const entry: ChainEntry = { source, effect };
 		this.map.set(key, entry);
 		return entry;

@@ -62,10 +62,9 @@ export async function exportImage(
 	const uniforms: Record<string, number> = {};
 	activeLayers.forEach((layer, i) => {
 		const sv = svMap.get(layer.id);
-		if (!sv) return;
 		const entry = layerRegistry[layer.type];
 		for (const key of Object.keys(entry.fields)) {
-			uniforms[`l${i}_${key}`] = sv[key].value;
+			uniforms[`l${i}_${key}`] = sv ? sv[key].value : (entry.fields as Record<string, { default: number }>)[key].default;
 		}
 	});
 	const rendered = await drawAsImage(

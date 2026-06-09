@@ -24,6 +24,9 @@ export function chainKey(layers: Layer[]): string {
 // (l0_stops, l1_amount, ...) so two layers of the same type never
 // collide.
 export function generateChainSource(layers: Layer[]): string {
+	console.log("[chain-source] generateChainSource called with", layers.length, "layers");
+	layers.forEach((l, i) => console.log(`  [${i}] type=${l.type} visible=${l.visible}`));
+
 	if (layers.length === 0) {
 		return `
 uniform shader image;
@@ -40,12 +43,14 @@ half4 main(vec2 coord) {
 	layers.forEach((layer, i) => {
 		const entry = layerRegistry[layer.type];
 		for (const key of Object.keys(entry.fields)) {
-			uniforms.push(`uniform half l${i}_${key};`);
+			const uniformName = `l${i}_${key}`;
+			console.log("  [chain-source] declaring uniform:", uniformName);
+			uniforms.push(`uniform half ${uniformName};`);
 		}
 		bodies.push(entry.body(i));
 	});
 
-	return `
+	const source = `
 ${uniforms.join("\n")}
 
 ${SRGB_TO_LINEAR}
@@ -60,4 +65,7 @@ ${bodies.join("\n")}
   return half4(linearToSrgb(clamp(color, half3(0.0), half3(1.0))), alpha);
 }
 `;
+
+	console.log("[chain-source] generated source:", source.substring(0, 500));
+	return source;
 }
