@@ -22,14 +22,13 @@ type ParamsProps = {
 export function Params({ layer, onCommit, onRemove, sv }: ParamsProps) {
 	const entry = layerRegistry[layer.type];
 	const fields = entry.fields as Record<string, FieldDef>;
-	const values = sv;
 	return (
 		<View className="gap-3">
 			<ParamHeader label={entry.label} onRemove={onRemove} />
 			{Object.entries(fields).map(([key, field]) => (
 				<Slider
 					key={key}
-					value={values[key]}
+					value={sv[key]}
 					min={field.min}
 					max={field.max}
 					step={field.step}

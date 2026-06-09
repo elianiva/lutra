@@ -10,7 +10,6 @@ import Animated, {
 	type SharedValue,
 	useAnimatedReaction,
 	useAnimatedStyle,
-	useSharedValue,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
@@ -45,13 +44,8 @@ export function Slider({
 	formatValue,
 	onCommit,
 }: SliderProps): ReactNode {
-	const trackWidth = useSharedValue(0);
-	// `displayValue` is updated by `useAnimatedReaction` (post-render, on
-	// the RN thread). We seed it with "0.00" as a placeholder — reading
-	// `value.value` during render would trip Reanimated 4's strict-mode
-	// warning. The reaction fires on mount and replaces the placeholder
-	// with the real value shortly after.
-	const [displayValue, setDisplayValue] = useState(() => format(0, formatValue));
+	const [trackWidth, setTrackWidth] = useState(0);
+	const [displayValue, setDisplayValue] = useState(() => format(value.value, formatValue));
 
 	const updateDisplay = useCallback(
 		(v: number) => setDisplayValue(format(v, formatValue)),
@@ -65,8 +59,8 @@ export function Slider({
 
 	const setValueFromX = (x: number) => {
 		"worklet";
-		const clamped = clamp(0, x, trackWidth.value);
-		const ratio = trackWidth.value > 0 ? clamped / trackWidth.value : 0;
+		const clamped = clamp(0, x, trackWidth);
+		const ratio = trackWidth > 0 ? clamped / trackWidth : 0;
 		const raw = min + ratio * (max - min);
 		const snapped = Math.round(raw / step) * step;
 		value.value = clamp(min, snapped, max);
@@ -97,12 +91,12 @@ export function Slider({
 
 	const thumbStyle = useAnimatedStyle(() => {
 		const ratio = (value.value - min) / (max - min);
-		return { transform: [{ translateX: ratio * trackWidth.value - THUMB_SIZE / 2 }] };
-	});
+		return { transform: [{ translateX: ratio * trackWidth - THUMB_SIZE / 2 }] };
+	}, [trackWidth]);
 
-	const onTrackLayout = (e: LayoutChangeEvent) => {
-		trackWidth.value = e.nativeEvent.layout.width;
-	};
+	const onTrackLayout = useCallback((e: LayoutChangeEvent) => {
+		setTrackWidth(e.nativeEvent.layout.width);
+	}, []);
 
 	return (
 		<View>
