@@ -37,6 +37,7 @@ export type FieldDef = {
 	step?: number;
 	label: string;
 	format: FormatPreset | Formatter;
+	majorTicks?: number[];
 };
 
 // Per-layer entry. The keys (body, field map, label, formatValue) are
@@ -47,6 +48,9 @@ export type LayerEntry = {
 	body: BodyRenderer;
 	fields: { readonly [F: string]: FieldDef };
 	label: string;
+	// When true, the layer has two parameters shown one at a time.
+	// The user clicks the label (with ⇅ icon) to toggle between them.
+	toggled?: boolean;
 	// The per-entry function is typed against its own narrow shape
 	// (e.g. `({ type: "exposure", stops: number }) => string`). The
 	// union-typed `LayerEntry` widens the param so the registry can hold
