@@ -4,6 +4,10 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { Uniwind } from "uniwind";
+
+// Lock to dark mode — no light theme, no system-follow.
+Uniwind.setTheme("dark");
 
 // Hide the native splash only after fonts are loaded so the wordmark
 // renders in Electrolize from the first frame, not after a swap.

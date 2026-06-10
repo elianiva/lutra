@@ -2,55 +2,55 @@
 @import "uniwind";
 
 @theme {
-	--font-sans: "Electrolize_400Regular";
+  --font-sans: "Electrolize_400Regular";
 }
 
 @layer theme {
-	:root {
-		@variant dark {
-			--color-background: #0a0a0a;
-			--color-foreground: #fafafa;
-			--color-card: #0a0a0a;
-			--color-card-foreground: #fafafa;
-			--color-popover: #0a0a0a;
-			--color-popover-foreground: #fafafa;
-			--color-primary: #fafafa;
-			--color-primary-foreground: #0a0a0a;
-			--color-secondary: #262626;
-			--color-secondary-foreground: #fafafa;
-			--color-muted: #262626;
-			--color-muted-foreground: #a3a3a3;
-			--color-accent: #262626;
-			--color-accent-foreground: #fafafa;
-			--color-destructive: #7f1d1d;
-			--color-destructive-foreground: #fafafa;
-			--color-border: #262626;
-			--color-input: #262626;
-			--color-ring: #525252;
-			--radius: 0.625rem;
-		}
+  :root {
+    @variant dark {
+      --color-background: #1f1f1f;
+      --color-foreground: #fafafa;
+      --color-card: #1f1f1f;
+      --color-card-foreground: #fafafa;
+      --color-popover: #1f1f1f;
+      --color-popover-foreground: #fafafa;
+      --color-primary: #cc0000;
+      --color-primary-foreground: #fafafa;
+      --color-secondary: #262626;
+      --color-secondary-foreground: #fafafa;
+      --color-muted: #262626;
+      --color-muted-foreground: #a3a3a3;
+      --color-accent: #262626;
+      --color-accent-foreground: #fafafa;
+      --color-destructive: #7f1d1d;
+      --color-destructive-foreground: #fafafa;
+      --color-border: #262626;
+      --color-input: #262626;
+      --color-ring: #525252;
+      --radius: 0.25rem;
+    }
 
-		@variant light {
-			--color-background: #ffffff;
-			--color-foreground: #0a0a0a;
-			--color-card: #ffffff;
-			--color-card-foreground: #0a0a0a;
-			--color-popover: #ffffff;
-			--color-popover-foreground: #0a0a0a;
-			--color-primary: #18181b;
-			--color-primary-foreground: #fafafa;
-			--color-secondary: #f4f4f5;
-			--color-secondary-foreground: #18181b;
-			--color-muted: #f4f4f5;
-			--color-muted-foreground: #71717a;
-			--color-accent: #f4f4f5;
-			--color-accent-foreground: #18181b;
-			--color-destructive: #dc2626;
-			--color-destructive-foreground: #fafafa;
-			--color-border: #e4e4e7;
-			--color-input: #e4e4e7;
-			--color-ring: #a1a1aa;
-			--radius: 0.625rem;
-		}
-	}
+    @variant light {
+      --color-background: #1f1f1f;
+      --color-foreground: #fafafa;
+      --color-card: #1f1f1f;
+      --color-card-foreground: #fafafa;
+      --color-popover: #1f1f1f;
+      --color-popover-foreground: #fafafa;
+      --color-primary: #cc0000;
+      --color-primary-foreground: #fafafa;
+      --color-secondary: #262626;
+      --color-secondary-foreground: #fafafa;
+      --color-muted: #262626;
+      --color-muted-foreground: #a3a3a3;
+      --color-accent: #262626;
+      --color-accent-foreground: #fafafa;
+      --color-destructive: #7f1d1d;
+      --color-destructive-foreground: #fafafa;
+      --color-border: #262626;
+      --color-input: #262626;
+      --color-ring: #525252;
+      --radius: 0.25rem;
+    }
+  }
 }

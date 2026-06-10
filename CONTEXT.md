@@ -18,17 +18,20 @@ _Avoid_: "Stack" (Snapseed uses this word but it suggests LIFO; the chain is ord
 
 ### Adjustments
 
-The v1 palette — nine **adjustment layer** types the user can add to the **edit chain**. No LUT yet (see Future). Order is significant.
+The v1 palette — ten **adjustment layer** types the user can add to the **edit chain**. No LUT yet (see Future). Order is significant.
+
+Most layers expose a single parameter with one ruler slider. Two layers — **White balance** and **Vignette** — have **toggled parameters**: two parameters sharing one layer, one visible at a time. The user clicks the label (indicated by a ⇅ icon) to switch between them. This groups related parameters under one mental model while keeping the one-ruler-at-a-time constraint.
 
 1. **Exposure** — stops (-3 to +3, default 0). Multiplicative gain.
 2. **Contrast** — S-curve amount (-1 to +1, default 0). Anchored at mid-gray.
-3. **Shadows / Highlights** — single layer with two sliders (a.k.a. Snapseed's "Ambiance"). Shadows lifts dark tones; Highlights compresses bright tones.
-4. **White balance** — temperature (K) + tint. Default 6500K / 0.
-5. **Saturation** — multiplier (-1 to +1, default 0 = no-op).
-6. **Grain** — film-grain noise overlay (0 to 1, default 0 = no-op). Hash-based, no texture.
-7. **Vignette** — radial darkening from edges. Two sliders: amount (-1 to +1, default 0 = no-op) + size (0.2 to 1, default 0.6).
-8. **Chromatic aberration** — radial R/B channel split (-1 to +1, default 0 = no-op).
-9. **Clarity** — midtone contrast / structure enhancement (-1 to +1, default 0 = no-op).
+3. **Shadows** — lifts dark tones (-1 to +1, default 0 = no-op).
+4. **Highlights** — compresses bright tones (-1 to +1, default 0 = no-op).
+5. **White balance** — toggled: temperature (K, default 6500) ↔ tint (-1 to +1, default 0).
+6. **Saturation** — multiplier (-1 to +1, default 0 = no-op).
+7. **Grain** — film-grain noise overlay (0 to 1, default 0 = no-op). Hash-based, no texture.
+8. **Vignette** — toggled: amount (-1 to +1, default 0 = no-op) ↔ size (0.2 to 1, default 0.6).
+9. **Chromatic aberration** — radial R/B channel split (-1 to +1, default 0 = no-op).
+10. **Clarity** — midtone contrast / structure enhancement (-1 to +1, default 0 = no-op).
 
 ### Screens
 
