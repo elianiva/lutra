@@ -41,6 +41,7 @@
     "expo-media-library": "~56.0.6",
     "expo-router": "~56.2.9",
     "expo-splash-screen": "~56.0.10",
+    "expo-sqlite": "~56.0.5",
     "expo-status-bar": "~56.0.4",
     "expo-symbols": "~56.0.6",
     "expo-system-ui": "~56.0.5",
@@ -71,5 +72,6 @@
     "oxlint-plugin-react-native": "^0.2.21",
     "tailwindcss": "^4.3.0",
     "typescript": "~6.0.3"
-  }
+  },
+  "packageManager": "pnpm@11.6.0"
 }

@@ -1,5 +1,8 @@
+import { useLocalSearchParams } from "expo-router";
+
 import { Editor } from "../features/image-processing/editor";
 
 export default function EditorRoute() {
-	return <Editor />;
+	const { editId } = useLocalSearchParams<{ editId?: string }>();
+	return <Editor editId={editId ? Number(editId) : undefined} />;
 }

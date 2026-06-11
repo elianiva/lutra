@@ -36,20 +36,28 @@ Most layers expose a single parameter with one ruler slider. Two layers — **Wh
 ### Screens
 
 **Main menu**:
-The app's entry screen. Shows the app name and the two top-level actions: **Edit Image** (open the picker, then jump to the **editor**) and **Options** (jump to the **options screen**). Reached at launch and on back from any other screen.
+The app's entry screen. Shows the app name (**LUTRA**, left-aligned) and a grid of **saved edits** (3-column, square-cropped thumbnails). Top-right icons: **+** (start new edit → picker → **editor**), **→** (open **options screen**). Empty state shows "Start editing" button with "Your edits will appear here" subtitle.
 _Avoid_: "home" (iOS-centric, ambiguous with system home), "start screen" (ambiguous), "landing" (web jargon).
 
 **Editor**:
-The color-grading screen that renders an **edit chain** for one image. Reached only from **main menu** → Edit Image → picker → image selected. Always has an image in v1; the no-image empty state on the editor is dead code once the main menu exists.
+The color-grading screen that renders an **edit chain** for one image. Reached from **main menu** → **+** → picker → image selected, or by tapping a **saved edit** (resumes the chain). No-image empty state is dead code.
 _Avoid_: "color grading menu" (the menu is the main menu, not this), "workspace" (overloaded), "canvas" (only the top half is a canvas).
 
 **Options screen**:
-The forward-loaded settings surface. Reached from **main menu** → Options. Holds future preferences (LUT packs, export options, recent files, theme). In v1 the surface is intentionally empty; the route exists to make the **main menu** honest about the button, not to ship settings.
+Settings surface with storage info. Reached from **main menu** → **→** icon. Shows edit count and total storage used. Includes "Clear all" action (deletes all **saved edits** and source images, with confirmation).
 _Avoid_: "settings" (Android-centric), "preferences" (macOS-centric), "config".
+
+### Saved edit
+
+A persisted record of a user's work: source image file + **edit chain** + thumbnail. Stored in SQLite with file references in the local file system. Grid on the **main menu** displays **saved edits** sorted newest-first.
 
 ### Back behavior
 
-In v1, leaving the **editor** (back button, gesture) **discards the current edit session** — `imageStore` and `chainStore` are cleared. The **main menu** is always a fresh "Edit Image / Options" prompt, never a "resume" screen. See the "edits gallery" item in Future.
+Leaving the **editor** (back button, gesture) **auto-saves** the current session as a **saved edit**. The **main menu** always reflects the latest state. If the chain is unchanged from the last save, no duplicate is created.
+
+### Grid actions
+
+Long-press on a **saved edit** in the **main menu** grid shows a context menu: **Duplicate** (shallow copy — same source file, new edit entry with identical chain) and **Delete** (removes saved edit + our copy of the source file). Export is only available from within the **editor**.
 
 ### Future (not in v1)
 
@@ -57,7 +65,7 @@ Captured so they aren't lost:
 
 - **LUT layer** — a layer type that applies a 3D color cube (`.cube` format) as a shader pass. Reference architecture: [YahiaAngelo/Film-Simulator](https://github.com/YahiaAngelo/Film-Simulator) (KMP + Skiko, bundles `.cube` files in resources). Our variant will **download LUTs at runtime** (not bundled), per product decision.
 - Lift / gain / gamma (lifted blacks), masks, blend modes per layer.
-- **Edits gallery** — a Snapseed-Mobile-style list of saved **edit sessions** on the **main menu**. In v1 back discards; in the future back returns to a gallery where the user can resume, duplicate, or delete a session. This is the reason the v1 main menu has two actions (Edit Image, Options) and not a "Resume" affordance — the gallery will grow into that slot.
+- **Storage management** — soft/hard caps on saved edits, per-edit storage info, cleanup suggestions.
 
 ## Flagged ambiguities
 
