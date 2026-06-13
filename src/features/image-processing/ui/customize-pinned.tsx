@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Haptics from "expo-haptics";
 import { Check, Sun, Contrast, Eye, Palette, Aperture, Eclipse, Sparkles, Shirt, CircleDot, Flame } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -62,7 +63,8 @@ export function CustomizePinned({ visible, currentPinned, onClose }: CustomizePi
 		}
 	}, [visible, currentPinned]);
 
-	const toggleTool = (type: LayerType) => {
+	const toggleTool = useCallback((type: LayerType) => {
+		Haptics.selectionAsync();
 		setSelected((prev) => {
 			if (prev.includes(type)) {
 				// Don't allow removing last tool
@@ -74,9 +76,10 @@ export function CustomizePinned({ visible, currentPinned, onClose }: CustomizePi
 				return [...prev, type];
 			}
 		});
-	};
+	}, []);
 
-	const handleConfirm = async () => {
+	const handleConfirm = useCallback(async () => {
+		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 		try {
 			await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(selected));
 		} catch {
@@ -87,7 +90,7 @@ export function CustomizePinned({ visible, currentPinned, onClose }: CustomizePi
 		backdropOpacity.value = withSpring(0, SPRING_CONFIG);
 		// Then close
 		setTimeout(() => onClose(selected), 200);
-	};
+	}, [selected, onClose]);
 
 	const gesture = Gesture.Pan()
 		.onUpdate((e) => {

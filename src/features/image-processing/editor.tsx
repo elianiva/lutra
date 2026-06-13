@@ -2,6 +2,7 @@ import { useImage } from "@shopify/react-native-skia";
 import { useMachine } from "@xstate/react";
 import { useSelector } from "@xstate/store-react";
 import { Check, ChevronUp, Layers, Menu, X } from "lucide-react-native";
+import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Pressable, View, useWindowDimensions, type LayoutChangeEvent } from "react-native";
@@ -147,6 +148,7 @@ export function Editor({ editId }: EditorProps): ReactNode {
 	// --- Confirm draft ---
 	const onConfirmDraft = () => {
 		if (!draftLayer) return;
+		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 		chainStore.trigger.add({ layer: draftLayer });
 		uiSend({ type: "SELECT_LAYER", id: draftLayer.id });
 		setDraftLayer(null);
@@ -154,6 +156,7 @@ export function Editor({ editId }: EditorProps): ReactNode {
 
 	// --- Cancel/discard draft ---
 	const onCancelDraft = () => {
+		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 		setDraftLayer(null);
 	};
 

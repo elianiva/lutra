@@ -1,4 +1,6 @@
+import * as Haptics from "expo-haptics";
 import { Contrast, Eye, Sun, Palette, Aperture } from "lucide-react-native";
+import { useCallback } from "react";
 import { Pressable, View } from "react-native";
 
 import { Text } from "../../../components/ui/text";
@@ -27,6 +29,16 @@ type PinnedToolsProps = {
 };
 
 export function PinnedTools({ tools, onToolPress, onToolLongPress }: PinnedToolsProps) {
+	const handlePress = useCallback((type: LayerType) => {
+		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+		onToolPress(type);
+	}, [onToolPress]);
+
+	const handleLongPress = useCallback((type: LayerType) => {
+		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+		onToolLongPress(type);
+	}, [onToolLongPress]);
+
 	return (
 		<View className="flex-row items-center justify-center gap-2 px-4">
 			{tools.map((type) => {
@@ -35,18 +47,22 @@ export function PinnedTools({ tools, onToolPress, onToolLongPress }: PinnedTools
 				return (
 					<Pressable
 						key={type}
-						onPress={() => onToolPress(type)}
-						onLongPress={() => onToolLongPress(type)}
+						onPress={() => handlePress(type)}
+						onLongPress={() => handleLongPress(type)}
 						delayLongPress={500}
-						className="items-center justify-center border border-white/30 rounded-lg px-3 py-3 min-w-[64px]"
-						style={{ backgroundColor: "rgba(255,255,255,0.04)" }}
+						className="items-center justify-center rounded-lg px-3 py-3 min-w-[64px]"
+						style={{
+							backgroundColor: "rgba(255,255,255,0.04)",
+							borderWidth: 1,
+							borderColor: "rgba(255,255,255,0.25)",
+						}}
 					>
 						<Icon size={22} className="text-white mb-1.5" />
 						<Text
 							style={{
 								fontSize: 9,
 								color: "#fff",
-								letterSpacing: 1,
+								letterSpacing: 1.5,
 								fontFamily: "Electrolize_400Regular",
 							}}
 						>

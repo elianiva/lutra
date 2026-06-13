@@ -10,7 +10,8 @@ import {
 	Flame,
 	CircleDot,
 } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import * as Haptics from "expo-haptics";
+import { useCallback, useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -50,6 +51,11 @@ export function ToolOverlay({ visible, onClose, onSelect }: ToolOverlayProps) {
 	const [activeTab, setActiveTab] = useState<"adjustments" | "luts">("adjustments");
 
 	const tools = Object.keys(layerRegistry) as LayerType[];
+
+	const handleSelect = useCallback((type: LayerType) => {
+		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+		onSelect(type);
+	}, [onSelect]);
 
 	// Animate in/out based on visible prop
 	useEffect(() => {
@@ -151,7 +157,7 @@ export function ToolOverlay({ visible, onClose, onSelect }: ToolOverlayProps) {
 									return (
 										<Pressable
 											key={type}
-											onPress={() => onSelect(type)}
+											onPress={() => handleSelect(type)}
 											className="w-[22%] items-center justify-center border border-white/20 rounded-lg py-4"
 											style={{ backgroundColor: "rgba(255,255,255,0.03)" }}
 										>

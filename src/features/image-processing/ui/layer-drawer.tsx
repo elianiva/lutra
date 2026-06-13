@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import * as Haptics from "expo-haptics";
+import { useCallback, useEffect } from "react";
 import { Pressable, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -48,6 +49,12 @@ export function LayerDrawer({
 			backdropOpacity.value = withSpring(0, SPRING_CONFIG);
 		}
 	}, [visible]);
+
+	const handleSelect = useCallback((id: string) => {
+		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+		onSelect(id);
+		onClose();
+	}, [onSelect, onClose]);
 
 	const gesture = Gesture.Pan()
 		.activeOffsetX([-10, 10])
@@ -110,10 +117,7 @@ export function LayerDrawer({
 						<LayersPanel
 							layers={layers}
 							selectedId={selectedId}
-							onSelect={(id) => {
-								onSelect(id);
-								onClose();
-							}}
+							onSelect={handleSelect}
 							onRemove={onRemove}
 							onReorder={onReorder}
 							onToggleVisible={onToggleVisible}
