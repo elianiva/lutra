@@ -16,8 +16,8 @@ import Animated, {
 
 import { BackButton } from "../../components/back-button";
 import { Icon } from "../../components/ui/icon";
-import { ExportPanel } from "../image-encoding/export-panel";
 import { imageStore } from "../image-encoding/image-store";
+import { useExport } from "../image-encoding/use-export";
 import { useSaveEdit } from "../image-encoding/use-save-edit";
 import { useSavedEdit } from "../image-encoding/use-saved-edit";
 import { createLayer } from "./chain/defaults";
@@ -25,9 +25,11 @@ import { layerRegistry, type LayerType } from "./chain/registry";
 import { type Layer, type LayerPatch } from "./chain/types";
 import { chainStore } from "./state/chain-store";
 import { uiMachine, type PanelMode } from "./state/ui-machine";
+import { CustomizePinned, loadPinnedTools } from "./ui/customize-pinned";
 import { DraftEditPanel } from "./ui/draft-edit-panel";
 import { EditPanel } from "./ui/edit-panel";
 import { EmptyEdit } from "./ui/empty-edit";
+import { ExportMenu } from "./ui/export-menu";
 import { LayerDrawer } from "./ui/layer-drawer";
 import { PinnedTools } from "./ui/pinned-tools";
 import { Pipeline } from "./ui/pipeline";
@@ -58,6 +60,8 @@ export function Editor({ editId }: EditorProps): ReactNode {
 	const [pinnedTools, setPinnedTools] = useState<LayerType[]>(DEFAULT_PINNED);
 	const [toolOverlayVisible, setToolOverlayVisible] = useState(false);
 	const [layerDrawerVisible, setLayerDrawerVisible] = useState(false);
+	const [exportMenuVisible, setExportMenuVisible] = useState(false);
+	const [customizeVisible, setCustomizeVisible] = useState(false);
 	const [draftLayer, setDraftLayer] = useState<Layer | null>(null);
 
 	const svMap = useLayerSVMap(layers);
@@ -81,6 +85,14 @@ export function Editor({ editId }: EditorProps): ReactNode {
 		merged.set(draftLayer.id, draftSVs);
 		return merged;
 	}, [svMap, draftLayer, draftSVs]);
+
+	// Export
+	const { status: exportStatus, exportToPhotos } = useExport(layers, svMap);
+
+	// Load pinned tools from storage on mount
+	useEffect(() => {
+		loadPinnedTools().then(setPinnedTools);
+	}, []);
 
 	// Hydrate stores when saved edit data arrives (once)
 	const hasHydrated = useRef(false);
@@ -262,9 +274,7 @@ export function Editor({ editId }: EditorProps): ReactNode {
 				</Pressable>
 				<Pressable
 					onPress={() => {
-						if (!isDraftActive) {
-							// TODO: Open hamburger menu for export
-						}
+						if (!isDraftActive) setExportMenuVisible(true);
 					}}
 					disabled={isDraftActive}
 					hitSlop={8}
@@ -343,7 +353,7 @@ export function Editor({ editId }: EditorProps): ReactNode {
 							tools={pinnedTools}
 							onToolPress={onToolSelect}
 							onToolLongPress={(type) => {
-								// TODO: Long-press to customize pinned tools
+								setCustomizeVisible(true);
 							}}
 						/>
 					</View>
@@ -373,6 +383,23 @@ export function Editor({ editId }: EditorProps): ReactNode {
 				onRemove={onRemove}
 				onReorder={onReorder}
 				onToggleVisible={onToggleVisible}
+			/>
+
+			{/* Export menu */}
+			<ExportMenu
+				visible={exportMenuVisible}
+				onClose={() => setExportMenuVisible(false)}
+				onExport={exportToPhotos}
+			/>
+
+			{/* Customize pinned tools */}
+			<CustomizePinned
+				visible={customizeVisible}
+				currentPinned={pinnedTools}
+				onClose={(newPinned) => {
+					setPinnedTools(newPinned);
+					setCustomizeVisible(false);
+				}}
 			/>
 		</View>
 	);
