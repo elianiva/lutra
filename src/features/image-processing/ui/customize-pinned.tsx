@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Check, Sun, Contrast, Eye, Palette, Aperture, Eclipse, Sparkles, Shirt, CircleDot, Flame } from "lucide-react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -12,6 +12,9 @@ import Animated, {
 import { Icon } from "../../../components/ui/icon";
 import { Text } from "../../../components/ui/text";
 import { layerRegistry, type LayerType } from "../chain/registry";
+
+const SPRING_CONFIG = { damping: 20, stiffness: 200, mass: 1 };
+const SHEET_HEIGHT = 500;
 
 const TOOL_ICONS: Record<string, typeof Sun> = {
 	exposure: Sun,
@@ -36,9 +39,28 @@ type CustomizePinnedProps = {
 
 export function CustomizePinned({ visible, currentPinned, onClose }: CustomizePinnedProps) {
 	const [selected, setSelected] = useState<LayerType[]>(currentPinned);
-	const translateY = useSharedValue(600);
+	const translateY = useSharedValue(SHEET_HEIGHT);
+	const backdropOpacity = useSharedValue(0);
 
 	const allTools = Object.keys(layerRegistry) as LayerType[];
+
+	// Animate in/out based on visible prop
+	useEffect(() => {
+		if (visible) {
+			translateY.value = withSpring(0, SPRING_CONFIG);
+			backdropOpacity.value = withSpring(1, SPRING_CONFIG);
+		} else {
+			translateY.value = withSpring(SHEET_HEIGHT, SPRING_CONFIG);
+			backdropOpacity.value = withSpring(0, SPRING_CONFIG);
+		}
+	}, [visible]);
+
+	// Reset selection when opening
+	useEffect(() => {
+		if (visible) {
+			setSelected(currentPinned);
+		}
+	}, [visible, currentPinned]);
 
 	const toggleTool = (type: LayerType) => {
 		setSelected((prev) => {
@@ -60,7 +82,11 @@ export function CustomizePinned({ visible, currentPinned, onClose }: CustomizePi
 		} catch {
 			// Best effort
 		}
-		onClose(selected);
+		// Animate out first
+		translateY.value = withSpring(SHEET_HEIGHT, SPRING_CONFIG);
+		backdropOpacity.value = withSpring(0, SPRING_CONFIG);
+		// Then close
+		setTimeout(() => onClose(selected), 200);
 	};
 
 	const gesture = Gesture.Pan()
@@ -68,14 +94,17 @@ export function CustomizePinned({ visible, currentPinned, onClose }: CustomizePi
 			"worklet";
 			if (e.translationY > 0) {
 				translateY.value = e.translationY;
+				backdropOpacity.value = 1 - e.translationY / SHEET_HEIGHT;
 			}
 		})
 		.onEnd((e) => {
 			"worklet";
 			if (e.translationY > 100 || e.velocityY > 500) {
-				translateY.value = withSpring(600);
+				translateY.value = withSpring(SHEET_HEIGHT, SPRING_CONFIG);
+				backdropOpacity.value = withSpring(0, SPRING_CONFIG);
 			} else {
-				translateY.value = withSpring(0);
+				translateY.value = withSpring(0, SPRING_CONFIG);
+				backdropOpacity.value = withSpring(1, SPRING_CONFIG);
 			}
 		});
 
@@ -83,18 +112,22 @@ export function CustomizePinned({ visible, currentPinned, onClose }: CustomizePi
 		transform: [{ translateY: translateY.value }],
 	}));
 
-	if (!visible) return null;
+	const backdropStyle = useAnimatedStyle(() => ({
+		opacity: backdropOpacity.value,
+	}));
 
 	return (
-		<View className="absolute inset-0 z-40">
+		<View className="absolute inset-0 z-40" pointerEvents={visible ? "auto" : "none"}>
 			{/* Backdrop */}
-			<Pressable className="absolute inset-0 bg-black/60" onPress={() => onClose(currentPinned)} />
+			<Animated.View style={backdropStyle} className="absolute inset-0 bg-black/60">
+				<Pressable className="flex-1" onPress={() => onClose(currentPinned)} />
+			</Animated.View>
 
 			{/* Sheet */}
 			<GestureDetector gesture={gesture}>
 				<Animated.View
 					style={animatedStyle}
-					className="absolute bottom-0 left-0 right-0 bg-[#111] rounded-t-2xl max-h-[70%]"
+					className="absolute bottom-0 left-0 right-0 bg-[#111] rounded-t-2xl"
 				>
 					{/* Handle */}
 					<View className="items-center pt-3 pb-2">
@@ -125,7 +158,7 @@ export function CustomizePinned({ visible, currentPinned, onClose }: CustomizePi
 					</View>
 
 					{/* Tool grid */}
-					<ScrollView className="px-4 pb-8">
+					<ScrollView className="px-4 pb-8" style={{ maxHeight: 350 }}>
 						<View className="flex-row flex-wrap gap-3">
 							{allTools.map((type) => {
 								const IconComp = TOOL_ICONS[type] ?? Sun;

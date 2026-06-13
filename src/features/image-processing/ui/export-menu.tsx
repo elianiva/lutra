@@ -1,6 +1,6 @@
 import { Download, Share2, X } from "lucide-react-native";
+import { useEffect } from "react";
 import { Pressable, View } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
 	useAnimatedStyle,
 	useSharedValue,
@@ -10,6 +10,8 @@ import Animated, {
 import { Icon } from "../../../components/ui/icon";
 import { Text } from "../../../components/ui/text";
 
+const SPRING_CONFIG = { damping: 20, stiffness: 200, mass: 1 };
+
 type ExportMenuProps = {
 	visible: boolean;
 	onClose: () => void;
@@ -17,69 +19,62 @@ type ExportMenuProps = {
 };
 
 export function ExportMenu({ visible, onClose, onExport }: ExportMenuProps) {
-	const translateY = useSharedValue(-200);
+	const scale = useSharedValue(0.8);
+	const opacity = useSharedValue(0);
 
-	const gesture = Gesture.Pan()
-		.onUpdate((e) => {
-			"worklet";
-			if (e.translationY < 0) {
-				translateY.value = e.translationY;
-			}
-		})
-		.onEnd((e) => {
-			"worklet";
-			if (e.translationY < -50 || e.velocityY < -500) {
-				translateY.value = withSpring(-200);
-			} else {
-				translateY.value = withSpring(0);
-			}
-		});
+	// Animate in/out based on visible prop
+	useEffect(() => {
+		if (visible) {
+			scale.value = withSpring(1, SPRING_CONFIG);
+			opacity.value = withSpring(1, SPRING_CONFIG);
+		} else {
+			scale.value = withSpring(0.8, SPRING_CONFIG);
+			opacity.value = withSpring(0, SPRING_CONFIG);
+		}
+	}, [visible]);
 
 	const animatedStyle = useAnimatedStyle(() => ({
-		transform: [{ translateY: translateY.value }],
+		transform: [{ scale: scale.value }],
+		opacity: opacity.value,
 	}));
 
-	if (!visible) return null;
-
 	return (
-		<View className="absolute inset-0 z-40">
+		<View className="absolute inset-0 z-40" pointerEvents={visible ? "auto" : "none"}>
 			{/* Backdrop */}
-			<Pressable className="absolute inset-0 bg-black/60" onPress={onClose} />
+			<Pressable className="absolute inset-0" onPress={onClose} />
 
 			{/* Menu */}
-			<GestureDetector gesture={gesture}>
-				<Animated.View
-					style={animatedStyle}
-					className="absolute top-16 right-4 w-56 bg-[#1a1a1a] rounded-xl overflow-hidden border border-white/10"
+			<Animated.View
+				style={animatedStyle}
+				className="absolute top-16 right-4 w-56 bg-[#1a1a1a] rounded-xl overflow-hidden border border-white/10"
+			>
+				{/* Close button */}
+				<Pressable
+					onPress={onClose}
+					className="absolute top-3 right-3 z-10"
+					hitSlop={8}
 				>
-					{/* Close button */}
-					<Pressable
-						onPress={onClose}
-						className="absolute top-3 right-3 z-10"
-						hitSlop={8}
-					>
-						<Icon as={X} className="text-white/50" size={16} />
-					</Pressable>
+					<Icon as={X} className="text-white/50" size={16} />
+				</Pressable>
 
-					{/* Export options */}
-					<View className="py-2">
-						<MenuItem
-							icon={Download}
-							label="Save to Photos"
-							onPress={() => {
-								onClose();
-								onExport();
-							}}
-						/>
-						<MenuItem
-							icon={Share2}
-							label="Share"
-							onPress={onClose}
-							disabled
-						/>
-					</View>
-				</Animated.View>
-			</GestureDetector>
+				{/* Export options */}
+				<View className="py-2">
+					<MenuItem
+						icon={Download}
+						label="Save to Photos"
+						onPress={() => {
+							onClose();
+							onExport();
+						}}
+					/>
+					<MenuItem
+						icon={Share2}
+						label="Share"
+						onPress={onClose}
+						disabled
+					/>
+				</View>
+			</Animated.View>
 		</View>
 	);
 }

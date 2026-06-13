@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Pressable, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -9,6 +10,9 @@ import Animated, {
 import { Text } from "../../../components/ui/text";
 import { type Layer } from "../chain/types";
 import { LayersPanel } from "./layers-panel";
+
+const SPRING_CONFIG = { damping: 20, stiffness: 200, mass: 1 };
+const DRAWER_WIDTH = 340;
 
 type LayerDrawerProps = {
 	visible: boolean;
@@ -31,7 +35,19 @@ export function LayerDrawer({
 	onReorder,
 	onToggleVisible,
 }: LayerDrawerProps) {
-	const translateX = useSharedValue(400);
+	const translateX = useSharedValue(DRAWER_WIDTH);
+	const backdropOpacity = useSharedValue(0);
+
+	// Animate in/out based on visible prop
+	useEffect(() => {
+		if (visible) {
+			translateX.value = withSpring(0, SPRING_CONFIG);
+			backdropOpacity.value = withSpring(1, SPRING_CONFIG);
+		} else {
+			translateX.value = withSpring(DRAWER_WIDTH, SPRING_CONFIG);
+			backdropOpacity.value = withSpring(0, SPRING_CONFIG);
+		}
+	}, [visible]);
 
 	const gesture = Gesture.Pan()
 		.activeOffsetX([-10, 10])
@@ -40,14 +56,17 @@ export function LayerDrawer({
 			// Only allow swiping right to dismiss
 			if (e.translationX > 0) {
 				translateX.value = e.translationX;
+				backdropOpacity.value = 1 - e.translationX / DRAWER_WIDTH;
 			}
 		})
 		.onEnd((e) => {
 			"worklet";
 			if (e.translationX > 100 || e.velocityX > 500) {
-				translateX.value = withSpring(400);
+				translateX.value = withSpring(DRAWER_WIDTH, SPRING_CONFIG);
+				backdropOpacity.value = withSpring(0, SPRING_CONFIG);
 			} else {
-				translateX.value = withSpring(0);
+				translateX.value = withSpring(0, SPRING_CONFIG);
+				backdropOpacity.value = withSpring(1, SPRING_CONFIG);
 			}
 		});
 
@@ -55,18 +74,22 @@ export function LayerDrawer({
 		transform: [{ translateX: translateX.value }],
 	}));
 
-	if (!visible) return null;
+	const backdropStyle = useAnimatedStyle(() => ({
+		opacity: backdropOpacity.value,
+	}));
 
 	return (
-		<View className="absolute inset-0 z-40">
+		<View className="absolute inset-0 z-40" pointerEvents={visible ? "auto" : "none"}>
 			{/* Backdrop */}
-			<Pressable className="absolute inset-0 bg-black/60" onPress={onClose} />
+			<Animated.View style={backdropStyle} className="absolute inset-0 bg-black/60">
+				<Pressable className="flex-1" onPress={onClose} />
+			</Animated.View>
 
 			{/* Drawer */}
 			<GestureDetector gesture={gesture}>
 				<Animated.View
 					style={animatedStyle}
-					className="absolute top-0 right-0 bottom-0 w-[85%] bg-[#111]"
+					className="absolute top-0 right-0 bottom-0 bg-[#111]"
 				>
 					{/* Header */}
 					<View className="pt-14 pb-4 px-4 border-b border-white/10">
@@ -83,7 +106,7 @@ export function LayerDrawer({
 					</View>
 
 					{/* Layer list */}
-					<View className="flex-1">
+					<View className="flex-1" style={{ width: DRAWER_WIDTH }}>
 						<LayersPanel
 							layers={layers}
 							selectedId={selectedId}

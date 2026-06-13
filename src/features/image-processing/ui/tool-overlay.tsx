@@ -10,7 +10,7 @@ import {
 	Flame,
 	CircleDot,
 } from "lucide-react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -21,6 +21,9 @@ import Animated, {
 
 import { Text } from "../../../components/ui/text";
 import { type LayerType, layerRegistry } from "../chain/registry";
+
+const SPRING_CONFIG = { damping: 20, stiffness: 200, mass: 1 };
+const SHEET_HEIGHT = 420;
 
 const TOOL_ICONS: Record<string, typeof Sun> = {
 	exposure: Sun,
@@ -35,36 +38,46 @@ const TOOL_ICONS: Record<string, typeof Sun> = {
 	clarity: Flame,
 };
 
-type ToolOverlayProps={
+type ToolOverlayProps = {
 	visible: boolean;
 	onClose: () => void;
 	onSelect: (type: LayerType) => void;
 };
 
 export function ToolOverlay({ visible, onClose, onSelect }: ToolOverlayProps) {
-	const translateY = useSharedValue(600);
+	const translateY = useSharedValue(SHEET_HEIGHT);
+	const backdropOpacity = useSharedValue(0);
 	const [activeTab, setActiveTab] = useState<"adjustments" | "luts">("adjustments");
 
-	// Animate in/out based on visible prop
-	// Note: In production, we'd use useDerivedValue or useEffect
-	// For now, this is a simplified version
-
 	const tools = Object.keys(layerRegistry) as LayerType[];
+
+	// Animate in/out based on visible prop
+	useEffect(() => {
+		if (visible) {
+			translateY.value = withSpring(0, SPRING_CONFIG);
+			backdropOpacity.value = withSpring(1, SPRING_CONFIG);
+		} else {
+			translateY.value = withSpring(SHEET_HEIGHT, SPRING_CONFIG);
+			backdropOpacity.value = withSpring(0, SPRING_CONFIG);
+		}
+	}, [visible]);
 
 	const gesture = Gesture.Pan()
 		.onUpdate((e) => {
 			"worklet";
 			if (e.translationY > 0) {
 				translateY.value = e.translationY;
+				backdropOpacity.value = 1 - e.translationY / SHEET_HEIGHT;
 			}
 		})
 		.onEnd((e) => {
 			"worklet";
 			if (e.translationY > 100 || e.velocityY > 500) {
-				translateY.value = withSpring(600);
-				// onClose will be called via useEffect
+				translateY.value = withSpring(SHEET_HEIGHT, SPRING_CONFIG);
+				backdropOpacity.value = withSpring(0, SPRING_CONFIG);
 			} else {
-				translateY.value = withSpring(0);
+				translateY.value = withSpring(0, SPRING_CONFIG);
+				backdropOpacity.value = withSpring(1, SPRING_CONFIG);
 			}
 		});
 
@@ -72,12 +85,16 @@ export function ToolOverlay({ visible, onClose, onSelect }: ToolOverlayProps) {
 		transform: [{ translateY: translateY.value }],
 	}));
 
-	if (!visible) return null;
+	const backdropStyle = useAnimatedStyle(() => ({
+		opacity: backdropOpacity.value,
+	}));
 
 	return (
-		<View className="absolute inset-0 z-40">
+		<View className="absolute inset-0 z-40" pointerEvents={visible ? "auto" : "none"}>
 			{/* Backdrop */}
-			<Pressable className="absolute inset-0 bg-black/60" onPress={onClose} />
+			<Animated.View style={backdropStyle} className="absolute inset-0 bg-black/60">
+				<Pressable className="flex-1" onPress={onClose} />
+			</Animated.View>
 
 			{/* Sheet */}
 			<GestureDetector gesture={gesture}>
