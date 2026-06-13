@@ -39,7 +39,7 @@ export function Editor({ editId }: EditorProps): ReactNode {
 	const { width: screenW } = useWindowDimensions();
 	const [canvasH, setCanvasH] = useState(0);
 	const savedEditId = useRef(editId);
-	const saveEdit = useSaveEdit();
+	const { mutate: saveEditMutate } = useSaveEdit();
 	const { data: savedEdit } = useSavedEdit(editId);
 
 	const svMap = useLayerSVMap(layers);
@@ -66,13 +66,13 @@ export function Editor({ editId }: EditorProps): ReactNode {
 			const currentImage = imageStore.getSnapshot().context;
 
 			if (currentImage.originalUri && currentImage.previewUri) {
-				saveEdit.mutate({ editId: savedEditId.current });
+				saveEditMutate({ editId: savedEditId.current, svMap });
 			}
 
 			imageStore.trigger.clear();
 			chainStore.trigger.clear();
 		};
-	}, [saveEdit]);
+	}, [saveEditMutate]);
 
 	const selectedLayer: Layer | null =
 		layers.find((l) => l.id === selectedLayerId) ?? null;

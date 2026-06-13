@@ -3,11 +3,13 @@ import { useSQLiteContext } from "expo-sqlite";
 
 import { chainStore } from "../image-processing/state/chain-store";
 import { imageStore } from "./image-store";
-import { generateThumbnail } from "./thumbnail";
+import { generateEditedThumbnail } from "./thumbnail";
 import { SAVED_EDITS_KEY } from "./use-saved-edits";
+import { type LayerSVMap } from "../image-processing/ui/use-layer-sv-map";
 
 type SaveEditParams = {
 	editId?: number;
+	svMap: LayerSVMap;
 };
 
 export function useSaveEdit() {
@@ -15,14 +17,18 @@ export function useSaveEdit() {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: async ({ editId }: SaveEditParams) => {
+		mutationFn: async ({ editId, svMap }: SaveEditParams) => {
 			const layers = chainStore.getSnapshot().context.layers;
 			const image = imageStore.getSnapshot().context;
 
 			if (!image.originalUri || !image.previewUri) return;
 
 			const chainJson = JSON.stringify(layers);
-			const thumbnailUri = await generateThumbnail(image.previewUri);
+			const thumbnailUri = await generateEditedThumbnail(
+				image.previewUri,
+				layers,
+				svMap,
+			);
 
 			if (editId) {
 				await db.runAsync(

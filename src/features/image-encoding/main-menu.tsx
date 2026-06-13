@@ -6,6 +6,7 @@ import {
 	Image,
 	Pressable,
 	RefreshControl,
+	useWindowDimensions,
 	View,
 } from "react-native";
 import { Settings } from "lucide-react-native";
@@ -17,7 +18,12 @@ import { useDuplicateEdit } from "./use-duplicate-edit";
 import { useImagePicker } from "./use-image-picker";
 import { useSavedEdits } from "./use-saved-edits";
 
+const GUTTER = 8;
+const PADDING = 8;
+const COLUMNS = 3;
+
 export function MainMenu() {
+	const { width } = useWindowDimensions();
 	const { pick, isPicking } = useImagePicker();
 	const { data: edits, isLoading, refetch } = useSavedEdits();
 	const deleteEdit = useDeleteEdit();
@@ -61,12 +67,15 @@ export function MainMenu() {
 
 	const onOptions = () => router.push("/options");
 
+	const itemWidth = (width - PADDING * 2 - GUTTER * (COLUMNS - 1)) / COLUMNS;
+
 	const renderItem = useCallback(
 		({ item }: { item: SavedEdit }) => (
 			<Pressable
 				onPress={() => onEditPress(item)}
 				onLongPress={() => onEditLongPress(item)}
-				className="flex-1 aspect-square rounded-md bg-secondary overflow-hidden"
+				style={{ width: itemWidth, height: itemWidth }}
+				className="rounded-md bg-secondary overflow-hidden"
 			>
 				{item.thumbnail_path ? (
 					<Image
@@ -81,7 +90,7 @@ export function MainMenu() {
 				)}
 			</Pressable>
 		),
-		[],
+		[itemWidth],
 	);
 
 	const keyExtractor = useCallback((item: SavedEdit) => String(item.id), []);
