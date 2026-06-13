@@ -1,6 +1,5 @@
-import { useSQLiteContext } from "expo-sqlite";
-import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { router } from "expo-router";
+import { useCallback } from "react";
 import {
 	Alert,
 	FlatList,
@@ -12,55 +11,17 @@ import {
 import { Settings } from "lucide-react-native";
 
 import { Text } from "../../components/ui/text";
+import { type SavedEdit } from "./db";
+import { useDeleteEdit } from "./use-delete-edit";
+import { useDuplicateEdit } from "./use-duplicate-edit";
 import { useImagePicker } from "./use-image-picker";
-
-type SavedEdit = {
-	id: number;
-	source_path: string;
-	chain: unknown[];
-	thumbnail_path: string;
-	created_at: string;
-};
+import { useSavedEdits } from "./use-saved-edits";
 
 export function MainMenu() {
 	const { pick, isPicking } = useImagePicker();
-	const [edits, setEdits] = useState<SavedEdit[]>([]);
-	const [refreshing, setRefreshing] = useState(false);
-	const db = useSQLiteContext();
-
-	const loadEdits = useCallback(async () => {
-		try {
-			const rows = await db.getAllAsync<{
-				id: number;
-				source_path: string;
-				chain: string;
-				thumbnail_path: string;
-				created_at: string;
-			}>("SELECT * FROM saved_edits ORDER BY created_at DESC");
-
-			setEdits(
-				rows.map((row) => ({
-					...row,
-					chain: JSON.parse(row.chain),
-				})),
-			);
-		} catch (err) {
-			console.error("Failed to load edits:", err);
-		}
-	}, [db]);
-
-	// Reload when screen comes into focus
-	useFocusEffect(
-		useCallback(() => {
-			loadEdits();
-		}, [loadEdits]),
-	);
-
-	const onRefresh = useCallback(async () => {
-		setRefreshing(true);
-		await loadEdits();
-		setRefreshing(false);
-	}, [loadEdits]);
+	const { data: edits, isLoading, refetch } = useSavedEdits();
+	const deleteEdit = useDeleteEdit();
+	const duplicateEdit = useDuplicateEdit();
 
 	const onNewEdit = async () => {
 		await pick();
@@ -78,13 +39,7 @@ export function MainMenu() {
 		Alert.alert("Edit", "What would you like to do?", [
 			{
 				text: "Duplicate",
-				onPress: async () => {
-					await db.runAsync(
-						"INSERT INTO saved_edits (source_path, chain, thumbnail_path) SELECT source_path, chain, thumbnail_path FROM saved_edits WHERE id = ?",
-						edit.id,
-					);
-					await loadEdits();
-				},
+				onPress: () => duplicateEdit.mutate(edit.id),
 			},
 			{
 				text: "Delete",
@@ -95,13 +50,7 @@ export function MainMenu() {
 						{
 							text: "Delete",
 							style: "destructive",
-							onPress: async () => {
-								await db.runAsync(
-									"DELETE FROM saved_edits WHERE id = ?",
-									edit.id,
-								);
-								await loadEdits();
-							},
+							onPress: () => deleteEdit.mutate(edit.id),
 						},
 					]);
 				},
@@ -132,12 +81,14 @@ export function MainMenu() {
 				)}
 			</Pressable>
 		),
-		[loadEdits],
+		[],
 	);
 
 	const keyExtractor = useCallback((item: SavedEdit) => String(item.id), []);
 
-	if (edits.length === 0) {
+	const editList = edits ?? [];
+
+	if (editList.length === 0 && !isLoading) {
 		return (
 			<View className="flex-1 bg-background">
 				<View className="flex-row justify-between items-center px-4 pt-16">
@@ -180,14 +131,17 @@ export function MainMenu() {
 				</View>
 			</View>
 			<FlatList
-				data={edits}
+				data={editList}
 				renderItem={renderItem}
 				keyExtractor={keyExtractor}
 				numColumns={3}
 				contentContainerClassName="px-2 pb-8"
 				columnWrapperClassName="gap-2 mb-2"
 				refreshControl={
-					<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+					<RefreshControl
+						refreshing={isLoading}
+						onRefresh={refetch}
+					/>
 				}
 			/>
 		</View>

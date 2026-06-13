@@ -1,11 +1,14 @@
 import "../global.css";
 import { Electrolize_400Regular, useFonts } from "@expo-google-fonts/electrolize";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { SQLiteProvider } from "expo-sqlite";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Uniwind } from "uniwind";
+
+import { queryClient } from "../lib/query-client";
 
 // Lock to dark mode — no light theme, no system-follow.
 Uniwind.setTheme("dark");
@@ -59,7 +62,9 @@ export default function RootLayout() {
 	return (
 		<GestureHandlerRootView className="flex-1">
 			<SQLiteProvider databaseName="lutra.db" onInit={initDb}>
-				<Stack screenOptions={{ headerShown: false }} />
+				<QueryClientProvider client={queryClient}>
+					<Stack screenOptions={{ headerShown: false }} />
+				</QueryClientProvider>
 			</SQLiteProvider>
 		</GestureHandlerRootView>
 	);

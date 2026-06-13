@@ -1,8 +1,8 @@
-import { File, Paths } from "expo-file-system";
+import { Directory, File, Paths } from "expo-file-system";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 
 const THUMB_SIZE = 200;
-const thumbDir = new File(Paths.document, "thumbnails");
+const thumbDir = new Directory(Paths.document, "thumbnails");
 
 /**
  * Generate a square-cropped thumbnail for the grid.
@@ -14,7 +14,7 @@ export async function generateThumbnail(
 	sourceHeight?: number,
 ): Promise<string> {
 	// Ensure thumbnail directory exists
-	await thumbDir.create({ intermediates: true });
+	await thumbDir.create({ intermediates: true, idempotent: true });
 
 	const filename = `thumb_${Date.now()}.jpg`;
 	const dest = new File(thumbDir, filename);

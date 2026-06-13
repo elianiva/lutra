@@ -1,12 +1,13 @@
 import Constants from "expo-constants";
 import { File } from "expo-file-system";
-import { useSQLiteContext } from "expo-sqlite";
 import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { Alert, Linking, Pressable, ScrollView, View } from "react-native";
 
 import { BackButton } from "../../components/back-button";
 import { Text } from "../../components/ui/text";
+import { useClearAllEdits } from "../image-encoding/use-clear-all-edits";
+import { useSavedEdits } from "../image-encoding/use-saved-edits";
 
 function formatBytes(bytes: number): string {
 	if (bytes === 0) return "0 B";
@@ -18,23 +19,17 @@ function formatBytes(bytes: number): string {
 
 export function OptionsScreen() {
 	const version = Constants.expoConfig?.version ?? "1.0.0";
-	const db = useSQLiteContext();
-	const [editCount, setEditCount] = useState(0);
+	const { data: edits } = useSavedEdits();
+	const clearAll = useClearAllEdits();
 	const [storageUsed, setStorageUsed] = useState(0);
 
-	const loadStats = useCallback(async () => {
-		try {
-			const countRow = await db.getFirstAsync<{ count: number }>(
-				"SELECT COUNT(*) as count FROM saved_edits",
-			);
-			setEditCount(countRow?.count ?? 0);
+	const editCount = edits?.length ?? 0;
 
-			// Calculate storage from file system
-			const edits = await db.getAllAsync<{
-				source_path: string;
-				thumbnail_path: string;
-			}>("SELECT source_path, thumbnail_path FROM saved_edits");
+	// Calculate storage from file system when edits change
+	useMemo(() => {
+		if (!edits) return;
 
+		const calculateStorage = async () => {
 			let total = 0;
 			for (const edit of edits) {
 				try {
@@ -50,14 +45,10 @@ export function OptionsScreen() {
 				}
 			}
 			setStorageUsed(total);
-		} catch (err) {
-			console.error("Failed to load stats:", err);
-		}
-	}, [db]);
+		};
 
-	useEffect(() => {
-		loadStats();
-	}, [loadStats]);
+		calculateStorage();
+	}, [edits]);
 
 	const onClearAll = () => {
 		Alert.alert(
@@ -68,31 +59,7 @@ export function OptionsScreen() {
 				{
 					text: "Clear all",
 					style: "destructive",
-					onPress: async () => {
-						// Delete all files
-						const edits = await db.getAllAsync<{
-							source_path: string;
-							thumbnail_path: string;
-						}>("SELECT source_path, thumbnail_path FROM saved_edits");
-
-						for (const edit of edits) {
-							try {
-								const sourceFile = new File(edit.source_path);
-								await sourceFile.delete();
-							} catch {
-								// File might not exist, skip
-							}
-							try {
-								const thumbFile = new File(edit.thumbnail_path);
-								await thumbFile.delete();
-							} catch {
-								// File might not exist, skip
-							}
-						}
-
-						await db.runAsync("DELETE FROM saved_edits");
-						await loadStats();
-					},
+					onPress: () => clearAll.mutate(),
 				},
 			],
 		);
