@@ -16,6 +16,24 @@ _Avoid_: "Presets" (these are built-in looks, distinct from the adjustment primi
 The ordered list of **adjustment layers** applied to a single source image. The chain is the unit of non-destructive persistence: it can be saved, replayed, reordered, and pruned without touching the source image.
 _Avoid_: "Stack" (Snapseed uses this word but it suggests LIFO; the chain is order-sensitive in both directions), "history" (history is a side effect, not the model).
 
+### Editor UI
+
+**Pinned tools**:
+The user's customized set of quick-access **adjustment layer** types shown in the bottom toolbar of the **editor**. Defaults to five (Exposure, White Balance, Saturation, Contrast, Vignette). User can swap any pinned tool via long-press. Minimum one, maximum five. Stored in AsyncStorage, not part of the **edit chain**.
+_Avoid_: "toolbar" (too generic), "quick actions" (Android-centric)
+
+**Draft layer**:
+An **adjustment layer** in a transactional preview state before the user confirms it. Created when the user selects a tool from the **tool overlay**. The slider adjusts live, but the layer is not added to the **edit chain** until confirmed. If the user cancels or navigates away, the draft is discarded. The **editor** blocks other interactions (layer drawer, tool selection) while a draft is active.
+_Avoid_: "preview layer" (ambiguous with image preview), "temp layer" (implies temporary persistence)
+
+**Tool overlay**:
+A bottom-sheet overlay showing all available **adjustment layer** types in a 4-column grid. Accessed via the chevron-up affordance below the **pinned tools**. Organized into tabs (Adjustments, LUTs placeholder for v1). Selecting a tool creates a **draft layer** and closes the overlay.
+_Avoid_: "tool palette" (desktop jargon), "adjustments panel" (conflicts with the old tab-based UI)
+
+**Layer drawer**:
+A right-edge overlay showing the current **edit chain** with reorder, visibility toggle, and delete capabilities. Accessed via the layer icon in the top bar. Opens via slide-in, dismissed by swipe-right or tap-outside. Blocked while a **draft layer** is active.
+_Avoid_: "layers panel" (was the old bottom tab), "layer list" (too generic)
+
 ### Adjustments
 
 The v1 palette — ten **adjustment layer** types the user can add to the **edit chain**. No LUT yet (see Future). Order is significant.
@@ -40,7 +58,7 @@ The app's entry screen. Shows the app name (**LUTRA**, left-aligned) and a grid 
 _Avoid_: "home" (iOS-centric, ambiguous with system home), "start screen" (ambiguous), "landing" (web jargon).
 
 **Editor**:
-The color-grading screen that renders an **edit chain** for one image. Reached from **main menu** → **+** → picker → image selected, or by tapping a **saved edit** (resumes the chain). No-image empty state is dead code.
+The color-grading screen that renders an **edit chain** for one image. Reached from **main menu** → **+** → picker → image selected, or by tapping a **saved edit** (resumes the chain). Top bar: **back** (left), **layer icon** (opens **layer drawer**), **hamburger** (export). Bottom: **pinned tools** with chevron-up to **tool overlay**. During active edit: bottom shows slider (240px) replacing pinned tools; top shows confirm/cancel for **draft layer**, or back-button-as-done for existing layer edits. Pannable/zoomable image (pinch-to-zoom, double-tap 100%).
 _Avoid_: "color grading menu" (the menu is the main menu, not this), "workspace" (overloaded), "canvas" (only the top half is a canvas).
 
 **Options screen**:
