@@ -4,16 +4,17 @@ The ruler slider emulates a mechanical lens adjustment ring. The physical feel c
 
 ## 1. Gesture thread model
 
-The slider uses RNGH v3's `Gesture.Pan()` (not the legacy `usePanGesture` hook). This is critical: `Gesture.Pan()` callbacks execute as **worklets on the UI thread** at native frame rate. The deprecated `usePanGesture` runs on the JS thread, crossing the RN bridge on every frame — that bridge overhead is what causes the "sticky" or "jumpy" feel.
+The slider uses RNGH v3's `usePanGesture()` hook API (not the legacy builder `Gesture.Pan()`). This is critical: `usePanGesture()` callbacks execute as **worklets on the UI thread** at native frame rate. The deprecated `Gesture.Pan()` builder API runs on the JS thread, crossing the RN bridge on every frame — that bridge overhead is what causes the "sticky" or "jumpy" feel.
 
 ```ts
 // ✅ UI thread, no bridge
-const gesture = Gesture.Pan()
-  .onChange((e) => { "worklet"; /* ... */ })
-  .onFinalize(() => { "worklet"; /* ... */ });
+const gesture = usePanGesture({
+  onUpdate: (e) => { /* e.changeX is available here */ },
+  onFinalize: () => { /* ... */ },
+});
 ```
 
-The `.onChange()` callback fires continuously during the drag, providing `e.changeX` (delta in points since the last event) at 60–120 fps on the UI thread. The SharedValue `value.value` is mutated directly inside the worklet; Reanimated propagates the change to the display label and the Skia shader uniforms without a React re-render.
+The `onUpdate` callback fires continuously during the drag, providing `e.changeX` (delta in points since the last event) at 60–120 fps on the UI thread. The SharedValue `value.value` is mutated directly inside the worklet; Reanimated propagates the change to the display label and the Skia shader uniforms without a React re-render.
 
 ## 2. Transfer function (piecewise-linear acceleration)
 
@@ -83,4 +84,4 @@ Earlier versions snapped the value to tick boundaries during and after the drag.
 - [libinput pointer acceleration](https://wayland.freedesktop.org/libinput/doc/latest/pointer-acceleration.html) — the three-zone piecewise model
 - [X server pointer acceleration analysis](https://who-t.blogspot.com/2018/05/x-server-pointer-acceleration-analysis-part1.html) — classic profile behavior, deceleration zone rationale
 - [Gesture Guide — Physics Feel](https://interactionguide.cn/physics/) — momentum, friction, springs, and rubber-banding in gesture-driven UIs
-- [RNGH v3 Gesture API](https://docs.swmansion.com/react-native-gesture-handler/docs/gestures/pan-gesture) — `Gesture.Pan()` worklet model vs legacy `usePanGesture`
+- [RNGH v3 Pan Gesture](https://docs.swmansion.com/react-native-gesture-handler/docs/gestures/use-pan-gesture) — `usePanGesture()` hook API vs legacy builder `Gesture.Pan()`
