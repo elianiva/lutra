@@ -41,7 +41,7 @@ export function PinnedTools({ tools, onToolPress, onToolLongPress }: PinnedTools
 	}, [onToolLongPress]);
 
 	return (
-		<View className="flex-row items-center justify-center gap-2 px-4">
+		<View className="flex-row items-center justify-center gap-2 px-4" style={{ flex: 1, width: "100%" }}>
 			{tools.map((type) => {
 				const LucideIcon = TOOL_ICONS[type] ?? Sun;
 				const label = TOOL_LABELS[type] ?? type.toUpperCase();
@@ -51,7 +51,7 @@ export function PinnedTools({ tools, onToolPress, onToolLongPress }: PinnedTools
 						onPress={() => handlePress(type)}
 						onLongPress={() => handleLongPress(type)}
 						delayLongPress={500}
-						className="items-center justify-center rounded-lg px-3 py-3 min-w-[64px]"
+						className="flex-1 items-center justify-center py-3"
 						style={{
 							backgroundColor: "rgba(255,255,255,0.04)",
 							borderWidth: 1,

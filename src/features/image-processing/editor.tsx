@@ -1,11 +1,12 @@
 import { useImage } from "@shopify/react-native-skia";
 import { useMachine } from "@xstate/react";
 import { useSelector } from "@xstate/store-react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Check, ChevronUp, Layers, Menu, X } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Pressable, View, useWindowDimensions, type LayoutChangeEvent } from "react-native";
+import { Alert, Pressable, View, useWindowDimensions, type LayoutChangeEvent } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
 	type SharedValue,
@@ -38,7 +39,15 @@ import { ToolOverlay } from "./ui/tool-overlay";
 import { useLayerSVMap } from "./ui/use-layer-sv-map";
 
 // Default pinned tools — user can customize via long-press
-const DEFAULT_PINNED: LayerType[] = ["exposure", "whiteBalance", "saturation", "contrast", "vignette"];
+const DEFAULT_PINNED: LayerType[] = [
+	"exposure",
+	"whiteBalance",
+	"saturation",
+	"contrast",
+	"vignette",
+];
+
+const STORAGE_KEY = "lutra:pinned-tools";
 
 type EditorProps = {
 	editId?: number;
@@ -143,6 +152,31 @@ export function Editor({ editId }: EditorProps): ReactNode {
 		const layer = createLayer(type);
 		setDraftLayer(layer);
 		setToolOverlayVisible(false);
+	};
+
+	// --- Unpin tool via long-press menu ---
+	const onUnpinTool = (type: LayerType) => {
+		Alert.alert(
+			layerRegistry[type]?.label ?? type,
+			undefined,
+			[
+				{
+					text: "Unpin",
+					style: "destructive",
+					onPress: async () => {
+						if (pinnedTools.length <= 1) return;
+						const updated = pinnedTools.filter((t) => t !== type);
+						setPinnedTools(updated);
+						await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+					},
+				},
+				{
+					text: "Customize…",
+					onPress: () => setCustomizeVisible(true),
+				},
+				{ text: "Cancel", style: "cancel" },
+			],
+		);
 	};
 
 	// --- Confirm draft ---
@@ -433,9 +467,7 @@ export function Editor({ editId }: EditorProps): ReactNode {
 						<PinnedTools
 							tools={pinnedTools}
 							onToolPress={onToolSelect}
-							onToolLongPress={(type) => {
-								setCustomizeVisible(true);
-							}}
+							onToolLongPress={onUnpinTool}
 						/>
 					</View>
 					<Pressable
