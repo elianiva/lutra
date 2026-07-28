@@ -1,5 +1,7 @@
+import { memo } from "react";
 import { LinearGradient } from "expo-linear-gradient";
 import { View } from "react-native";
+import Animated, { useAnimatedStyle, type SharedValue } from "react-native-reanimated";
 
 import { Text } from "../../../components/ui/text";
 
@@ -54,15 +56,27 @@ export function getValueTickPosition(value: number, ticks: Tick[]): number {
 
 type SliderTrackProps = {
   trackWidth: number;
-  scrollPosition: number;
+  scrollPosition: SharedValue<number>;
   ticks: Tick[];
   formatValue?: (v: number) => string;
   min: number;
   max: number;
 };
 
-export function SliderTrack({ trackWidth, scrollPosition, ticks, formatValue, min, max }: SliderTrackProps) {
+export const SliderTrack = memo(function SliderTrack({
+  trackWidth,
+  scrollPosition,
+  ticks,
+  formatValue,
+  min,
+  max,
+}: SliderTrackProps) {
   const fmt = (v: number) => (formatValue ? formatValue(v) : v.toFixed(2));
+
+  // Translate the tick container on the UI thread — no React re-renders during panning.
+  const tickScrollStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: -scrollPosition.value * TICK_GAP }],
+  }));
 
   if (trackWidth <= 0) {
     return (
@@ -112,60 +126,61 @@ export function SliderTrack({ trackWidth, scrollPosition, ticks, formatValue, mi
       />
 
       {ticks.length > 0 ? (
-        ticks.map((tick, i) => {
-          const x = (i - scrollPosition) * TICK_GAP + trackWidth / 2;
-          if (x < -FADE_WIDTH || x > trackWidth + FADE_WIDTH) return null;
+        <Animated.View style={[{ position: "absolute", left: 0, right: 0, height: RULER_HEIGHT }, tickScrollStyle]}>
+          {ticks.map((tick, i) => {
+            const x = i * TICK_GAP + trackWidth / 2;
 
-          const screenCenter = trackWidth / 2;
-          const distFromCenter = Math.abs(x - screenCenter);
-          const maxDist = trackWidth / 2;
-          const t = maxDist === 0 ? 0 : distFromCenter / maxDist;
-          const opacity = Math.max(0.08, 1 - t * t * 0.9);
+            const screenCenter = trackWidth / 2;
+            const distFromCenter = Math.abs(x - screenCenter);
+            const maxDist = trackWidth / 2;
+            const t = maxDist === 0 ? 0 : distFromCenter / maxDist;
+            const opacity = Math.max(0.08, 1 - t * t * 0.9);
 
-          const tickH = tick.isMajor ? MAJOR_TICK_HEIGHT : MINOR_TICK_HEIGHT;
-          const tickW = tick.isMajor ? MAJOR_TICK_WIDTH : MINOR_TICK_WIDTH;
+            const tickH = tick.isMajor ? MAJOR_TICK_HEIGHT : MINOR_TICK_HEIGHT;
+            const tickW = tick.isMajor ? MAJOR_TICK_WIDTH : MINOR_TICK_WIDTH;
 
-          return (
-            <View
-              key={`${tick.value}-${i}`}
-              style={{
-                position: "absolute",
-                left: x - tickW / 2,
-                bottom: 0,
-                height: RULER_HEIGHT,
-                opacity,
-              }}
-            >
+            return (
               <View
+                key={`${tick.value}-${i}`}
                 style={{
                   position: "absolute",
-                  bottom: TICK_LABEL_HEIGHT,
-                  width: tickW,
-                  height: tickH,
-                  backgroundColor: "#fff",
-                  borderRadius: 1.5,
+                  left: x - tickW / 2,
+                  bottom: 0,
+                  height: RULER_HEIGHT,
+                  opacity,
                 }}
-              />
-              {tick.isMajor && (
-                <Text
+              >
+                <View
                   style={{
                     position: "absolute",
-                    bottom: -20,
-                    left: -18,
-                    width: 40,
-                    textAlign: "center",
-                    fontSize: 18,
-                    color: "#fff",
-                    fontFamily: "Electrolize_400Regular",
-                    opacity: Math.max(0.4, 1 - t * 0.6),
+                    bottom: TICK_LABEL_HEIGHT,
+                    width: tickW,
+                    height: tickH,
+                    backgroundColor: "#fff",
+                    borderRadius: 1.5,
                   }}
-                >
-                  {Number.isInteger(tick.value) ? tick.value : tick.value.toFixed(1)}
-                </Text>
-              )}
-            </View>
-          );
-        })
+                />
+                {tick.isMajor && (
+                  <Text
+                    style={{
+                      position: "absolute",
+                      bottom: -20,
+                      left: -18,
+                      width: 40,
+                      textAlign: "center",
+                      fontSize: 18,
+                      color: "#fff",
+                      fontFamily: "Electrolize_400Regular",
+                      opacity: Math.max(0.4, 1 - t * 0.6),
+                    }}
+                  >
+                    {Number.isInteger(tick.value) ? tick.value : tick.value.toFixed(1)}
+                  </Text>
+                )}
+              </View>
+            );
+          })}
+        </Animated.View>
       ) : (
         <>
           <View style={{ position: "absolute", left: 24, bottom: 0, height: RULER_HEIGHT }}>
@@ -238,4 +253,4 @@ export function SliderTrack({ trackWidth, scrollPosition, ticks, formatValue, mi
       />
     </View>
   );
-}
+});

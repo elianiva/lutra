@@ -73,9 +73,27 @@ export function Pipeline({ layers, svMap, image, width, height }: PipelineProps)
 
 	// Reactive updates on the UI thread for slider drags (individual SVs
 	// change → mapper re-runs → uniforms.value updated).
+	//
+	// The version guard prevents a stale mapper (whose closure captured
+	// an old uniformEntries) from overwriting uniforms.value after the
+	// layer composition has changed.  When uniformEntries changes we
+	// bump a shared value; the mapper skips if its captured version
+	// doesn't match.  Without this, the old mapper can fire between
+	// the synchronous render update and the effect cleanup, clobbering
+	// the correct uniforms with stale data and causing Skia to throw
+	// "Missing uniform value for: l0_stops".
+	const versionRef = useRef<SharedValue<number> | null>(null);
+	if (versionRef.current === null) {
+		versionRef.current = makeMutable(0);
+	}
+	const versionSv = versionRef.current;
+	versionSv.value += 1;
+	const currentVersion = versionSv.value;
+
 	useEffect(() => {
 		const fun = () => {
 			"worklet";
+			if (versionSv.value !== currentVersion) return;
 			const u: Uniforms = { u_resolution: [width, height] };
 			for (const { name, sv } of uniformEntries) {
 				u[name] = sv.value;

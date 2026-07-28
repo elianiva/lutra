@@ -26,16 +26,14 @@ function createSVs(): Record<string, SharedValue<number>> {
 function syncSVs(layer: Layer, svs: Record<string, SharedValue<number>>): void {
 	const entry = layerRegistry[layer.type];
 	for (const [key] of Object.entries(entry.fields)) {
-		const chainVal = (layer as unknown as Record<string, number>)[key];
 		if (!svs[key]) {
-			svs[key] = makeMutable(chainVal);
-		} else if (svs[key].value !== chainVal) {
-			// Recreate the SV with the chain-store value. Direct assignment
-			// (sv.value = x) from the JS thread doesn't reliably propagate
-			// to the UI thread in Reanimated 4, but `makeMutable` correctly
-			// sets the initial value on both threads for a new SV.
+			const chainVal = (layer as unknown as Record<string, number>)[key];
 			svs[key] = makeMutable(chainVal);
 		}
+		// Once created, the SharedValue is the source of truth.
+		// The slider mutates it directly on the UI thread; the Pipeline
+		// mapper watches the same instance. Never replace it — that would
+		// disconnect the slider from the renderer and kill live preview.
 	}
 }
 

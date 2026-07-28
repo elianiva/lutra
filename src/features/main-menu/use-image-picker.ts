@@ -5,7 +5,7 @@ import { Alert } from "react-native";
 import { imageStore } from "../saved-edits/image-store";
 import { resampleForPreview } from "./resample-image";
 
-type PickResult = {
+export type PickResult = {
   originalUri: string;
   previewUri: string;
 };
@@ -13,7 +13,10 @@ type PickResult = {
 // `isPending` covers the resample step only. Permission prompt and
 // picker sheet are system modals that already block the user, so the
 // hook doesn't need to expose a "true" state during those.
-export function useImagePicker(onSuccess?: () => void) {
+//
+// The optional `onSuccess` receives the picked URIs so callers can chain
+// work (e.g. persist the project) before navigating.
+export function useImagePicker(onSuccess?: (data: PickResult) => void) {
   return useMutation({
     mutationFn: async (): Promise<PickResult | null> => {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -43,7 +46,7 @@ export function useImagePicker(onSuccess?: () => void) {
     onSuccess: (data) => {
       if (data) {
         imageStore.trigger.setImage(data);
-        onSuccess?.();
+        onSuccess?.(data);
       }
     },
     onError: (err) => {

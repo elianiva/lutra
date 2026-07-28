@@ -7,11 +7,20 @@ import { type SharedValue } from "react-native-reanimated";
 // the index (l0_stops, l1_amount, ...).
 export type BodyRenderer = (layerIndex: number) => string;
 
-export const formatSigned = (v: number): string => `${v >= 0 ? "+" : ""}${v.toFixed(2)}`;
+export const formatSigned = (v: number): string => {
+	"worklet";
+	return `${v >= 0 ? "+" : ""}${v.toFixed(2)}`;
+};
 
-export const formatEV = (v: number): string => `${formatSigned(v)} EV`;
+export const formatEV = (v: number): string => {
+	"worklet";
+	return `${formatSigned(v)} EV`;
+};
 
-export const formatPercent = (v: number): string => `${Math.round(v * 100)}%`;
+export const formatPercent = (v: number): string => {
+	"worklet";
+	return `${Math.round(v * 100)}%`;
+};
 
 export type Formatter = (v: number) => string;
 

@@ -1,8 +1,13 @@
 import { type ReactNode, useCallback, useState } from "react";
 import { Pressable, View, type LayoutChangeEvent } from "react-native";
 import { usePanGesture, GestureDetector } from "react-native-gesture-handler";
-import { type SharedValue, useAnimatedReaction } from "react-native-reanimated";
+import {
+  type SharedValue,
+  useAnimatedProps,
+  useDerivedValue,
+} from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import AnimateableText from "react-native-animateable-text";
 
 import { Text } from "../../../components/ui/text";
 import { SliderTrack, generateTicks, getValueTickPosition } from "./slider-track";
@@ -24,7 +29,10 @@ const clamp = (min: number, x: number, max: number) => {
   return Math.max(min, Math.min(max, x));
 };
 
-const format = (v: number, fmt?: (v: number) => string) => (fmt ? fmt(v) : v.toFixed(2));
+const format = (v: number, fmt?: (v: number) => string) => {
+  "worklet";
+  return fmt ? fmt(v) : v.toFixed(2);
+};
 
 type SliderProps = {
   value: SharedValue<number>;
@@ -51,20 +59,19 @@ export function Slider({
   majorTicks = [],
 }: SliderProps): ReactNode {
   const [trackWidth, setTrackWidth] = useState(0);
-  const [displayValue, setDisplayValue] = useState(() => format(value.value, formatValue));
-  const updateDisplay = useCallback(
-    (v: number) => setDisplayValue(format(v, formatValue)),
-    [formatValue],
-  );
 
   const ticks = generateTicks(majorTicks);
   const hasTicks = ticks.length > 0;
-  const scrollPosition = hasTicks ? getValueTickPosition(value.value, ticks) : 0;
 
-  useAnimatedReaction(
-    () => value.value,
-    (current) => scheduleOnRN(updateDisplay, current),
-  );
+  // Display text: animated props on the UI thread.
+  // format functions are now workletized (see format.ts).
+  const displayProps = useAnimatedProps(() => ({
+    text: format(value.value, formatValue),
+  }), [formatValue]);
+
+  const scrollPosition = useDerivedValue(() => {
+    return hasTicks ? getValueTickPosition(value.value, ticks) : 0;
+  }, [hasTicks, ticks]);
 
   const gesture = usePanGesture({
     onUpdate: (e) => {
@@ -115,7 +122,8 @@ export function Slider({
         >
           {label.toUpperCase()}
         </Text>
-        <Text
+        <AnimateableText
+          animatedProps={displayProps}
           style={{
             fontSize: 20,
             fontWeight: "400",
@@ -125,9 +133,7 @@ export function Slider({
             minWidth: 60,
             textAlign: "center",
           }}
-        >
-          {displayValue}
-        </Text>
+        />
       </Pressable>
 
       <GestureDetector gesture={gesture}>

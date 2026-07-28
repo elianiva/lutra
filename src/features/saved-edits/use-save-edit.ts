@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Alert } from "react-native";
 import { useSQLiteContext } from "expo-sqlite";
 
 import { chainStore } from "../editor/state/chain-store";
@@ -44,6 +45,10 @@ export function useSaveEdit() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: editKeys.all });
+    },
+    onError: (err) => {
+      console.error("Failed to save edit:", err);
+      Alert.alert("Save failed", (err as Error).message);
     },
   });
 }

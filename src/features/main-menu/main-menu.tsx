@@ -14,10 +14,11 @@ import {
 import { Icon } from "../../components/ui/icon";
 import { Text } from "../../components/ui/text";
 import { type SavedEdit } from "../saved-edits/db";
+import { useCreateEdit } from "../saved-edits/use-create-edit";
 import { useDeleteEdit } from "../saved-edits/use-delete-edit";
 import { useDuplicateEdit } from "../saved-edits/use-duplicate-edit";
-import { useImagePicker } from "./use-image-picker";
 import { useEdits } from "../saved-edits/use-edits";
+import { useImagePicker } from "./use-image-picker";
 
 const GUTTER = 8;
 const PADDING = 8;
@@ -25,12 +26,22 @@ const COLUMNS = 3;
 
 export function MainMenu() {
 	const { width } = useWindowDimensions();
-	const pickMutation = useImagePicker(() => router.push("/editor"));
+	const pickMutation = useImagePicker();
+	const createEdit = useCreateEdit();
 	const { data: edits, isLoading, refetch } = useEdits();
 	const deleteEdit = useDeleteEdit();
 	const duplicateEdit = useDuplicateEdit();
 
-	const onNewEdit = () => pickMutation.mutate();
+	const onNewEdit = useCallback(async () => {
+		try {
+			const data = await pickMutation.mutateAsync();
+			if (!data) return;
+			const editId = await createEdit.mutateAsync(data);
+			router.push({ pathname: "/editor", params: { editId: String(editId) } });
+		} catch (err) {
+			// Errors are already surfaced by each mutation's onError handler.
+		}
+	}, [pickMutation, createEdit]);
 
 	const onEditPress = (edit: SavedEdit) => {
 		router.push({
@@ -109,11 +120,11 @@ export function MainMenu() {
 				<View className="flex-1 items-center justify-center px-8">
 					<Pressable
 						onPress={onNewEdit}
-						disabled={pickMutation.isPending}
+						disabled={pickMutation.isPending || createEdit.isPending}
 						className="items-center rounded-md bg-primary px-6 py-4 active:opacity-70 disabled:opacity-50"
 					>
 						<Text className="text-primary-foreground text-lg">
-							{pickMutation.isPending ? "Preparing…" : "Start editing"}
+							{pickMutation.isPending || createEdit.isPending ? "Preparing…" : "Start editing"}
 						</Text>
 					</Pressable>
 					<Text variant="muted" className="mt-4">
@@ -129,7 +140,7 @@ export function MainMenu() {
 			<View className="flex-row justify-between items-center px-4 pt-16 pb-2">
 				<Text className="text-xl tracking-tight font-sans">LUTRA</Text>
 				<View className="flex-row gap-4">
-					<Pressable onPress={onNewEdit} disabled={pickMutation.isPending} className="p-2">
+					<Pressable onPress={onNewEdit} disabled={pickMutation.isPending || createEdit.isPending} className="p-2 disabled:opacity-30">
 						<Text className="text-2xl">+</Text>
 					</Pressable>
 					<Pressable onPress={onOptions} className="p-2">
