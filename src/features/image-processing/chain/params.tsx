@@ -36,7 +36,6 @@ export function Params({ layer, onCommit, onRemove, sv }: ParamsProps) {
           value={sv[activeFieldKey]}
           min={activeField.min}
           max={activeField.max}
-          step={activeField.step}
           label={activeField.label}
           formatValue={resolveFormat(activeField.format)}
           majorTicks={activeField.majorTicks}
@@ -59,7 +58,6 @@ export function Params({ layer, onCommit, onRemove, sv }: ParamsProps) {
           value={sv[key]}
           min={field.min}
           max={field.max}
-          step={field.step}
           label={field.label}
           formatValue={resolveFormat(field.format)}
           majorTicks={field.majorTicks}

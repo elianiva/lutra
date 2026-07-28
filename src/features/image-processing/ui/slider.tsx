@@ -1,8 +1,7 @@
-import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { type ReactNode, useCallback, useState } from "react";
 import { Pressable, View, type LayoutChangeEvent } from "react-native";
-import { GestureDetector, usePanGesture } from "react-native-gesture-handler";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { type SharedValue, useAnimatedReaction } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
@@ -14,7 +13,17 @@ const MINOR_TICK_HEIGHT = 28;
 const MAJOR_TICK_WIDTH = 3;
 const MINOR_TICK_WIDTH = 3;
 const INDICATOR_WIDTH = 4;
-const SENSITIVITY = 0.04;
+// Piecewise-linear transfer function, modelled after libinput's
+// pointer-acceleration profile. Three zones:
+//   [0 … LOW]  — deceleration (40% speed) for micro-adjustments
+//   (LOW … HIGH] — linear ramp from 40% → MAX factor
+//   > HIGH      — capped at MAX factor (covers range on fast swipes)
+// See docs/slider-physics.md for rationale and tuning guidance.
+const BASE_SENSITIVITY = 0.015;
+const DECEL_FACTOR = 0.4;
+const ACCEL_MAX = 1.6;
+const LOW_VEL = 2; // px/frame: below this = precision zone
+const HIGH_VEL = 16; // px/frame: above this = capped acceleration
 const FADE_WIDTH = 150;
 const TICK_GAP = 16;
 const TICK_LABEL_HEIGHT = 18;
@@ -71,17 +80,10 @@ function getValueTickPosition(value: number, ticks: Tick[]): number {
   return ticks.length - 1;
 }
 
-function getTickValueByIndex(ticks: Tick[], index: number): number {
-  "worklet";
-  const i = Math.max(0, Math.min(ticks.length - 1, Math.round(index)));
-  return ticks[i].value;
-}
-
 type SliderProps = {
   value: SharedValue<number>;
   min: number;
   max: number;
-  step?: number;
   label: string;
   formatValue?: (v: number) => string;
   onCommit: (v: number) => void;
@@ -95,7 +97,6 @@ export function Slider({
   value,
   min,
   max,
-  step = 0.01,
   label,
   formatValue,
   onCommit,
@@ -119,45 +120,25 @@ export function Slider({
     (current) => scheduleOnRN(updateDisplay, current),
   );
 
-  const triggerHaptic = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, []);
-
-  useAnimatedReaction(
-    () => {
-      if (ticks.length === 0) return -1;
-      return Math.round(getValueTickPosition(value.value, ticks));
-    },
-    (current, previous) => {
-      if (current !== -1 && current !== previous) {
-        scheduleOnRN(triggerHaptic);
-      }
-    },
-  );
-
-  const gesture = usePanGesture({
-    onUpdate: (e) => {
+  const gesture = Gesture.Pan()
+    .onChange((e) => {
       "worklet";
-      if (ticks.length === 0) {
-        const valueChange = -e.changeX * SENSITIVITY;
-        value.value = clamp(min, value.value + valueChange, max);
-        return;
+      const mag = Math.abs(e.changeX);
+      let factor: number;
+      if (mag < LOW_VEL) {
+        factor = DECEL_FACTOR;
+      } else if (mag < HIGH_VEL) {
+        const t = (mag - LOW_VEL) / (HIGH_VEL - LOW_VEL);
+        factor = DECEL_FACTOR + t * (ACCEL_MAX - DECEL_FACTOR);
+      } else {
+        factor = ACCEL_MAX;
       }
-      const currentIndex = getValueTickPosition(value.value, ticks);
-      const indexChange = -e.changeX / TICK_GAP;
-      value.value = getTickValueByIndex(ticks, currentIndex + indexChange);
-    },
-    onFinalize: () => {
+      value.value = clamp(min, value.value - e.changeX * BASE_SENSITIVITY * factor, max);
+    })
+    .onFinalize(() => {
       "worklet";
-      if (ticks.length > 0) {
-        value.value = getTickValueByIndex(
-          ticks,
-          getValueTickPosition(value.value, ticks),
-        );
-      }
       scheduleOnRN(onCommit, value.value);
-    },
-  });
+    });
 
   const onTrackLayout = useCallback((e: LayoutChangeEvent) => {
     setTrackWidth(e.nativeEvent.layout.width - 32);
