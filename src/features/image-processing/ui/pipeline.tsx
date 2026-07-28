@@ -87,7 +87,7 @@ export function Pipeline({ layers, svMap, image, width, height }: PipelineProps)
 	}, [uniformEntries, width, height]);
 
 	return (
-		<Canvas style={{ width, height }}>
+		<Canvas style={{ width, height }} pointerEvents="none">
 			<Fill>
 				<Shader source={effect} uniforms={uniforms}>
 					<ImageShader image={image} fit="contain" rect={{ x: 0, y: 0, width, height }} />

@@ -192,7 +192,51 @@ export function Editor({ editId }: EditorProps): ReactNode {
 	const savedTranslateX = useSharedValue(0);
 	const savedTranslateY = useSharedValue(0);
 
+	// Displayed image size under fit="contain" — computed once for clamping.
+	const displayDims = useMemo(() => {
+		if (!image || canvasH <= 0) return null;
+		const iw = image.width();
+		const ih = image.height();
+		if (iw === 0 || ih === 0) return null;
+		const imageAspect = iw / ih;
+		const containerAspect = screenW / canvasH;
+		if (imageAspect > containerAspect) {
+			return { w: screenW, h: screenW / imageAspect };
+		}
+		return { w: canvasH * imageAspect, h: canvasH };
+	}, [image, screenW, canvasH]);
+
+	// Shared values for display dimensions (readable on worklet thread).
+	const displayW = useSharedValue(displayDims?.w ?? screenW);
+	const displayH = useSharedValue(displayDims?.h ?? canvasH);
+	useEffect(() => {
+		if (displayDims) {
+			displayW.value = displayDims.w;
+			displayH.value = displayDims.h;
+		}
+	}, [displayDims]);
+
+	// Clamp translation so the image doesn't disappear off-screen.
+	const clampTranslation = () => {
+		"worklet";
+		const s = scale.value;
+		const dw = displayW.value;
+		const dh = displayH.value;
+		// Maximum translation before an image edge becomes visible.
+		const maxX = Math.max(0, (dw * s - screenW) / 2);
+		const maxY = Math.max(0, (dh * s - canvasH) / 2);
+		translateX.value = Math.max(-maxX, Math.min(maxX, translateX.value));
+		translateY.value = Math.max(-maxY, Math.min(maxY, translateY.value));
+	};
+
+	// Pinch zoom (always active).
 	const pinchGesture = Gesture.Pinch()
+		.onBegin(() => {
+			"worklet";
+			savedScale.value = scale.value;
+			savedTranslateX.value = translateX.value;
+			savedTranslateY.value = translateY.value;
+		})
 		.onUpdate((e) => {
 			"worklet";
 			scale.value = Math.max(0.5, Math.min(savedScale.value * e.scale, 5));
@@ -203,16 +247,45 @@ export function Editor({ editId }: EditorProps): ReactNode {
 				scale.value = withSpring(1);
 				translateX.value = withSpring(0);
 				translateY.value = withSpring(0);
-			} else if (scale.value > 5) {
-				scale.value = withSpring(5);
+				savedScale.value = 1;
+				savedTranslateX.value = 0;
+				savedTranslateY.value = 0;
+			} else {
+				clampTranslation();
+				savedScale.value = scale.value;
+				savedTranslateX.value = translateX.value;
+				savedTranslateY.value = translateY.value;
 			}
-			savedScale.value = scale.value;
+		});
+
+	// Two-finger pan (works alongside pinch for combined zoom + pan).
+	const twoFingerPan = Gesture.Pan()
+		.minPointers(2)
+		.onBegin(() => {
+			"worklet";
+			savedTranslateX.value = translateX.value;
+			savedTranslateY.value = translateY.value;
+		})
+		.onUpdate((e) => {
+			"worklet";
+			translateX.value = savedTranslateX.value + e.translationX;
+			translateY.value = savedTranslateY.value + e.translationY;
+		})
+		.onEnd(() => {
+			"worklet";
+			clampTranslation();
 			savedTranslateX.value = translateX.value;
 			savedTranslateY.value = translateY.value;
 		});
 
-	const panGesture = Gesture.Pan()
-		.minPointers(1)
+	// Single-finger pan (only when zoomed in past 1×).
+	const singleFingerPan = Gesture.Pan()
+		.maxPointers(1)
+		.onBegin(() => {
+			"worklet";
+			savedTranslateX.value = translateX.value;
+			savedTranslateY.value = translateY.value;
+		})
 		.onUpdate((e) => {
 			"worklet";
 			if (savedScale.value <= 1) return;
@@ -221,10 +294,12 @@ export function Editor({ editId }: EditorProps): ReactNode {
 		})
 		.onEnd(() => {
 			"worklet";
+			clampTranslation();
 			savedTranslateX.value = translateX.value;
 			savedTranslateY.value = translateY.value;
 		});
 
+	// Double-tap toggles between 1× and 2× zoom.
 	const doubleTapGesture = Gesture.Tap()
 		.numberOfTaps(2)
 		.onEnd(() => {
@@ -238,15 +313,18 @@ export function Editor({ editId }: EditorProps): ReactNode {
 				savedTranslateY.value = 0;
 			} else {
 				scale.value = withSpring(2);
+				translateX.value = withSpring(0);
+				translateY.value = withSpring(0);
 				savedScale.value = 2;
+				savedTranslateX.value = 0;
+				savedTranslateY.value = 0;
 			}
 		});
 
-	const composedGestures = Gesture.Simultaneous(
-		pinchGesture,
-		panGesture,
-		doubleTapGesture,
-	);
+	// Compose: pinch + 2-finger pan run together; 1-finger pan and double-tap
+	// race against the 2-finger gesture so they don't fire during a pinch.
+	const twoFinger = Gesture.Simultaneous(pinchGesture, twoFingerPan);
+	const composedGestures = Gesture.Race(doubleTapGesture, twoFinger, singleFingerPan);
 
 	const imageAnimatedStyle = useAnimatedStyle(() => ({
 		transform: [
