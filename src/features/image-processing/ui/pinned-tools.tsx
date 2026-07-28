@@ -3,6 +3,7 @@ import { Contrast, Eye, Sun, Palette, Aperture } from "lucide-react-native";
 import { useCallback } from "react";
 import { Pressable, View } from "react-native";
 
+import { Icon } from "../../../components/ui/icon";
 import { Text } from "../../../components/ui/text";
 import { type LayerType } from "../chain/registry";
 
@@ -42,7 +43,7 @@ export function PinnedTools({ tools, onToolPress, onToolLongPress }: PinnedTools
 	return (
 		<View className="flex-row items-center justify-center gap-2 px-4">
 			{tools.map((type) => {
-				const Icon = TOOL_ICONS[type] ?? Sun;
+				const LucideIcon = TOOL_ICONS[type] ?? Sun;
 				const label = TOOL_LABELS[type] ?? type.toUpperCase();
 				return (
 					<Pressable
@@ -57,7 +58,7 @@ export function PinnedTools({ tools, onToolPress, onToolLongPress }: PinnedTools
 							borderColor: "rgba(255,255,255,0.25)",
 						}}
 					>
-						<Icon size={22} className="text-white mb-1.5" />
+						<Icon as={LucideIcon} size={22} className="text-white mb-1.5" />
 						<Text
 							style={{
 								fontSize: 9,

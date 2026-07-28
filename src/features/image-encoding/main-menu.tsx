@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { Settings } from "lucide-react-native";
 import { useCallback } from "react";
 import {
 	Alert,
@@ -9,8 +10,8 @@ import {
 	useWindowDimensions,
 	View,
 } from "react-native";
-import { Settings } from "lucide-react-native";
 
+import { Icon } from "../../components/ui/icon";
 import { Text } from "../../components/ui/text";
 import { type SavedEdit } from "./db";
 import { useDeleteEdit } from "./use-delete-edit";
@@ -104,7 +105,7 @@ export function MainMenu() {
 					<Text className="text-xl tracking-tight font-sans">LUTRA</Text>
 					<View className="flex-row gap-4">
 						<Pressable onPress={onOptions} className="p-2">
-							<Settings size={20} className="text-foreground" />
+							<Icon as={Settings} size={20} color="#fafafa" />
 						</Pressable>
 					</View>
 				</View>
@@ -135,7 +136,7 @@ export function MainMenu() {
 						<Text className="text-2xl">+</Text>
 					</Pressable>
 					<Pressable onPress={onOptions} className="p-2">
-						<Settings size={20} className="text-foreground" />
+						<Icon as={Settings} size={20} className="fill-foreground" fill="#ffffff" />
 					</Pressable>
 				</View>
 			</View>
@@ -146,12 +147,7 @@ export function MainMenu() {
 				numColumns={3}
 				contentContainerClassName="px-2 pb-8"
 				columnWrapperClassName="gap-2 mb-2"
-				refreshControl={
-					<RefreshControl
-						refreshing={isLoading}
-						onRefresh={refetch}
-					/>
-				}
+				refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} />}
 			/>
 		</View>
 	);

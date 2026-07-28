@@ -20,6 +20,7 @@ import Animated, {
 	withSpring,
 } from "react-native-reanimated";
 
+import { Icon } from "../../../components/ui/icon";
 import { Text } from "../../../components/ui/text";
 import { type LayerType, layerRegistry } from "../chain/registry";
 
@@ -152,7 +153,7 @@ export function ToolOverlay({ visible, onClose, onSelect }: ToolOverlayProps) {
 						{activeTab === "adjustments" ? (
 							<View className="flex-row flex-wrap gap-3">
 								{tools.map((type) => {
-									const Icon = TOOL_ICONS[type] ?? Sun;
+									const LucideIcon = TOOL_ICONS[type] ?? Sun;
 									const label = layerRegistry[type].label.toUpperCase();
 									return (
 										<Pressable
@@ -161,7 +162,7 @@ export function ToolOverlay({ visible, onClose, onSelect }: ToolOverlayProps) {
 											className="w-[22%] items-center justify-center border border-white/20 rounded-lg py-4"
 											style={{ backgroundColor: "rgba(255,255,255,0.03)" }}
 										>
-											<Icon size={24} className="text-white mb-2" />
+											<Icon as={LucideIcon} size={24} className="text-white mb-2" />
 											<Text
 												style={{
 													fontSize: 8,

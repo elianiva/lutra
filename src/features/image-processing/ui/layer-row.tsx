@@ -9,6 +9,7 @@ import {
 import Animated, { type SharedValue, useAnimatedStyle } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
+import { themeColors } from "@/constants/theme";
 import { Icon } from "../../../components/ui/icon";
 import { Text } from "../../../components/ui/text";
 import { layerRegistry } from "../chain/registry";
@@ -149,7 +150,7 @@ export function LayerRow({
 					style={{ height: ROW_HEIGHT }}
 				>
 					<View className="flex-row items-center gap-2 flex-1">
-						<Icon as={GripVertical} className="text-muted-foreground size-4" />
+						<Icon as={GripVertical} color={themeColors.mutedForeground} className="size-4" />
 						<View className="flex-1">
 							<Text className="font-medium">{layerRegistry[layer.type].label}</Text>
 							<Text variant="muted">{formatLayerValue(layer)}</Text>
@@ -160,17 +161,18 @@ export function LayerRow({
 							<View hitSlop={8} className="p-1">
 								<Icon
 									as={layer.visible ? Eye : EyeOff}
-									className={
+									color={
 										layer.visible
-											? "text-foreground size-5"
-											: "text-muted-foreground size-5"
+											? themeColors.foreground
+											: themeColors.mutedForeground
 									}
+									className="size-5"
 								/>
 							</View>
 						</GestureDetector>
 						<GestureDetector gesture={remove}>
 							<View hitSlop={8} className="p-1">
-								<Icon as={Trash2} className="text-destructive size-5" />
+								<Icon as={Trash2} color={themeColors.destructive} className="size-5" />
 							</View>
 						</GestureDetector>
 					</View>

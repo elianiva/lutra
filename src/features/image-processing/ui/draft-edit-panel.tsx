@@ -2,6 +2,7 @@ import { Trash2 } from "lucide-react-native";
 import { Pressable, View } from "react-native";
 import { type SharedValue } from "react-native-reanimated";
 
+import { themeColors } from "@/constants/theme";
 import { Icon } from "../../../components/ui/icon";
 import { Params } from "../chain/params";
 import { type Layer } from "../chain/types";
@@ -32,7 +33,7 @@ export function DraftEditPanel({ layer, sv, onUpdate, onDiscard }: Props) {
 				className="absolute bottom-4 right-4 p-2 rounded-full"
 				style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
 			>
-				<Icon as={Trash2} className="text-muted-foreground size-4" />
+				<Icon as={Trash2} color={themeColors.mutedForeground} className="size-4" />
 			</Pressable>
 		</View>
 	);

@@ -164,7 +164,7 @@ export function CustomizePinned({ visible, currentPinned, onClose }: CustomizePi
 					<ScrollView className="px-4 pb-8" style={{ maxHeight: 350 }}>
 						<View className="flex-row flex-wrap gap-3">
 							{allTools.map((type) => {
-								const IconComp = TOOL_ICONS[type] ?? Sun;
+								const LucideIcon = TOOL_ICONS[type] ?? Sun;
 								const label = layerRegistry[type].label.toUpperCase();
 								const isSelected = selected.includes(type);
 								return (
@@ -177,7 +177,7 @@ export function CustomizePinned({ visible, currentPinned, onClose }: CustomizePi
 											backgroundColor: isSelected ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.03)",
 										}}
 									>
-										<IconComp size={24} className={isSelected ? "text-white" : "text-white/60"} />
+										<Icon as={LucideIcon} size={24} className={isSelected ? "text-white" : "text-white/60"} />
 										<Text
 											style={{
 												fontSize: 8,
