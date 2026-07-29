@@ -42,20 +42,22 @@ export function useNavigationStatePersistence(): boolean {
 	if (!__DEV__) return true;
 
 	const [ready, setReady] = useState(false);
+	const [didRestore, setDidRestore] = useState(false);
 	const navRef = useNavigationContainerRef();
 	const rootState = useRootNavigationState();
 
 	// Save state to storage whenever it changes (after initial hydration).
 	useEffect(() => {
-		if (!rootState) return;
-		if (ready) {
-			AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(rootState));
-		}
+		if (!rootState || !ready) return;
+		AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(rootState));
 	}, [rootState, ready]);
 
-	// On mount, restore previous state before the first render commits.
+	// Restore previous state once the navigation container is ready.
+	// We use rootState (not navRef) as the dependency because navRef is a
+	// stable ref that never changes identity, so the effect would only run
+	// once on mount — before the container is actually ready.
 	useEffect(() => {
-		if (!navRef.current?.isReady()) return;
+		if (didRestore || !rootState) return;
 
 		AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
 			if (raw) {
@@ -70,8 +72,9 @@ export function useNavigationStatePersistence(): boolean {
 				}
 			}
 			setReady(true);
+			setDidRestore(true);
 		});
-	}, [navRef]);
+	}, [rootState, didRestore]);
 
 	return ready;
 }
