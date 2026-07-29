@@ -26,3 +26,6 @@ minimumReleaseAgeExclude:
 
 overrides:
   lightningcss: 1.30.1
+
+patchedDependencies:
+  '@expo/cli@56.1.14': patches/@expo__cli@56.1.14.patch
