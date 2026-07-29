@@ -9,7 +9,6 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Uniwind } from "uniwind";
 
 import { queryClient } from "../lib/query-client";
-import { useNavigationStatePersistence } from "../lib/useNavigationStatePersistence";
 
 // Lock to dark mode — no light theme, no system-follow.
 Uniwind.setTheme("dark");
@@ -53,13 +52,11 @@ export default function RootLayout() {
 	const [loaded, error] = useFonts({
 		Electrolize_400Regular,
 	});
-	const navReady = useNavigationStatePersistence();
-
 	useEffect(() => {
 		if (loaded || error) SplashScreen.hideAsync();
 	}, [loaded, error]);
 
-	if ((!loaded && !error) || !navReady) return null;
+	if (!loaded && !error) return null;
 
 	return (
 		<GestureHandlerRootView className="flex-1">
