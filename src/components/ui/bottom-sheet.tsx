@@ -8,7 +8,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
-const SPRING_CONFIG = { damping: 20, stiffness: 200, mass: 1 };
+const SPRING_CONFIG = { damping: 40, stiffness: 400, mass: 0.6 };
 
 type BottomSheetProps = {
   visible: boolean;

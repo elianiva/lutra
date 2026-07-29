@@ -1,19 +1,13 @@
 import * as Haptics from "expo-haptics";
-import { useCallback, useEffect } from "react";
-import { Pressable, View } from "react-native";
-import { usePanGesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
-	useAnimatedStyle,
-	useSharedValue,
-	withSpring,
-} from "react-native-reanimated";
+import { useCallback } from "react";
+import { View } from "react-native";
 
+import { BottomSheet } from "../../../components/ui/bottom-sheet";
 import { Text } from "../../../components/ui/text";
 import { type Layer } from "../chain/types";
 import { LayersPanel } from "./layers-panel";
 
-const SPRING_CONFIG = { damping: 20, stiffness: 200, mass: 1 };
-const DRAWER_WIDTH = 340;
+const SHEET_HEIGHT = 420;
 
 type LayerDrawerProps = {
 	visible: boolean;
@@ -36,88 +30,37 @@ export function LayerDrawer({
 	onReorder,
 	onToggleVisible,
 }: LayerDrawerProps) {
-	const translateX = useSharedValue(DRAWER_WIDTH);
-	const backdropOpacity = useSharedValue(0);
-
-	useEffect(() => {
-		if (visible) {
-			translateX.value = withSpring(0, SPRING_CONFIG);
-			backdropOpacity.value = withSpring(1, SPRING_CONFIG);
-		} else {
-			translateX.value = withSpring(DRAWER_WIDTH, SPRING_CONFIG);
-			backdropOpacity.value = withSpring(0, SPRING_CONFIG);
-		}
-	}, [visible]);
-
 	const handleSelect = useCallback((id: string) => {
 		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 		onSelect(id);
 		onClose();
 	}, [onSelect, onClose]);
 
-	const gesture = usePanGesture({
-		activeOffsetX: [-10, 10],
-		onUpdate: (e) => {
-			if (e.translationX > 0) {
-				translateX.value = e.translationX;
-				backdropOpacity.value = 1 - e.translationX / DRAWER_WIDTH;
-			}
-		},
-		onDeactivate: (e) => {
-			if (e.translationX > 100 || e.velocityX > 500) {
-				translateX.value = withSpring(DRAWER_WIDTH, SPRING_CONFIG);
-				backdropOpacity.value = withSpring(0, SPRING_CONFIG);
-			} else {
-				translateX.value = withSpring(0, SPRING_CONFIG);
-				backdropOpacity.value = withSpring(1, SPRING_CONFIG);
-			}
-		},
-	});
-
-	const animatedStyle = useAnimatedStyle(() => ({
-		transform: [{ translateX: translateX.value }],
-	}));
-
-	const backdropStyle = useAnimatedStyle(() => ({
-		opacity: backdropOpacity.value,
-	}));
-
 	return (
-		<View className="absolute inset-0 z-40" pointerEvents={visible ? "auto" : "none"}>
-			<Animated.View style={backdropStyle} className="absolute inset-0 bg-black/60">
-				<Pressable className="flex-1" onPress={onClose} />
-			</Animated.View>
-
-			<GestureDetector gesture={gesture}>
-				<Animated.View
-					style={animatedStyle}
-					className="absolute top-0 right-0 bottom-0 bg-[#111]"
+		<BottomSheet visible={visible} onClose={onClose} height={SHEET_HEIGHT}>
+			<View className="pb-4 px-4 border-b border-white/10">
+				<Text
+					style={{
+						fontFamily: "Electrolize_400Regular",
+						color: "#fff",
+						letterSpacing: 2,
+						fontSize: 14,
+					}}
 				>
-					<View className="pt-14 pb-4 px-4 border-b border-white/10">
-						<Text
-							style={{
-								fontFamily: "Electrolize_400Regular",
-								color: "#fff",
-								letterSpacing: 2,
-								fontSize: 14,
-							}}
-						>
-							LAYERS
-						</Text>
-					</View>
+					LAYERS
+				</Text>
+			</View>
 
-					<View className="flex-1" style={{ width: DRAWER_WIDTH }}>
-						<LayersPanel
-							layers={layers}
-							selectedId={selectedId}
-							onSelect={handleSelect}
-							onRemove={onRemove}
-							onReorder={onReorder}
-							onToggleVisible={onToggleVisible}
-						/>
-					</View>
-				</Animated.View>
-			</GestureDetector>
-		</View>
+			<View className="flex-1">
+				<LayersPanel
+					layers={layers}
+					selectedId={selectedId}
+					onSelect={handleSelect}
+					onRemove={onRemove}
+					onReorder={onReorder}
+					onToggleVisible={onToggleVisible}
+				/>
+			</View>
+		</BottomSheet>
 	);
 }

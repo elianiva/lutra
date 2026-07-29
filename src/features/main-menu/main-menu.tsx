@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { Settings } from "lucide-react-native";
+import { PlusIcon, Settings } from "lucide-react-native";
 import { useCallback } from "react";
 import {
 	Alert,
@@ -124,7 +124,9 @@ export function MainMenu() {
 						className="items-center rounded-md bg-primary px-6 py-4 active:opacity-70 disabled:opacity-50"
 					>
 						<Text className="text-primary-foreground text-lg">
-							{pickMutation.isPending || createEdit.isPending ? "Preparing…" : "Start editing"}
+							{pickMutation.isPending || createEdit.isPending
+								? "Preparing…"
+								: "Start editing"}
 						</Text>
 					</Pressable>
 					<Text variant="muted" className="mt-4">
@@ -139,12 +141,16 @@ export function MainMenu() {
 		<View className="flex-1 bg-background">
 			<View className="flex-row justify-between items-center px-4 pt-16 pb-2">
 				<Text className="text-xl tracking-tight font-sans">LUTRA</Text>
-				<View className="flex-row gap-4">
-					<Pressable onPress={onNewEdit} disabled={pickMutation.isPending || createEdit.isPending} className="p-2 disabled:opacity-30">
-						<Text className="text-2xl">+</Text>
+				<View className="flex-row gap-2">
+					<Pressable
+						onPress={onNewEdit}
+						disabled={pickMutation.isPending || createEdit.isPending}
+						className="p-2 disabled:opacity-30"
+					>
+						<Icon as={PlusIcon} size={20} color="#ffffff" />
 					</Pressable>
 					<Pressable onPress={onOptions} className="p-2">
-						<Icon as={Settings} size={20} className="fill-foreground" fill="#ffffff" />
+						<Icon as={Settings} size={20} color="#ffffff" />
 					</Pressable>
 				</View>
 			</View>

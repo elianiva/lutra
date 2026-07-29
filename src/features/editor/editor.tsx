@@ -175,7 +175,7 @@ export function Editor({ editId }: EditorProps): ReactNode {
 			<View className="absolute top-12 right-4 z-50 flex-row items-center gap-2">
 				<Pressable
 					onPress={() => {
-						if (!isDraftActive) setLayerDrawerVisible(true);
+						if (!isDraftActive) setLayerDrawerVisible((v) => !v);
 					}}
 					disabled={isDraftActive}
 					hitSlop={8}
@@ -185,7 +185,7 @@ export function Editor({ editId }: EditorProps): ReactNode {
 				</Pressable>
 				<Pressable
 					onPress={() => {
-						if (!isDraftActive) setExportMenuVisible(true);
+						if (!isDraftActive) setExportMenuVisible((v) => !v);
 					}}
 					disabled={isDraftActive}
 					hitSlop={8}
