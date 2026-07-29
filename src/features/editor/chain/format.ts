@@ -1,5 +1,6 @@
 import { type ComponentType } from "react";
 import { type SharedValue } from "react-native-reanimated";
+import { type LucideIcon } from "lucide-react-native";
 
 // A body renderer emits the SkSL statements for one layer, inlined
 // into the chain shader at the layer's index. The body operates on a
@@ -57,6 +58,9 @@ export type LayerEntry = {
 	body: BodyRenderer;
 	fields: { readonly [F: string]: FieldDef };
 	label: string;
+	icon: LucideIcon;
+	// When true, the layer appears in the pinned bottom bar.
+	pinned?: boolean;
 	// When true, the layer has two parameters shown one at a time.
 	// The user clicks the label (with ⇅ icon) to toggle between them.
 	toggled?: boolean;

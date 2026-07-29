@@ -1,43 +1,26 @@
 import * as Haptics from "expo-haptics";
-import {
-	Contrast,
-	Eye,
-	Sun,
-	Palette,
-	Aperture,
-	Eclipse,
-	Sparkles,
-	Shirt,
-	CircleDot,
-	Flame,
-} from "lucide-react-native";
-import { useCallback } from "react";
-import { Pressable, View } from "react-native";
+import { useCallback, useMemo } from "react";
+import { Pressable, View, useWindowDimensions } from "react-native";
 
 import { Icon } from "../../../components/ui/icon";
 import { Text } from "../../../components/ui/text";
 import { layerRegistry, type LayerType } from "../chain/registry";
 
-const TOOL_ICONS: Record<string, typeof Sun> = {
-	exposure: Sun,
-	contrast: Contrast,
-	saturation: Palette,
-	whiteBalance: Eye,
-	vignette: Aperture,
-	shadows: Eclipse,
-	highlights: Sparkles,
-	grain: Shirt,
-	chromaticAberration: CircleDot,
-	clarity: Flame,
-};
-
 type PinnedToolsProps = {
-	tools: LayerType[];
 	onToolPress: (type: LayerType) => void;
-	onToolLongPress: (type: LayerType) => void;
 };
 
-export function PinnedTools({ tools, onToolPress, onToolLongPress }: PinnedToolsProps) {
+export function PinnedTools({ onToolPress }: PinnedToolsProps) {
+	const { width: screenW } = useWindowDimensions();
+
+	const pinned = useMemo(
+		() =>
+			(Object.entries(layerRegistry) as [LayerType, (typeof layerRegistry)[LayerType]][]).filter(
+				([, entry]) => entry.pinned,
+			),
+		[],
+	);
+
 	const handlePress = useCallback(
 		(type: LayerType) => {
 			Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -46,39 +29,37 @@ export function PinnedTools({ tools, onToolPress, onToolLongPress }: PinnedTools
 		[onToolPress],
 	);
 
-	const handleLongPress = useCallback(
-		(type: LayerType) => {
-			Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-			onToolLongPress(type);
-		},
-		[onToolLongPress],
-	);
+	// Calculate button dimensions deterministically — no reliance on
+	// flex-1 + arbitrary Tailwind values that may not resolve.
+	const GAP = 8;
+	const PADDING_X = 16;
+	const count = pinned.length;
+	const buttonW = (screenW - PADDING_X * 2 - GAP * (count - 1)) / count;
+
+	// Scale font size to button width so labels never overflow.
+	const fontSize = buttonW < 72 ? 8 : buttonW < 90 ? 9 : 10;
 
 	return (
-		<View className="flex-row items-center justify-center gap-2 px-4 flex-1 w-full bg-black">
-			{tools.map((type) => {
-				const LucideIcon = TOOL_ICONS[type] ?? Sun;
-				const label = layerRegistry[type].label.toUpperCase();
+		<View className="flex-row items-center justify-center px-4 bg-black" style={{ gap: GAP }}>
+			{pinned.map(([type, entry]) => {
+				const label = entry.label.toUpperCase();
 				return (
 					<Pressable
 						key={type}
 						onPress={() => handlePress(type)}
-						onLongPress={() => handleLongPress(type)}
-						delayLongPress={500}
-						className="flex-1 items-center justify-center py-3"
+						className="items-center justify-center py-3"
 						style={{
+							width: buttonW,
 							borderWidth: 1,
 							borderColor: "rgba(255,255,255,0.25)",
 						}}
 					>
-						<Icon as={LucideIcon} size={22} className="text-white mb-1.5" />
+						<Icon as={entry.icon} size={22} className="text-white mb-1.5" />
 						<Text
-							style={{
-								fontSize: 12,
-								color: "#fff",
-								letterSpacing: 1.5,
-								fontFamily: "Electrolize_400Regular",
-							}}
+							numberOfLines={1}
+							tracking="normal"
+							className="text-white text-center"
+							style={{ fontSize }}
 						>
 							{label}
 						</Text>

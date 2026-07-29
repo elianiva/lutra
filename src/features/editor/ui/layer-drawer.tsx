@@ -40,12 +40,8 @@ export function LayerDrawer({
 		<BottomSheet visible={visible} onClose={onClose} height={SHEET_HEIGHT}>
 			<View className="pb-4 px-4 border-b border-white/10">
 				<Text
-					style={{
-						fontFamily: "Electrolize_400Regular",
-						color: "#fff",
-						letterSpacing: 2,
-						fontSize: 14,
-					}}
+					tracking="wider"
+					className="text-white text-sm"
 				>
 					LAYERS
 				</Text>

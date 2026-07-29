@@ -19,7 +19,7 @@ _Avoid_: "Stack" (Snapseed uses this word but it suggests LIFO; the chain is ord
 ### Editor UI
 
 **Pinned tools**:
-The user's customized set of quick-access **adjustment layer** types shown in the bottom toolbar of the **editor**. Defaults to five (Exposure, White Balance, Saturation, Contrast, Vignette). User can swap any pinned tool via long-press. Minimum one, maximum five. Stored in AsyncStorage, not part of the **edit chain**.
+The fixed set of four quick-access **adjustment layer** types shown in the bottom toolbar of the **editor**: Exposure, White Balance, Saturation, Contrast. These are not configurable. The chevron-up affordance below opens the **tool overlay** for access to all available tools.
 _Avoid_: "toolbar" (too generic), "quick actions" (Android-centric)
 
 **Draft layer**:

@@ -1,9 +1,18 @@
 import { Slot } from "@rn-primitives/slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
-import { Platform, Text as RNText, type Role } from "react-native";
+import { Platform, Text as RNText, type Role, type TextStyle } from "react-native";
 
 import { cn } from "@/lib/utils";
+
+const TRACKING = {
+	tight: 0.5,
+	normal: 1,
+	wide: 1.5,
+	wider: 2,
+} as const;
+
+type Tracking = keyof typeof TRACKING;
 
 const textVariants = cva(
 	cn(
@@ -75,19 +84,30 @@ function Text({
 	className,
 	asChild = false,
 	variant = "default",
+	tracking,
+	style,
 	...props
 }: React.ComponentProps<typeof RNText> &
 	React.RefAttributes<typeof RNText> &
 	TextVariantProps & {
 		asChild?: boolean;
+		tracking?: Tracking;
 	}) {
 	const textClass = React.useContext(TextClassContext);
 	const Component = asChild ? Slot : RNText;
+
+	const mergedStyle = React.useMemo(() => {
+		if (!tracking) return style;
+		const ls = { letterSpacing: TRACKING[tracking] };
+		return style ? [style, ls] : ls;
+	}, [tracking, style]) as TextStyle | TextStyle[] | undefined;
+
 	return (
 		<Component
 			className={cn(textVariants({ variant }), textClass, className)}
 			role={variant ? ROLE[variant] : undefined}
 			aria-level={variant ? ARIA_LEVEL[variant] : undefined}
+			style={mergedStyle}
 			{...props}
 		/>
 	);

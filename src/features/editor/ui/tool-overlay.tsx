@@ -1,16 +1,4 @@
 import * as Haptics from "expo-haptics";
-import {
-	Contrast,
-	Eye,
-	Sun,
-	Palette,
-	Aperture,
-	Sparkles,
-	Eclipse,
-	Shirt,
-	Flame,
-	CircleDot,
-} from "lucide-react-native";
 import { useCallback, useState } from "react";
 import { Pressable, View } from "react-native";
 
@@ -20,19 +8,6 @@ import { Text } from "../../../components/ui/text";
 import { type LayerType, layerRegistry } from "../chain/registry";
 
 const SHEET_HEIGHT = 420;
-
-const TOOL_ICONS: Record<string, typeof Sun> = {
-	exposure: Sun,
-	contrast: Contrast,
-	saturation: Palette,
-	whiteBalance: Eye,
-	vignette: Aperture,
-	shadows: Eclipse,
-	highlights: Sparkles,
-	grain: Shirt,
-	chromaticAberration: CircleDot,
-	clarity: Flame,
-};
 
 type ToolOverlayProps = {
 	visible: boolean;
@@ -60,12 +35,8 @@ export function ToolOverlay({ visible, onClose, onSelect }: ToolOverlayProps) {
 					className={`flex-1 py-3 items-center ${activeTab === "adjustments" ? "border-b-2 border-white" : ""}`}
 				>
 					<Text
-						style={{
-							fontFamily: "Electrolize_400Regular",
-							color: activeTab === "adjustments" ? "#fff" : "#666",
-							letterSpacing: 2,
-							fontSize: 13,
-						}}
+						tracking="wider"
+						className={activeTab === "adjustments" ? "text-white text-[13px]" : "text-[#666] text-[13px]"}
 					>
 						ADJUSTMENTS
 					</Text>
@@ -75,12 +46,8 @@ export function ToolOverlay({ visible, onClose, onSelect }: ToolOverlayProps) {
 					className={`flex-1 py-3 items-center ${activeTab === "luts" ? "border-b-2 border-white" : ""}`}
 				>
 					<Text
-						style={{
-							fontFamily: "Electrolize_400Regular",
-							color: activeTab === "luts" ? "#fff" : "#666",
-							letterSpacing: 2,
-							fontSize: 13,
-						}}
+						tracking="wider"
+						className={activeTab === "luts" ? "text-white text-[13px]" : "text-[#666] text-[13px]"}
 					>
 						LUTS
 					</Text>
@@ -91,8 +58,8 @@ export function ToolOverlay({ visible, onClose, onSelect }: ToolOverlayProps) {
 				{activeTab === "adjustments" ? (
 					<View className="flex-row flex-wrap gap-2">
 						{tools.map((type) => {
-							const LucideIcon = TOOL_ICONS[type] ?? Sun;
-							const label = layerRegistry[type].label.toUpperCase();
+							const entry = layerRegistry[type];
+							const label = entry.label.toUpperCase();
 							return (
 								<Pressable
 									key={type}
@@ -100,15 +67,10 @@ export function ToolOverlay({ visible, onClose, onSelect }: ToolOverlayProps) {
 									className="w-[22%] items-center justify-center border border-white/20 py-4"
 									style={{ backgroundColor: "rgba(255,255,255,0.03)" }}
 								>
-									<Icon as={LucideIcon} size={24} className="text-white mb-2" />
+									<Icon as={entry.icon} size={24} className="text-white mb-2" />
 									<Text
-										style={{
-											fontSize: 8,
-											color: "#fff",
-											letterSpacing: 0.5,
-											fontFamily: "Electrolize_400Regular",
-											textAlign: "center",
-										}}
+										tracking="tight"
+										className="text-white text-[8px] text-center"
 									>
 										{label}
 									</Text>
@@ -119,11 +81,8 @@ export function ToolOverlay({ visible, onClose, onSelect }: ToolOverlayProps) {
 				) : (
 					<View className="items-center justify-center py-12">
 						<Text
-							style={{
-								fontFamily: "Electrolize_400Regular",
-								color: "#666",
-								letterSpacing: 1,
-							}}
+							tracking="normal"
+							className="text-[#666]"
 						>
 							Coming soon
 						</Text>

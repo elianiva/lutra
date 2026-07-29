@@ -107,17 +107,13 @@ export function Slider({
         disabled={!toggled}
         className="flex-row items-center justify-center mb-4 gap-2"
       >
-        {toggled && <Text style={{ fontSize: 20, color: "#fff" }}>⇅</Text>}
+        {toggled && <Text className="text-white text-xl">⇅</Text>}
         <Text
+          tracking="wider"
+          className="text-white text-xl font-medium text-center"
           style={{
-            fontSize: 20,
-            fontWeight: "500",
-            color: "#fff",
-            letterSpacing: 2,
-            fontFamily: "Electrolize_400Regular",
             fontVariant: ["tabular-nums"],
             minWidth: 60,
-            textAlign: "center",
           }}
         >
           {label.toUpperCase()}
@@ -128,7 +124,6 @@ export function Slider({
             fontSize: 20,
             fontWeight: "400",
             color: "#fff",
-            fontFamily: "Electrolize_400Regular",
             fontVariant: ["tabular-nums"],
             minWidth: 60,
             textAlign: "center",

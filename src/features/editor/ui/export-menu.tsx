@@ -93,12 +93,8 @@ function MenuItem({
 		>
 			<Icon as={icon} className="text-white" size={20} />
 			<Text
-				style={{
-					fontFamily: "Electrolize_400Regular",
-					color: "#fff",
-					letterSpacing: 1,
-					fontSize: 13,
-				}}
+				tracking="normal"
+				className="text-white text-[13px]"
 			>
 				{label}
 			</Text>

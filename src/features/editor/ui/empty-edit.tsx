@@ -6,13 +6,8 @@ export function EmptyEdit() {
 	return (
 		<View className="flex-1 items-center justify-center p-4">
 			<Text
-				style={{
-					fontFamily: "Electrolize_400Regular",
-					color: "#666",
-					letterSpacing: 1,
-					fontSize: 12,
-					textAlign: "center",
-				}}
+				tracking="normal"
+				className="text-[#666] text-xs text-center"
 			>
 				Select a tool to begin editing
 			</Text>
@@ -24,13 +19,8 @@ export function EmptyChain() {
 	return (
 		<View className="flex-1 items-center justify-center p-4">
 			<Text
-				style={{
-					fontFamily: "Electrolize_400Regular",
-					color: "#666",
-					letterSpacing: 1,
-					fontSize: 11,
-					textAlign: "center",
-				}}
+				tracking="normal"
+				className="text-[#666] text-[11px] text-center"
 			>
 				No adjustments yet.{"\n"}Tap a tool below or use the chevron to see all tools.
 			</Text>

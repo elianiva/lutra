@@ -1,3 +1,16 @@
+import {
+	Aperture,
+	CircleDot,
+	Contrast,
+	Eclipse,
+	Eye,
+	Flame,
+	Palette,
+	Shirt,
+	Sparkles,
+	Sun,
+} from "lucide-react-native";
+
 import { renderChromaticAberration } from "./bodies/chromatic-aberration";
 import { renderClarity } from "./bodies/clarity";
 import { renderContrast } from "./bodies/contrast";
@@ -20,6 +33,8 @@ export const layerRegistry = {
   exposure: {
     body: renderExposure,
     label: "Exposure",
+    icon: Sun,
+    pinned: true,
     fields: {
       stops: {
         default: 0,
@@ -35,6 +50,8 @@ export const layerRegistry = {
   contrast: {
     body: renderContrast,
     label: "Contrast",
+    icon: Contrast,
+    pinned: true,
     fields: {
       amount: {
         default: 0,
@@ -50,6 +67,8 @@ export const layerRegistry = {
   shadows: {
     body: renderShadows,
     label: "Shadows",
+    icon: Eclipse,
+    pinned: false,
     fields: {
       amount: {
         default: 0,
@@ -65,6 +84,8 @@ export const layerRegistry = {
   highlights: {
     body: renderHighlights,
     label: "Highlights",
+    icon: Sparkles,
+    pinned: false,
     fields: {
       amount: {
         default: 0,
@@ -80,6 +101,8 @@ export const layerRegistry = {
   whiteBalance: {
     body: renderWhiteBalance,
     label: "White Balance",
+    icon: Eye,
+    pinned: true,
     toggled: true,
     fields: {
       temp: {
@@ -114,6 +137,8 @@ export const layerRegistry = {
   saturation: {
     body: renderSaturation,
     label: "Saturation",
+    icon: Palette,
+    pinned: true,
     fields: {
       amount: {
         default: 0,
@@ -129,6 +154,8 @@ export const layerRegistry = {
   grain: {
     body: renderGrain,
     label: "Grain",
+    icon: Shirt,
+    pinned: false,
     fields: {
       amount: {
         default: 0,
@@ -144,6 +171,8 @@ export const layerRegistry = {
   vignette: {
     body: renderVignette,
     label: "Vignette",
+    icon: Aperture,
+    pinned: false,
     toggled: true,
     fields: {
       amount: {
@@ -168,6 +197,8 @@ export const layerRegistry = {
   chromaticAberration: {
     body: renderChromaticAberration,
     label: "Chromatic Aberration",
+    icon: CircleDot,
+    pinned: false,
     fields: {
       amount: {
         default: 0,
@@ -183,6 +214,8 @@ export const layerRegistry = {
   clarity: {
     body: renderClarity,
     label: "Clarity",
+    icon: Flame,
+    pinned: false,
     fields: {
       amount: {
         default: 0,

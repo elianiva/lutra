@@ -162,15 +162,12 @@ export const SliderTrack = memo(function SliderTrack({
                 />
                 {tick.isMajor && (
                   <Text
+                    className="text-white text-lg text-center"
                     style={{
                       position: "absolute",
                       bottom: -20,
                       left: -18,
                       width: 40,
-                      textAlign: "center",
-                      fontSize: 18,
-                      color: "#fff",
-                      fontFamily: "Electrolize_400Regular",
                       opacity: Math.max(0.4, 1 - t * 0.6),
                     }}
                   >
@@ -195,15 +192,12 @@ export const SliderTrack = memo(function SliderTrack({
               }}
             />
             <Text
+              className="text-[#606060] text-[11px] text-center"
               style={{
                 position: "absolute",
                 bottom: 0,
                 left: -14,
                 width: 32,
-                textAlign: "center",
-                fontSize: 11,
-                color: "#606060",
-                fontFamily: "Electrolize_400Regular",
               }}
             >
               {fmt(min)}
@@ -221,15 +215,12 @@ export const SliderTrack = memo(function SliderTrack({
               }}
             />
             <Text
+              className="text-white text-[11px] text-center"
               style={{
                 position: "absolute",
                 bottom: 0,
                 left: -14,
                 width: 32,
-                textAlign: "center",
-                fontSize: 11,
-                color: "#fff",
-                fontFamily: "Electrolize_400Regular",
               }}
             >
               {fmt(max)}

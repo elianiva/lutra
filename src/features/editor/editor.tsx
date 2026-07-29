@@ -5,7 +5,7 @@ import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import { Check, ChevronUp, Layers, Menu, X } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Alert, Pressable, View, useWindowDimensions, type LayoutChangeEvent } from "react-native";
+import { Pressable, View, useWindowDimensions, type LayoutChangeEvent } from "react-native";
 import { GestureDetector } from "react-native-gesture-handler";
 import Animated, { type SharedValue, makeMutable } from "react-native-reanimated";
 
@@ -20,7 +20,6 @@ import { layerRegistry, type LayerType } from "./chain/registry";
 import { type Layer, type LayerPatch } from "./chain/types";
 import { chainStore } from "./state/chain-store";
 import { uiMachine } from "./state/ui-machine";
-import { CustomizePinned } from "./ui/customize-pinned";
 import { DraftEditPanel } from "./ui/draft-edit-panel";
 import { EditPanel } from "./ui/edit-panel";
 import { ExportMenu } from "./ui/export-menu";
@@ -30,7 +29,6 @@ import { Pipeline } from "./ui/pipeline";
 import { ToolOverlay } from "./ui/tool-overlay";
 import { useLayerSVMap } from "./ui/use-layer-sv-map";
 import { usePanZoom } from "./ui/use-pan-zoom";
-import { usePinnedTools, useSavePinnedTools } from "./ui/use-pinned-tools";
 
 type EditorProps = {
 	editId?: number;
@@ -48,12 +46,9 @@ export function Editor({ editId }: EditorProps): ReactNode {
 	const { mutate: saveEditMutate } = useSaveEdit();
 	const { data: savedEdit } = useEdit(editId);
 
-	const { data: pinnedTools = [] } = usePinnedTools();
-	const savePinned = useSavePinnedTools();
 	const [toolOverlayVisible, setToolOverlayVisible] = useState(false);
 	const [layerDrawerVisible, setLayerDrawerVisible] = useState(false);
 	const [exportMenuVisible, setExportMenuVisible] = useState(false);
-	const [customizeVisible, setCustomizeVisible] = useState(false);
 	const [draftLayer, setDraftLayer] = useState<Layer | null>(null);
 
 	const svMap = useLayerSVMap(layers);
@@ -123,22 +118,6 @@ export function Editor({ editId }: EditorProps): ReactNode {
 		const layer = createLayer(type);
 		setDraftLayer(layer);
 		setToolOverlayVisible(false);
-	};
-
-	const onUnpinTool = (type: LayerType) => {
-		Alert.alert(layerRegistry[type]?.label ?? type, undefined, [
-			{
-				text: "Unpin",
-				style: "destructive",
-				onPress: () => {
-					if (pinnedTools.length <= 1) return;
-					const updated = pinnedTools.filter((t) => t !== type);
-					savePinned.mutate(updated);
-				},
-			},
-			{ text: "Customize…", onPress: () => setCustomizeVisible(true) },
-			{ text: "Cancel", style: "cancel" },
-		]);
 	};
 
 	const onConfirmDraft = () => {
@@ -250,15 +229,12 @@ export function Editor({ editId }: EditorProps): ReactNode {
 					/>
 				</View>
 			) : (
-				<View style={{ backgroundColor: "#111" }}>
-					<PinnedTools
-						tools={pinnedTools}
-						onToolPress={onToolSelect}
-						onToolLongPress={onUnpinTool}
-					/>
+				<View style={{ height: 120, backgroundColor: "#111" }}>
+					<PinnedTools onToolPress={onToolSelect} />
 					<Pressable
 						onPress={() => setToolOverlayVisible(true)}
-						className="flex justify-center items-center h-18"
+						className="flex justify-center items-center"
+						style={{ height: 40 }}
 					>
 						<Icon as={ChevronUp} className="text-white/60" size={24} />
 					</Pressable>
@@ -284,11 +260,6 @@ export function Editor({ editId }: EditorProps): ReactNode {
 				visible={exportMenuVisible}
 				onClose={() => setExportMenuVisible(false)}
 				onExport={exportToPhotos}
-			/>
-			<CustomizePinned
-				visible={customizeVisible}
-				currentPinned={pinnedTools}
-				onClose={() => setCustomizeVisible(false)}
 			/>
 		</View>
 	);
