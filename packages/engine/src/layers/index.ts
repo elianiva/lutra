@@ -1,0 +1,6 @@
+export { createLayer } from "./defaults"
+export { nextLayerId, _resetLayerCounter } from "./id"
+export { makeRegistry } from "./registry"
+export { LAYER_TYPES, Layer, LayerPatch } from "./schemas"
+export type { LayerId, LayerType } from "./schemas"
+export type { FieldMeta, LayerEntry, LayerRegistry, RegistryInput } from "./registry"
