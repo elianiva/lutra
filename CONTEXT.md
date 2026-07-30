@@ -67,21 +67,20 @@ _Avoid_: "Stack" (Snapseed uses this word but it suggests LIFO; the chain is ord
 
 ### Editor UI
 
-**Pinned tools**:
-The fixed set of four quick-access **adjustment layer** types shown in the bottom toolbar of the **editor**: Exposure, White Balance, Saturation, Contrast. These are not configurable. The chevron-up affordance below opens the **tool overlay** for access to all available tools.
-_Avoid_: "toolbar" (too generic), "quick actions"
+**Tool panel**:
+A persistent panel in the **editor** showing all 10 **adjustment layer** types. Always visible — no distinction between "pinned" and "overflow" tools. Selecting a tool from the panel creates a **draft layer**.
+_Avoid_: "toolbar" (too generic), "tool palette" (desktop jargon)
 
 **Draft layer**:
-An **adjustment layer** in a transactional preview state before the user confirms it. Created when the user selects a tool from the **tool overlay**. The slider adjusts live, but the layer is not added to the **edit chain** until confirmed. If the user cancels or navigates away, the draft is discarded. The **editor** blocks other interactions (layer drawer, tool selection) while a draft is active.
+An **adjustment layer** in a transactional preview state before the user confirms it. Created when the user selects a tool from the **tool panel**. The slider adjusts live, but the layer is not added to the **edit chain** until confirmed. If the user cancels or navigates away, the draft is discarded. The **editor** blocks other interactions (layer drawer, tool selection) while a draft is active.
 _Avoid_: "preview layer" (ambiguous with image preview), "temp layer" (implies temporary persistence)
 
-**Tool overlay**:
-A bottom-sheet overlay showing all available **adjustment layer** types in a 4-column grid. Accessed via the chevron-up affordance below the **pinned tools**. Organized into tabs (Adjustments, LUTs placeholder for v1). Selecting a tool creates a **draft layer** and closes the overlay.
-_Avoid_: "tool palette" (desktop jargon), "adjustments panel" (conflicts with the old tab-based UI)
-
 **Layer drawer**:
-A side panel showing the current **edit chain** with reorder, visibility toggle, and delete capabilities. Accessed via the layer icon in the top bar. Blocked while a **draft layer** is active.
+The right sidebar of the **editor**, always visible, showing the current **edit chain** as a vertical list. Displays each layer with its icon, label, formatted value, visibility toggle, and delete button. When a layer is selected or a **draft layer** is active, the slider and confirm/cancel controls render inline below the layer entry. Supports drag-to-reorder.
 _Avoid_: "layers panel" (was the old bottom tab), "layer list" (too generic)
+
+**Upload zone**:
+The empty-state placeholder in the canvas area before an image is loaded. Shows a dashed-border drop target with an icon and the prompt "Drop an image or click to browse." Accepts drag-and-drop and click-to-browse file input. Disappears once an image is loaded.
 
 ### Adjustments
 
@@ -102,24 +101,15 @@ Most layers expose a single parameter with one ruler slider. Two layers — **Wh
 
 ### Screens
 
-**Main menu**:
-The app's entry screen at `/`. Shows the app name (**LUTRA**) and a grid of **saved edits** (3-column, square-cropped thumbnails). "New edit" button starts the image picker flow → **editor**. Empty state shows "Start editing" with "Your edits will appear here" subtitle.
-_Avoid_: "home" (ambiguous with system home), "landing" (web jargon).
-
 **Editor**:
-The color-grading screen at `/editor/:editId` or `/editor/new` that renders an **edit chain** for one image. Top bar: **back** (left), **layer icon** (opens **layer drawer**), **hamburger** (export). Bottom: **pinned tools** with chevron-up to **tool overlay**. During active edit: bottom shows slider replacing pinned tools; top shows confirm/cancel for **draft layer**. Pannable/zoomable image.
-_Avoid_: "color grading menu", "workspace", "canvas"
-
-**Options screen**:
-Settings surface at `/options` with storage info. Shows edit count and total storage used. Includes "Clear all" action (deletes all **saved edits** and source images, with confirmation).
-_Avoid_: "settings", "preferences", "config"
-
-### Saved edit
-
-A persisted record of a user's work: source image file + **edit chain** + thumbnail. Stored in IndexedDB (OPFS for source images, JSON for chain metadata). Grid on the **main menu** displays **saved edits** sorted newest-first.
+The single screen at `/`. Three-column Lightroom-style layout: left sidebar (**tool panel**, ~240px), center (**canvas** with pannable/zoomable image), right sidebar (**layer drawer**, ~280px). Top bar: app wordmark (**LUTRA**) left-aligned, export button right-aligned. No routing beyond the root — the editor is the app.
+_Avoid_: "color grading menu", "workspace"
 
 ### Future (not in v1)
 
+- **Main menu** — a gallery screen at `/` showing saved edits in a grid. The entry point for a multi-edit workflow.
+- **Options screen** — settings surface with storage info and "Clear all" action.
+- **Saved edit** — persisted record of source image + **edit chain** + thumbnail. Stored in IndexedDB (OPFS for source images, JSON for chain metadata).
 - **LUT layer** — a layer type that applies a 3D color cube (`.cube` format) as a shader pass. Downloaded at runtime, not bundled.
 - Lift / gain / gamma, masks, blend modes per layer.
 - **Storage management** — soft/hard caps on saved edits, per-edit storage info, cleanup suggestions.

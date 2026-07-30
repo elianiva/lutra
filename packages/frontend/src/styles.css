@@ -1,1 +1,79 @@
 @import 'tailwindcss';
+
+/*
+ * Lutra — light, futuristic, hard-cornered.
+ * No rounded corners anywhere: panels, buttons, inputs, and the canvas all
+ * use 0 radius. Thin 1px borders delineate regions; a single near-black ink
+ * is the accent against a bright paper background.
+ */
+@theme {
+  --color-bg: #f4f5f7;
+  --color-panel: #ffffff;
+  --color-panel-alt: #f0f1f4;
+  --color-border: #d6d9de;
+  --color-border-strong: #b9bdc5;
+  --color-ink: #0a0a0b;
+  --color-muted: #6b7280;
+  --color-accent: #0a0a0b;
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code',
+    monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Range inputs rendered as bare tracks with a hard-edged thumb. */
+input[type='range'].lutra-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 28px;
+  background: transparent;
+  cursor: ew-resize;
+}
+input[type='range'].lutra-range::-webkit-slider-runnable-track {
+  height: 2px;
+  background: var(--color-border-strong);
+}
+input[type='range'].lutra-range::-moz-range-track {
+  height: 2px;
+  background: var(--color-border-strong);
+}
+input[type='range'].lutra-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -7px;
+  width: 16px;
+  height: 16px;
+  background: var(--color-accent);
+  border: none;
+  border-radius: 0;
+}
+input[type='range'].lutra-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--color-accent);
+  border: none;
+  border-radius: 0;
+}
+
+/* Numeric readouts use tabular figures so values don't jitter while dragging. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}

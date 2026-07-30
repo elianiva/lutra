@@ -8,10 +8,10 @@ export {
   makeRegistry,
   LAYER_TYPES,
   Layer,
+  LayerId,
   LayerPatch,
 } from "./layers"
 export type {
-  LayerId,
   FieldMeta,
   LayerEntry,
   LayerRegistry,
@@ -37,3 +37,18 @@ export type { RenderError, GpuBackendShape } from "./render"
 // Shader generation
 export { generateChainSource, SRGB_TO_LINEAR } from "./shaders"
 export type { ChainLayerInfo, ChainShader, UniformSlot, BodyRenderer } from "./shaders"
+
+// Shader body renderers — one per layer type. Consumers build a registry
+// (`makeRegistry`) from these to drive both `createLayer` and `render`.
+export {
+  renderExposure,
+  renderContrast,
+  renderShadows,
+  renderHighlights,
+  renderWhiteBalance,
+  renderSaturation,
+  renderGrain,
+  renderVignette,
+  renderChromaticAberration,
+  renderClarity,
+} from "./shaders"

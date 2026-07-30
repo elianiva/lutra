@@ -1,7 +1,7 @@
-import { Context, Effect } from "effect"
+import { Context, Data, Effect } from "effect"
 import type { Layer } from "./layers/schemas"
 import type { LayerEntry } from "./layers/registry"
-import { generateChainSource, type ChainShader } from "./shaders/chain-source"
+import { generateChainSource, type ChainLayerInfo, type ChainShader } from "./shaders/chain-source"
 
 // ---- service interface ----
 
@@ -32,17 +32,12 @@ export class GpuBackend extends Context.Service<GpuBackend, GpuBackendShape>()(
 
 // ---- errors ----
 
-export class GpuError {
-  readonly _tag = "GpuError"
-  constructor(
-    readonly message: string,
-    readonly cause?: unknown,
-  ) {}
-}
+export class GpuError extends Data.TaggedError("GpuError")<{
+  message: string
+  cause?: unknown
+}> {}
 
-export class EmptyChainError {
-  readonly _tag = "EmptyChainError"
-}
+export class EmptyChainError extends Data.TaggedError("EmptyChainError")<{}> {}
 
 export type RenderError = GpuError | EmptyChainError
 
@@ -90,19 +85,19 @@ export function render(
     }
 
     // Build chain-layer info for the assembler
-    const chainLayers = chain
-      .filter((l) => l.visible)
-      .map((l) => {
-        const entry = registry[l.type]
-        if (!entry) {
-          throw new Error(`Unknown layer type: ${l.type}`)
-        }
-        return {
-          type: l.type,
-          body: entry.body,
-          fieldKeys: Object.keys(entry.fields),
-        }
+    const chainLayers: ChainLayerInfo[] = []
+    for (const l of chain) {
+      if (!l.visible) continue
+      const entry = registry[l.type]
+      if (!entry) {
+        return yield* Effect.fail(new GpuError({ message: `Unknown layer type: ${l.type}` }))
+      }
+      chainLayers.push({
+        type: l.type,
+        body: entry.body,
+        fieldKeys: Object.keys(entry.fields),
       })
+    }
 
     if (chainLayers.length === 0) {
       return yield* Effect.fail(new EmptyChainError())
@@ -113,7 +108,7 @@ export function render(
     try {
       shader = generateChainSource(chainLayers)
     } catch (e) {
-      return yield* Effect.fail(new GpuError("Shader generation failed", e))
+      return yield* Effect.fail(new GpuError({ message: "Shader generation failed", cause: e }))
     }
 
     // Pack uniforms from layer parameter values

@@ -1,40 +1,34 @@
+import { Html } from 'foldkit'
 import type { HtmlBuilder } from 'foldkit/html'
-import type { Model, Message } from './model'
+import type { Model } from './app/model'
+import type { AppMessage } from './app/message'
+import { topBar } from './editor/topBar'
+import { toolPanel } from './editor/toolPanel'
+import { layerDrawer } from './editor/layerDrawer'
+import { canvasStage } from './editor/canvasStage'
 
-export function view(model: Model, h: HtmlBuilder<Message>) {
-  return {
-    title: 'Lutra',
-    body: h.div(
-      [h.Class('flex flex-col items-center justify-center min-h-screen gap-6 bg-neutral-50')],
-      [
-        h.h1(
-          [h.Class('text-6xl font-bold tracking-tight text-neutral-900')],
-          [String(model.count)],
-        ),
-        h.div(
-          [h.Class('flex gap-3')],
-          [
-            h.button(
-              [
-                h.Class(
-                  'px-5 py-2 text-lg font-medium text-white bg-neutral-800 rounded-lg hover:bg-neutral-700 transition-colors',
-                ),
-                h.OnClick({ _tag: 'Decrement' }),
-              ],
-              ['\u2212'],
-            ),
-            h.button(
-              [
-                h.Class(
-                  'px-5 py-2 text-lg font-medium text-white bg-neutral-800 rounded-lg hover:bg-neutral-700 transition-colors',
-                ),
-                h.OnClick({ _tag: 'Increment' }),
-              ],
-              ['+'],
-            ),
-          ],
-        ),
-      ],
-    ),
-  }
+export const view = (model: Model, h: HtmlBuilder<AppMessage>): Html.Document => ({
+  title: 'Lutra',
+  body: layout(h, model),
+})
+
+const layout = (
+  h: HtmlBuilder<AppMessage>,
+  model: Model,
+) => {
+  const hasImage = model.source.status === 'loaded' && !!model.source.bitmap
+  return h.div(
+    [h.Class('flex h-full flex-col bg-bg text-ink')],
+    [
+      topBar(h, hasImage),
+      h.div(
+        [h.Class('flex min-h-0 flex-1')],
+        [
+          toolPanel(h, model.draft !== null),
+          canvasStage(h, model),
+          layerDrawer(h, model),
+        ],
+      ),
+    ],
+  )
 }

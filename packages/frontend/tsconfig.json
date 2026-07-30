@@ -4,6 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ES2022", "DOM"],
+    "types": ["@webgpu/types"],
     "paths": {
       "@lutra/engine": ["../engine/src/index.ts"]
     }

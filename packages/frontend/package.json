@@ -18,11 +18,14 @@
     "@tailwindcss/vite": "^4.3.3",
     "effect": "^4.0.0-beta.102",
     "foldkit": "^0.134.0",
+    "lucide": "^1.24.0",
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@foldkit/devtools-mcp": "^0.14.0",
     "@foldkit/oxlint-plugin": "^0.4.0",
+    "@foldkit/vite-plugin": "^0.11.3",
+    "@webgpu/types": "^0.1.60",
     "happy-dom": "^20.11.1",
     "typescript": "^7.0.2",
     "vite": "^8.1.5",

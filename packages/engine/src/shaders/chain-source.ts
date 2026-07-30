@@ -61,17 +61,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
   }
 
-  // Collect uniforms and assign offsets
-  const uniforms: UniformSlot[] = []
-  let offset = 0
-
-  for (const layer of layers) {
-    for (const key of layer.fieldKeys) {
-      uniforms.push({ layerIndex: uniforms.length > 0 ? layers.indexOf(layer) : 0, field: key, offset })
-      offset++
-    }
-  }
-  // Recompute layer indices correctly
   const uniformsCorrected: UniformSlot[] = []
   let off = 0
   for (let li = 0; li < layers.length; li++) {

@@ -1,3 +1,4 @@
+import { Data } from "effect"
 import type { Layer, LayerPatch, LayerType } from "./layers/schemas"
 import type { LayerId } from "./layers/schemas"
 import type { LayerRegistry } from "./layers/registry"
@@ -5,15 +6,14 @@ import { createLayer } from "./layers/defaults"
 
 // ---- errors ----
 
-export class LayerNotFoundError {
-  readonly _tag = "LayerNotFoundError"
-  constructor(readonly layerId: LayerId) {}
-}
+export class LayerNotFoundError extends Data.TaggedError("LayerNotFoundError")<{
+  layerId: LayerId
+}> {}
 
-export class InvalidPositionError {
-  readonly _tag = "InvalidPositionError"
-  constructor(readonly index: number, readonly chainLength: number) {}
-}
+export class InvalidPositionError extends Data.TaggedError("InvalidPositionError")<{
+  index: number
+  chainLength: number
+}> {}
 
 export type ChainError = LayerNotFoundError | InvalidPositionError
 
@@ -67,7 +67,6 @@ export function updateLayerParam(
   const idx = chain.findIndex((l) => l.type === patch.type)
   if (idx === -1) return [...chain]
 
-  // Verify the layer at idx has the right type and id
   const layer = chain[idx]!
   const result = [...chain]
   result[idx] = { ...layer, ...patch.patch } as Layer
