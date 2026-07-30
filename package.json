@@ -1,0 +1,26 @@
+{
+  "name": "lutra",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "turbo build",
+    "check": "vp check",
+    "dev": "turbo dev",
+    "fmt": "vp fmt",
+    "lint": "vp lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "infra:deploy": "alchemy deploy --yes"
+  },
+  "dependencies": {
+    "alchemy": "^2.0.0-beta.65"
+  },
+  "devDependencies": {
+    "@foldkit/oxlint-plugin": "^0.4.0",
+    "turbo": "^2.10.7",
+    "typescript": "^7.0.2",
+    "vite-plus": "^0.2.6"
+  },
+  "packageManager": "pnpm@9.15.4"
+}

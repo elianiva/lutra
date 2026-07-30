@@ -1,0 +1,15 @@
+{
+  "name": "@lutra/infra",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "effect": "^4.0.0-beta.102"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}

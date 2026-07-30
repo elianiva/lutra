@@ -1,0 +1,31 @@
+{
+  "name": "@lutra/frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@effect/platform-browser": "^4.0.0-beta.102",
+    "@foldkit/devtools": "^0.134.0",
+    "@foldkit/ui": "^0.134.0",
+    "@lutra/engine": "workspace:*",
+    "@tailwindcss/vite": "^4.3.3",
+    "effect": "^4.0.0-beta.102",
+    "foldkit": "^0.134.0",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@foldkit/devtools-mcp": "^0.14.0",
+    "@foldkit/oxlint-plugin": "^0.4.0",
+    "happy-dom": "^20.11.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10"
+  }
+}
