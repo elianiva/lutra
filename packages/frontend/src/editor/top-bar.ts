@@ -1,11 +1,11 @@
 import type { HtmlBuilder } from 'foldkit/html'
 import { Download } from 'lucide'
 import { icon } from '../components/icon'
-import { ExportRequested, ClearedImage } from '../app/message'
-import type { AppMessage } from '../app/message'
+import { ExportRequested, ClearedImage } from './message'
+import type { EditorMessage } from './message'
 
 /** Minimal top bar: LUTRA wordmark left, export + clear right. */
-export const topBar = (h: HtmlBuilder<AppMessage>, hasImage: boolean) =>
+export const topBar = (h: HtmlBuilder<EditorMessage>, hasImage: boolean) =>
   h.header(
     [
       h.Class(

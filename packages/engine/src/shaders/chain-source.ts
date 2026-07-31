@@ -166,7 +166,7 @@ function layerPass({
   uniforms,
   linearize,
   encode,
-  samplesInput,
+  samplesInput: _samplesInput,
   needsSampler,
   dstFormat,
 }: LayerPassOptions): ChainPass {

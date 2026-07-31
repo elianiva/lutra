@@ -15,9 +15,9 @@ import {
   CancelledDraft,
   CycledToggledField,
   ReorderedLayer,
-} from '../app/message'
-import type { AppMessage } from '../app/message'
-import type { Model } from '../app/model'
+} from './message'
+import type { EditorMessage } from './message'
+import type { Model } from './model'
 import { FieldKey, type Layer, type LayerType } from '@lutra/engine'
 
 const num = (layer: Layer, key: FieldKey): number => {
@@ -33,7 +33,7 @@ const summary = (model: Model, layer: Layer, ui: (typeof LAYER_UI)[LayerType]): 
     : ui.formatValue(layer)
 
 /** Right sidebar: the edit chain as a vertical list with inline sliders. */
-export const layerDrawer = (h: HtmlBuilder<AppMessage>, model: Model) =>
+export const layerDrawer = (h: HtmlBuilder<EditorMessage>, model: Model) =>
   h.aside(
     [h.Class('flex w-72 shrink-0 flex-col border-l border-border bg-panel'), h.AriaLabel('Layers')],
     [
@@ -65,13 +65,13 @@ export const layerDrawer = (h: HtmlBuilder<AppMessage>, model: Model) =>
 // The chain renders bottom-up (newest at the top, like Lightroom's history) so
 // the most recent adjustment sits at eye level.
 
-const emptyState = (h: HtmlBuilder<AppMessage>) =>
+const emptyState = (h: HtmlBuilder<EditorMessage>) =>
   h.div(
     [h.Class('px-4 py-10 text-center text-xs text-muted')],
     ['No adjustments yet. Pick one from the left.'],
   )
 
-const draftRow = (h: HtmlBuilder<AppMessage>, model: Model, layer: Layer) => {
+const draftRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer) => {
   const ui = LAYER_UI[layer.type]
   return h.div(
     [h.Class('border-b border-border bg-panel-alt'), h.AriaLabel(`${ui.label} draft`)],
@@ -115,7 +115,7 @@ const draftRow = (h: HtmlBuilder<AppMessage>, model: Model, layer: Layer) => {
 }
 
 const draftSlider = (
-  h: HtmlBuilder<AppMessage>,
+  h: HtmlBuilder<EditorMessage>,
   layer: Layer,
   field: FieldKey,
   ui: (typeof LAYER_UI)[LayerType],
@@ -128,7 +128,7 @@ const draftSlider = (
   )
 }
 
-const chainRow = (h: HtmlBuilder<AppMessage>, model: Model, layer: Layer, index: number) => {
+const chainRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer, index: number) => {
   const ui = LAYER_UI[layer.type]
   // A row is focused only in the Selected phase — the draft (Drafting) takes
   // priority and blocks new selections.
@@ -201,7 +201,7 @@ const chainRow = (h: HtmlBuilder<AppMessage>, model: Model, layer: Layer, index:
 }
 
 const chainSlider = (
-  h: HtmlBuilder<AppMessage>,
+  h: HtmlBuilder<EditorMessage>,
   layer: Layer,
   field: FieldKey,
   ui: (typeof LAYER_UI)[LayerType],
@@ -234,11 +234,11 @@ const chainSlider = (
 }
 
 const reorderButton = (
-  h: HtmlBuilder<AppMessage>,
+  h: HtmlBuilder<EditorMessage>,
   label: string,
   node: Parameters<typeof icon>[1],
   disabled: boolean,
-  onClick: () => AppMessage,
+  onClick: () => EditorMessage,
 ) =>
   h.button(
     [
@@ -252,15 +252,15 @@ const reorderButton = (
 
 /** One labelled slider row: label, numeric readout, range input. */
 export const sliderControl = (
-  h: HtmlBuilder<AppMessage>,
+  h: HtmlBuilder<EditorMessage>,
   label: string,
   display: string,
   min: number,
   max: number,
   value: number,
-  onChange: (v: number) => AppMessage,
+  onChange: (v: number) => EditorMessage,
   toggledLabel = false,
-  onToggleLabel?: () => AppMessage,
+  onToggleLabel?: () => EditorMessage,
 ) =>
   h.div(
     [h.Class('flex flex-col gap-1')],

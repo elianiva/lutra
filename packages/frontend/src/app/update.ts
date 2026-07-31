@@ -12,6 +12,7 @@ import {
   SaveExportSettings,
   PickImageFile,
   RenderChain,
+  ReadHistogram,
 } from './command'
 import { editorMachine } from './phase'
 import { LAYER_UI } from '../editor/layer-meta'
@@ -140,6 +141,7 @@ export const update = (model: Model, message: AppMessage): Result => {  // Data-
           renderPending: false,
           renderedStamp: 0,
           lastRender: null,
+          bins: null,
         },
         [],
       ],
@@ -291,19 +293,33 @@ export const update = (model: Model, message: AppMessage): Result => {  // Data-
         // A newer mutation arrived while this render was in flight — render
         // again with the newest chain+draft instead of dropping the work.
         // The stale frame's handle is NOT stored: `lastRender` always points
-        // at the frame the canvas is actually showing.
+        // at the frame the canvas is actually showing. ReadHistogram still
+        // runs for the stale frame so its per-render bins buffer is consumed
+        // (destroyed) rather than leaked; the stale bins are dropped below.
         if (stamp < model.revision) {
-          return renderNow({ ...model, phase, renderPending: false })
+          const [next, commands] = renderNow({ ...model, phase, renderPending: false })
+          return [next, [...commands, ReadHistogram({ handle, stamp })]]
         }
         return [
           { ...model, phase, renderPending: false, renderedStamp: stamp, lastRender: handle },
-          [],
+          [ReadHistogram({ handle, stamp })],
         ]
       },
       RenderFailed: ({ reason }) => [
         { ...model, phase, renderPending: false, source: { ...model.source, error: reason } },
         [],
       ],
+      // ---- histogram overlay ----
+      // Bins for the frame that's on screen — or a stale readback that
+      // landed after a newer mutation, which is dropped (the buffer was
+      // already consumed by the ReadHistogram command).
+      HistogramComputed: ({ bins, stamp }) => {
+        if (stamp < model.revision) return [model, []]
+        return [{ ...model, phase, bins }, []]
+      },
+      // Readback failure is observability only — the frame is already on
+      // the canvas; a 1KB map cannot be retried or shown.
+      HistogramFailed: () => [model, []],
 
       // ---- export dialog ----
       ExportRequested: () => {

@@ -47,6 +47,10 @@ export const Model = Schema.Struct({
   // The GPU frame handle of the last rendered frame; export snapshots from
   // exactly this frame (never an implicit backend "last session").
   lastRender: Schema.NullOr(Schema.instanceOf(RenderHandle)),
+  // The luminance histogram bins (256 u32) of the frame currently displayed,
+  // read back asynchronously from the GPU (null until the first readback
+  // lands; cleared with the image). The Histogram overlay draws from this.
+  bins: Schema.NullOr(Schema.instanceOf(Uint32Array)),
   // Monotonic counter hashed into the render trigger stamp.
   revision: Schema.Number,
   // ---- export dialog ----
@@ -91,6 +95,7 @@ export const initialModel = (): Model => ({
   renderPending: false,
   renderedStamp: 0,
   lastRender: null,
+  bins: null,
   revision: 0,
   exportDialog: Dialog.init({ id: 'export-dialog' }),
   exportSettings: defaultExportSettings(),

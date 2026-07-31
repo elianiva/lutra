@@ -43,7 +43,7 @@ const loadedModel = () => ({
   source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
   renderedStamp: 1,
   // oxlint-disable-next-line consistent-type-assertions
-  lastRender: new RenderHandle({} as GPUTexture, 200, 150),
+  lastRender: new RenderHandle({} as GPUTexture, 200, 150, { buffer: {} as GPUBuffer, map: null }),
 })
 
 /** A 200×150 export frame, as the snapshot readback produces it. */

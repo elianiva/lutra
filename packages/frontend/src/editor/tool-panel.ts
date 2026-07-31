@@ -1,14 +1,14 @@
 import type { HtmlBuilder } from 'foldkit/html'
 import { icon } from '../components/icon'
 import { LAYER_UI, LAYER_TYPES_ORDER } from './layer-meta'
-import { SelectedTool } from '../app/message'
-import type { AppMessage } from '../app/message'
-import type { Model } from '../app/model'
-import type { EditorPhase } from '../app/phase'
+import { SelectedTool } from './message'
+import type { EditorMessage } from './message'
+import type { Model } from './model'
+import type { EditorPhase } from './phase'
 import type { LayerType } from '@lutra/engine'
 
 /** Left sidebar: all 11 adjustment types as a vertical icon+label list. */
-export const toolPanel = (h: HtmlBuilder<AppMessage>, model: Model) =>
+export const toolPanel = (h: HtmlBuilder<EditorMessage>, model: Model) =>
   h.aside(
     [
       h.Class('flex w-60 shrink-0 flex-col border-r border-border bg-panel'),
@@ -26,7 +26,17 @@ export const toolPanel = (h: HtmlBuilder<AppMessage>, model: Model) =>
       h.nav(
         [h.Class('flex flex-col')],
         LAYER_TYPES_ORDER.map((type) =>
-          toolRow(h, type, canPickTool(model.phase), model.catalog !== null),
+          toolRow(h, type, canPickTool(model.phase), model.catalog !== import type { HtmlBuilder } from 'foldkit/html'
+import { icon } from '../components/icon'
+import { LAYER_UI, LAYER_TYPES_ORDER } from './layer-meta'
+import { SelectedTool } from './message'
+import type { EditorMessage } from './message'
+import type { Model } from './model'
+import type { EditorPhase } from './phase'
+import type { LayerType } from '@lutra/engine'
+
+/** Left sidebar: all 11 adjustment types as a vertical icon+label list. */
+export const toolPanel = (h: HtmlBuilder<EditorMessage>, model: Model) =>),
         ),
       ),
     ],
@@ -39,7 +49,7 @@ const canPickTool = (phase: EditorPhase): boolean =>
   phase._tag === 'Idle' || phase._tag === 'Selected'
 
 const toolRow = (
-  h: HtmlBuilder<AppMessage>,
+  h: HtmlBuilder<EditorMessage>,
   type: LayerType,
   editable: boolean,
   lutEnabled: boolean,

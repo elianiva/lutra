@@ -7,13 +7,14 @@ import { view } from '../view'
 import { ErrorState } from './phase'
 import { PanZoom, RegisterCanvas } from '../editor/canvas-stage'
 import { RenderHandle } from '../gpu/backend'
-import { PickImageFile, DecodeImage, RenderChain } from './command'
+import { PickImageFile, DecodeImage, RenderChain, ReadHistogram } from './command'
 import {
   FilePickCancelled,
   SelectedImageFile,
   ImageDecoded,
   ImageFailedToDecode,
   RenderedFrame,
+  HistogramComputed,
   ScaledCanvas,
   CanvasRegistered,
 } from './message'
@@ -218,11 +219,18 @@ describe('Image decode flow', () => {
       Command.expectHas(RenderChain),
       Command.resolve(
         RenderChain,
-        // oxlint-disable-next-line consistent-type-assertions
-        RenderedFrame({ stamp: 1, handle: new RenderHandle({} as GPUTexture, 200, 150) }),
+        RenderedFrame({
+          stamp: 1,
+          // oxlint-disable-next-line consistent-type-assertions
+          handle: new RenderHandle({} as GPUTexture, 200, 150, { buffer: {} as GPUBuffer, map: null }),
+        }),
       ),
       Mount.resolve(PanZoom, ScaledCanvas({ scale: 1, offsetX: 0, offsetY: 0 })),
       Mount.resolve(RegisterCanvas, CanvasRegistered()),
+      // The RenderedFrame handler dispatches ReadHistogram for the frame;
+      // the scene resolves it so the session ends cleanly.
+      Command.expectHas(ReadHistogram),
+      Command.resolve(ReadHistogram, HistogramComputed({ bins: new Uint32Array(256), stamp: 1 })),
       expect(selector('#lutra-canvas')).toExist(),
       Command.expectNone(),
     )

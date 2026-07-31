@@ -9,11 +9,25 @@ import { GpuError, WORKGROUP_SIZE, type ChainPass, type LutCube, type RenderRequ
  * (RenderedFrame message → model) so `snapshot` never reads an implicit
  * "last session" — export snapshots exactly the frame it was handed.
  */
+/**
+ * One slot of the histogram readback ring. `execute` copies a frame's bins
+ * into `buffer` and issues `map` once the frame's submit completed — so the
+ * map never queues behind a later render — then `readHistogram` consumes it
+ * (read + unmap, `map` back to null), freeing the slot for the ring's next
+ * pass. A slot whose `map` is non-null is never copied into.
+ */
+interface HistogramSlot {
+  readonly buffer: GPUBuffer
+  map: Promise<void> | null
+}
+
 export class RenderHandle {
   constructor(
     readonly dstTex: GPUTexture,
     readonly width: number,
     readonly height: number,
+    /** This frame's slot on the histogram readback ring (see HistogramSlot). */
+    readonly readback: HistogramSlot,
   ) {}
 }
 
@@ -36,6 +50,17 @@ export interface GpuBackendShape {
    * receives it without a copy.
    */
   readonly snapshot: (handle: RenderHandle) => Effect.Effect<ImageData, GpuError>
+  /**
+   * Read the histogram bins of the frame identified by `handle` back to the
+   * CPU (256 u32 Rec.709 luma counts). The only readback on the display
+   * path, and a scoped one: 1KB of aggregate statistics, never the frame.
+   * The map was already issued by `execute` once the frame's submit
+   * completed, so this never waits on the render queue. Consumes the
+   * handle's readback slot (map → read → unmap), freeing it for the ring.
+   */
+  readonly readHistogram: (
+    handle: RenderHandle,
+  ) => Effect.Effect<Uint32Array<ArrayBuffer>, GpuError>
 }
 
 export class GpuBackend extends Context.Service<GpuBackend, GpuBackendShape>()(
@@ -122,6 +147,47 @@ fn fs(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
 
 const roundUp = (n: number, to: number) => Math.ceil(n / to) * to
 
+// ---- histogram pass ----
+
+/** Bins per channel. Matches the 8-bit sRGB-encoded display texture 1:1. */
+const HISTOGRAM_BINS = 256
+
+/**
+ * Readback ring depth. A slot is mapped from the moment `execute` issues
+ * the map (after the frame's submit completed) until `readHistogram`
+ * consumes it in the same message cycle — three slots give two full cycles
+ * of slack before a slot is reused, so a slow consumer can never collide
+ * with a copy.
+ */
+const HISTOGRAM_SLOTS = 3
+
+/**
+ * Scatter-write histogram pass: bins the Rec.709 luma of every texel of the
+ * final display texture (sRGB-encoded rgba8unorm) into 256 atomic u32 bins.
+ * Full-resolution — every pixel counted exactly once, so clipping and
+ * specular peaks are never averaged away by a reduction. Reads dstTex as a
+ * plain texture (binding 0), writes the session's bins accumulator
+ * (binding 1).
+ */
+const HISTOGRAM_SOURCE = `
+@group(0) @binding(0) var srcTex: texture_2d<f32>;
+@group(0) @binding(1) var<storage, read_write> bins: array<atomic<u32>, 256>;
+
+@compute @workgroup_size(16, 16)
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let size = textureDimensions(srcTex);
+  if (gid.x >= size.x || gid.y >= size.y) {
+    return;
+  }
+  let color = textureLoad(srcTex, vec2<i32>(gid.xy), 0);
+  // Rec.709 luma — the same coefficients the engine's shader bodies use.
+  let luma = dot(color.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
+  // [0, 1] -> bin 0..255; 1.0 clamps into the top bin.
+  let bin = min(u32(luma * 256.0), 255u);
+  atomicAdd(&bins[bin], 1u);
+}
+`
+
 // ---- the live backend ----
 
 interface ComputeEntry {
@@ -152,6 +218,13 @@ interface Session {
   readonly resolutionBuffer: GPUBuffer
   readonly frameBuffer: GPUBuffer
   readonly blitGroup: GPUBindGroup
+  /** Histogram bins accumulator (STORAGE | COPY_SRC) — the pass atomicAdds into this. */
+  readonly binsBuffer: GPUBuffer
+  /** 256 zeroes for the per-render accumulator reset (writeBuffer, 1KB). */
+  readonly binsZeros: Uint32Array
+  readonly histogramGroup: GPUBindGroup
+  /** Readback ring: per render, the bins are copied into one slot, which is then mapped. */
+  readonly readbacks: [HistogramSlot, HistogramSlot, HistogramSlot]
   /** Per-pass-source params buffer + compute bind group (both reference session resources). */
   readonly compute: Record<string, ComputeEntry>
 }
@@ -182,6 +255,12 @@ export const GpuBackendLive = Layer.effect(
     >({})
     const lutTexturesRef = yield* Ref.make(new Map<string, GPUTexture>())
 
+    // Histogram readback ring cursor: which slot the next render copies
+    // into. Renders are serialized (one in flight — the caller coalesces
+    // via renderPending), so a plain counter is race-free; it just rotates
+    // forever, session rebuilds included.
+    let readbackCursor = 0
+
     const sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' })
 
     const blitModule = device.createShaderModule({ code: BLIT_SOURCE })
@@ -195,6 +274,15 @@ export const GpuBackendLive = Layer.effect(
         targets: [{ format: swapFormat }],
       },
       primitive: { topology: 'triangle-list' },
+    })
+
+    // Device-scoped histogram pipeline (fixed shader, like the blit). The
+    // bind group is per session — it references the session's bins
+    // accumulator and dstTex, neither of which change per render.
+    const histogramModule = device.createShaderModule({ code: HISTOGRAM_SOURCE })
+    const histogramPipeline = device.createComputePipeline({
+      layout: 'auto',
+      compute: { module: histogramModule, entryPoint: 'main' },
     })
 
     // Device-scoped LUT texture cache: a cube uploads once per lutId and
@@ -252,6 +340,10 @@ export const GpuBackendLive = Layer.effect(
       s.intermediates[1].destroy()
       s.resolutionBuffer.destroy()
       s.frameBuffer.destroy()
+      s.binsBuffer.destroy()
+      for (const slot of s.readbacks) {
+        slot.buffer.destroy()
+      }
       for (const entry of Object.values(s.compute)) {
         entry.paramsBuffer?.destroy()
       }
@@ -336,6 +428,35 @@ export const GpuBackendLive = Layer.effect(
         ],
       })
 
+      // Histogram resources, all session-scoped (created once per image,
+      // never per render): a storage-only bins accumulator — MAP_READ can't
+      // combine with STORAGE (WebGPU usage rules), so the bins cross back
+      // via a ring of MAP_READ readback buffers the encoder copies into per
+      // render — and the pass's bind group, which only references
+      // session-scoped resources. All three readback slots start unmapped
+      // with no pending map, so a fresh session's ring is immediately
+      // reusable.
+      const binsBuffer = device.createBuffer({
+        size: HISTOGRAM_BINS * 4,
+        // COPY_DST for the per-render zeroing writeBuffer; COPY_SRC for the
+        // copy into the readback ring.
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+      })
+      const histogramGroup = device.createBindGroup({
+        layout: histogramPipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: dstTex.createView() },
+          { binding: 1, resource: { buffer: binsBuffer } },
+        ],
+      })
+      const makeSlot = (): HistogramSlot => ({
+        buffer: device.createBuffer({
+          size: HISTOGRAM_BINS * 4,
+          usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+        }),
+        map: null,
+      })
+
       return {
         canvas,
         ctx,
@@ -347,6 +468,10 @@ export const GpuBackendLive = Layer.effect(
         resolutionBuffer,
         frameBuffer,
         blitGroup,
+        binsBuffer,
+        binsZeros: new Uint32Array(HISTOGRAM_BINS),
+        histogramGroup,
+        readbacks: [makeSlot(), makeSlot(), makeSlot()],
         compute: {},
       }
     }
@@ -529,7 +654,38 @@ export const GpuBackendLive = Layer.effect(
             computePass.end()
           }
 
-          // Pass 2: blit dstTex onto the canvas swapchain texture.
+          // Histogram scatter pass: bin the final frame's Rec.709 luma into
+          // 256 atomic bins (full-res, exact). The pass writes the
+          // session-scoped bins accumulator; the bins are then copied into
+          // this frame's slot of the readback ring in the same encoder
+          // (MAP_READ buffers can't receive storage writes, so the copy is
+          // the bridge). The accumulator is zeroed per render — atomics add
+          // across renders, and the previous render's work completed before
+          // this one started (execute resolves on onSubmittedWorkDone).
+          const slot = s.readbacks[readbackCursor % HISTOGRAM_SLOTS]!
+          readbackCursor += 1
+          if (slot.map !== null) {
+            // Abnormal flow: the previous frame on this slot was never
+            // consumed (a dropped RenderedFrame). Wait out its map so we
+            // don't copy into a mapped buffer, then reclaim the slot.
+            const pending = slot.map
+            yield* Effect.ignore(Effect.promise(() => pending))
+            slot.buffer.unmap()
+            slot.map = null
+          }
+          device.queue.writeBuffer(s.binsBuffer, 0, s.binsZeros)
+          const histogramPass = encoder.beginComputePass()
+          histogramPass.setPipeline(histogramPipeline)
+          histogramPass.setBindGroup(0, s.histogramGroup)
+          histogramPass.dispatchWorkgroups(
+            Math.ceil(width / WORKGROUP_SIZE),
+            Math.ceil(height / WORKGROUP_SIZE),
+            1,
+          )
+          histogramPass.end()
+          encoder.copyBufferToBuffer(s.binsBuffer, 0, slot.buffer, 0, HISTOGRAM_BINS * 4)
+
+          // Finally: blit dstTex onto the canvas swapchain texture.
           const canvasTexture = s.ctx.getCurrentTexture()
           const renderPass = encoder.beginRenderPass({
             colorAttachments: [
@@ -555,7 +711,17 @@ export const GpuBackendLive = Layer.effect(
             catch: (cause) => new GpuError({ message: 'GPU work failed', cause }),
           })
 
-          return new RenderHandle(s.dstTex, s.width, s.height)
+          // Issue this slot's map NOW, before any later render can submit:
+          // mapAsync is enqueued on the queue timeline behind every pending
+          // submission, so a map issued later (from the readback command)
+          // would queue behind the next render — and the next after that
+          // during a drag — landing stale and getting dropped. Issued right
+          // after this frame's own submit completed, it resolves before the
+          // frame's RenderedFrame is even handled, and readHistogram
+          // consumes it with no waiting.
+          slot.map = slot.buffer.mapAsync(GPUMapMode.READ)
+
+          return new RenderHandle(s.dstTex, s.width, s.height, slot)
         }).pipe(
           // Any unexpected exception (bind group/layout mismatch, browser-
           // specific WGSL rejection) must surface as a GpuError. Without
@@ -606,6 +772,32 @@ export const GpuBackendLive = Layer.effect(
 
           const imageData = new ImageData(dense, width, height)
           return imageData
+        }),
+
+      readHistogram: (handle) =>
+        Effect.gen(function* () {
+          const slot = handle.readback
+          const live = yield* Ref.get(sessionRef)
+          const map = slot.map
+          if (map === null || Option.isNone(live) || !live.value.readbacks.includes(slot)) {
+            // Consumed already, or the owning session was torn down (its
+            // buffers destroyed — the map would reject). Either way the
+            // frame is stale and its bins would be dropped by the stamp
+            // guard: resolve with empty bins rather than surfacing a
+            // spurious failure.
+            return new Uint32Array(HISTOGRAM_BINS)
+          }
+          // The map was issued by execute after this frame's submit
+          // completed, so it resolves without waiting on any later render.
+          yield* Effect.tryPromise({
+            try: () => map,
+            catch: (cause) => new GpuError({ message: 'Failed to map histogram bins buffer', cause }),
+          })
+          const bins = new Uint32Array(slot.buffer.getMappedRange())
+          const copy = new Uint32Array(bins)
+          slot.buffer.unmap()
+          slot.map = null
+          return copy
         }),
     })
   }),

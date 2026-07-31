@@ -1,16 +1,16 @@
 import { Effect, Schema as S, Stream, Queue } from 'effect'
 import { Mount } from 'foldkit'
 import type { HtmlBuilder } from 'foldkit/html'
-import type { AppMessage } from '../app/message'
+import type { EditorMessage } from './message'
 import {
   FilePickRequested,
   ScaledCanvas,
   SelectedImageFile,
   CanvasRegistered,
-} from '../app/message'
-import { hasImage } from '../app/phase'
+} from './message'
+import { hasImage } from './phase'
 import { canvasRef, registerCanvas } from '../gpu/canvas-ref'
-import type { Model } from '../app/model'
+import type { Model } from './model'
 
 const ZOOM_SPEED = 0.01
 
@@ -184,7 +184,7 @@ export const RegisterCanvas = Mount.define(
 
 // ---- sub-views ----
 
-const emptyStage = (h: HtmlBuilder<AppMessage>) =>
+const emptyStage = (h: HtmlBuilder<EditorMessage>) =>
   h.div(
     [
       h.Class('flex flex-col items-center justify-center gap-3 text-sm text-muted select-none'),
@@ -216,7 +216,7 @@ const emptyStage = (h: HtmlBuilder<AppMessage>) =>
     ],
   )
 
-const errorStage = (h: HtmlBuilder<AppMessage>, error: string) =>
+const errorStage = (h: HtmlBuilder<EditorMessage>, error: string) =>
   h.div(
     [h.Class('flex flex-col items-center justify-center gap-2 text-sm text-muted')],
     [
@@ -231,7 +231,76 @@ const errorStage = (h: HtmlBuilder<AppMessage>, error: string) =>
     ],
   )
 
-const loadedStage = (h: HtmlBuilder<AppMessage>, model: Model) => {
+// ---- histogram overlay ----
+
+const HISTOGRAM_WIDTH = 220
+const HISTOGRAM_HEIGHT = 110
+
+/**
+ * The **Histogram overlay**: a filled-area luminance histogram of the frame
+ * currently displayed, fixed to the stage's bottom-right corner. Screen
+ * space — a sibling of the panned/zoomed image, so pan/zoom never moves it.
+ * Purely decorative: `pointer-events-none`, so wheel and drag pass straight
+ * through. Linear max-bin normalization; an all-black frame draws a flat
+ * baseline. Rendered as SVG in the foldkit view — a pure function of the
+ * model's bins, like every other piece of UI.
+ */
+const histogramOverlay = (h: HtmlBuilder<EditorMessage>, bins: Uint32Array | null) => {
+  if (!bins) return null
+
+  let max = 0
+  for (let i = 0; i < 256; i++) {
+    if (bins[i]! > max) max = bins[i]!
+  }
+
+  // Area polygon: the bin curve left→right, then the bottom edge back to
+  // the origin. The stroke reuses the same curve (without the corners).
+  const curve: string[] = []
+  for (let i = 0; i < 256; i++) {
+    const x = (i / 255) * HISTOGRAM_WIDTH
+    const y = max === 0 ? 0 : HISTOGRAM_HEIGHT - (bins[i]! / max) * HISTOGRAM_HEIGHT
+    curve.push(`${x.toFixed(1)},${y.toFixed(1)}`)
+  }
+  const area = [...curve, `${HISTOGRAM_WIDTH},${HISTOGRAM_HEIGHT}`, `0,${HISTOGRAM_HEIGHT}`]
+
+  return h.div(
+    [
+      h.Class(
+        'pointer-events-none absolute bottom-3 right-3 rounded border border-border bg-panel/80 text-ink',
+      ),
+      h.Attribute('style', `width: ${HISTOGRAM_WIDTH}px; height: ${HISTOGRAM_HEIGHT}px;`),
+    ],
+    [
+      h.svg(
+        [
+          h.Class('block h-full w-full'),
+          h.Attribute('viewBox', `0 0 ${HISTOGRAM_WIDTH} ${HISTOGRAM_HEIGHT}`),
+        ],
+        [
+          h.polygon(
+            [
+              h.Attribute('points', area.join(' ')),
+              h.Attribute('fill', 'currentColor'),
+              h.Attribute('fill-opacity', '0.25'),
+            ],
+            [],
+          ),
+          h.polyline(
+            [
+              h.Attribute('points', curve.join(' ')),
+              h.Attribute('fill', 'none'),
+              h.Attribute('stroke', 'currentColor'),
+              h.Attribute('stroke-width', '1'),
+            ],
+            [],
+          ),
+        ],
+      ),
+    ],
+  )
+}
+
+const loadedStage = (h: HtmlBuilder<EditorMessage>, model: Model) => {
   const src = model.source
   return h.div(
     [
@@ -269,6 +338,7 @@ const loadedStage = (h: HtmlBuilder<AppMessage>, model: Model) => {
           ),
         ],
       ),
+      histogramOverlay(h, model.bins),
     ],
   )
 }
@@ -277,7 +347,7 @@ const loadedStage = (h: HtmlBuilder<AppMessage>, model: Model) => {
  *  rendered canvas with pan/zoom. Which stage shows is the phase machine's
  *  call (app/phase.ts): Empty/Loading → upload zone, Error → error stage,
  *  Idle/Drafting/Selected → the loaded canvas. */
-export const canvasStage = (h: HtmlBuilder<AppMessage>, model: Model) =>
+export const canvasStage = (h: HtmlBuilder<EditorMessage>, model: Model) =>
   h.main(
     [h.Class('relative flex min-w-0 flex-1 items-center justify-center overflow-hidden bg-bg')],
     [

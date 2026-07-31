@@ -1,14 +1,14 @@
 import type { HtmlBuilder } from 'foldkit/html'
 import { Dialog } from '@foldkit/ui'
-import type { Model } from '../app/model'
-import type { AppMessage } from '../app/message'
+import type { Model } from './model'
+import type { EditorMessage } from './message'
 import {
   ChangedExportFormat,
   ChangedExportQuality,
   ChangedExportScale,
   ExportDownloadRequested,
   GotExportDialogMessage,
-} from '../app/message'
+} from './message'
 import { EXPORT_FORMATS, EXPORT_SCALES, fileExtension, isLossy, type ExportFormat, type ExportScale } from '@lutra/engine'
 
 const fmtBytes = (bytes: number): string => {
@@ -20,10 +20,10 @@ const fmtBytes = (bytes: number): string => {
 
 /** A 4-up segmented grid of hard-edged buttons; the selected one is filled. */
 const segmentedRow = (
-  h: HtmlBuilder<AppMessage>,
+  h: HtmlBuilder<EditorMessage>,
   options: readonly { label: string; value: string }[],
   selected: string,
-  onSelect: (value: string) => AppMessage,
+  onSelect: (value: string) => EditorMessage,
 ) =>
   h.div(
     [h.Class('grid grid-cols-4 border border-border')],
@@ -56,7 +56,7 @@ const segmentedRow = (
  * download — tweak and re-export until it looks right. Settings persist
  * across sessions.
  */
-export const exportDialogView = (h: HtmlBuilder<AppMessage>, model: Model) =>
+export const exportDialogView = (h: HtmlBuilder<EditorMessage>, model: Model) =>
   h.submodel({
     slotId: model.exportDialog.id,
     model: model.exportDialog,
@@ -124,7 +124,7 @@ export const exportDialogView = (h: HtmlBuilder<AppMessage>, model: Model) =>
     toParentMessage: (message) => GotExportDialogMessage({ message }),
   })
 
-const formatSection = (h: HtmlBuilder<AppMessage>, model: Model) =>
+const formatSection = (h: HtmlBuilder<EditorMessage>, model: Model) =>
   h.div(
     [h.Class('flex flex-col gap-1.5')],
     [
@@ -140,7 +140,7 @@ const formatSection = (h: HtmlBuilder<AppMessage>, model: Model) =>
     ],
   )
 
-const qualitySection = (h: HtmlBuilder<AppMessage>, model: Model) => {
+const qualitySection = (h: HtmlBuilder<EditorMessage>, model: Model) => {
   const { format, quality } = model.exportSettings
   if (!isLossy(format)) return h.div([], [])
   return h.div(
@@ -166,7 +166,7 @@ const qualitySection = (h: HtmlBuilder<AppMessage>, model: Model) => {
   )
 }
 
-const resolutionSection = (h: HtmlBuilder<AppMessage>, model: Model) => {
+const resolutionSection = (h: HtmlBuilder<EditorMessage>, model: Model) => {
   const { exportImage, exportSettings } = model
   const dims = exportImage
     ? `${exportImage.width} × ${exportImage.height}`
@@ -193,7 +193,7 @@ const resolutionSection = (h: HtmlBuilder<AppMessage>, model: Model) => {
   )
 }
 
-const statusSection = (h: HtmlBuilder<AppMessage>, model: Model) => {
+const statusSection = (h: HtmlBuilder<EditorMessage>, model: Model) => {
   let content: string
   if (model.exportError) {
     content = model.exportError

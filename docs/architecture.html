@@ -252,6 +252,8 @@
   <div class="arrow">&rarr;</div>
   <div class="box"><span class="t">Pass N&minus;1</span><span class="s">last effect + encode back to sRGB &rarr; <code>dstTex</code></span></div>
   <div class="arrow">&rarr;</div>
+  <div class="box"><span class="t">Histogram</span><span class="s">scatter-write luma bins &rarr; 1KB readback &mdash; the display path&rsquo;s only one (&sect;8)</span></div>
+  <div class="arrow">&rarr;</div>
   <div class="box"><span class="t">Blit</span><span class="s">fullscreen-triangle fragment pass, bilinear, &rarr; canvas</span></div>
 </div>
 
@@ -264,7 +266,7 @@
   <li><strong>Export (not shown).</strong> Only on export does a frame leave the GPU: <code>dstTex</code> is copied to a CPU buffer (rows padded to 256-byte alignment — a WebGPU requirement), un-padded, and turned into an <code>ImageBitmap</code> for PNG encoding.</li>
 </ol>
 
-<p>The per-tick cost of dragging a slider is therefore: write the changed uniform values into buffers, dispatch one compute pass per layer, submit, and wait for the GPU to catch up. The frontend keeps at most one render in flight (<code>queue.onSubmittedWorkDone</code>) so a fast slider drag can&rsquo;t backlog the GPU queue — the next render simply waits.</p>
+<p>The per-tick cost of dragging a slider is therefore: write the changed uniform values into buffers, dispatch one compute pass per layer, submit, and wait for the GPU to catch up. The frontend keeps at most one render in flight (<code>queue.onSubmittedWorkDone</code>) so a fast slider drag can&rsquo;t backlog the GPU queue — the next render simply waits. Between the last pass and the blit, one more dispatch runs: the histogram pass bins the frame&rsquo;s luma into 256 counters, and a 1KB copy of the bins crosses back to the UI — the display path&rsquo;s single, scoped readback (&sect;8).</p>
 
 <h2>3 · The chain model and why one pass per layer</h2>
 
@@ -544,7 +546,50 @@ color = mix(color, lutColor, l0_amount);</code></pre>
 
 <p>The LUT layer applies a film-emulation color cube — a 13&sup3; lookup table from the vendored G&rsquo;MIC film presets (296 cubes, mirrored from <code>YahiaAngelo/Film-Luts</code>, shipped as static assets and loaded on demand). The cube lives on the GPU as a 13&sup3; rgba32float 3D texture. The format is deliberate: rgba16float would need an f32&rarr;f16 conversion on upload, and Chrome&rsquo;s <code>writeTexture</code> conversion path is broken (raw f32 bytes land verbatim, corrupting rows) — rgba32float matches the Float32Array upload byte-for-byte, and 32-bit float textures are not filterable anyway, so the body reads the cube with <code>textureLoad</code> and performs manual trilinear interpolation over texel coordinates (the same texel-space mapping hardware filtering would use). The body operates on sRGB-encoded values (§4) — the pass boundary handles the round-trip — and <code>amount</code> mixes the graded color with the original in sRGB space, so 0 is identity and 1 is the full look. The LUT id is a layer field, not a uniform: the render request carries an id&rarr;cube map, and an unresolvable id fails the render rather than silently skipping the grade.</p>
 
-<h2>8 · Reference tables</h2>
+<h2>8 · The histogram overlay</h2>
+
+<p><span class="newthought">&ldquo;Above all else, show the data.&rdquo;</span> The one piece of UI that reads the image itself is the small histogram pinned to the stage&rsquo;s bottom-right corner: a filled-area luminance curve of the frame currently on screen. It is a pure display widget — always on, no toggle, <code>pointer-events-none</code> so wheel and drag pass straight through — and it is <em>screen-space</em>: a sibling of the panned/zoomed image, so panning and zooming never move it. It is drawn as SVG in the foldkit view, a pure function of the model, and because it is UI rather than part of the blit, it never appears in exports.</p>
+
+<p>What it measures is exactly what the eye is judging: <code>dstTex</code>, the sRGB-encoded display texture, after the whole chain has run — the <em>graded output</em>, not the source. Each texel contributes its <em>luma</em>, the Rec. 709 dot product <code>(0.2126, 0.7152, 0.0722)</code> you met in &sect;4 — the same coefficients every body in &sect;7 uses for its masks — into one of 256 bins. Luminance only: no per-channel traces.</p>
+
+<p>Binning happens on the GPU, in the same command encoder as the render, with a scatter-write pass running between the last compute pass and the blit:</p>
+
+<pre><code>@group(0) @binding(0) var srcTex: texture_2d&lt;f32&gt;;
+@group(0) @binding(1) var&lt;storage, read_write&gt; bins: array&lt;atomic&lt;u32&gt;, 256&gt;;
+
+@compute @workgroup_size(16, 16)
+fn main(@builtin(global_invocation_id) gid: vec3&lt;u32&gt;) {
+  let size = textureDimensions(srcTex);
+  if (gid.x &gt;= size.x || gid.y &gt;= size.y) { return; }
+  let color = textureLoad(srcTex, vec2&lt;i32&gt;(gid.xy), 0);
+  let luma = dot(color.rgb, vec3&lt;f32&gt;(0.2126, 0.7152, 0.0722));
+  let bin = min(u32(luma * 256.0), 255u);   // 1.0 clamps into the top bin
+  atomicAdd(&amp;bins[bin], 1u);
+}</code></pre>
+
+<p>Every texel is counted exactly once — the pass is full-resolution, one invocation per pixel, exactly like the layer passes.<label for="sn-hist-res" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-hist-res" class="margin-toggle"/><span class="sidenote">A histogram exists to show what a reduction hides. Downsampling before binning would average clipped highlights and specular peaks into the body of the curve — smoothing away precisely the artifacts a histogram is for.</span> The shader is frontend-owned, like the blit (&sect;2): the engine generates chain shaders; presentation- and analysis-side WGSL lives in <code>GpuBackend</code>.</p>
+
+<p>And this is the display path&rsquo;s one readback — the single exception to &ldquo;the frame never leaves the GPU.&rdquo; It is a scoped one: 1KB of aggregate statistics, never the frame, and it is the reason the readback machinery deserves its own diagram:</p>
+
+<div class="flow">
+  <div class="box"><span class="t">Histogram pass</span><span class="s">atomicAdd &rarr; bins accumulator (STORAGE | COPY_SRC | COPY_DST)</span></div>
+  <div class="arrow">&rarr;</div>
+  <div class="box"><span class="t">copyBufferToBuffer</span><span class="s">same encoder &rarr; this frame&rsquo;s ring slot (MAP_READ | COPY_DST)</span></div>
+  <div class="arrow">&rarr;</div>
+  <div class="box"><span class="t">mapAsync</span><span class="s">issued inside execute, the moment the submit completes</span></div>
+  <div class="arrow">&rarr;</div>
+  <div class="box"><span class="t">readHistogram</span><span class="s">consumes the slot a message later &rarr; 1KB &rarr; model</span></div>
+</div>
+
+<p><strong>Two buffers, bridged by a copy.</strong> The pass writes a storage-only accumulator, because WebGPU forbids combining <code>MAP_READ</code> with <code>STORAGE</code> on one buffer — usage flags are mutually exclusive in exactly the combinations you&rsquo;d want. The bins cross to the CPU through a <code>MAP_READ | COPY_DST</code> staging buffer, with the copy enqueued in the same encoder, so the GPU-to-GPU hop is free. The accumulator is zeroed once per render (a 1KB <code>writeBuffer</code>; atomics <em>add</em>, so bins would otherwise accumulate across frames) — which is why it also carries <code>COPY_DST</code>.</p>
+
+<p><strong>Three staging buffers, mapped a frame ahead.</strong> The readback slots rotate in a ring of three, and each frame&rsquo;s map is issued inside <code>execute</code>, immediately after <code>queue.onSubmittedWorkDone</code> resolves — before any later render can submit.<label for="sn-hist-map" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-hist-map" class="margin-toggle"/><span class="sidenote">mapAsync is enqueued on the queue timeline behind <em>every</em> pending submission (gpuweb#2646) — even ones that never touch the buffer. Issued from the readback command instead, the map would queue behind the next render — and the next after that during a drag — landing one or more frames late, where the stamp guard would drop it. Issued at the end of the frame&rsquo;s own submit, the queue behind it is empty, so the map resolves before the frame&rsquo;s RenderedFrame is even handled.</span> A slot is then mapped from that moment until <code>readHistogram</code> consumes it (map &rarr; read &rarr; unmap) in the same message cycle; three slots leave two full cycles of slack before a slot is reused, so a slow consumer can never collide with a copy. The abnormal flows are covered too: a slot whose map was never consumed (a dropped message) is reclaimed before reuse, and a readback for a session torn down mid-flight resolves with empty bins instead of failing.</p>
+
+<p><strong>The app side.</strong> Every <code>RenderedFrame</code> dispatches a <code>ReadHistogram</code> command — stale frames included, so their slots are always consumed — and the resulting <code>HistogramComputed</code> lands in the model only when its stamp is still fresh (the same guard <code>RenderedFrame</code> itself uses; bins that arrive after a newer mutation are dropped). <code>HistogramFailed</code> is observability-only: the frame is already on the canvas, and a 1KB map is not worth retrying. Clearing the image resets the bins. The view then draws them: an SVG area polygon at 25% ink opacity with a 1px stroke on top, normalized linearly so the tallest bin fills the 220&times;110 card — and a flat baseline when every bin is zero, as an all-black frame would produce.</p>
+
+<p>The total cost of all this is one extra full-resolution dispatch per render and 1KB crossing back per frame, from three 1KB staging buffers and one session-scoped accumulator — no per-render allocations, no waiting, and the render loop never blocks on the map.</p>
+
+<h2>9 · Reference tables</h2>
 
 <table>
   <tr><th>Constant</th><th>Value</th><th>Used by</th></tr>
@@ -566,15 +611,18 @@ color = mix(color, lutColor, l0_amount);</code></pre>
   <tr><td><code>u_frame</code></td><td>u32 uniform</td><td>animation seed (grain); binding exists only when used</td></tr>
   <tr><td><code>u_params</code></td><td>one f32 per layer field</td><td>the slider values; binding exists only when the layer has fields</td></tr>
   <tr><td><code>lutTex</code></td><td>rgba32float 3D, 13&sup3; (one per applied LUT, cached by id)</td><td>the film color cube; binding 6, only on LUT passes</td></tr>
+  <tr><td><code>bins</code> (accumulator)</td><td>256 &times; u32 storage (STORAGE | COPY_SRC | COPY_DST)</td><td>histogram pass target; zeroed per render, copied out per render (&sect;8)</td></tr>
+  <tr><td>readback ring</td><td>3 &times; 1KB MAP_READ buffers</td><td>staging slots for the histogram bins; mapped a frame ahead (&sect;8)</td></tr>
 </table>
 
-<h2>9 · Known limitations and the roadmap</h2>
+<h2>10 · Known limitations and the roadmap</h2>
 
 <ul>
   <li><strong>White balance is channel-scale approximation</strong> — the CCT/LMS-based model is the upgrade path.</li>
   <li><strong>Shadows/highlights are additive lifts</strong> — fine for v1; lift/gamma/gain separation would match professional tools.</li>
   <li><strong>Alpha is passed through untouched</strong> — correct for photographs (opaque), a known limitation once compositing appears.</li>
   <li><strong>LUTs load on demand</strong> — each film cube fetches (~131KB) the first time it is applied, then stays cached in memory and on the GPU; the 296-cube library is vendored, so nothing depends on a third-party server at runtime.</li>
+  <li><strong>The histogram is luminance-only</strong> — one Rec. 709 luma curve. Per-channel (RGB parade) or waveform traces are the natural extension: the readback ring already carries the counts, and the bins array would simply grow to 3 &times; 256.</li>
   <li>Every generated pass can be validated against <code>naga</code>, the reference WGSL validator — the shaders are pure strings, so a syntax bug in a generated pass is caught before it ever reaches a browser.</li>
 </ul>
 

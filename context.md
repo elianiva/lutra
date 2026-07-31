@@ -10,6 +10,12 @@ The pure computational core. Owns the layer registry (what layers exist, their f
 **Frontend** (`@lutra/frontend`):
 The web application. Owns the WebGPU pipeline setup (device, bind groups, compute passes), the TEA-based UI (foldkit), and all browser-side concerns. Consumes `@lutra/engine` as a library.
 
+**Store** (`@lutra/store`):
+The persistence seam. Owns the **Edit** / **Edit summary** schemas, the **Edit store** service contract (save/load/list/delete), and the browser's IndexedDB `EditStoreLive` implementation (docs/adr/0007, 0008). A future server/account-side `EditStoreLive` swaps in behind the same seam. Depends on `@lutra/engine` (for the `Layer` schema); the frontend consumes both engine and store.
+
+**Frontend structure** (`@lutra/frontend`):
+A **root Submodel** owns the top-level `route` and one Submodel per route arm. **Gallery** is a thin Submodel (list of **Edit summaries**); **Editor** is a Submodel hosting the existing editor (phase machine, chain, draft, render, export). Route-driven state lives in the Submodel: each exposes `init(route)` (cold load) and `informRouteChanged(route)` (navigation) calling the shared route-firing Commands, so reload and in-app navigation behave identically. Editor Messages wrap as `GotEditorMessage`, Gallery as `GotGalleryMessage`. This restructure lands before the store work (docs/adr/0009).
+
 **Effect-TS runtime**:
 The engine uses the Effect library (`effect` ^4.x) for its public API. `Effect` models the image processing pipeline (async GPU operations, error handling, resource management). `Schema` defines the layer data model. `Context` provides dependency injection for GPU resources when the engine is hosted in a browser.
 
@@ -18,7 +24,7 @@ Direct port of each SkSL body to WGSL by hand. The mobile SkSL bodies are the re
 
 **Chromatic aberration**: Implemented (not deferred), radial. Each layer runs as its own compute pass, so CA samples the previous pass's output (the accumulated result of earlier layers) at offsets that grow quadratically from the image center — not the source image. A dedicated linearize pass is inserted ahead of the first sampling layer so sampled texels are always linear light.
 
-**GPU pipeline**: Compute shaders for processing, render pipeline for presentation. The chain assembler emits one compute pass per layer; passes ping-pong through linear-light rgba16float intermediates (8-bit intermediates would band), and only the final pass encodes to sRGB and writes the display texture. This enables neighbor-sampling bodies: clarity runs a 9-tap bilinear blur of the previous pass's output (local contrast, unsharp-mask style, midtone-masked), and grain is 3-octave FBM value noise (integer lattice hash, quintic interpolation, animated per frame) — the mobile's per-pixel hash was pure white noise with no spatial coherence. Sampling passes expose a binding-5 sampler and use textureSampleLevel (textureSample is fragment-stage only). LUT passes are the exception to the linear-light rule: the vendored film cubes are authored in sRGB space, so a LUT pass decodes its linear input to sRGB, applies the cube via a 13³ 3D texture (manual trilinear — 32-bit float textures are not filterable, so the body reads texels with textureLoad), mixes by strength, and re-encodes to linear — skipping the round-trip at the chain ends, where source and display textures are already sRGB. Future scatter-write passes (histograms) remain unlocked. The processed frame never leaves the GPU on the display path — the final storage texture is blitted to the canvas swapchain by a fullscreen-triangle pass (free bilinear). Readback to an ImageData happens only on export.
+**GPU pipeline**: Compute shaders for processing, render pipeline for presentation. The chain assembler emits one compute pass per layer; passes ping-pong through linear-light rgba16float intermediates (8-bit intermediates would band), and only the final pass encodes to sRGB and writes the display texture. This enables neighbor-sampling bodies: clarity runs a 9-tap bilinear blur of the previous pass's output (local contrast, unsharp-mask style, midtone-masked), and grain is 3-octave FBM value noise (integer lattice hash, quintic interpolation, animated per frame) — the mobile's per-pixel hash was pure white noise with no spatial coherence. Sampling passes expose a binding-5 sampler and use textureSampleLevel (textureSample is fragment-stage only). LUT passes are the exception to the linear-light rule: the vendored film cubes are authored in sRGB space, so a LUT pass decodes its linear input to sRGB, applies the cube via a 13³ 3D texture (manual trilinear — 32-bit float textures are not filterable, so the body reads texels with textureLoad), mixes by strength, and re-encodes to linear — skipping the round-trip at the chain ends, where source and display textures are already sRGB. Future scatter-write passes (LUT tetrahedral interpolation) remain unlocked. The processed frame never leaves the GPU on the display path — the final storage texture is blitted to the canvas swapchain by a fullscreen-triangle pass (free bilinear). Readback to an ImageData happens only on export. The **Histogram overlay** is the one display-path exception, and a scoped one: a full-resolution scatter-write pass (frontend-owned, like the blit) atomicAdds Rec.709 luma into a session-scoped 256×u32 bins accumulator, and only the 1KB bins cross back — never the frame. The readback rotates through a ring of three mapped staging buffers, with each frame's map issued the moment its submit completes (mapAsync queues behind every pending submission, so a late-issued map would land stale during fast slider drags); the app consumes the mapped bins a message later, off the render loop's critical path.
 
 **Clarity**: Implemented as local contrast: a 9-tap bilinear box blur (radius 4 px) of the pass input, then unsharp-mask push away from the local mean, masked to midtones. Radius is fixed — a true wide-radius clarity would need a separable blur or mip pyramid.
 
@@ -50,7 +56,7 @@ engine/src/
   index.ts           ← public API surface
 ```
 
-**Public API**: The engine defines `Chain` operations (add/remove/reorder/update) and `createRenderRequest` (assembles a chain into a `RenderRequest`: shader + packed uniforms + source bitmap + frame counter). The frontend calls `createRenderRequest`, then hands the request and the canvas to its own `GpuBackend` service (Effect Context resource) — the backend executes the compute pass, blits to the canvas, and provides `snapshot` for export. The frontend doesn't touch WGSL or binding groups; the engine doesn't touch the DOM or WebGPU.
+**Public API**: The engine defines `Chain` operations (add/remove/reorder/update) and `createRenderRequest` (assembles a chain into a `RenderRequest`: shader + packed uniforms + source bitmap + frame counter). The frontend calls `createRenderRequest`, then hands the request and the canvas to its own `GpuBackend` service (Effect Context resource) — the backend executes the compute pass, blits to the canvas, and provides `snapshot` for export. The split follows the presentation boundary: chain shader _generation_ is engine-owned (bodies, assembly, colorspace helpers), while presentation- and analysis-side WGSL is frontend-owned (the blit's fullscreen-triangle pass; the histogram scatter pass lives there too). The engine doesn't touch the DOM or WebGPU.
 
 **Data model**: Effect Schema is the source of truth. Each layer type is a `Schema.Struct` defining its parameters with constraints (min, max, defaults). Types are derived via `typeof Schema.Type`. The registry maps layer type keys to their Schema + shader body + metadata (label, icon reference). Runtime validation uses `Schema.decode` at persistence boundaries.
 
@@ -71,6 +77,27 @@ _Avoid_: "presets" (see **Film simulation adjustment**), "LUT pack"
 **Edit chain**:
 The ordered list of **adjustment layers** applied to a single source image. The chain is the unit of non-destructive persistence: it can be saved, replayed, reordered, and pruned without touching the source image.
 _Avoid_: "Stack" (Snapseed uses this word but it suggests LIFO; the chain is order-sensitive in both directions), "history" (history is a side effect, not the model).
+
+**Edit**:
+A gallery record: a stable UUID identifying one **edit chain**, the **source image** it grades, and a **thumbnail** of the graded result. Each Edit is self-contained — it owns its own source image copy. An Edit's UUID never changes: **Save** replaces its **edit chain** in place (source image untouched), while **Save as** forks a new Edit with a new UUID and a duplicated source image. The **main menu** lists one tile per Edit via its **Edit summary**. Ordering comes from the Edit's **savedAt**.
+_Avoid_: "Saved edit" (was the old term; collapsed the record and its chain), "project", "document".
+
+**Edit id**:
+The UUID that identifies an **Edit**. Generated at creation, stable for the Edit's lifetime. Its **schema validates the UUID format** and fails the whole decode on a malformed value — a corrupt id inside a saved **Edit** is corruption, not a recoverable case. (Same posture applies to the runtime-UUID `LayerId`; `LutId` is validated by **path shape**, not UUID — see Flagged ambiguities.)
+
+**Edit store**:
+The swappable storage backend behind the **main menu** and the editor's save flow, owned by the **Store** package. It exposes aggregate-level operations on **Edits**: `save` (upsert by **Edit id**), `load` (full Edit, source bytes included), `list` (Edit summaries, source bytes excluded), `delete`, and `clearAll`. `load` of a missing id yields `Option.None`; a genuine failure surfaces as a **Store error**. The v1 implementation is the browser's IndexedDB `KeyValueStore` (see docs/adr/0007, 0008); an opt-in online store is a future backend through the same seam. Because each Edit is one IndexedDB record, save/load/delete are atomic per Edit by construction.
+
+**Edit summary**:
+A gallery tile: an **Edit id**, its **thumbnail** (bytes), and its **edit chain** — explicitly **without** the source-image bytes. `list()` returns summaries so the **main menu** can render a grid without loading every Edit's multi-MB source image. A `byteLength` on the summary feeds per-edit storage size. Thumbnails render as object URLs the gallery converts from bytes; a future cloud backend may serve them by URL instead, and the render contract is unchanged.
+_Avoid_: "thumbnail card" (it's the record, not the visual card), "saved-edit tile".
+
+**savedAt**:
+The timestamp stored on an **Edit** that orders the **main menu**. Because the local IndexedDB `KeyValueStore` is keyed by **Edit id** and not indexable by time, `list()` sorts summaries by `savedAt` in memory. A future sqlite/cloud backend may order server-side instead (docs/adr/0007).
+
+**Store error**:
+The tagged error type a failed **Edit store** operation raises (a genuine failure — quota, blocked access, corruption — not a missing record, which `load` reports as `Option.None`). Its purpose is to give the frontend a channel to surface failures (in the **main menu** or **Options screen**) and to let future sync distinguish local from server failure.
+_Avoid_: reusing the engine's `GpuError`/`EncodeError` — storage failures are a distinct defect class in a distinct package.
 
 ### Editor UI
 
@@ -100,6 +127,10 @@ Tool selection and layer selection are edges only from the editable states, so a
 **Layer drawer**:
 The right sidebar of the **editor**, always visible, showing the current **edit chain** as a vertical list. Displays each layer with its icon, label, formatted value, visibility toggle, and delete button. When a layer is selected or a **draft layer** is active, the slider and confirm/cancel controls render inline below the layer entry. Supports drag-to-reorder.
 _Avoid_: "layers panel" (was the old bottom tab), "layer list" (too generic)
+
+**Histogram overlay**:
+The small histogram drawn in the bottom-right corner of the **canvas stage**, on top of the image. A pure display widget — no interaction, never blocks pan/zoom. Fixed to the stage, not the image: panning or zooming the photo does not move it. Shows the luminance distribution (Rec.709 luma, same coefficients as the shader bodies) of the currently displayed frame: the source after the full **edit chain** (the graded output), not the source. Luminance only — no per-channel traces. Linear max-bin normalization (the tallest bin fills the height).
+_Avoid_: "chart", "waveform" (video terminology)
 
 **LUT picker**:
 The inline control in the **layer drawer** for choosing the LUT on a **LUT layer** (draft or selected). Expands as per-category accordions showing a thumbnail grid; selecting updates the preview live and keeps the picker open for comparison. The current LUT is shown on a selector row above the grid, with the strength slider below.
@@ -136,21 +167,29 @@ Most layers expose a single parameter with one ruler slider. Two layers — **Wh
 ### Screens
 
 **Editor**:
-The single screen at `/`. Three-column Lightroom-style layout: left sidebar (**tool panel**, ~240px), center (**canvas** with pannable/zoomable image), right sidebar (**layer drawer**, ~280px). Top bar: app wordmark (**LUTRA**) left-aligned, export button right-aligned. No routing beyond the root — the editor is the app.
+The screen at `/editor` (current root behaviour). Three-column Lightroom-style layout: left sidebar (**tool panel**, ~240px), center (**canvas** with pannable/zoomable image), right sidebar (**layer drawer**, ~280px). Top bar: app wordmark (**LUTRA**) left-aligned, export button right-aligned.
 _Avoid_: "color grading menu", "workspace"
+
+**Main menu**:
+The gallery screen at `/` (the app's entry point). Shows saved **edits** as a grid of **Edit summaries** (their **thumbnails**), ordered by **savedAt**. Selecting a tile opens the **Editor** attached to that **Edit**. v1 tile actions are **open** (the whole tile) and **delete** (a per-tile control that calls the **Edit store**); no rename or multi-select in v1. The **Options screen** affordance (storage info, "Clear all") anchors here.
+_Avoid_: "Gallery" (ambiguous with the image-processing sense of the word), "landing page".
+
+**Attached edit**:
+The state of the **Editor** when it was opened from a **Main menu** tile: the editor is tied to that **Edit id**, its source image, and its **edit chain**. In this state, **Save** updates that Edit in place (chain only) and **Save as** forks. When the editor is instead seeded from a fresh file pick, there is no attached edit and **Save** creates a new one. The attached edit is model data (id + source bytes), not a new editor phase — an opened Edit is the existing `Idle` phase. Through the **Edit store** seam both write modes are the same call: **Save** is `save(edit)` with the existing id, **Save as** is `save(edit)` with a freshly generated id and duplicated source bytes.
+_Avoid_: "opened edit" (ambiguous), "edit session".
 
 ### Future (not in v1)
 
-- **Main menu** — a gallery screen at `/` showing saved edits in a grid. The entry point for a multi-edit workflow.
-- **Options screen** — settings surface with storage info and "Clear all" action.
-- **Saved edit** — persisted record of source image + **edit chain** + thumbnail. Stored in IndexedDB (OPFS for source images, JSON for chain metadata).
+- **Options screen** — settings surface with storage info (usage/quota from `navigator.storage.estimate()`, per-edit size from each **Edit summary**'s `byteLength`) and a "Clear all" action (the **Edit store**'s `clearAll`).
 - Lift / gain / gamma, masks, blend modes per layer.
-- **Storage management** — soft/hard caps on saved edits, per-edit storage info, cleanup suggestions.
+- **Storage management** — soft/hard caps on **edits**, per-edit storage info, cleanup suggestions.
+- **Online storage** — an opt-in, login-gated store for **edits** (e.g. D1 or Turso with R2 for source-image blobs), reached through the same swappable storage seam as the local IndexedDB backend.
 
 ## Flagged ambiguities
 
 - **"Layer"** in this project is exclusively an **adjustment layer** (sequential). It is not a Photoshop-style composited layer. If we ever introduce the latter, the term must change.
 - **"Filter"** is reserved for a finished look / preset, not a single adjustment. An **adjustment** is a primitive; a **filter** (if added) would be a named, ordered set of adjustments applied as one.
+- **Id format validation is NOT "make every id a UUID".** Only ids that are genuinely runtime-generated UUIDs (`LayerId`, the new **Edit id**) validate against the UUID pattern. `LutId` is a `.cube` **file path** and validates its path shape; `FieldKey` is a layer field name and stays a loose string. A UUID check on `LutId` would break the vendored LUT scheme.
 
 ## Example dialogue
 

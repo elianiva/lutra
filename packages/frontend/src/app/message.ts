@@ -133,6 +133,20 @@ export const RenderedFrame = Message.m('RenderedFrame', {
 })
 export const RenderFailed = Message.m('RenderFailed', { reason: S.String })
 
+// ---- histogram overlay ----
+
+// The luminance histogram bins (256 u32 Rec.709 luma counts) of the frame
+// just rendered, read back from the GPU asynchronously — the display path
+// never waits on the readback. The stamp guards staleness exactly like
+// RenderedFrame: bins that land after a newer mutation are dropped.
+export const HistogramComputed = Message.m('HistogramComputed', {
+  bins: S.instanceOf(Uint32Array),
+  stamp: S.Number,
+})
+// Bins readback failure — observability only (the frame itself is already
+// on the canvas; a 1KB map cannot be retried or shown).
+export const HistogramFailed = Message.m('HistogramFailed', { reason: S.String })
+
 // ---- canvas registration ----
 
 // One-shot acknowledgment from the canvas mount: the side effect (registering
@@ -221,6 +235,8 @@ export const AppMessage = S.Union([
   MovedLayerReorder,
   RenderedFrame,
   RenderFailed,
+  HistogramComputed,
+  HistogramFailed,
   CanvasRegistered,
   ExportRequested,
   GotExportDialogMessage,

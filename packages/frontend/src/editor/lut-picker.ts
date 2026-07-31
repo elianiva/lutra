@@ -2,9 +2,9 @@ import type { HtmlBuilder } from 'foldkit/html'
 import { ChevronDown, ChevronRight } from 'lucide'
 import { icon } from '../components/icon'
 import { lutName } from './layer-meta'
-import { ToggledLutPicker } from '../app/message'
-import type { AppMessage } from '../app/message'
-import type { Model } from '../app/model'
+import { ToggledLutPicker } from './message'
+import type { EditorMessage } from './message'
+import type { Model } from './model'
 import type { LutId } from '@lutra/engine'
 import type { LutCatalogEntry } from '../luts/store'
 
@@ -15,10 +15,10 @@ import type { LutCatalogEntry } from '../luts/store'
  * re-renders live and the picker stays open for comparison.
  */
 export const lutPicker = (
-  h: HtmlBuilder<AppMessage>,
+  h: HtmlBuilder<EditorMessage>,
   model: Model,
   lutId: LutId,
-  onPick: (lutId: LutId) => AppMessage,
+  onPick: (lutId: LutId) => EditorMessage,
 ) => {
   const catalog = model.catalog ?? []
   const current = lutName(catalog, lutId)
@@ -64,10 +64,10 @@ const groupByCategory = (
 }
 
 const pickerBody = (
-  h: HtmlBuilder<AppMessage>,
+  h: HtmlBuilder<EditorMessage>,
   catalog: ReadonlyArray<LutCatalogEntry>,
   lutId: LutId,
-  onPick: (lutId: LutId) => AppMessage,
+  onPick: (lutId: LutId) => EditorMessage,
 ) =>
   h.div(
     [h.Class('flex max-h-72 flex-col gap-1 overflow-y-auto rounded border border-border bg-bg p-2')],
@@ -96,10 +96,10 @@ const pickerBody = (
   )
 
 const lutRow = (
-  h: HtmlBuilder<AppMessage>,
+  h: HtmlBuilder<EditorMessage>,
   entry: LutCatalogEntry,
   selected: boolean,
-  onPick: (lutId: LutId) => AppMessage,
+  onPick: (lutId: LutId) => EditorMessage,
 ) =>
   h.button(
     [
