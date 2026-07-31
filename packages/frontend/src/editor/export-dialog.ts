@@ -38,7 +38,7 @@ const segmentedRow = (
           h.Class(
             `border-r border-border px-1 py-1.5 text-xs last:border-r-0 ${
               value === selected
-                ? 'bg-ink text-panel'
+                ? 'bg-accent text-ink'
                 : 'bg-panel text-muted hover:bg-panel-alt hover:text-ink'
             }`,
           ),
@@ -69,7 +69,7 @@ export const exportDialogView = (h: HtmlBuilder<AppMessage>, model: Model) =>
             ? [
                 // The dialog is `position: relative`; the backdrop and panel
                 // are positioned against it (see @foldkit/ui-showcase).
-                h.div([...backdrop, h.Class('fixed inset-0 z-[59] bg-ink/20')], []),
+                h.div([...backdrop, h.Class('fixed inset-0 z-[59] bg-black/60')], []),
                 h.div(
                   [
                     ...panel,
@@ -108,7 +108,7 @@ export const exportDialogView = (h: HtmlBuilder<AppMessage>, model: Model) =>
                             h.OnClick(ExportDownloadRequested()),
                             h.Disabled(!model.exportImage || model.exportEncoding),
                             h.Class(
-                              'bg-ink px-4 py-1.5 text-xs text-panel hover:opacity-90 disabled:opacity-30',
+                              'bg-accent px-4 py-1.5 text-xs text-ink hover:opacity-90 disabled:opacity-30',
                             ),
                           ],
                           [model.exportEncoding ? 'Encoding…' : 'Export'],

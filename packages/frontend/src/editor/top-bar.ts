@@ -13,7 +13,7 @@ export const topBar = (h: HtmlBuilder<AppMessage>, hasImage: boolean) =>
       ),
     ],
     [
-      h.h1([h.Class('text-sm font-semibold tracking-[0.3em]')], ['LUTRA']),
+      h.h1([h.Class('text-sm font-semibold tracking-[0.3em] text-accent')], ['LUTRA']),
       h.div([h.Class('flex items-center gap-1')], [
         h.button(
           [

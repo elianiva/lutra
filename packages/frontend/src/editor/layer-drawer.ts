@@ -104,7 +104,7 @@ const draftRow = (h: HtmlBuilder<AppMessage>, model: Model, layer: Layer) => {
             [
               h.OnClick(ConfirmedDraft()),
               h.AriaLabel('Confirm draft'),
-              h.Class('grid size-7 place-items-center bg-accent text-bg'),
+              h.Class('grid size-7 place-items-center bg-accent text-ink'),
             ],
             [icon(h, Check, 'Confirm draft')],
           ),

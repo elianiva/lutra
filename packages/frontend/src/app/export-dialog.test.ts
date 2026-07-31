@@ -118,22 +118,22 @@ describe('Export dialog', () => {
       ...openDialog,
       Command.resolve(SnapshotForExport, ExportSnapshotted({ image: exportImage })),
       // PNG and 100% are the persisted defaults; their cells are filled.
-      expect(text('PNG')).toHaveClass('bg-ink'),
-      expect(text('100%')).toHaveClass('bg-ink'),
-      expect(text('JPEG')).not.toHaveClass('bg-ink'),
-      expect(text('50%')).not.toHaveClass('bg-ink'),
+      expect(text('PNG')).toHaveClass('bg-accent'),
+      expect(text('100%')).toHaveClass('bg-accent'),
+      expect(text('JPEG')).not.toHaveClass('bg-accent'),
+      expect(text('50%')).not.toHaveClass('bg-accent'),
       // The pressed state is exposed to assistive tech.
       expect(text('PNG')).toHaveAttr('aria-pressed', 'true'),
       expect(text('JPEG')).toHaveAttr('aria-pressed', 'false'),
 
       // Switching moves the fill along with the selection.
       click(text('JPEG')),
-      expect(text('JPEG')).toHaveClass('bg-ink'),
-      expect(text('PNG')).not.toHaveClass('bg-ink'),
+      expect(text('JPEG')).toHaveClass('bg-accent'),
+      expect(text('PNG')).not.toHaveClass('bg-accent'),
       Command.resolve(SaveExportSettings, ExportSettingsSaved()),
       click(text('50%')),
-      expect(text('50%')).toHaveClass('bg-ink'),
-      expect(text('100%')).not.toHaveClass('bg-ink'),
+      expect(text('50%')).toHaveClass('bg-accent'),
+      expect(text('100%')).not.toHaveClass('bg-accent'),
       Command.resolve(SaveExportSettings, ExportSettingsSaved()),
       Command.expectNone(),
     )

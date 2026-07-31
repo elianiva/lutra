@@ -205,7 +205,7 @@ const emptyStage = (h: HtmlBuilder<AppMessage>) =>
           'Drop an image here, or ',
           h.button(
             [
-              h.Class('cursor-pointer text-foreground underline underline-offset-2'),
+              h.Class('cursor-pointer text-ink underline underline-offset-2'),
               h.OnClick(FilePickRequested()),
             ],
             ['browse'],
@@ -223,7 +223,7 @@ const errorStage = (h: HtmlBuilder<AppMessage>, error: string) =>
       h.p([], [`Failed to load image: ${error}`]),
       h.button(
         [
-          h.Class('cursor-pointer text-foreground underline underline-offset-2'),
+          h.Class('cursor-pointer text-ink underline underline-offset-2'),
           h.OnClick(FilePickRequested()),
         ],
         ['Try another'],

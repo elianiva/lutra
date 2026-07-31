@@ -1,20 +1,21 @@
 @import 'tailwindcss';
 
 /*
- * Lutra — light, futuristic, hard-cornered.
+ * Lutra — dark, hard-cornered, Leica/Fuji-styled (mirrors lutra-mobile).
  * No rounded corners anywhere: panels, buttons, inputs, and the canvas all
- * use 0 radius. Thin 1px borders delineate regions; a single near-black ink
- * is the accent against a bright paper background.
+ * use 0 radius. Thin 1px borders delineate regions on an off-black body;
+ * a single red (#cc0000, the mobile app's primary) is the accent — the
+ * slider thumbs, the active fills, and the wordmark.
  */
 @theme {
-  --color-bg: #f4f5f7;
-  --color-panel: #ffffff;
-  --color-panel-alt: #f0f1f4;
-  --color-border: #d6d9de;
-  --color-border-strong: #b9bdc5;
-  --color-ink: #0a0a0b;
-  --color-muted: #6b7280;
-  --color-accent: #0a0a0b;
+  --color-bg: #111111;
+  --color-panel: #1f1f1f;
+  --color-panel-alt: #262626;
+  --color-border: #262626;
+  --color-border-strong: #525252;
+  --color-ink: #fafafa;
+  --color-muted: #a3a3a3;
+  --color-accent: #cc0000;
 
   --font-sans: 'Electrolize', ui-sans-serif, system-ui, -apple-system,
     'Segoe UI', sans-serif;
@@ -35,6 +36,8 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* Dark scrollbars and native controls (range inputs, file pickers). */
+  color-scheme: dark;
 }
 
 /* Range inputs rendered as bare tracks with a hard-edged thumb. */
