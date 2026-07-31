@@ -28,12 +28,9 @@ export const createLayerFor = (type: LayerType): Layer =>
  * a file, dispatches `SelectedImageFile`; if they cancel, dispatches
  * `FilePickCancelled`.
  */
-export const PickImageFile = Command.define(
-  'PickImageFile',
-  SelectedImageFile,
-  FilePickCancelled,
-)(
-  FoldkitFile.select(['image/*', '.jpg', '.jpeg', '.png', '.webp', '.avif']).pipe(
+export const PickImageFile = Command.define('PickImageFile', {
+  messages: [SelectedImageFile, FilePickCancelled],
+  execute: FoldkitFile.select(['image/*', '.jpg', '.jpeg', '.png', '.webp', '.avif']).pipe(
     Effect.map(
       Option.match({
         onNone: () => FilePickCancelled(),
@@ -41,7 +38,7 @@ export const PickImageFile = Command.define(
       }),
     ),
   ),
-)
+})
 
 const errMsg = (cause: unknown): string =>
   cause instanceof Error ? cause.message : String(cause)
@@ -51,25 +48,23 @@ const errMsg = (cause: unknown): string =>
  * A decode error becomes `ImageFailedToDecode`; any defect (a bug) crashes
  * rather than being relabeled.
  */
-export const DecodeImage = Command.define(
-  'DecodeImage',
-  { file: Schema.instanceOf(File) },
-  ImageDecoded,
-  ImageFailedToDecode,
-)(({ file }) =>
-  Effect.tryPromise({
-    try: () => createImageBitmap(file),
-    catch: (cause) => new Error(`Failed to decode image: ${String(cause)}`),
-  }).pipe(
-    Effect.map((bitmap) =>
-      ImageDecoded({ bitmap, width: bitmap.width, height: bitmap.height }),
+export const DecodeImage = Command.define('DecodeImage', {
+  args: { file: Schema.instanceOf(File) },
+  messages: [ImageDecoded, ImageFailedToDecode],
+  execute: ({ file }) =>
+    Effect.tryPromise({
+      try: () => createImageBitmap(file),
+      catch: (cause) => new Error(`Failed to decode image: ${String(cause)}`),
+    }).pipe(
+      Effect.map((bitmap) =>
+        ImageDecoded({ bitmap, width: bitmap.width, height: bitmap.height }),
+      ),
+      Effect.catchIf(
+        (err): err is Error => err instanceof Error,
+        (err) => Effect.succeed(ImageFailedToDecode({ error: errMsg(err) })),
+      ),
     ),
-    Effect.catchIf(
-      (err): err is Error => err instanceof Error,
-      (err) => Effect.succeed(ImageFailedToDecode({ error: errMsg(err) })),
-    ),
-  ),
-)
+})
 
 /**
  * Render the current chain (plus an optional draft appended last) through
@@ -85,35 +80,33 @@ export const DecodeImage = Command.define(
  * `GpuError`s (unknown layer type, shader generation, device/canvas failures)
  * become `RenderFailed`. Defects crash.
  */
-export const RenderChain = Command.define(
-  'RenderChain',
-  {
+export const RenderChain = Command.define('RenderChain', {
+  args: {
     layers: Schema.Array(Schema.Unknown),
     draft: Schema.NullOr(Schema.Unknown),
     bitmap: Schema.instanceOf(ImageBitmap),
     stamp: Schema.Number,
   },
-  RenderedFrame,
-  RenderFailed,
-)(({ layers, draft, bitmap, stamp }) =>
-  Effect.gen(function* () {
-    yield* Render.afterCommit
-    const canvas = document.getElementById('lutra-canvas') as HTMLCanvasElement | null
-    if (!canvas) return RenderFailed({ reason: 'Canvas not ready' })
+  messages: [RenderedFrame, RenderFailed],
+  execute: ({ layers, draft, bitmap, stamp }) =>
+    Effect.gen(function* () {
+      yield* Render.afterCommit
+      const canvas = document.getElementById('lutra-canvas') as HTMLCanvasElement | null
+      if (!canvas) return RenderFailed({ reason: 'Canvas not ready' })
 
-    const chain: Layer[] = [...(layers as ReadonlyArray<Layer>)]
-    if (draft) chain.push(draft as Layer)
+      const chain: Layer[] = [...(layers as ReadonlyArray<Layer>)]
+      if (draft) chain.push(draft as Layer)
 
-    const request = yield* createRenderRequest(chain, ENGINE_REGISTRY, bitmap, stamp)
-    const backend = yield* GpuBackend
-    yield* backend.execute(request, canvas)
-    return RenderedFrame({ stamp })
-  }).pipe(
-    Effect.catchTag('GpuError', (err: GpuError) =>
-      Effect.succeed(RenderFailed({ reason: err.message })),
+      const request = yield* createRenderRequest(chain, ENGINE_REGISTRY, bitmap, stamp)
+      const backend = yield* GpuBackend
+      yield* backend.execute(request, canvas)
+      return RenderedFrame({ stamp })
+    }).pipe(
+      Effect.catchTag('GpuError', (err: GpuError) =>
+        Effect.succeed(RenderFailed({ reason: err.message })),
+      ),
     ),
-  ),
-)
+})
 
 /**
  * Encode the last rendered frame as PNG and trigger a browser download. The
@@ -126,12 +119,9 @@ export const RenderChain = Command.define(
  * Failure cases are handled separately: the snapshot `GpuError`, the missing
  * 2d context, and the encode error each map to `ExportFailed`. Defects crash.
  */
-export const ExportImage = Command.define(
-  'ExportImage',
-  ExportFinished,
-  ExportFailed,
-)(
-  Effect.gen(function* () {
+export const ExportImage = Command.define('ExportImage', {
+  messages: [ExportFinished, ExportFailed],
+  execute: Effect.gen(function* () {
     const backend = yield* GpuBackend
     const bitmap = yield* backend.snapshot()
     const canvas = document.createElement('canvas')
@@ -173,4 +163,4 @@ export const ExportImage = Command.define(
       (err) => Effect.succeed(ExportFailed({ reason: errMsg(err) })),
     ),
   ),
-)
+})

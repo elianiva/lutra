@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { Scene } from 'foldkit'
+import { describe, it } from 'vitest'
+import { Command, Mount, click, expect, given, scene, selector, text } from 'foldkit/scene'
 import { initialModel } from './model'
 import { update } from './update'
 import { view } from '../view'
@@ -44,27 +44,27 @@ const config = {
 
 describe('Upload zone (empty state)', () => {
   it('shows the upload prompt with a browse button when no image is loaded', () => {
-    Scene.scene(
+    scene(
       config,
-      Scene.with(initialModel()),
+      given(initialModel()),
       // The text in the parent div is "Drop an image here, or browse".
       // Use exact: false for substring matching.
-      Scene.expect(Scene.text('Drop an image here', { exact: false })).toExist(),
-      Scene.expect(Scene.text('browse')).toExist(),
-      Scene.expect(Scene.text('Supports JPEG, PNG, WebP')).toExist(),
-      Scene.Command.expectNone(),
+      expect(text('Drop an image here', { exact: false })).toExist(),
+      expect(text('browse')).toExist(),
+      expect(text('Supports JPEG, PNG, WebP')).toExist(),
+      Command.expectNone(),
     )
   })
 
   it('dispatches PickImageFile command when browse is clicked', () => {
-    Scene.scene(
+    scene(
       config,
-      Scene.with(initialModel()),
-      Scene.click(Scene.text('browse')),
-      Scene.Command.expectHas(PickImageFile),
+      given(initialModel()),
+      click(text('browse')),
+      Command.expectHas(PickImageFile),
       // Resolve the command so the scene ends cleanly.
-      Scene.Command.resolve(PickImageFile, FilePickCancelled()),
-      Scene.Command.expectNone(),
+      Command.resolve(PickImageFile, FilePickCancelled()),
+      Command.expectNone(),
     )
   })
 })
@@ -81,12 +81,12 @@ describe('Error state', () => {
         error: 'Failed to decode image',
       },
     }
-    Scene.scene(
+    scene(
       config,
-      Scene.with(model),
-      Scene.expect(Scene.text('Failed to load image: Failed to decode image')).toExist(),
-      Scene.expect(Scene.text('Try another')).toExist(),
-      Scene.Command.expectNone(),
+      given(model),
+      expect(text('Failed to load image: Failed to decode image')).toExist(),
+      expect(text('Try another')).toExist(),
+      Command.expectNone(),
     )
   })
 
@@ -101,49 +101,49 @@ describe('Error state', () => {
         error: 'Something went wrong',
       },
     }
-    Scene.scene(
+    scene(
       config,
-      Scene.with(model),
-      Scene.click(Scene.text('Try another')),
-      Scene.Command.expectHas(PickImageFile),
-      Scene.Command.resolve(PickImageFile, FilePickCancelled()),
-      Scene.Command.expectNone(),
+      given(model),
+      click(text('Try another')),
+      Command.expectHas(PickImageFile),
+      Command.resolve(PickImageFile, FilePickCancelled()),
+      Command.expectNone(),
     )
   })
 })
 
 describe('File picker command resolution', () => {
   it('resolves PickImageFile -> SelectedImageFile -> DecodeImage', () => {
-    Scene.scene(
+    scene(
       config,
-      Scene.with(initialModel()),
+      given(initialModel()),
       // Click browse
-      Scene.click(Scene.text('browse')),
-      Scene.Command.expectHas(PickImageFile),
+      click(text('browse')),
+      Command.expectHas(PickImageFile),
       // Resolve the file picker — user selected a file
-      Scene.Command.resolve(
+      Command.resolve(
         PickImageFile,
         SelectedImageFile({ file: mockPngFile }),
       ),
       // After file selected, the model goes to 'loading' and DecodeImage fires
-      Scene.Command.expectHas(DecodeImage),
+      Command.expectHas(DecodeImage),
       // Resolve DecodeImage to end cleanly
-      Scene.Command.resolve(
+      Command.resolve(
         DecodeImage,
         ImageFailedToDecode({ error: 'Cancelled in test' }),
       ),
-      Scene.Command.expectNone(),
+      Command.expectNone(),
     )
   })
 
   it('resolves PickImageFile -> FilePickCancelled (user cancels picker)', () => {
-    Scene.scene(
+    scene(
       config,
-      Scene.with(initialModel()),
-      Scene.click(Scene.text('browse')),
-      Scene.Command.expectHas(PickImageFile),
-      Scene.Command.resolve(PickImageFile, FilePickCancelled()),
-      Scene.Command.expectNone(),
+      given(initialModel()),
+      click(text('browse')),
+      Command.expectHas(PickImageFile),
+      Command.resolve(PickImageFile, FilePickCancelled()),
+      Command.expectNone(),
     )
   })
 })
@@ -152,19 +152,19 @@ describe('Image decode flow', () => {
   it('decodes a selected file and transitions to loaded state', () => {
     const bitmap = new (ImageBitmap as unknown as new (w: number, h: number) => ImageBitmap)(200, 150)
 
-    Scene.scene(
+    scene(
       config,
-      Scene.with(initialModel()),
+      given(initialModel()),
 
       // Click browse, resolve file pick
-      Scene.click(Scene.text('browse')),
-      Scene.Command.resolve(
+      click(text('browse')),
+      Command.resolve(
         PickImageFile,
         SelectedImageFile({ file: mockPngFile }),
       ),
 
       // Resolve decode — image decoded successfully
-      Scene.Command.resolve(
+      Command.resolve(
         DecodeImage,
         ImageDecoded({ bitmap, width: 200, height: 150 }),
       ),
@@ -173,35 +173,35 @@ describe('Image decode flow', () => {
       // canvas. The update dispatches RenderChain (stamp = revision 1); the
       // command's own effect would wait for the canvas to commit, but in the
       // scene we resolve it manually.
-      Scene.Command.expectHas(RenderChain),
-      Scene.Command.resolve(RenderChain, RenderedFrame({ stamp: 1 })),
-      Scene.Mount.resolve(PanZoom, ScaledCanvas({ scale: 1, offsetX: 0, offsetY: 0 })),
-      Scene.expect(Scene.selector('#lutra-canvas')).toExist(),
-      Scene.Command.expectNone(),
+      Command.expectHas(RenderChain),
+      Command.resolve(RenderChain, RenderedFrame({ stamp: 1 })),
+      Mount.resolve(PanZoom, ScaledCanvas({ scale: 1, offsetX: 0, offsetY: 0 })),
+      expect(selector('#lutra-canvas')).toExist(),
+      Command.expectNone(),
     )
   })
 
   it('handles decode failure and shows error state', () => {
-    Scene.scene(
+    scene(
       config,
-      Scene.with(initialModel()),
+      given(initialModel()),
 
-      Scene.click(Scene.text('browse')),
-      Scene.Command.resolve(
+      click(text('browse')),
+      Command.resolve(
         PickImageFile,
         SelectedImageFile({ file: mockPngFile }),
       ),
 
       // Resolve decode with failure
-      Scene.Command.resolve(
+      Command.resolve(
         DecodeImage,
         ImageFailedToDecode({ error: 'Corrupt image file' }),
       ),
 
       // Error text should be visible
-      Scene.expect(Scene.text('Failed to load image: Corrupt image file')).toExist(),
-      Scene.expect(Scene.text('Try another')).toExist(),
-      Scene.Command.expectNone(),
+      expect(text('Failed to load image: Corrupt image file')).toExist(),
+      expect(text('Try another')).toExist(),
+      Command.expectNone(),
     )
   })
 })
