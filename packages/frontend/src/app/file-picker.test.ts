@@ -1,5 +1,6 @@
 import { describe, it } from 'vitest'
 import { Command, Mount, click, expect, given, scene, selector, text } from 'foldkit/scene'
+import { MockImageBitmap } from '../vitest-setup'
 import { initialModel } from './model'
 import { update } from './update'
 import { view } from '../view'
@@ -139,7 +140,7 @@ describe('File picker command resolution', () => {
 
 describe('Image decode flow', () => {
   it('decodes a selected file and transitions to loaded state', () => {
-    const bitmap = new (ImageBitmap as unknown as new (w: number, h: number) => ImageBitmap)(200, 150)
+    const bitmap = new MockImageBitmap(200, 150)
 
     scene(
       config,

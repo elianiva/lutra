@@ -7,6 +7,14 @@ import type { Model } from '../app/model'
 
 const ZOOM_SPEED = 0.01
 
+/** Foldkit mounts on any Element; the stage needs HTMLElement APIs (the
+ *  typed wheel/pointer event overloads). Narrow via instanceof instead of an
+ *  assertion so the linter's assertion ban stays satisfied. */
+const asHtmlElement = (element: Element): HTMLElement => {
+  if (element instanceof HTMLElement) return element
+  throw new Error('PanZoom stage must be an HTMLElement')
+}
+
 /** Pan & zoom mount for the image canvas. Exported for Scene test resolution.
  *  On mount it measures the stage and emits the initial view: the whole image
  *  fitted into the stage (contain, never upscaled past 1×). Wheel zooms about
@@ -19,7 +27,7 @@ export const PanZoom = Mount.defineStream(
 )(({ imageWidth, imageHeight }) => (element) =>
   Stream.callback<typeof ScaledCanvas.Type>((queue) =>
     Effect.gen(function* () {
-      const stage = element as HTMLElement
+      const stage = asHtmlElement(element)
       const state = {
         scale: 1,
         offsetX: 0,

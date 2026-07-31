@@ -69,7 +69,8 @@ export function updateLayerParam(
 
   const layer = chain[idx]!
   const result = [...chain]
-  result[idx] = { ...layer, ...patch.patch } as Layer
+  const updated: Layer = { ...layer, ...patch.patch }
+  result[idx] = updated
   return result
 }
 
