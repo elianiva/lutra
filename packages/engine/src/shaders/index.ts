@@ -1,5 +1,5 @@
 export { generateChainSource, WORKGROUP_SIZE } from "./chain-source"
-export type { ChainLayerInfo, ChainShader, UniformSlot } from "./chain-source"
+export type { ChainLayerInfo, ChainPass, ChainShader, UniformSlot } from "./chain-source"
 export { SRGB_TO_LINEAR } from "./colorspace"
 export type { BodyRenderer } from "./types"
 

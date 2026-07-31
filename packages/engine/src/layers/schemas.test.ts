@@ -82,7 +82,7 @@ describe("Layer schemas", () => {
         extraField: 123,
       })
       expect(result.type).toBe("exposure")
-      expect(result.stops).toBe(0)
+      expect((result as Record<string, unknown>)["stops"]).toBe(0)
       // extraField is stripped by Schema
       expect((result as Record<string, unknown>)["extraField"]).toBeUndefined()
     })

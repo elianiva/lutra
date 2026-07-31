@@ -26,11 +26,14 @@ describe("shader bodies", () => {
   })
 
   describe("renderContrast", () => {
-    it("emits WGSL with mid-grey anchor", () => {
+    it("emits a power-curve S-curve around linear mid-grey", () => {
       const src = renderContrast(0)
+      expect(src).toContain("l0_amount")
+      expect(src).toContain("exp2(-l0_amount * 0.5)")
       expect(src).toContain("0.2140")
-      expect(src).toContain("clamp(l0_amount, -0.99, 0.99)")
-      expect(src).toContain("select")
+      expect(src).toContain("pow(t, vec3<f32>(gain)) * 0.2140")
+      // Negative input is clamped before the power so it can't NaN
+      expect(src).toContain("max(color, vec3<f32>(0.0))")
     })
   })
 
@@ -78,14 +81,17 @@ describe("shader bodies", () => {
       expect(src).toContain("coord.x")
       expect(src).toContain("u_frame")
       expect(src).toContain("l0_amount")
+      // Retuned amplitude: ±0.08 linear at full amount, not ±0.5
+      expect(src).toContain("0.08")
       expect(src).toContain("clamp(color, vec3<f32>(0.0), vec3<f32>(1.0))")
     })
   })
 
   describe("renderVignette", () => {
-    it("emits WGSL with uv and smoothstep", () => {
+    it("emits WGSL with aspect-corrected uv and smoothstep", () => {
       const src = renderVignette(1)
       expect(src).toContain("u_resolution")
+      expect(src).toContain("uv.x *= u_resolution.x / u_resolution.y")
       expect(src).toContain("smoothstep(l1_size * 0.6, l1_size, dist)")
       expect(src).toContain("l1_amount")
       expect(src).toContain("color *= k")
@@ -93,9 +99,11 @@ describe("shader bodies", () => {
   })
 
   describe("renderChromaticAberration", () => {
-    it("emits WGSL with source texture sampling", () => {
+    it("emits radial source sampling around the image center", () => {
       const src = renderChromaticAberration(0)
       expect(src).toContain("textureLoad(srcTex")
+      expect(src).toContain("u_resolution * 0.5")
+      expect(src).toContain("radius * radius")
       expect(src).toContain("l0_amount")
       expect(src).toContain("mix(color.r, rVal, strength)")
       expect(src).toContain("mix(color.b, bVal, strength)")

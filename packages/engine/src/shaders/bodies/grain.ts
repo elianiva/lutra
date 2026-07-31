@@ -3,7 +3,12 @@ import type { BodyRenderer } from "../types"
 // Film-grain noise with density weighting. Uses an integer hash
 // (Wang-style) with triangular midtone falloff (peak at 0.5, floor at
 // 0.35) so deep blacks and bright highlights stay clean while noise
-// concentrates where film grain is most visible.
+// concentrates where film grain is most visible. Amplitude is capped at
+// ±0.08 linear light at full amount (roughly ±20 sRGB levels at
+// midtone) — the original ±0.5 was a full stop of swing, far past film
+// grain. Grain is added in linear light, so its display-space size
+// grows toward the blacks (see AMD's fine-art-of-film-grain notes); the
+// midtone weight floor keeps it from raising black levels outright.
 //
 // The mobile SkSL used fract(sin(dot(...))) — a transcendental per
 // pixel that costs several ALU ops. Integer hash is bit-twiddling
@@ -21,7 +26,7 @@ export const renderGrain: BodyRenderer = (i) => `
   let noise = n - 0.5;
   let L = clamp(dot(color, vec3<f32>(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
   let w = max(1.0 - abs(L - 0.5) * 1.4, 0.35);
-  color += noise * l${i}_amount * w;
+  color += noise * l${i}_amount * 0.08 * w;
   color = clamp(color, vec3<f32>(0.0), vec3<f32>(1.0));
 }
 `

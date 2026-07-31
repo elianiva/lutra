@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from 'effect'
-import { GpuError, WORKGROUP_SIZE, type ChainShader, type RenderRequest } from '@lutra/engine'
+import { GpuError, WORKGROUP_SIZE, type ChainPass, type ChainShader, type RenderRequest } from '@lutra/engine'
 
 // ---- service ----
 
@@ -119,8 +119,8 @@ interface ComputeEntry {
 /**
  * Image-scoped resources. Rebuilt when the image (or canvas) changes; the
  * source bitmap upload and every texture/buffer allocation happen once per
- * image, not once per render. A slider tick is then just two buffer writes +
- * two dispatches + one submit.
+ * image, not once per render. A slider tick is then a few buffer writes +
+ * one dispatch per pass + one submit.
  */
 interface Session {
   readonly canvas: HTMLCanvasElement
@@ -129,10 +129,16 @@ interface Session {
   readonly height: number
   readonly srcTex: GPUTexture
   readonly dstTex: GPUTexture
+  /**
+   * Ping-pong linear-light rgba16float intermediates. Layer passes read
+   * the previous pass's output and write the next; only the final pass
+   * writes dstTex (sRGB-encoded rgba8unorm).
+   */
+  readonly intermediates: [GPUTexture, GPUTexture]
   readonly resolutionBuffer: GPUBuffer
   readonly frameBuffer: GPUBuffer
   readonly blitGroup: GPUBindGroup
-  /** Per-shader params buffer + compute bind group (both reference session resources). */
+  /** Per-pass-source params buffer + compute bind group (both reference session resources). */
   readonly compute: Record<string, ComputeEntry>
 }
 
@@ -164,6 +170,8 @@ export const GpuBackendLive = Layer.effect(
     const destroySession = (s: Session): void => {
       s.srcTex.destroy()
       s.dstTex.destroy()
+      s.intermediates[0].destroy()
+      s.intermediates[1].destroy()
       s.resolutionBuffer.destroy()
       s.frameBuffer.destroy()
       for (const entry of Object.values(s.compute)) {
@@ -207,7 +215,8 @@ export const GpuBackendLive = Layer.effect(
         { width, height, depthOrArrayLayers: 1 },
       )
 
-      // Destination storage texture: compute writes it, the blit samples it.
+      // Destination storage texture: the final compute pass writes it (sRGB),
+      // the blit samples it, and export copies it back to the CPU.
       const dstTex = device.createTexture({
         size: { width, height, depthOrArrayLayers: 1 },
         format: 'rgba8unorm',
@@ -216,6 +225,17 @@ export const GpuBackendLive = Layer.effect(
           GPUTextureUsage.TEXTURE_BINDING |
           GPUTextureUsage.COPY_SRC,
       })
+
+      // Ping-pong linear-light intermediates (rgba16float so multi-pass
+      // grading doesn't band like 8-bit would). Pass i reads the previous
+      // pass's output and writes the other.
+      const makeIntermediate = (): GPUTexture =>
+        device.createTexture({
+          size: { width, height, depthOrArrayLayers: 1 },
+          format: 'rgba16float',
+          usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+        })
+      const intermediates: [GPUTexture, GPUTexture] = [makeIntermediate(), makeIntermediate()]
 
       // Uniform buffers. `u_resolution` is written once; `u_frame` is
       // rewritten every render (grain animates).
@@ -245,6 +265,7 @@ export const GpuBackendLive = Layer.effect(
         height,
         srcTex,
         dstTex,
+        intermediates,
         resolutionBuffer,
         frameBuffer,
         blitGroup,
@@ -253,15 +274,22 @@ export const GpuBackendLive = Layer.effect(
       return session
     }
 
-    const getCompute = (s: Session, shader: ChainShader): ComputeEntry => {
-      const cached = s.compute[shader.source]
+    /**
+     * Get (or lazily create) the pipeline + bind group for one compute pass.
+     * Cached per pass source; within a session the same pass source always
+     * binds the same src/dst pair, because the pass's position in the chain
+     * is fixed and its source encodes linearize/encode/dstFormat, which pin
+     * it to that position.
+     */
+    const getCompute = (s: Session, pass: ChainPass, src: GPUTexture, dst: GPUTexture): ComputeEntry => {
+      const cached = s.compute[pass.source]
       if (cached) return cached
 
-      const cachedPipeline = pipelineCache[shader.source]
+      const cachedPipeline = pipelineCache[pass.source]
       const compiled =
         cachedPipeline ??
         (() => {
-          const module = device.createShaderModule({ code: shader.source })
+          const module = device.createShaderModule({ code: pass.source })
           const pipeline = device.createComputePipeline({
             layout: 'auto',
             compute: { module, entryPoint: 'main' },
@@ -270,28 +298,28 @@ export const GpuBackendLive = Layer.effect(
             pipeline,
             layout: pipeline.getBindGroupLayout(0),
           }
-          pipelineCache[shader.source] = built
+          pipelineCache[pass.source] = built
           return built
         })()
 
-      const hasParams = shader.uniforms.length > 0
+      const hasParams = pass.uniforms.length > 0
       const paramsBuffer = hasParams
         ? device.createBuffer({
-            size: roundUp(shader.uniforms.length * 4, 16),
+            size: roundUp(pass.uniforms.length * 4, 16),
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
           })
         : null
 
       // With `layout: 'auto'` the pipeline only exposes bindings the shader
-      // statically uses: binding 3 (frame) exists only when a body reads
+      // statically uses: binding 3 (frame) exists only when this pass reads
       // `u_frame` (currently grain), and binding 4 (params) only when there
       // are uniform slots. Entries must mirror that.
       const entries: Array<GPUBindGroupEntry> = [
-        { binding: 0, resource: s.srcTex.createView() },
-        { binding: 1, resource: s.dstTex.createView() },
+        { binding: 0, resource: src.createView() },
+        { binding: 1, resource: dst.createView() },
         { binding: 2, resource: { buffer: s.resolutionBuffer } },
       ]
-      if (shader.usesFrame) {
+      if (pass.usesFrame) {
         entries.push({ binding: 3, resource: { buffer: s.frameBuffer } })
       }
       if (paramsBuffer) {
@@ -300,7 +328,7 @@ export const GpuBackendLive = Layer.effect(
 
       const bindGroup = device.createBindGroup({ layout: compiled.layout, entries })
       const entry: ComputeEntry = { paramsBuffer, bindGroup, pipeline: compiled.pipeline }
-      s.compute[shader.source] = entry
+      s.compute[pass.source] = entry
       return entry
     }
 
@@ -324,31 +352,43 @@ export const GpuBackendLive = Layer.effect(
             )
           }
 
-          const { paramsBuffer, bindGroup, pipeline } = getCompute(s, request.shader)
+          const passes = request.shader.passes
 
-          // Cheap per-tick updates: repack the params buffer and the frame
-          // counter, then dispatch. No allocations, no texture churn.
-          if (paramsBuffer) {
-            const paramsData = new Float32Array(roundUp(request.uniforms.length, 4))
-            paramsData.set(request.uniforms)
-            device.queue.writeBuffer(paramsBuffer, 0, paramsData)
-          }
+          // Cheap per-tick updates: repack each pass's params buffer and the
+          // frame counter once, then dispatch every pass. No allocations, no
+          // texture churn.
           if (request.shader.usesFrame) {
             device.queue.writeBuffer(s.frameBuffer, 0, new Uint32Array([request.frame >>> 0]))
           }
 
           const encoder = device.createCommandEncoder()
 
-          // Pass 1: chain compute shader writes the processed frame to dstTex.
-          const computePass = encoder.beginComputePass()
-          computePass.setPipeline(pipeline)
-          computePass.setBindGroup(0, bindGroup)
-          computePass.dispatchWorkgroups(
-            Math.ceil(width / WORKGROUP_SIZE),
-            Math.ceil(height / WORKGROUP_SIZE),
-            1,
-          )
-          computePass.end()
+          // Pass 1..N: each layer runs as its own compute pass. Pass 0 reads
+          // the sRGB source (or the linearize pass output); every later pass
+          // reads the previous pass's output through the ping-pong
+          // intermediates; the last pass writes the sRGB-encoded dstTex.
+          for (let i = 0; i < passes.length; i++) {
+            const pass = passes[i]!
+            const src = i === 0 ? s.srcTex : s.intermediates[(i - 1) % 2]!
+            const dst = i === passes.length - 1 ? s.dstTex : s.intermediates[i % 2]!
+            const { paramsBuffer, bindGroup, pipeline } = getCompute(s, pass, src, dst)
+
+            if (paramsBuffer) {
+              const paramsData = new Float32Array(roundUp(request.uniforms[i]!.length, 4))
+              paramsData.set(request.uniforms[i]!)
+              device.queue.writeBuffer(paramsBuffer, 0, paramsData)
+            }
+
+            const computePass = encoder.beginComputePass()
+            computePass.setPipeline(pipeline)
+            computePass.setBindGroup(0, bindGroup)
+            computePass.dispatchWorkgroups(
+              Math.ceil(width / WORKGROUP_SIZE),
+              Math.ceil(height / WORKGROUP_SIZE),
+              1,
+            )
+            computePass.end()
+          }
 
           // Pass 2: blit dstTex onto the canvas swapchain texture.
           const canvasTexture = s.ctx.getCurrentTexture()

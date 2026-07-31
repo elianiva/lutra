@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect"
 import type { Layer } from "./layers/schemas"
 import type { LayerEntry } from "./layers/registry"
-import { generateChainSource, type ChainLayerInfo, type ChainShader } from "./shaders/chain-source"
+import { generateChainSource, type ChainLayerInfo, type ChainPass, type ChainShader } from "./shaders/chain-source"
 
 // ---- errors ----
 
@@ -13,17 +13,17 @@ export class GpuError extends Schema.TaggedErrorClass<GpuError>()("GpuError", {
 // ---- uniform packing ----
 
 /**
- * Pack the active (visible) layers' parameter values into a flat
- * Float32Array following the slot layout returned by the assembler.
+ * Pack one pass's layer parameter values into a flat Float32Array
+ * following the slot layout returned by the assembler.
  */
 function packUniforms(
   chain: ReadonlyArray<Layer>,
-  shader: ChainShader,
+  pass: ChainPass,
 ): Float32Array {
-  const buf = new Float32Array(shader.uniforms.length)
+  const buf = new Float32Array(pass.uniforms.length)
   const visibleLayers = chain.filter((l) => l.visible)
 
-  for (const slot of shader.uniforms) {
+  for (const slot of pass.uniforms) {
     const layer = visibleLayers[slot.layerIndex]
     if (layer) {
       buf[slot.offset] = (layer as Record<string, unknown>)[slot.field] as number
@@ -37,7 +37,7 @@ function packUniforms(
 
 /**
  * Everything the GPU backend needs to render one frame: the assembled
- * chain shader, the packed uniforms, the source image, and a frame
+ * chain passes, the packed uniforms, the source image, and a frame
  * counter (seeds `u_frame` for animated bodies like grain).
  *
  * The engine stops at building the request — WebGPU execution, canvas
@@ -46,7 +46,8 @@ function packUniforms(
  */
 export interface RenderRequest {
   readonly shader: ChainShader
-  readonly uniforms: Float32Array
+  /** Packed uniforms, one Float32Array per pass (aligned with shader.passes). */
+  readonly uniforms: ReadonlyArray<Float32Array>
   readonly srcBitmap: ImageBitmap
   readonly frame: number
 }
@@ -87,8 +88,8 @@ export function createRenderRequest(
       return yield* Effect.fail(new GpuError({ message: "Shader generation failed", cause: e }))
     }
 
-    // Pack uniforms from layer parameter values
-    const uniforms = packUniforms(chain, shader)
+    // Pack uniforms per pass from layer parameter values
+    const uniforms = shader.passes.map((pass) => packUniforms(chain, pass))
 
     return { shader, uniforms, srcBitmap, frame }
   })

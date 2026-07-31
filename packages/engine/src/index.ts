@@ -38,7 +38,7 @@ export type { RenderRequest } from "./render"
 
 // Shader generation
 export { generateChainSource, SRGB_TO_LINEAR, WORKGROUP_SIZE } from "./shaders"
-export type { ChainLayerInfo, ChainShader, UniformSlot, BodyRenderer } from "./shaders"
+export type { ChainLayerInfo, ChainPass, ChainShader, UniformSlot, BodyRenderer } from "./shaders"
 
 // Shader body renderers — one per layer type. Consumers build a registry
 // (`makeRegistry`) from these to drive both `createLayer` and `render`.

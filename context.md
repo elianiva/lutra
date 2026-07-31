@@ -16,9 +16,9 @@ The engine uses the Effect library (`effect` ^4.x) for its public API. `Effect` 
 **Shader porting**:
 Direct port of each SkSL body to WGSL by hand. The mobile SkSL bodies are the reference. No shared IR or transpilation layer — just parallel implementations in two shader dialects.
 
-**Chromatic aberration**: Implemented (not deferred). The chain shader exposes both the accumulated `color` and the source texture coordinate so CA can sample the input texture at offset positions. The assembler contract supports per-body source-texture access.
+**Chromatic aberration**: Implemented (not deferred), radial. Each layer runs as its own compute pass, so CA samples the previous pass's output (the accumulated result of earlier layers) at offsets that grow quadratically from the image center — not the source image. A dedicated linearize pass is inserted ahead of the first sampling layer so sampled texels are always linear light.
 
-**GPU pipeline**: Compute shaders for processing, render pipeline for presentation. Unlocks: real clarity (local contrast with workgroup shared memory), proper film-grain (FBM noise with neighbor coherence), and future scatter-write passes (histograms, LUT tetrahedral interpolation). Grain is a priority — the mobile's cheap per-pixel hash is not acceptable for the web engine. The processed frame is written to a storage texture and blitted to the canvas swapchain by a fullscreen-triangle pass (free bilinear); it never leaves the GPU on the display path. Readback to an ImageBitmap happens only on export.
+**GPU pipeline**: Compute shaders for processing, render pipeline for presentation. The chain assembler emits one compute pass per layer; passes ping-pong through linear-light rgba16float intermediates (8-bit intermediates would band), and only the final pass encodes to sRGB and writes the display texture. This unlocks: real clarity (local contrast with neighbor access across passes), proper film-grain (FBM noise with neighbor coherence), and future scatter-write passes (histograms, LUT tetrahedral interpolation). Grain is a priority — the mobile's cheap per-pixel hash is not acceptable for the web engine. The processed frame never leaves the GPU on the display path — the final storage texture is blitted to the canvas swapchain by a fullscreen-triangle pass (free bilinear). Readback to an ImageBitmap happens only on export.
 
 **Clarity**: Placeholder for now (midtone lift, same as mobile). Real local contrast is deferred despite compute-shader capability.
 
@@ -92,8 +92,8 @@ Most layers expose a single parameter with one ruler slider. Two layers — **Wh
 1. **Exposure** — stops (-3 to +3, default 0). Multiplicative gain.
 2. **Contrast** — S-curve amount (-1 to +1, default 0). Anchored at mid-gray.
 3. **Shadows** — lifts dark tones (-1 to +1, default 0 = no-op).
-4. **Highlights** — compresses bright tones (-1 to +1, default 0 = no-op).
-5. **White balance** — toggled: temperature (K, default 6500) ↔ tint (-1 to +1, default 0).
+4. **Highlights** — lifts bright tones (-1 to +1, default 0 = no-op).
+5. **White balance** — toggled: temperature (-1 to +1, default 0, cool → warm) ↔ tint (-1 to +1, default 0). Approximated with direct linear-light channel scaling (R/B ±30%, G ±20% at full slider), not a CCT-based model.
 6. **Saturation** — multiplier (-1 to +1, default 0 = no-op).
 7. **Grain** — film-grain noise overlay (0 to 1, default 0 = no-op). Hash-based, no texture.
 8. **Vignette** — toggled: amount (-1 to +1, default 0 = no-op) ↔ size (0.2 to 1, default 0.6).
