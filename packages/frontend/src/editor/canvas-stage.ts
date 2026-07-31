@@ -1,4 +1,4 @@
-import { Effect, Option, Ref, Schema as S, Stream, Queue } from 'effect'
+import { Effect, Schema as S, Stream, Queue } from 'effect'
 import { Mount } from 'foldkit'
 import type { HtmlBuilder } from 'foldkit/html'
 import type { AppMessage } from '../app/message'
@@ -9,7 +9,7 @@ import {
   CanvasRegistered,
 } from '../app/message'
 import { hasImage } from '../app/phase'
-import { CanvasRef } from '../gpu/canvas-ref'
+import { canvasRef, registerCanvas } from '../gpu/canvas-ref'
 import type { Model } from '../app/model'
 
 const ZOOM_SPEED = 0.01
@@ -158,32 +158,25 @@ export const PanZoom = Mount.defineStream(
 // ---- canvas registration ----
 
 /**
- * One-shot mount on the render canvas: registers the element in the
- * `CanvasRef` service so render commands resolve the canvas from the app
- * context instead of a global DOM query. The registration lives for the
- * element's lifetime (acquireRelease): when the canvas unmounts, the ref is
- * cleared unless a newer canvas already replaced it.
+ * One-shot mount on the render canvas: registers the element in the shared
+ * `canvasRef` so render commands resolve the canvas from the app context
+ * instead of a global DOM query. The registration lives for the element's
+ * lifetime (a scope finalizer — the mount's scope stays open until the
+ * element unmounts): when the canvas unmounts, the ref is cleared unless a
+ * newer canvas already replaced it.
+ *
+ * The mount writes the shared ref directly instead of resolving the
+ * `CanvasRef` service: mounts run in the runtime's render context, which
+ * does not include the `resources` layer — the service is only visible to
+ * Commands and Subscriptions.
  */
 export const RegisterCanvas = Mount.define(
   'RegisterCanvas',
   CanvasRegistered,
 )((element) =>
   Effect.gen(function* () {
-    const canvasRef = yield* Effect.serviceOption(CanvasRef)
     if (element instanceof HTMLCanvasElement) {
-      yield* Option.match(canvasRef, {
-        onNone: () => Effect.void,
-        onSome: (ref) =>
-          Effect.acquireRelease(Ref.set(ref, Option.some(element)), () =>
-            Ref.get(ref).pipe(
-              Effect.flatMap((current) =>
-                Option.isSome(current) && current.value === element
-                  ? Ref.set(ref, Option.none())
-                  : Effect.void,
-              ),
-            ),
-          ),
-      })
+      yield* registerCanvas(canvasRef, element)
     }
     return CanvasRegistered()
   }),
