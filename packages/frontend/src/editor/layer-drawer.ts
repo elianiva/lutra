@@ -52,12 +52,11 @@ export const layerDrawer = (h: HtmlBuilder<AppMessage>, model: Model) =>
         [h.Class('flex flex-col overflow-y-auto')],
         [
           // The draft layer renders first, above the committed chain, with its
-          // confirm/cancel controls — it previews on top in the GPU pipeline too.
-          ...(model.draft ? [draftRow(h, model, model.draft)] : []),
-          ...model.chain
-            .map((layer, index) => chainRow(h, model, layer, index))
-            .reverse(),
-          ...(model.chain.length === 0 && !model.draft ? [emptyState(h)] : []),
+          // confirm/cancel controls — it previews on top in the GPU pipeline
+          // too. The draft itself lives in the phase machine (Drafting).
+          ...(model.phase._tag === 'Drafting' ? [draftRow(h, model, model.phase.layer)] : []),
+          ...model.chain.map((layer, index) => chainRow(h, model, layer, index)).reverse(),
+          ...(model.chain.length === 0 && model.phase._tag !== 'Drafting' ? [emptyState(h)] : []),
         ],
       ),
     ],
@@ -75,10 +74,7 @@ const emptyState = (h: HtmlBuilder<AppMessage>) =>
 const draftRow = (h: HtmlBuilder<AppMessage>, model: Model, layer: Layer) => {
   const ui = LAYER_UI[layer.type]
   return h.div(
-    [
-      h.Class('border-b border-border bg-panel-alt'),
-      h.AriaLabel(`${ui.label} draft`),
-    ],
+    [h.Class('border-b border-border bg-panel-alt'), h.AriaLabel(`${ui.label} draft`)],
     [
       h.div(
         [h.Class('flex items-center gap-2 px-4 py-2')],
@@ -93,26 +89,27 @@ const draftRow = (h: HtmlBuilder<AppMessage>, model: Model, layer: Layer) => {
           ...Object.keys(ui.fields).map((field) => draftSlider(h, layer, FieldKey(field), ui)),
         ],
       ),
-      h.div([h.Class('flex items-center justify-end gap-2 px-4 py-2')], [
-        h.button(
-          [
-            h.OnClick(CancelledDraft()),
-            h.AriaLabel('Cancel draft'),
-            h.Class(
-              'grid size-7 place-items-center text-muted hover:text-ink',
-            ),
-          ],
-          [icon(h, X, 'Cancel draft')],
-        ),
-        h.button(
-          [
-            h.OnClick(ConfirmedDraft()),
-            h.AriaLabel('Confirm draft'),
-            h.Class('grid size-7 place-items-center bg-accent text-bg'),
-          ],
-          [icon(h, Check, 'Confirm draft')],
-        ),
-      ]),
+      h.div(
+        [h.Class('flex items-center justify-end gap-2 px-4 py-2')],
+        [
+          h.button(
+            [
+              h.OnClick(CancelledDraft()),
+              h.AriaLabel('Cancel draft'),
+              h.Class('grid size-7 place-items-center text-muted hover:text-ink'),
+            ],
+            [icon(h, X, 'Cancel draft')],
+          ),
+          h.button(
+            [
+              h.OnClick(ConfirmedDraft()),
+              h.AriaLabel('Confirm draft'),
+              h.Class('grid size-7 place-items-center bg-accent text-bg'),
+            ],
+            [icon(h, Check, 'Confirm draft')],
+          ),
+        ],
+      ),
     ],
   )
 }
@@ -126,25 +123,16 @@ const draftSlider = (
   const fieldUi = ui.fields[field]!
   const { min, max } = fieldBounds(layer.type, field)
   const value = num(layer, field)
-  return sliderControl(
-    h,
-    fieldUi.label,
-    fieldUi.format(value),
-    min,
-    max,
-    value,
-    (v) => UpdatedDraftParam({ field, value: v }),
+  return sliderControl(h, fieldUi.label, fieldUi.format(value), min, max, value, (v) =>
+    UpdatedDraftParam({ field, value: v }),
   )
 }
 
-const chainRow = (
-  h: HtmlBuilder<AppMessage>,
-  model: Model,
-  layer: Layer,
-  index: number,
-) => {
+const chainRow = (h: HtmlBuilder<AppMessage>, model: Model, layer: Layer, index: number) => {
   const ui = LAYER_UI[layer.type]
-  const selected = model.selectedLayerId === layer.id && model.draft === null
+  // A row is focused only in the Selected phase — the draft (Drafting) takes
+  // priority and blocks new selections.
+  const selected = model.phase._tag === 'Selected' && model.phase.layerId === layer.id
   const total = model.chain.length
   return h.div(
     [
@@ -153,10 +141,7 @@ const chainRow = (
     ],
     [
       h.div(
-        [
-          h.Class('flex items-center gap-2 px-4 py-2'),
-          h.OnClick(SelectedLayer({ id: layer.id })),
-        ],
+        [h.Class('flex items-center gap-2 px-4 py-2'), h.OnClick(SelectedLayer({ id: layer.id }))],
         [
           h.button(
             [
@@ -167,31 +152,31 @@ const chainRow = (
             [icon(h, layer.visible ? Eye : EyeOff, layer.visible ? 'Hide' : 'Show')],
           ),
           icon(h, ui.icon, ui.label),
-          h.span(
-            [h.Class('min-w-0 flex-1 truncate text-sm')],
-            [ui.label],
-          ),
+          h.span([h.Class('min-w-0 flex-1 truncate text-sm')], [ui.label]),
           h.span([h.Class('tnum text-xs text-muted')], [summary(model, layer, ui)]),
-          h.div([h.Class('flex items-center gap-0.5')], [
-            // The chain renders bottom-up (newest at the top), so "Move up"
-            // targets a higher chain index and "Move down" a lower one. A row
-            // at the top of the stack can't move up; a row at the bottom can't
-            // move down.
-            reorderButton(h, 'Move up', ArrowUp, index === total - 1, () =>
-              ReorderedLayer({ from: index, to: index + 1 }),
-            ),
-            reorderButton(h, 'Move down', ArrowDown, index === 0, () =>
-              ReorderedLayer({ from: index, to: index - 1 }),
-            ),
-            h.button(
-              [
-                h.OnClick(RemovedLayer({ id: layer.id })),
-                h.AriaLabel('Delete layer'),
-                h.Class('grid size-6 place-items-center text-muted hover:text-ink'),
-              ],
-              [icon(h, Trash2, 'Delete layer')],
-            ),
-          ]),
+          h.div(
+            [h.Class('flex items-center gap-0.5')],
+            [
+              // The chain renders bottom-up (newest at the top), so "Move up"
+              // targets a higher chain index and "Move down" a lower one. A row
+              // at the top of the stack can't move up; a row at the bottom can't
+              // move down.
+              reorderButton(h, 'Move up', ArrowUp, index === total - 1, () =>
+                ReorderedLayer({ from: index, to: index + 1 }),
+              ),
+              reorderButton(h, 'Move down', ArrowDown, index === 0, () =>
+                ReorderedLayer({ from: index, to: index - 1 }),
+              ),
+              h.button(
+                [
+                  h.OnClick(RemovedLayer({ id: layer.id })),
+                  h.AriaLabel('Delete layer'),
+                  h.Class('grid size-6 place-items-center text-muted hover:text-ink'),
+                ],
+                [icon(h, Trash2, 'Delete layer')],
+              ),
+            ],
+          ),
         ],
       ),
       selected
@@ -199,7 +184,11 @@ const chainRow = (
             [h.Class('flex flex-col gap-3 px-4 pb-4')],
             [
               ...(layer.type === 'lut'
-                ? [lutPicker(h, model, layer.lutId, (lutId) => ChangedLayerLut({ id: layer.id, lutId }))]
+                ? [
+                    lutPicker(h, model, layer.lutId, (lutId) =>
+                      ChangedLayerLut({ id: layer.id, lutId }),
+                    ),
+                  ]
                 : []),
               ...Object.keys(ui.fields).map((field) =>
                 chainSlider(h, layer, FieldKey(field), ui, model),
@@ -239,14 +228,8 @@ const chainSlider = (
       () => CycledToggledField({ id: layer.id }),
     )
   }
-  return sliderControl(
-    h,
-    fieldUi.label,
-    fieldUi.format(value),
-    min,
-    max,
-    value,
-    (v) => UpdatedLayerParam({ id: layer.id, field, value: v }),
+  return sliderControl(h, fieldUi.label, fieldUi.format(value), min, max, value, (v) =>
+    UpdatedLayerParam({ id: layer.id, field, value: v }),
   )
 }
 
@@ -262,9 +245,7 @@ const reorderButton = (
       h.OnClick(onClick()),
       h.Disabled(disabled),
       h.AriaLabel(label),
-      h.Class(
-        'grid size-6 place-items-center text-muted hover:text-ink disabled:opacity-30',
-      ),
+      h.Class('grid size-6 place-items-center text-muted hover:text-ink disabled:opacity-30'),
     ],
     [icon(h, node, label)],
   )

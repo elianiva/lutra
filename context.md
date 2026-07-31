@@ -23,6 +23,7 @@ Direct port of each SkSL body to WGSL by hand. The mobile SkSL bodies are the re
 **Clarity**: Implemented as local contrast: a 9-tap bilinear box blur (radius 4 px) of the pass input, then unsharp-mask push away from the local mean, masked to midtones. Radius is fixed — a true wide-radius clarity would need a separable blur or mip pyramid.
 
 **Scaffolding order**:
+
 1. Layer data model (Schema definitions, registry, `createLayer`)
 2. Colorspace + WGSL utilities
 3. Shader bodies (10 WGSL body renderers)
@@ -33,6 +34,7 @@ Direct port of each SkSL body to WGSL by hand. The mobile SkSL bodies are the re
 8. Tests — written alongside each workstream, not as a separate phase
 
 **Engine package structure**:
+
 ```
 engine/src/
   layers/
@@ -73,12 +75,27 @@ _Avoid_: "Stack" (Snapseed uses this word but it suggests LIFO; the chain is ord
 ### Editor UI
 
 **Tool panel**:
-A persistent panel in the **editor** showing all 11 **adjustment layer** types. Always visible — no distinction between "pinned" and "overflow" tools. Selecting a tool from the panel creates a **draft layer**; the LUT tool stays disabled until the **LUT library** catalog has loaded.
+A persistent panel in the **editor** showing all 11 **adjustment layer** types. Always visible — no distinction between "pinned" and "overflow" tools. Selecting a tool from the panel creates a **draft layer**; the LUT tool stays disabled until the **LUT library** catalog has loaded. The whole panel is disabled until an image is loaded (see **Editor phase machine**).
 _Avoid_: "toolbar" (too generic), "tool palette" (desktop jargon)
 
 **Draft layer**:
-An **adjustment layer** in a transactional preview state before the user confirms it. Created when the user selects a tool from the **tool panel**. The slider adjusts live, but the layer is not added to the **edit chain** until confirmed. If the user cancels or navigates away, the draft is discarded. The **editor** blocks other interactions (layer drawer, tool selection) while a draft is active.
+An **adjustment layer** in a transactional preview state before the user confirms it. Created when the user selects a tool from the **tool panel**. The slider adjusts live, but the layer is not added to the **edit chain** until confirmed. If the user cancels or navigates away, the draft is discarded. The **editor** blocks tool selection and layer selection while a draft is active (chain edits — remove, reorder, visibility — stay available).
 _Avoid_: "preview layer" (ambiguous with image preview), "temp layer" (implies temporary persistence)
+
+**Editor phase machine**:
+The editor's interaction mode is a foldkit **Machine** (the experimental module) defined in `packages/frontend/src/app/phase.ts`; the model's `phase` field is its state. The image lifecycle and the interaction mode are one state union because they gate each other:
+
+- `Empty` / `Loading` / `Error` — no image; the editor is blocked.
+- `Idle` / `Drafting` / `Selected` — editable; the canvas is showing.
+
+Tool selection and layer selection are edges only from the editable states, so a draft is structurally impossible without an image, and layer selection while a draft is active is blocked (the draft is never silently cancelled). A decode that lands after a `ClearedImage` has no edge and is dropped — a stale decode cannot resurrect a cleared image. Messages with no edge are ignored; that _is_ the blocking, with no scattered `if` guards. `unreachableStates()` and `deadTransitions()` are asserted empty in `phase.test.ts`.
+
+**State machine inventory** — which editor state is a machine, and which is plain data:
+
+- **Editor phase** (`app/phase.ts`): the machine above. Owns the image lifecycle, the draft, and the selection. The `Drafting` state carries the draft layer; the model no longer has `draft`/`selectedLayerId`/`source.status` flags.
+- **Render loop** (`renderPending` / `revision` / `stamp`): deliberately plain — a latest-wins reconciliation whose stale-frame decision needs the model `revision`, and whose trigger is `renderNow` from data-op handlers, not a message.
+- **LUT catalog**: one-shot AsyncData (`null` until the startup fetch lands) — not a machine.
+- **Chain data ops, pan/zoom, export, LUT picker expansion**: pure data updates.
 
 **Layer drawer**:
 The right sidebar of the **editor**, always visible, showing the current **edit chain** as a vertical list. Displays each layer with its icon, label, formatted value, visibility toggle, and delete button. When a layer is selected or a **draft layer** is active, the slider and confirm/cancel controls render inline below the layer entry. Supports drag-to-reorder.

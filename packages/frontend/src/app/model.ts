@@ -3,11 +3,14 @@ import { EditorRoute } from '../route'
 import { RenderHandle } from '../gpu/backend'
 import { SourceImage, Catalog } from './message'
 import { LayerIdSchema, Layer } from '@lutra/engine'
+import { EditorPhase, editorMachine } from './phase'
 
-// Surfaced layers (committed) render through the chain; a draft layer renders
-// on top in preview and is discarded on cancel, per context.md's draft flow.
-// Both the chain and the draft render live in the GPU pipeline; the model
-// keeps draft null whenever no tool is mid-creation.
+// The editor's interaction mode is a foldkit Machine (app/phase.ts): the
+// `phase` field is its state. The image lifecycle (Empty/Loading/Error), the
+// draft (Drafting), and the focused layer (Selected) are machine states, not
+// model flags — the machine makes "no draft without an image" structural.
+// The model keeps the data those states reference: the chain, the source
+// bitmap, per-layer UI state, and the render/export bookkeeping.
 
 // Which field a toggled layer (White Balance, Vignette) currently shows in the
 // drawer. Keyed by layer id so each toggled layer remembers its own selection.
@@ -18,11 +21,10 @@ export const Model = Schema.Struct({
   source: SourceImage,
   // The committed edit chain. Laptop-visible order = render order.
   chain: Schema.Array(Layer),
-  // The transactional preview layer; not part of `chain` until confirmed.
-  draft: Schema.NullOr(Layer),
-  // Which committed layer the drawer is focused on (the draft takes priority
-  // when present).
-  selectedLayerId: Schema.NullOr(LayerIdSchema),
+  // Editor phase machine state (app/phase.ts): Empty | Loading | Error |
+  // Idle | Drafting | Selected. Owns the image lifecycle, the draft, and the
+  // selection — replaced the old draft/selectedLayerId/source.status flags.
+  phase: EditorPhase,
   // Per-layer index into the toggled layer's two fields.
   activeFieldIndex: ActiveFieldIndex,
   // Canvas pan/zoom driven by wheel + drag on the center stage.
@@ -53,15 +55,13 @@ export type Model = typeof Model.Type
 export const initialModel = (): Model => ({
   route: EditorRoute(),
   source: {
-    status: 'empty',
     bitmap: null,
     width: 0,
     height: 0,
     error: null,
   },
   chain: [],
-  draft: null,
-  selectedLayerId: null,
+  phase: editorMachine.initial,
   activeFieldIndex: {},
   scale: 1,
   offsetX: 0,

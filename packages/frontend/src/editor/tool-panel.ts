@@ -4,6 +4,7 @@ import { LAYER_UI, LAYER_TYPES_ORDER } from './layer-meta'
 import { SelectedTool } from '../app/message'
 import type { AppMessage } from '../app/message'
 import type { Model } from '../app/model'
+import type { EditorPhase } from '../app/phase'
 import type { LayerType } from '@lutra/engine'
 
 /** Left sidebar: all 11 adjustment types as a vertical icon+label list. */
@@ -25,21 +26,27 @@ export const toolPanel = (h: HtmlBuilder<AppMessage>, model: Model) =>
       h.nav(
         [h.Class('flex flex-col')],
         LAYER_TYPES_ORDER.map((type) =>
-          toolRow(h, type, model.draft !== null, model.catalog !== null),
+          toolRow(h, type, canPickTool(model.phase), model.catalog !== null),
         ),
       ),
     ],
   )
 
+/** The machine owns the real gate (no SelectedTool edge from Empty/Loading/
+ *  Error/Drafting — see app/phase.ts); this mirrors it so the buttons read
+ *  as disabled instead of dead. */
+const canPickTool = (phase: EditorPhase): boolean =>
+  phase._tag === 'Idle' || phase._tag === 'Selected'
+
 const toolRow = (
   h: HtmlBuilder<AppMessage>,
   type: LayerType,
-  draftActive: boolean,
+  editable: boolean,
   lutEnabled: boolean,
 ) => {
   const ui = LAYER_UI[type]
   // The LUT tool needs the catalog: a draft must reference a real lutId.
-  const disabled = draftActive || (type === 'lut' && !lutEnabled)
+  const disabled = !editable || (type === 'lut' && !lutEnabled)
   return h.button(
     [
       h.OnClick(SelectedTool({ type })),
@@ -49,9 +56,6 @@ const toolRow = (
         'flex items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors hover:bg-panel-alt disabled:cursor-not-allowed disabled:opacity-40',
       ),
     ],
-    [
-      icon(h, ui.icon, ui.label),
-      h.span([h.Class('text-sm')], [ui.label]),
-    ],
+    [icon(h, ui.icon, ui.label), h.span([h.Class('text-sm')], [ui.label])],
   )
 }

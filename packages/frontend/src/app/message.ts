@@ -7,14 +7,12 @@ import { FieldKeySchema, LAYER_TYPES, LayerIdSchema, LutIdSchema } from '@lutra/
 export const ChangedRoute = Message.m('ChangedRoute', { route: AppRoute })
 export const Navigated = Message.m('Navigated', { request: S.Unknown })
 
-const ImageStatus = S.Literals(['empty', 'loading', 'loaded', 'error'] as const)
-export type ImageStatus = typeof ImageStatus.Type
-
 // A decoded source bitmap plus its pixel size. The bitmap is held in the model
 // as a plain ImageBitmap (`instanceOf` bypasses structural validation) so the
-// render command can hand it to WebGPU without re-decoding.
+// render command can hand it to WebGPU without re-decoding. Which phase the
+// image is in (empty/loading/loaded/error) is the editor machine's state
+// (app/phase.ts), not model data — the source only carries the payload.
 export const SourceImage = S.Struct({
-  status: ImageStatus,
   bitmap: S.NullOr(S.instanceOf(ImageBitmap)),
   width: S.Number,
   height: S.Number,
@@ -97,7 +95,10 @@ export const UpdatedLayerParam = Message.m('UpdatedLayerParam', {
   value: S.Number,
 })
 /** Pick a different LUT on a committed, selected LUT layer. */
-export const ChangedLayerLut = Message.m('ChangedLayerLut', { id: LayerIdSchema, lutId: LutIdSchema })
+export const ChangedLayerLut = Message.m('ChangedLayerLut', {
+  id: LayerIdSchema,
+  lutId: LutIdSchema,
+})
 /** Expand/collapse the inline LUT picker in the layer drawer. */
 export const ToggledLutPicker = Message.m('ToggledLutPicker')
 /** For toggled layers (White Balance, Vignette): cycle the active field shown in the drawer. */

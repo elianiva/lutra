@@ -27,7 +27,6 @@ const modelWith = (types: Parameters<typeof createLayerFor>[0][]) => {
   return {
     ...initialModel(),
     chain,
-    selectedLayerId: null,
   }
 }
 
@@ -48,9 +47,7 @@ describe('layer reorder buttons', () => {
       given(model),
       // rendered: saturation (top), contrast, exposure (bottom)
       tap((s) => {
-        vitestExpect(renderedOrder(s)).toEqual(
-          model.chain.map((l) => l.id).reverse(),
-        )
+        vitestExpect(renderedOrder(s)).toEqual(model.chain.map((l) => l.id).reverse())
       }),
       expect(nth(all.role('button', { name: 'Move up' }), 0)).toBeDisabled(),
       expect(nth(all.role('button', { name: 'Move up' }), 1)).toBeEnabled(),

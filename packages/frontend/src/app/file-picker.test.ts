@@ -4,6 +4,7 @@ import { MockImageBitmap } from '../vitest-setup'
 import { initialModel } from './model'
 import { update } from './update'
 import { view } from '../view'
+import { ErrorState } from './phase'
 import { PanZoom, RegisterCanvas } from '../editor/canvas-stage'
 import { RenderHandle } from '../gpu/backend'
 import { PickImageFile, DecodeImage, RenderChain } from './command'
@@ -21,15 +22,75 @@ import {
 const mockPngFile = new File(
   [
     new Uint8Array([
-      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, // PNG signature
-      0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
-      0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-      0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
-      0xde, 0x00, 0x00, 0x00, 0x0c, 0x49, 0x44, 0x41,
-      0x54, 0x08, 0xd7, 0x63, 0x60, 0x60, 0x60, 0x00,
-      0x00, 0x00, 0x04, 0x00, 0x01, 0x27, 0x34, 0x27,
-      0x24, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e,
-      0x44, 0xae, 0x42, 0x60, 0x82, // IEND chunk
+      0x89,
+      0x50,
+      0x4e,
+      0x47,
+      0x0d,
+      0x0a,
+      0x1a,
+      0x0a, // PNG signature
+      0x00,
+      0x00,
+      0x00,
+      0x0d,
+      0x49,
+      0x48,
+      0x44,
+      0x52, // IHDR chunk
+      0x00,
+      0x00,
+      0x00,
+      0x01,
+      0x00,
+      0x00,
+      0x00,
+      0x01,
+      0x08,
+      0x02,
+      0x00,
+      0x00,
+      0x00,
+      0x90,
+      0x77,
+      0x53,
+      0xde,
+      0x00,
+      0x00,
+      0x00,
+      0x0c,
+      0x49,
+      0x44,
+      0x41,
+      0x54,
+      0x08,
+      0xd7,
+      0x63,
+      0x60,
+      0x60,
+      0x60,
+      0x00,
+      0x00,
+      0x00,
+      0x04,
+      0x00,
+      0x01,
+      0x27,
+      0x34,
+      0x27,
+      0x24,
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x49,
+      0x45,
+      0x4e,
+      0x44,
+      0xae,
+      0x42,
+      0x60,
+      0x82, // IEND chunk
     ]),
   ],
   'test-image.png',
@@ -76,8 +137,8 @@ describe('Error state', () => {
   it('shows error text and a "Try another" button when decoding fails', () => {
     const model = {
       ...initialModel(),
+      phase: ErrorState(),
       source: {
-        status: 'error' as const,
         bitmap: null,
         width: 0,
         height: 0,
@@ -96,8 +157,8 @@ describe('Error state', () => {
   it('dispatches PickImageFile when "Try another" is clicked on error stage', () => {
     const model = {
       ...initialModel(),
+      phase: ErrorState(),
       source: {
-        status: 'error' as const,
         bitmap: null,
         width: 0,
         height: 0,
@@ -124,17 +185,11 @@ describe('File picker command resolution', () => {
       click(text('browse')),
       Command.expectHas(PickImageFile),
       // Resolve the file picker — user selected a file
-      Command.resolve(
-        PickImageFile,
-        SelectedImageFile({ file: mockPngFile }),
-      ),
+      Command.resolve(PickImageFile, SelectedImageFile({ file: mockPngFile })),
       // After file selected, the model goes to 'loading' and DecodeImage fires
       Command.expectHas(DecodeImage),
       // Resolve DecodeImage to end cleanly
-      Command.resolve(
-        DecodeImage,
-        ImageFailedToDecode({ error: 'Cancelled in test' }),
-      ),
+      Command.resolve(DecodeImage, ImageFailedToDecode({ error: 'Cancelled in test' })),
       Command.expectNone(),
     )
   })
@@ -150,16 +205,10 @@ describe('Image decode flow', () => {
 
       // Click browse, resolve file pick
       click(text('browse')),
-      Command.resolve(
-        PickImageFile,
-        SelectedImageFile({ file: mockPngFile }),
-      ),
+      Command.resolve(PickImageFile, SelectedImageFile({ file: mockPngFile })),
 
       // Resolve decode — image decoded successfully
-      Command.resolve(
-        DecodeImage,
-        ImageDecoded({ bitmap, width: 200, height: 150 }),
-      ),
+      Command.resolve(DecodeImage, ImageDecoded({ bitmap, width: 200, height: 150 })),
 
       // Empty chain → the passthrough render presents the source on the
       // canvas. The update dispatches RenderChain (stamp = revision 1); the
@@ -185,16 +234,10 @@ describe('Image decode flow', () => {
       given(initialModel()),
 
       click(text('browse')),
-      Command.resolve(
-        PickImageFile,
-        SelectedImageFile({ file: mockPngFile }),
-      ),
+      Command.resolve(PickImageFile, SelectedImageFile({ file: mockPngFile })),
 
       // Resolve decode with failure
-      Command.resolve(
-        DecodeImage,
-        ImageFailedToDecode({ error: 'Corrupt image file' }),
-      ),
+      Command.resolve(DecodeImage, ImageFailedToDecode({ error: 'Corrupt image file' })),
 
       // Error text should be visible
       expect(text('Failed to load image: Corrupt image file')).toExist(),

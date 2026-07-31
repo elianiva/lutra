@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { LutId } from '@lutra/engine'
+import { LutId, type LayerType } from '@lutra/engine'
 import { initialModel } from './model'
 import { update } from './update'
+import { Idle } from './phase'
 import { SelectedTool, ChangedDraftLut, ToggledLutPicker, ConfirmedDraft } from './message'
 import type { Catalog } from './message'
+import type { Model } from './model'
 
 // ---- helpers ----
 
@@ -22,41 +24,55 @@ const catalog: Catalog = [
   },
 ]
 
-const withCatalog = { ...initialModel(), catalog }
+// A model in the Idle phase (image loaded, nothing mid-flight) with the
+// catalog in place, so the LUT tool is pickable.
+const withCatalog = { ...initialModel(), phase: Idle(), catalog }
 
 // ---- tests ----
 
 describe('LUT layer flow', () => {
   it('keeps the LUT tool inert until the catalog loads', () => {
     const [model] = update(initialModel(), SelectedTool({ type: 'lut' }))
-    expect(model.draft).toBeNull()
+    expect(model.phase._tag).toBe('Empty')
   })
 
   it('creates a LUT draft with the first catalog entry and the picker open', () => {
     const [model] = update(withCatalog, SelectedTool({ type: 'lut' }))
-    expect(model.draft?.type).toBe('lut')
-    if (model.draft?.type === 'lut') {
-      expect(model.draft.lutId).toBe('luts/print/kodak_2393_cuspclip.cube')
-      expect(model.draft.amount).toBe(1)
+    expect(model.phase._tag).toBe('Drafting')
+    if (model.phase._tag === 'Drafting' && model.phase.layer.type === 'lut') {
+      expect(model.phase.layer.lutId).toBe('luts/print/kodak_2393_cuspclip.cube')
+      expect(model.phase.layer.amount).toBe(1)
     }
     expect(model.lutPickerOpen).toBe(true)
   })
 
-  it('swaps the draft LUT and re-renders', () => {
+  it('swaps the draft LUT through the machine and keeps the draft', () => {
     const [withDraft] = update(withCatalog, SelectedTool({ type: 'lut' }))
-    const [model] = update(withDraft, ChangedDraftLut({ lutId: LutId('luts/bw/agfa_apx_100.cube') }))
-    if (model.draft?.type === 'lut') {
-      expect(model.draft.lutId).toBe('luts/bw/agfa_apx_100.cube')
+    const [model] = update(
+      withDraft,
+      ChangedDraftLut({ lutId: LutId('luts/bw/agfa_apx_100.cube') }),
+    )
+    expect(model.phase._tag).toBe('Drafting')
+    if (model.phase._tag === 'Drafting' && model.phase.layer.type === 'lut') {
+      expect(model.phase.layer.lutId).toBe('luts/bw/agfa_apx_100.cube')
     }
-    // No image loaded: the render is skipped, but the draft holds the pick
-    expect(model.draft).not.toBeNull()
+  })
+
+  it('ignores a LUT swap on a non-LUT draft', () => {
+    const [withDraft] = update(withCatalog, SelectedTool({ type: 'exposure' }))
+    const [model] = update(
+      withDraft,
+      ChangedDraftLut({ lutId: LutId('luts/bw/agfa_apx_100.cube') }),
+    )
+    expect(model.phase._tag).toBe('Drafting')
+    expect(draftLayerType(model)).toBe('exposure')
   })
 
   it('confirms the draft into the chain and closes the picker', () => {
     const [withDraft] = update(withCatalog, SelectedTool({ type: 'lut' }))
     const [model] = update(withDraft, ConfirmedDraft())
     expect(model.chain).toHaveLength(1)
-    expect(model.draft).toBeNull()
+    expect(model.phase._tag).toBe('Selected')
     expect(model.lutPickerOpen).toBe(false)
     if (model.chain[0]?.type === 'lut') {
       expect(model.chain[0].lutId).toBe('luts/print/kodak_2393_cuspclip.cube')
@@ -79,3 +95,6 @@ describe('LUT layer flow', () => {
     expect(m3.lutPickerOpen).toBe(false)
   })
 })
+
+const draftLayerType = (model: Model): LayerType | undefined =>
+  model.phase._tag === 'Drafting' ? model.phase.layer.type : undefined

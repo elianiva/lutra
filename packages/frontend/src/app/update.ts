@@ -3,7 +3,8 @@ import { Command } from 'foldkit'
 import { GpuBackend } from '../gpu/backend'
 import { CanvasRef } from '../gpu/canvas-ref'
 import { LutStore } from '../luts/store'
-import { createLayerFor, PickImageFile, DecodeImage, RenderChain, ExportImage } from './command'
+import { PickImageFile, RenderChain, ExportImage } from './command'
+import { editorMachine } from './phase'
 import { LAYER_UI } from '../editor/layer-meta'
 import type { LayerId } from '@lutra/engine'
 import type { Model } from './model'
@@ -17,8 +18,7 @@ type Result = readonly [
 const ensureFieldIndex = (
   index: Record<LayerId, number>,
   layerId: LayerId,
-): Record<LayerId, number> =>
-  index[layerId] === undefined ? { ...index, [layerId]: 0 } : index
+): Record<LayerId, number> => (index[layerId] === undefined ? { ...index, [layerId]: 0 } : index)
 
 /** Fire a RenderChain command for the current chain + draft. Bumps `revision`
  *  so stale render results can be dropped. When a render is already in
@@ -27,6 +27,9 @@ const ensureFieldIndex = (
  *  which keeps the GPU queue from backing up during slider drags. */
 const renderNow = (model: Model): Result => {
   if (!model.source.bitmap) return [model, []]
+  // The draft lives in the phase machine (Drafting); the render pipeline
+  // still receives it as a plain layer appended after the chain.
+  const draft = model.phase._tag === 'Drafting' ? model.phase.layer : null
   const next: Model = { ...model, revision: model.revision + 1 }
   const stamp = next.revision
   if (model.renderPending) {
@@ -37,7 +40,7 @@ const renderNow = (model: Model): Result => {
     [
       RenderChain({
         layers: model.chain,
-        draft: model.draft,
+        draft,
         bitmap: model.source.bitmap,
         stamp,
       }),
@@ -45,8 +48,35 @@ const renderNow = (model: Model): Result => {
   ]
 }
 
-export const update = (model: Model, message: AppMessage): Result =>
-  Match.value(message).pipe(
+/**
+ * The editor's update loop. The interaction mode is a foldkit Machine
+ * (app/phase.ts): every message steps the machine first, and phase-gated
+ * branches bail when the message was `Ignored` (no edge from the current
+ * state). Data branches — chain ops, pan/zoom, rendering, export — ignore
+ * the machine result and just carry the (unchanged) phase forward.
+ */
+export const update = (model: Model, message: AppMessage): Result => {
+  // Data-level gate the machine can't see: the LUT tool needs the catalog
+  // (a LUT draft must reference a real lutId, and the first catalog entry is
+  // the default selection). Everything else the editor blocks — no image,
+  // loading, error, draft active — is a missing edge in the machine.
+  if (
+    message._tag === 'SelectedTool' &&
+    message.type === 'lut' &&
+    (model.catalog === null || model.catalog.length === 0)
+  ) {
+    return [model, []]
+  }
+
+  // Step the phase machine. `from` is the pre-step state: the branches that
+  // commit or discard a draft read the draft layer from it.
+  const from = model.phase
+  const result = editorMachine.step(model.phase, message)
+  const phase = result.state
+  const transitioned = result._tag === 'Transitioned'
+  const machineCommands = transitioned ? result.commands : []
+
+  return Match.value(message).pipe(
     Match.withReturnType<Result>(),
     Match.tagsExhaustive({
       // ---- routing ----
@@ -63,35 +93,37 @@ export const update = (model: Model, message: AppMessage): Result =>
       FilePickCancelled: () => [model, []],
 
       // ---- LUT library ----
-      CatalogLoaded: ({ catalog }) => [{ ...model, catalog }, []],
+      CatalogLoaded: ({ catalog }) => [{ ...model, phase, catalog }, []],
       CatalogFailed: () => [model, []],
 
-      SelectedImageFile: ({ file }) => [
-        { ...model, source: { ...model.source, status: 'loading', error: null } },
-        [DecodeImage({ file })],
-      ],
-      // Always render after decode — with an empty chain the assembler emits a
-      // passthrough shader, so the canvas presents the source itself. The
-      // RenderChain command yields `Render.afterCommit`, so the canvas is
-      // mounted by the time it runs.
-      ImageDecoded: ({ bitmap, width, height }) => {
-        const next: Model = {
-          ...model,
-          source: { status: 'loaded', bitmap, width, height, error: null },
-        }
-        return renderNow(next)
+      // The machine's edge already dispatched DecodeImage (its args come from
+      // the message); the branch only carries the new phase forward. A file
+      // selection anywhere but Empty/Error/Loading is ignored.
+      SelectedImageFile: () => {
+        if (!transitioned) return [model, []]
+        return [{ ...model, phase, source: { ...model.source, error: null } }, machineCommands]
       },
-      ImageFailedToDecode: ({ error }) => [
-        { ...model, source: { ...model.source, status: 'error', error } },
-        [],
-      ],
+      // A decode can only land while Loading (or re-land in Idle/Error for
+      // the double-pick race). A completion that lands in Empty — after a
+      // ClearedImage — has no edge and is dropped: a stale decode cannot
+      // resurrect a cleared image.
+      ImageDecoded: ({ bitmap, width, height }) => {
+        if (!transitioned) return [model, []]
+        return renderNow({ ...model, phase, source: { bitmap, width, height, error: null } })
+      },
+      ImageFailedToDecode: ({ error }) => {
+        if (!transitioned) return [model, []]
+        return [{ ...model, phase, source: { ...model.source, error } }, []]
+      },
+      // The machine moves the phase (draft/selection discarded); the branch
+      // resets the model data that only makes sense with an image. In Empty
+      // the machine ignores the clear and the resets are no-ops.
       ClearedImage: () => [
         {
           ...model,
-          source: { status: 'empty', bitmap: null, width: 0, height: 0, error: null },
+          phase,
+          source: { bitmap: null, width: 0, height: 0, error: null },
           chain: [],
-          draft: null,
-          selectedLayerId: null,
           activeFieldIndex: {},
           renderPending: false,
           renderedStamp: 0,
@@ -102,127 +134,121 @@ export const update = (model: Model, message: AppMessage): Result =>
 
       // ---- canvas ----
       ScaledCanvas: ({ scale, offsetX, offsetY }) => [
-        { ...model, scale, offsetX, offsetY },
+        { ...model, phase, scale, offsetX, offsetY },
         [],
       ],
 
       // ---- tool panel / draft ----
       SelectedTool: ({ type }) => {
-        if (model.draft) return [model, []]
-        // The LUT tool needs the catalog: the draft must reference a real
-        // lutId, and the first catalog entry is the default selection.
+        // The machine built the draft (Drafting); the branch fills in what
+        // needs model data: the LUT default selection and the field index.
+        if (!transitioned || phase._tag !== 'Drafting') return [model, []]
+        const layer = phase.layer
+        let next: Model = { ...model, phase }
         if (type === 'lut') {
           const catalog = model.catalog
+          // Unreachable — the pre-guard above blocks LUT picks without a
+          // catalog before the machine steps. Kept for the type-checker.
           if (!catalog || catalog.length === 0) return [model, []]
-          const layer = createLayerFor(type)
-          const withLut = { ...layer, lutId: catalog[0]!.lut_file }
-          return renderNow({
-            ...model,
-            draft: withLut,
-            selectedLayerId: withLut.id,
-            activeFieldIndex: ensureFieldIndex(model.activeFieldIndex, withLut.id),
+          // The machine built this draft from a lut pick, so the layer is the
+          // LUT variant; the check narrows it for the spread below.
+          if (layer.type !== 'lut') return [model, []]
+          next = {
+            ...next,
+            phase: { ...phase, layer: { ...layer, lutId: catalog[0]!.lut_file } },
             lutPickerOpen: true,
-          })
+          }
         }
-        const layer = createLayerFor(type)
-        const withIndex = {
-          ...model,
-          draft: layer,
-          selectedLayerId: layer.id,
+        return renderNow({
+          ...next,
           activeFieldIndex: ensureFieldIndex(model.activeFieldIndex, layer.id),
-        }
-        return renderNow(withIndex)
+        })
       },
       ConfirmedDraft: () => {
-        if (!model.draft) return [model, []]
+        if (!transitioned || from._tag !== 'Drafting') return [model, []]
+        // The machine moved the phase to Selected (focused on the draft); the
+        // branch commits the draft layer into the chain.
         return renderNow({
           ...model,
-          chain: [...model.chain, model.draft],
-          draft: null,
-          selectedLayerId: model.draft.id,
+          phase,
+          chain: [...model.chain, from.layer],
           lutPickerOpen: false,
         })
       },
       CancelledDraft: () => {
-        if (!model.draft) return [model, []]
-        const draftId = model.draft.id
-        const { [draftId]: _removed, ...restIndex } = model.activeFieldIndex
+        if (!transitioned || from._tag !== 'Drafting') return [model, []]
+        const { [from.layer.id]: _removed, ...restIndex } = model.activeFieldIndex
         return renderNow({
           ...model,
-          draft: null,
-          selectedLayerId: null,
+          phase,
           activeFieldIndex: restIndex,
           lutPickerOpen: false,
         })
       },
-      UpdatedDraftParam: ({ field, value }) => {
-        if (!model.draft) return [model, []]
-        return renderNow({
-          ...model,
-          draft: { ...model.draft, [field]: value },
-        })
+      UpdatedDraftParam: () => {
+        // The machine already applied the param to the draft layer in the
+        // new phase; the branch only re-renders.
+        if (!transitioned || phase._tag !== 'Drafting') return [model, []]
+        return renderNow({ ...model, phase })
       },
-      ChangedDraftLut: ({ lutId }) => {
-        const draft = model.draft
-        if (!draft || draft.type !== 'lut') return [model, []]
-        return renderNow({
-          ...model,
-          draft: { ...draft, lutId },
-        })
+      ChangedDraftLut: () => {
+        if (!transitioned || phase._tag !== 'Drafting') return [model, []]
+        return renderNow({ ...model, phase })
       },
       ToggledLutPicker: () => {
-        const draft = model.draft
-        // The picker is only shown for a LUT draft or a selected committed
-        // LUT layer (when no draft is active) — anything else ignores the toggle.
-        const lutDraft = draft?.type === 'lut'
+        const lutDraft = phase._tag === 'Drafting' && phase.layer.type === 'lut'
         const lutSelected =
-          !draft && model.chain.some((l) => l.id === model.selectedLayerId && l.type === 'lut')
+          phase._tag === 'Selected' &&
+          model.chain.some((l) => l.id === phase.layerId && l.type === 'lut')
         if (!lutDraft && !lutSelected) return [model, []]
-        return [{ ...model, lutPickerOpen: !model.lutPickerOpen }, []]
+        return [{ ...model, phase, lutPickerOpen: !model.lutPickerOpen }, []]
       },
 
       // ---- committed chain ----
-      SelectedLayer: ({ id }) => [
-        { ...model, selectedLayerId: id, draft: null, lutPickerOpen: false },
-        [],
-      ],
+      SelectedLayer: () => {
+        // The machine moved to Selected; the branch closes the picker. A
+        // selection without an image (or while a draft is active) has no
+        // edge and is ignored.
+        if (!transitioned) return [model, []]
+        return [{ ...model, phase, lutPickerOpen: false }, []]
+      },
       RemovedLayer: ({ id }) => {
         const { [id]: _r, ...restIndex } = model.activeFieldIndex
+        // Removing the focused layer also deselects it — the machine's
+        // Selected → Idle edge handles that; any other removal leaves the
+        // phase alone.
         return renderNow({
           ...model,
+          phase,
           chain: model.chain.filter((l) => l.id !== id),
-          selectedLayerId: model.selectedLayerId === id ? null : model.selectedLayerId,
           activeFieldIndex: restIndex,
         })
       },
-      ReorderedLayer: ({ from, to }) => {
-        if (from === to) return [model, []]
+      ReorderedLayer: ({ from: fromIndex, to }) => {
+        if (fromIndex === to) return [model, []]
         const arr = [...model.chain]
-        const [moved] = arr.splice(from, 1)
+        const [moved] = arr.splice(fromIndex, 1)
         if (!moved) return [model, []]
         arr.splice(to, 0, moved)
-        return renderNow({ ...model, chain: arr })
+        return renderNow({ ...model, phase, chain: arr })
       },
       ToggledLayerVisibility: ({ id }) =>
         renderNow({
           ...model,
-          chain: model.chain.map((l) =>
-            l.id === id ? { ...l, ...{ visible: !l.visible } } : l,
-          ),
+          phase,
+          chain: model.chain.map((l) => (l.id === id ? { ...l, ...{ visible: !l.visible } } : l)),
         }),
       UpdatedLayerParam: ({ id, field, value }) =>
         renderNow({
           ...model,
-          chain: model.chain.map((l) =>
-            l.id === id ? { ...l, [field]: value } : l,
-          ),
+          phase,
+          chain: model.chain.map((l) => (l.id === id ? { ...l, [field]: value } : l)),
         }),
       ChangedLayerLut: ({ id, lutId }) =>
         renderNow({
           ...model,
-          chain: model.chain.map((l) =>
-            l.id === id ? { ...l, ...{ lutId } } : l,
-          ),
+          phase,
+          chain: model.chain.map((l) => (l.id === id ? { ...l, ...{ lutId } } : l)),
         }),
       CycledToggledField: ({ id }) => {
         const layer = model.chain.find((l) => l.id === id)
@@ -234,6 +260,7 @@ export const update = (model: Model, message: AppMessage): Result =>
         return [
           {
             ...model,
+            phase,
             activeFieldIndex: {
               ...model.activeFieldIndex,
               [id]: (current + 1) % keys.length,
@@ -254,15 +281,15 @@ export const update = (model: Model, message: AppMessage): Result =>
         // The stale frame's handle is NOT stored: `lastRender` always points
         // at the frame the canvas is actually showing.
         if (stamp < model.revision) {
-          return renderNow({ ...model, renderPending: false })
+          return renderNow({ ...model, phase, renderPending: false })
         }
         return [
-          { ...model, renderPending: false, renderedStamp: stamp, lastRender: handle },
+          { ...model, phase, renderPending: false, renderedStamp: stamp, lastRender: handle },
           [],
         ]
       },
       RenderFailed: ({ reason }) => [
-        { ...model, renderPending: false, source: { ...model.source, error: reason } },
+        { ...model, phase, renderPending: false, source: { ...model.source, error: reason } },
         [],
       ],
 
@@ -277,3 +304,4 @@ export const update = (model: Model, message: AppMessage): Result =>
       ExportFailed: () => [model, []],
     }),
   )
+}
