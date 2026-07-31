@@ -6,6 +6,8 @@ import { renderContrast } from "../shaders/bodies/contrast"
 import { renderSaturation } from "../shaders/bodies/saturation"
 import { renderVignette } from "../shaders/bodies/vignette"
 import { renderChromaticAberration } from "../shaders/bodies/chromatic-aberration"
+import { renderWhiteBalance } from "../shaders/bodies/white-balance"
+import { renderGrain } from "../shaders/bodies/grain"
 
 describe("generateChainSource", () => {
   it("generates a passthrough shader for empty chain", () => {
@@ -17,6 +19,8 @@ describe("generateChainSource", () => {
     expect(result.uniforms).toHaveLength(0)
     // No srgb conversions needed for passthrough
     expect(result.source).toContain("fn main")
+    // Nothing references the frame counter, so binding 3 is not used
+    expect(result.usesFrame).toBe(false)
   })
 
   it("generates a shader with one layer", () => {
@@ -120,5 +124,44 @@ describe("generateChainSource", () => {
     expect(result.source).toContain("l0_stops: f32")
     expect(result.source).toContain("l1_amount: f32")
     expect(result.source).toContain("l1_size: f32")
+  })
+
+  it("flags usesFrame when a body reads the frame counter", () => {
+    const exposure: ChainLayerInfo[] = [
+      { type: "exposure", body: renderExposure, fieldKeys: ["stops"] },
+    ]
+    expect(generateChainSource(exposure).usesFrame).toBe(false)
+
+    const withGrain: ChainLayerInfo[] = [
+      { type: "exposure", body: renderExposure, fieldKeys: ["stops"] },
+      { type: "grain", body: renderGrain, fieldKeys: ["amount"] },
+    ]
+    expect(generateChainSource(withGrain).usesFrame).toBe(true)
+  })
+
+  it("binds every uniform reference used by a body to u_params", () => {
+    // WGSL struct members are only in scope through the struct variable, so
+    // each `l{layerIndex}_{field}` reference a body makes must be bound to
+    // `u_params.<field>` before the bodies are inlined. Without these aliases
+    // the shader fails to compile (unknown identifier), which surfaces in the
+    // browser as an invalid BindGroupLayout/pipeline error cascade.
+    const layers: ChainLayerInfo[] = [
+      { type: "exposure", body: renderExposure, fieldKeys: ["stops"] },
+      { type: "contrast", body: renderContrast, fieldKeys: ["amount"] },
+      { type: "whiteBalance", body: renderWhiteBalance, fieldKeys: ["temp", "tint"] },
+      { type: "saturation", body: renderSaturation, fieldKeys: ["amount"] },
+      { type: "vignette", body: renderVignette, fieldKeys: ["amount", "size"] },
+      { type: "chromaticAberration", body: renderChromaticAberration, fieldKeys: ["amount"] },
+    ]
+    const result = generateChainSource(layers)
+    const tokens = result.source.match(/l\d+_\w+/g) ?? []
+    const unique: string[] = []
+    for (const token of tokens) {
+      if (!unique.includes(token)) unique.push(token)
+    }
+    expect(unique.length).toBeGreaterThan(0)
+    for (const token of unique) {
+      expect(result.source).toContain(`let ${token} = u_params.${token};`)
+    }
   })
 })

@@ -18,6 +18,12 @@ export default defineConfig({
   },
   optimizeDeps: {
     entries: ['src/entry.ts'],
-    include: ['@lutra/engine'],
+    // NOTE: @lutra/engine is intentionally NOT in `include`. It is a
+    // build-less workspace package aliased to its TS source above, so
+    // Vite transforms it on the fly. Pre-bundling it here would cache a
+    // stale copy in node_modules/.vite and the dev server would keep
+    // serving outdated engine code after edits (the `optimizeDeps.include`
+    // cache does not reliably re-optimize when files inside a linked
+    // package change).
   },
 })

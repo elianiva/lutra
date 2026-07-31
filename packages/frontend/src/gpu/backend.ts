@@ -52,7 +52,6 @@ interface CachedPipeline {
   readonly module: GPUShaderModule
   readonly pipeline: GPUComputePipeline
   readonly layout: GPUBindGroupLayout
-  readonly hasParams: boolean
 }
 
 const roundUp = (n: number, to: number) => Math.ceil(n / to) * to
@@ -77,7 +76,6 @@ export const GpuBackendLive = Layer.effect(
         module,
         pipeline,
         layout: pipeline.getBindGroupLayout(0),
-        hasParams: shader.uniforms.length > 0,
       }
       pipelineCache.set(shader.source, built)
       return built
@@ -136,7 +134,13 @@ export const GpuBackendLive = Layer.effect(
             return yield* Effect.fail(new GpuError({ message: 'Empty source bitmap' }))
           }
 
-          const { pipeline, layout, hasParams } = getPipeline(shader)
+          const { pipeline, layout } = getPipeline(shader)
+          // With `layout: 'auto'` the pipeline only exposes bindings the
+          // shader statically uses: binding 3 (frame) exists only when a
+          // body reads `u_frame` (currently grain), and binding 4 (params)
+          // only when there are uniform slots. Entries must mirror that.
+          const usesFrame = shader.usesFrame
+          const hasParams = shader.uniforms.length > 0
 
           // Source texture (rgba8unorm, texture binding).
           const srcTex = device.createTexture({
@@ -170,25 +174,28 @@ export const GpuBackendLive = Layer.effect(
           })
           device.queue.writeBuffer(resolutionBuffer, 0, new Float32Array([width, height]))
 
-          const frameBuffer = device.createBuffer({
-            size: 16,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-          })
-          device.queue.writeBuffer(
-            frameBuffer,
-            0,
-            new Uint32Array([frame >>> 0]),
-          )
-
-          // Tracked alongside `entries` so it can be destroyed deterministically.
+          // Tracked alongside `entries` so they can be destroyed deterministically.
+          let frameBuffer: GPUBuffer | null = null
           let paramsBuffer: GPUBuffer | null = null
 
           const entries: Array<GPUBindGroupEntry> = [
             { binding: 0, resource: srcTex.createView() },
             { binding: 1, resource: dstTex.createView() },
             { binding: 2, resource: { buffer: resolutionBuffer } },
-            { binding: 3, resource: { buffer: frameBuffer } },
           ]
+
+          if (usesFrame) {
+            frameBuffer = device.createBuffer({
+              size: 16,
+              usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            })
+            device.queue.writeBuffer(
+              frameBuffer,
+              0,
+              new Uint32Array([frame >>> 0]),
+            )
+            entries.push({ binding: 3, resource: { buffer: frameBuffer } })
+          }
 
           if (hasParams) {
             const paramsSize = roundUp(uniforms.length * 4, 16)
@@ -223,7 +230,7 @@ export const GpuBackendLive = Layer.effect(
           srcTex.destroy()
           dstTex.destroy()
           resolutionBuffer.destroy()
-          frameBuffer.destroy()
+          frameBuffer?.destroy()
           paramsBuffer?.destroy()
 
           return bitmap

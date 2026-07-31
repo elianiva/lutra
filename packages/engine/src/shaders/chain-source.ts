@@ -20,6 +20,13 @@ export interface ChainShader {
    * float slots to write when a layer parameter changes.
    */
   readonly uniforms: ReadonlyArray<UniformSlot>
+  /**
+   * Whether any layer body reads the frame counter (`u_frame`). With
+   * `layout: 'auto'` the pipeline only exposes bindings the shader
+   * statically uses, so the frontend must include the binding-3 entry
+   * (and allocate its buffer) only when this is true.
+   */
+  readonly usesFrame: boolean
 }
 
 export interface UniformSlot {
@@ -58,6 +65,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 `,
       uniforms: [],
+      usesFrame: false,
     }
   }
 
@@ -75,8 +83,20 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   const structFields = uniformsCorrected.map((u) => `  l${u.layerIndex}_${u.field}: f32,`)
   const structDef = `struct LayerParams {\n${structFields.join("\n")}\n}`
 
+  // WGSL struct members are only in scope through the struct variable, but
+  // bodies reference their params unqualified (e.g. `l0_stops`). Bind each
+  // member to the bare name inside `main` before the bodies are inlined.
+  const uniformAliases = uniformsCorrected
+    .map((u) => `  let l${u.layerIndex}_${u.field} = u_params.l${u.layerIndex}_${u.field};`)
+    .join("\n")
+
   // Generate bodies
   const bodyBlocks = layers.map((layer, i) => layer.body(i))
+
+  // `u_frame` is only referenced by bodies that animate (currently grain);
+  // an auto pipeline layout omits bindings the shader never statically uses,
+  // so the frontend must know whether binding 3 exists.
+  const usesFrame = bodyBlocks.some((body) => body.includes("u_frame"))
 
   // Build the full source
   const source = `
@@ -101,6 +121,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   var color = srgbToLinear(src.rgb);
   let alpha = src.a;
 
+${uniformAliases}
 ${bodyBlocks.join("\n")}
 
   let outColor = linearToSrgb(clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)));
@@ -108,5 +129,5 @@ ${bodyBlocks.join("\n")}
 }
 `
 
-  return { source, uniforms: uniformsCorrected }
+  return { source, uniforms: uniformsCorrected, usesFrame }
 }
