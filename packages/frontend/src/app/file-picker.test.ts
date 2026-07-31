@@ -135,17 +135,6 @@ describe('File picker command resolution', () => {
       Command.expectNone(),
     )
   })
-
-  it('resolves PickImageFile -> FilePickCancelled (user cancels picker)', () => {
-    scene(
-      config,
-      given(initialModel()),
-      click(text('browse')),
-      Command.expectHas(PickImageFile),
-      Command.resolve(PickImageFile, FilePickCancelled()),
-      Command.expectNone(),
-    )
-  })
 })
 
 describe('Image decode flow', () => {

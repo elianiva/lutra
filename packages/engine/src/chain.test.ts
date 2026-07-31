@@ -4,6 +4,7 @@ import {
   nextLayerId,
   _resetLayerCounter,
   makeRegistry,
+  LAYER_TYPES,
 } from "./layers"
 import type { Layer } from "./layers"
 import {
@@ -56,33 +57,31 @@ describe("createLayer", () => {
     _resetLayerCounter()
   })
 
-  it("creates an exposure layer with default values", () => {
-    const layer = createLayer("exposure", registry)
-    expect(layer.type).toBe("exposure")
-    expect(layer.visible).toBe(true)
-    expect(layer.id).toMatch(/^layer-\d+$/)
-    expect(field(layer, "stops")).toBe(0)
-  })
-
-  it("creates a whiteBalance layer with both fields", () => {
-    const layer = createLayer("whiteBalance", registry)
-    expect(layer.type).toBe("whiteBalance")
-    expect(field(layer, "temp")).toBe(0)
-    expect(field(layer, "tint")).toBe(0)
-  })
-
-  it("creates a vignette layer with correct defaults", () => {
-    const layer = createLayer("vignette", registry)
-    expect(layer.type).toBe("vignette")
-    expect(field(layer, "amount")).toBe(0)
-    expect(field(layer, "size")).toBe(0.6)
-  })
-
-  it("creates a grain layer with all defaults 0", () => {
-    const layer = createLayer("grain", registry)
-    expect(field(layer, "texture")).toBe(0)
-    expect(field(layer, "size")).toBe(0)
-    expect(field(layer, "blur")).toBe(0)
+  it("creates every layer type with its registry defaults", () => {
+    // Defaults are a product contract (e.g. vignette size 0.6, LUT amount 1
+    // = full apply), so every type is pinned, not just a sample. LAYER_TYPES
+    // drives the loop, so a type missing from `defaults` fails the test.
+    const defaults: Record<string, Record<string, number>> = {
+      exposure: { stops: 0 },
+      contrast: { amount: 0 },
+      shadows: { amount: 0 },
+      highlights: { amount: 0 },
+      whiteBalance: { temp: 0, tint: 0 },
+      saturation: { amount: 0 },
+      grain: { texture: 0, size: 0, blur: 0 },
+      vignette: { amount: 0, size: 0.6 },
+      chromaticAberration: { amount: 0 },
+      clarity: { amount: 0 },
+      lut: { amount: 1 },
+    }
+    for (const type of LAYER_TYPES) {
+      const layer = createLayer(type, registry)
+      expect(layer.type).toBe(type)
+      expect(layer.visible).toBe(true)
+      for (const [key, expected] of Object.entries(defaults[type]!)) {
+        expect(field(layer, key)).toBe(expected)
+      }
+    }
   })
 
   it("assigns unique ids", () => {
@@ -91,20 +90,10 @@ describe("createLayer", () => {
     expect(a.id).not.toBe(b.id)
   })
 
-  it("throws on unknown type", () => {
+  it("throws on an unknown type", () => {
     // An unknown type key reaches the registry lookup as a runtime string;
     // Object.create(null) supplies an arbitrary key without an assertion.
     expect(() => createLayer(Object.create(null), registry)).toThrow()
-  })
-
-  it("creates every layer type", () => {
-    const types = ["exposure", "contrast", "shadows", "highlights", "whiteBalance",
-      "saturation", "grain", "vignette", "chromaticAberration", "clarity", "lut"] as const
-    for (const t of types) {
-      const layer = createLayer(t, registry)
-      expect(layer.type).toBe(t)
-      expect(layer.visible).toBe(true)
-    }
   })
 })
 

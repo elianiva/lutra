@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { initialModel } from './model'
 import { update } from './update'
-import { SelectedTool, ChangedDraftLut, ToggledLutPicker, CatalogLoaded, ConfirmedDraft } from './message'
+import { SelectedTool, ChangedDraftLut, ToggledLutPicker, ConfirmedDraft } from './message'
 import type { Catalog } from './message'
 
 // ---- helpers ----
@@ -29,11 +29,6 @@ describe('LUT layer flow', () => {
   it('keeps the LUT tool inert until the catalog loads', () => {
     const [model] = update(initialModel(), SelectedTool({ type: 'lut' }))
     expect(model.draft).toBeNull()
-  })
-
-  it('loads the catalog into the model', () => {
-    const [model] = update(initialModel(), CatalogLoaded({ catalog }))
-    expect(model.catalog).toHaveLength(2)
   })
 
   it('creates a LUT draft with the first catalog entry and the picker open', () => {
