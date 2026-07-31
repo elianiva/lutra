@@ -3,7 +3,7 @@ import { Command, Mount, click, expect, given, scene, selector, text } from 'fol
 import { initialModel } from './model'
 import { update } from './update'
 import { view } from '../view'
-import { PanZoom } from '../editor/canvasStage'
+import { PanZoom } from '../editor/canvas-stage'
 import { PickImageFile, DecodeImage, RenderChain } from './command'
 import {
   FilePickCancelled,

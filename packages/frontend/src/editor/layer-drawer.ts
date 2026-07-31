@@ -1,7 +1,7 @@
 import type { HtmlBuilder } from 'foldkit/html'
 import { ArrowDown, ArrowUp, Eye, EyeOff, Trash2, X, Check } from 'lucide'
 import { icon } from '../components/icon'
-import { LAYER_UI, fieldBounds } from './layerMeta'
+import { LAYER_UI, fieldBounds } from './layer-meta'
 import {
   SelectedLayer,
   RemovedLayer,

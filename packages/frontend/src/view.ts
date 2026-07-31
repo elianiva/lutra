@@ -2,10 +2,10 @@ import { Html } from 'foldkit'
 import type { HtmlBuilder } from 'foldkit/html'
 import type { Model } from './app/model'
 import type { AppMessage } from './app/message'
-import { topBar } from './editor/topBar'
-import { toolPanel } from './editor/toolPanel'
-import { layerDrawer } from './editor/layerDrawer'
-import { canvasStage } from './editor/canvasStage'
+import { topBar } from './editor/top-bar'
+import { toolPanel } from './editor/tool-panel'
+import { layerDrawer } from './editor/layer-drawer'
+import { canvasStage } from './editor/canvas-stage'
 
 export const view = (model: Model, h: HtmlBuilder<AppMessage>): Html.Document => ({
   title: 'Lutra',

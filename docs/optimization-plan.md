@@ -120,7 +120,7 @@ structural inefficiencies above dominate; the shader-text tweaks are the tail.
 - Manual pass: drag a slider on a 12MP image; confirm no lag, low CPU during
   drag, export still correct.
 - Update ADR `0001-compute-shader-pipeline.md` (display path = compute + blit)
-  and CONTEXT.md (pipeline, coalescing, persistent resources).
+  and context.md (pipeline, coalescing, persistent resources).
 
 ## 4. Risks / notes
 

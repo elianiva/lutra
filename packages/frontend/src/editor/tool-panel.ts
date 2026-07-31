@@ -1,6 +1,6 @@
 import type { HtmlBuilder } from 'foldkit/html'
 import { icon } from '../components/icon'
-import { LAYER_UI, LAYER_TYPES_ORDER } from './layerMeta'
+import { LAYER_UI, LAYER_TYPES_ORDER } from './layer-meta'
 import { SelectedTool } from '../app/message'
 import type { AppMessage } from '../app/message'
 import type { LayerType } from '@lutra/engine'

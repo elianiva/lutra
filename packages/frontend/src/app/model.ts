@@ -4,7 +4,7 @@ import { SourceImage } from './message'
 import { Layer } from '@lutra/engine'
 
 // Surfaced layers (committed) render through the chain; a draft layer renders
-// on top in preview and is discarded on cancel, per CONTEXT.md's draft flow.
+// on top in preview and is discarded on cancel, per context.md's draft flow.
 // Both the chain and the draft render live in the GPU pipeline; the model
 // keeps draft null whenever no tool is mid-creation.
 

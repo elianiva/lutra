@@ -12,7 +12,7 @@ import {
   ExportFailed,
 } from './message'
 import { SelectedImageFile } from './message'
-import { ENGINE_REGISTRY } from '../editor/layerMeta'
+import { ENGINE_REGISTRY } from '../editor/layer-meta'
 
 // The engine owns the WGSL body renderers and builds the render request
 // (shader + uniforms + source); the frontend owns the WebGPU device and the
