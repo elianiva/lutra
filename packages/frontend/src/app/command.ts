@@ -1,6 +1,20 @@
 import { Effect, Option, Ref, Schema } from 'effect'
 import { Command, File as FoldkitFile, Render } from 'foldkit'
-import { createLayer, createRenderRequest, GpuError, Layer, type LayerType, type LutCube, type LutId } from '@lutra/engine'
+import * as Persistence from 'effect/unstable/persistence/KeyValueStore'
+import {
+  createLayer,
+  createRenderRequest,
+  ExportSettings,
+  defaultExportSettings,
+  mimeFor,
+  EncodeError,
+  GpuError,
+  ImageEncoder,
+  Layer,
+  type LayerType,
+  type LutCube,
+  type LutId,
+} from '@lutra/engine'
 import { GpuBackend, RenderHandle } from '../gpu/backend'
 import { CanvasRef } from '../gpu/canvas-ref'
 import { LutStore } from '../luts/store'
@@ -10,8 +24,14 @@ import {
   ImageFailedToDecode,
   RenderedFrame,
   RenderFailed,
-  ExportFinished,
-  ExportFailed,
+  ExportSnapshotted,
+  ExportSnapshotFailed,
+  ExportPrepared,
+  ExportEncodeFailed,
+  ExportDownloaded,
+  ExportSettingsLoaded,
+  ExportUrlRevoked,
+  ExportSettingsSaved,
   CatalogLoaded,
   CatalogFailed,
 } from './message'
@@ -159,66 +179,110 @@ export const RenderChain = Command.define('RenderChain', {
     ),
 })
 
+// ---- export dialog ----
+
+const EXPORT_SETTINGS_KEY = 'exportSettings'
+
 /**
- * Encode the last rendered frame as PNG and trigger a browser download. The
- * GPU backend reads the frame back to an ImageBitmap (the one place the
- * display path's no-readback rule is relaxed — export is a button click, not
- * a slider tick). Uses `HTMLCanvasElement.toBlob` (callback) wrapped in a
- * promise since the DOM canvas lacks `convertToBlob` (that's an
- * `OffscreenCanvas` method).
- *
- * Failure cases are handled separately: the snapshot `GpuError`, the missing
- * 2d context, and the encode error each map to `ExportFailed`. Defects crash.
+ * Read the frame identified by `handle` back from the GPU once, when the
+ * export dialog opens. The ImageData is cached in the model for the dialog's
+ * lifetime so pressing Export again re-encodes without another readback.
  */
-export const ExportImage = Command.define('ExportImage', {
-  args: {
-    // The exact frame to export — the model holds the handle of the last
-    // rendered frame and hands it to this command (see update's
-    // ExportRequested handler).
-    handle: Schema.instanceOf(RenderHandle),
-  },
-  messages: [ExportFinished, ExportFailed],
+export const SnapshotForExport = Command.define('SnapshotForExport', {
+  args: { handle: Schema.instanceOf(RenderHandle) },
+  messages: [ExportSnapshotted, ExportSnapshotFailed],
   execute: ({ handle }) =>
     Effect.gen(function* () {
       const backend = yield* GpuBackend
-      const bitmap = yield* backend.snapshot(handle)
-      const canvas = document.createElement('canvas')
-      canvas.width = bitmap.width
-      canvas.height = bitmap.height
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return ExportFailed({ reason: 'No 2d context for export' })
-      ctx.drawImage(bitmap, 0, 0)
-      const blob = yield* Effect.tryPromise({
-        try: () =>
-          new Promise<Blob>((resolve, reject) => {
-            canvas.toBlob((b) => {
-              if (b) resolve(b)
-              else reject(new Error('Export encode failed'))
-            }, 'image/png')
-          }),
-        catch: (cause) => new Error(errMsg(cause)),
-      })
+      const image = yield* backend.snapshot(handle)
+      return ExportSnapshotted({ image })
+    }).pipe(
+      Effect.catchIf(
+        (err): err is GpuError => err instanceof GpuError,
+        (err) => Effect.succeed(ExportSnapshotFailed({ reason: err.message })),
+      ),
+    ),
+})
+
+/**
+ * Encode the export frame with the given settings and report the resulting
+ * size + blob URL. Runs once per Export press — there is no live size
+ * preview (encoding for it was too slow). The previous blob URL is revoked
+ * here — the model's `exportUrl` is only ever replaced, never leaked.
+ */
+export const PrepareExport = Command.define('PrepareExport', {
+  args: {
+    image: Schema.instanceOf(ImageData),
+    settings: ExportSettings,
+    previousUrl: Schema.NullOr(Schema.String),
+  },
+  messages: [ExportPrepared, ExportEncodeFailed],
+  execute: ({ image, settings, previousUrl }) =>
+    Effect.gen(function* () {
+      if (previousUrl) yield* Effect.sync(() => URL.revokeObjectURL(previousUrl))
+      const encoder = yield* ImageEncoder
+      const bytes = yield* encoder.encode({ image, settings })
+      // The bytes' buffer came from the worker as a transferred ArrayBuffer;
+      // TS can't know that, hence the BlobPart assertion.
+      // oxlint-disable-next-line consistent-type-assertions
+      const blob = new Blob([bytes as BlobPart], { type: mimeFor(settings.format) })
       const url = URL.createObjectURL(blob)
+      return ExportPrepared({ sizeBytes: bytes.byteLength, url })
+    }).pipe(
+      Effect.catchIf(
+        (err): err is EncodeError => err instanceof EncodeError,
+        (err) => Effect.succeed(ExportEncodeFailed({ reason: err.message })),
+      ),
+    ),
+})
+
+/** Trigger the browser download of the encoded blob (the url stays alive
+ *  until the dialog closes — the tweak-and-re-export loop needs it). */
+export const ExportDownload = Command.define('ExportDownload', {
+  args: { url: Schema.String, filename: Schema.String },
+  messages: [ExportDownloaded],
+  execute: ({ url, filename }) =>
+    Effect.sync(() => {
       const a = document.createElement('a')
       a.href = url
-      a.download = 'lutra-edit.png'
+      a.download = filename
       a.click()
-      // Delay the revoke: browsers start the download asynchronously, and
-      // revoking the object URL in the same tick can abort it.
-      yield* Effect.callback<void>((resume) => {
-        const handle = setTimeout(() => resume(Effect.void), 500)
-        return Effect.sync(() => clearTimeout(handle))
-      })
-      URL.revokeObjectURL(url)
-      return ExportFinished({ url })
-    }).pipe(
-    Effect.catchIf(
-      (err): err is GpuError => err instanceof GpuError,
-      (err) => Effect.succeed(ExportFailed({ reason: err.message })),
-    ),
-    Effect.catchIf(
-      (err): err is Error => err instanceof Error,
-      (err) => Effect.succeed(ExportFailed({ reason: errMsg(err) })),
-    ),
-  ),
+      return ExportDownloaded({ url })
+    }),
+})
+
+/** Revoke a blob URL (dialog close, stale encode result). */
+export const RevokeExportUrl = Command.define('RevokeExportUrl', {
+  args: { url: Schema.String },
+  messages: [ExportUrlRevoked],
+  execute: ({ url }) => Effect.sync(() => URL.revokeObjectURL(url)).pipe(Effect.as(ExportUrlRevoked())),
+})
+
+/** Restore persisted export settings (dispatched once at startup). */
+export const LoadExportSettings = Command.define('LoadExportSettings', {
+  messages: [ExportSettingsLoaded],
+  execute: Effect.gen(function* () {
+    const store = yield* Persistence.KeyValueStore
+    const schemaStore = Persistence.toSchemaStore(store, ExportSettings)
+    // `Effect.option` wraps the success (itself an Option) — flatten.
+    const saved = Option.flatten(yield* schemaStore.get(EXPORT_SETTINGS_KEY).pipe(
+      // Missing or corrupt settings fall back to defaults.
+      Effect.option,
+    ))
+    return ExportSettingsLoaded({ settings: Option.getOrElse(defaultExportSettings)(saved) })
+  }),
+})
+
+/** Persist export settings (fired on every change; localStorage is cheap). */
+export const SaveExportSettings = Command.define('SaveExportSettings', {
+  args: { settings: ExportSettings },
+  messages: [ExportSettingsSaved],
+  execute: ({ settings }) =>
+    Effect.gen(function* () {
+      const store = yield* Persistence.KeyValueStore
+      yield* Persistence.toSchemaStore(store, ExportSettings)
+        .set(EXPORT_SETTINGS_KEY, settings)
+        .pipe(Effect.ignore)
+      return ExportSettingsSaved()
+    }),
 })

@@ -1,8 +1,18 @@
 import { Schema as S } from 'effect'
 import { Message } from 'foldkit'
+import { Dialog } from '@foldkit/ui'
 import { AppRoute } from '../route'
 import { RenderHandle } from '../gpu/backend'
-import { FieldKeySchema, LAYER_TYPES, LayerIdSchema, LutIdSchema } from '@lutra/engine'
+import {
+  ExportFormat,
+  ExportQuality,
+  ExportScale,
+  ExportSettings,
+  FieldKeySchema,
+  LAYER_TYPES,
+  LayerIdSchema,
+  LutIdSchema,
+} from '@lutra/engine'
 
 export const ChangedRoute = Message.m('ChangedRoute', { route: AppRoute })
 export const Navigated = Message.m('Navigated', { request: S.Unknown })
@@ -130,11 +140,57 @@ export const RenderFailed = Message.m('RenderFailed', { reason: S.String })
 // message exists so the mount stays observable (DevTools, Scene, replay).
 export const CanvasRegistered = Message.m('CanvasRegistered')
 
-// ---- export ----
+// ---- export dialog ----
 
+// Opens the export dialog (no longer an immediate download).
 export const ExportRequested = Message.m('ExportRequested')
-export const ExportFinished = Message.m('ExportFinished', { url: S.String })
-export const ExportFailed = Message.m('ExportFailed', { reason: S.String })
+
+// The dialog is a foldkit submodel (@foldkit/ui). Its messages arrive
+// wrapped; update delegates to `Dialog.update`.
+export const GotExportDialogMessage = Message.m('GotExportDialogMessage', {
+  message: Dialog.Message,
+})
+
+export const ChangedExportFormat = Message.m('ChangedExportFormat', {
+  format: ExportFormat,
+})
+export const ChangedExportQuality = Message.m('ChangedExportQuality', {
+  quality: ExportQuality,
+})
+export const ChangedExportScale = Message.m('ChangedExportScale', {
+  scale: ExportScale,
+})
+
+// The frame to export, read back from the GPU once per dialog open (the
+// dialog encodes from this cache when the user presses Export).
+export const ExportSnapshotted = Message.m('ExportSnapshotted', {
+  image: S.instanceOf(ImageData),
+})
+export const ExportSnapshotFailed = Message.m('ExportSnapshotFailed', {
+  reason: S.String,
+})
+// An encode completed: size + object URL of the encoded blob. The download
+// is triggered from here — encoding happens on Export press, not on
+// settings change (encoding for a live size preview was too slow).
+export const ExportPrepared = Message.m('ExportPrepared', {
+  sizeBytes: S.Number,
+  url: S.String,
+})
+export const ExportEncodeFailed = Message.m('ExportEncodeFailed', {
+  reason: S.String,
+})
+// The user asked to download the current blob (the button in the dialog).
+export const ExportDownloadRequested = Message.m('ExportDownloadRequested')
+// The download was triggered.
+export const ExportDownloaded = Message.m('ExportDownloaded', { url: S.String })
+// Persisted settings restored from localStorage.
+export const ExportSettingsLoaded = Message.m('ExportSettingsLoaded', {
+  settings: ExportSettings,
+})
+// Acks for fire-and-forget export commands (observability, like
+// CanvasRegistered).
+export const ExportUrlRevoked = Message.m('ExportUrlRevoked')
+export const ExportSettingsSaved = Message.m('ExportSettingsSaved')
 
 export const AppMessage = S.Union([
   ChangedRoute,
@@ -167,8 +223,19 @@ export const AppMessage = S.Union([
   RenderFailed,
   CanvasRegistered,
   ExportRequested,
-  ExportFinished,
-  ExportFailed,
+  GotExportDialogMessage,
+  ChangedExportFormat,
+  ChangedExportQuality,
+  ChangedExportScale,
+  ExportSnapshotted,
+  ExportSnapshotFailed,
+  ExportPrepared,
+  ExportEncodeFailed,
+  ExportDownloadRequested,
+  ExportDownloaded,
+  ExportSettingsLoaded,
+  ExportUrlRevoked,
+  ExportSettingsSaved,
 ])
 export type AppMessage = typeof AppMessage.Type
 

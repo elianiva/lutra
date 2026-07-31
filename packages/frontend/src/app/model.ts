@@ -1,8 +1,9 @@
 import { Schema } from 'effect'
+import { Dialog } from '@foldkit/ui'
 import { EditorRoute } from '../route'
 import { RenderHandle } from '../gpu/backend'
 import { SourceImage, Catalog } from './message'
-import { LayerIdSchema, Layer } from '@lutra/engine'
+import { ExportSettings, defaultExportSettings, LayerIdSchema, Layer } from '@lutra/engine'
 import { EditorPhase, editorMachine } from './phase'
 
 // The editor's interaction mode is a foldkit Machine (app/phase.ts): the
@@ -48,6 +49,25 @@ export const Model = Schema.Struct({
   lastRender: Schema.NullOr(Schema.instanceOf(RenderHandle)),
   // Monotonic counter hashed into the render trigger stamp.
   revision: Schema.Number,
+  // ---- export dialog ----
+  // The foldkit dialog submodel (open/close/animation state).
+  exportDialog: Dialog.Model,
+  // The export settings (format/quality/scale); persisted across sessions.
+  exportSettings: ExportSettings,
+  // The frame to export, read back from the GPU when the dialog opens and
+  // cached for the dialog's lifetime — pressing Export encodes from it
+  // without another readback.
+  exportImage: Schema.NullOr(Schema.instanceOf(ImageData)),
+  // True while an export encode is running (the Export button is disabled
+  // and the dialog shows "Encoding…").
+  exportEncoding: Schema.Boolean,
+  // The encoded blob's size and object URL (the download target).
+  exportSize: Schema.NullOr(Schema.Number),
+  exportUrl: Schema.NullOr(Schema.String),
+  // Encode failure reason, shown in the dialog.
+  exportError: Schema.NullOr(Schema.String),
+  // True after a successful download, until the next settings change.
+  exportDownloaded: Schema.Boolean,
 })
 
 export type Model = typeof Model.Type
@@ -72,4 +92,12 @@ export const initialModel = (): Model => ({
   renderedStamp: 0,
   lastRender: null,
   revision: 0,
+  exportDialog: Dialog.init({ id: 'export-dialog' }),
+  exportSettings: defaultExportSettings(),
+  exportImage: null,
+  exportEncoding: false,
+  exportSize: null,
+  exportUrl: null,
+  exportError: null,
+  exportDownloaded: false,
 })

@@ -7,6 +7,7 @@ import { topBar } from './editor/top-bar'
 import { toolPanel } from './editor/tool-panel'
 import { layerDrawer } from './editor/layer-drawer'
 import { canvasStage } from './editor/canvas-stage'
+import { exportDialogView } from './editor/export-dialog'
 
 export const view = (model: Model, h: HtmlBuilder<AppMessage>): Html.Document => ({
   title: 'Lutra',
@@ -25,6 +26,7 @@ const layout = (h: HtmlBuilder<AppMessage>, model: Model) => {
         [h.Class('flex min-h-0 flex-1')],
         [toolPanel(h, model), canvasStage(h, model), layerDrawer(h, model)],
       ),
+      exportDialogView(h, model),
     ],
   )
 }

@@ -1,18 +1,31 @@
-import { Match } from 'effect'
+import { Match, Option } from 'effect'
 import { Command } from 'foldkit'
+import { Dialog } from '@foldkit/ui'
 import { GpuBackend } from '../gpu/backend'
 import { CanvasRef } from '../gpu/canvas-ref'
 import { LutStore } from '../luts/store'
-import { PickImageFile, RenderChain, ExportImage } from './command'
+import {
+  SnapshotForExport,
+  PrepareExport,
+  ExportDownload,
+  RevokeExportUrl,
+  SaveExportSettings,
+  PickImageFile,
+  RenderChain,
+} from './command'
 import { editorMachine } from './phase'
 import { LAYER_UI } from '../editor/layer-meta'
-import type { LayerId } from '@lutra/engine'
+import { fileExtension, type ExportSettings, type ImageEncoder, type LayerId } from '@lutra/engine'
+import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import type { Model } from './model'
+import { GotExportDialogMessage } from './message'
 import type { AppMessage } from './message'
 
 type Result = readonly [
   Model,
-  ReadonlyArray<Command.Command<AppMessage, never, GpuBackend | LutStore | CanvasRef>>,
+  ReadonlyArray<
+    Command.Command<AppMessage, never, GpuBackend | LutStore | CanvasRef | ImageEncoder | KeyValueStore>
+  >,
 ]
 
 const ensureFieldIndex = (
@@ -55,8 +68,7 @@ const renderNow = (model: Model): Result => {
  * state). Data branches — chain ops, pan/zoom, rendering, export — ignore
  * the machine result and just carry the (unchanged) phase forward.
  */
-export const update = (model: Model, message: AppMessage): Result => {
-  // Data-level gate the machine can't see: the LUT tool needs the catalog
+export const update = (model: Model, message: AppMessage): Result => {  // Data-level gate the machine can't see: the LUT tool needs the catalog
   // (a LUT draft must reference a real lutId, and the first catalog entry is
   // the default selection). Everything else the editor blocks — no image,
   // loading, error, draft active — is a missing edge in the machine.
@@ -293,15 +305,137 @@ export const update = (model: Model, message: AppMessage): Result => {
         [],
       ],
 
-      // ---- export ----
+      // ---- export dialog ----
       ExportRequested: () => {
-        // Export snapshots exactly the frame the model holds: no render yet,
-        // or no frame, means nothing to export.
+        // The dialog opens only when there is a frame to export. The
+        // snapshot readback happens once per open; the dialog encodes from
+        // the cached ImageData when the user presses Export.
         if (model.renderedStamp === 0 || !model.lastRender) return [model, []]
-        return [model, [ExportImage({ handle: model.lastRender })]]
+        const [dialog, dialogCommands] = Dialog.open(model.exportDialog)
+        return [
+          { ...model, phase, exportDialog: dialog, exportDownloaded: false },
+          [
+            ...Command.mapMessages(dialogCommands, toExportDialogMessage),
+            SnapshotForExport({ handle: model.lastRender }),
+          ],
+        ]
       },
-      ExportFinished: () => [model, []],
-      ExportFailed: () => [model, []],
+      GotExportDialogMessage: ({ message }) => {
+        const [dialog, dialogCommands, out] = Dialog.update(model.exportDialog, message)
+        let next: Model = { ...model, phase, exportDialog: dialog }
+        let commands = Command.mapMessages(dialogCommands, toExportDialogMessage)
+        // On close: drop the cached frame and revoke the blob URL. The
+        // settings stay — they persist across sessions.
+        if (Option.isSome(out) && out.value._tag === 'Closed') {
+          next = {
+            ...next,
+            exportImage: null,
+            exportEncoding: false,
+            exportSize: null,
+            exportUrl: null,
+            exportError: null,
+            exportDownloaded: false,
+          }
+          if (model.exportUrl) commands = [...commands, RevokeExportUrl({ url: model.exportUrl })]
+        }
+        return [next, commands]
+      },
+      // The frame landed and is cached for the dialog's lifetime. If the
+      // dialog closed before the readback completed, drop the frame —
+      // nothing to encode from.
+      ExportSnapshotted: ({ image }) => {
+        if (!model.exportDialog.isOpen) return [model, []]
+        return [{ ...model, phase, exportImage: image, exportError: null }, []]
+      },
+      ExportSnapshotFailed: ({ reason }) => [
+        { ...model, phase, exportError: reason },
+        [],
+      ],
+      ChangedExportFormat: ({ format }) => {
+        // Switching to a lossy format fills the quality default; PNG is
+        // lossless and carries no quality. Settings changes only persist —
+        // the encode waits for the Export press.
+        const settings: ExportSettings = {
+          ...model.exportSettings,
+          format,
+          quality: format === 'png' ? null : (model.exportSettings.quality ?? 75),
+        }
+        return settingsChanged(model, settings)
+      },
+      ChangedExportQuality: ({ quality }) =>
+        settingsChanged(model, { ...model.exportSettings, quality }),
+      ChangedExportScale: ({ scale }) =>
+        settingsChanged(model, { ...model.exportSettings, scale }),
+      ExportPrepared: ({ sizeBytes, url }) => {
+        // An encode that completed after the dialog closed has no consumer.
+        if (!model.exportDialog.isOpen) return [model, [RevokeExportUrl({ url })]]
+        const filename = `lutra-edit.${fileExtension(model.exportSettings.format)}`
+        return [
+          {
+            ...model,
+            phase,
+            exportEncoding: false,
+            exportSize: sizeBytes,
+            exportUrl: url,
+            exportError: null,
+          },
+          [ExportDownload({ url, filename })],
+        ]
+      },
+      ExportEncodeFailed: ({ reason }) => [
+        { ...model, phase, exportEncoding: false, exportError: reason },
+        [],
+      ],
+      ExportDownloadRequested: () => {
+        // The encode runs here, on Export press — not on settings change.
+        if (!model.exportImage || model.exportEncoding) return [model, []]
+        return startEncode(model)
+      },
+      ExportDownloaded: ({ url }) => {
+        // Ignore downloads of a replaced blob (an encode finished after a
+        // newer Export press).
+        if (model.exportUrl !== url) return [model, []]
+        return [{ ...model, phase, exportDownloaded: true }, []]
+      },
+      ExportSettingsLoaded: ({ settings }) => [{ ...model, phase, exportSettings: settings }, []],
+      ExportUrlRevoked: () => [model, []],
+      ExportSettingsSaved: () => [model, []],
     }),
   )
+}
+
+const toExportDialogMessage = (message: Dialog.Message): AppMessage =>
+  GotExportDialogMessage({ message })
+
+/** Persist a settings change; the encode waits for the Export press. */
+const settingsChanged = (model: Model, settings: ExportSettings): Result => [
+  { ...model, exportSettings: settings, exportDownloaded: false },
+  [SaveExportSettings({ settings })],
+]
+
+/**
+ * Dispatch the encode for the cached export frame. Requires the snapshot —
+ * the dialog only encodes after it lands. The Export button is disabled
+ * while `exportEncoding`, so at most one encode is in flight; a result that
+ * lands after the dialog closed is revoked in ExportPrepared.
+ */
+const startEncode = (model: Model): Result => {
+  if (!model.exportImage) return [model, []]
+  return [
+    {
+      ...model,
+      exportEncoding: true,
+      exportSize: null,
+      exportUrl: null,
+      exportError: null,
+      exportDownloaded: false,
+    },
+    [
+      PrepareExport({
+        image: model.exportImage,
+        settings: model.exportSettings,
+        previousUrl: model.exportUrl,
+      }),
+    ],
+  ]
 }

@@ -64,3 +64,31 @@ export {
   renderClarity,
   renderLut,
 } from "./shaders"
+
+// Export encoding
+// The engine owns the encoder contract (`ImageEncoder` service) and the
+// jSquash implementation; the frontend provides a worker-backed layer for
+// the app (docs/adr/0006).
+export {
+  EXPORT_FORMATS,
+  ExportFormat,
+  EXPORT_SCALES,
+  ExportQuality,
+  ExportScale,
+  ExportSettings,
+  defaultExportSettings,
+  isLossy,
+  fileExtension,
+  mimeFor,
+  EncodeError,
+  ImageEncoder,
+  ImageEncoderLive,
+  encodeImage,
+} from "./encode"
+export type {
+  ExportFormat as ExportFormatType,
+  ExportQuality as ExportQualityType,
+  ExportScale as ExportScaleType,
+  ExportSettings as ExportSettingsType,
+  ImageEncoderShape,
+} from "./encode"

@@ -30,11 +30,12 @@ export interface GpuBackendShape {
     canvas: HTMLCanvasElement,
   ) => Effect.Effect<RenderHandle, GpuError>
   /**
-   * Read the frame identified by `handle` back to the CPU as an ImageBitmap.
-   * Used only by export (PNG encoding needs CPU pixels); never on the
-   * display path.
+   * Read the frame identified by `handle` back to the CPU as `ImageData`.
+   * Used only by export (encoding needs CPU pixels); never on the display
+   * path. The ImageData's buffer is transferable, so the encode worker
+   * receives it without a copy.
    */
-  readonly snapshot: (handle: RenderHandle) => Effect.Effect<ImageBitmap, GpuError>
+  readonly snapshot: (handle: RenderHandle) => Effect.Effect<ImageData, GpuError>
 }
 
 export class GpuBackend extends Context.Service<GpuBackend, GpuBackendShape>()(
@@ -604,10 +605,7 @@ export const GpuBackendLive = Layer.effect(
           readBuffer.destroy()
 
           const imageData = new ImageData(dense, width, height)
-          return yield* Effect.tryPromise({
-            try: () => createImageBitmap(imageData),
-            catch: (cause) => new GpuError({ message: 'Failed to create ImageBitmap', cause }),
-          })
+          return imageData
         }),
     })
   }),
