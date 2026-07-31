@@ -11,9 +11,10 @@ export default defineConfig({
   plugins: [foldkit({ devToolsMcpPort: 9988 }), tailwindcss()],
   resolve: {
     alias: {
-      // The engine has no build step — consume it as TS source so the
-      // frontend dev/build resolves directly into the workspace package.
+      // The engine and store have no build step — consume them as TS source so
+      // the frontend dev/build resolves directly into the workspace packages.
       '@lutra/engine': path.resolve(here, '../engine/src/index.ts'),
+      '@lutra/store': path.resolve(here, '../store/src/index.ts'),
     },
   },
   optimizeDeps: {

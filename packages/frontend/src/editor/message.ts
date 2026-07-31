@@ -1,7 +1,6 @@
 import { Schema as S } from 'effect'
 import { Message } from 'foldkit'
 import { Dialog } from '@foldkit/ui'
-import { AppRoute } from '../route'
 import { RenderHandle } from '../gpu/backend'
 import {
   ExportFormat,
@@ -14,14 +13,18 @@ import {
   LutIdSchema,
 } from '@lutra/engine'
 
-export const ChangedRoute = Message.m('ChangedRoute', { route: AppRoute })
-export const Navigated = Message.m('Navigated', { request: S.Unknown })
+// ---- the editor's message union ----
+// The Editor is a foldkit Submodel (docs/adr/0009): it owns its own Model,
+// Message, update, and Commands behind a `GotEditorMessage` boundary. These
+// Messages are all internal to the editor — routing (`ChangedRoute`,
+// `Navigated`) lives at the root, and the editor surfaces its domain facts
+// upward via an `OutMessage` when it needs to.
 
 // A decoded source bitmap plus its pixel size. The bitmap is held in the model
 // as a plain ImageBitmap (`instanceOf` bypasses structural validation) so the
 // render command can hand it to WebGPU without re-decoding. Which phase the
 // image is in (empty/loading/loaded/error) is the editor machine's state
-// (app/phase.ts), not model data — the source only carries the payload.
+// (./phase.ts), not model data — the source only carries the payload.
 export const SourceImage = S.Struct({
   bitmap: S.NullOr(S.instanceOf(ImageBitmap)),
   width: S.Number,
@@ -206,9 +209,7 @@ export const ExportSettingsLoaded = Message.m('ExportSettingsLoaded', {
 export const ExportUrlRevoked = Message.m('ExportUrlRevoked')
 export const ExportSettingsSaved = Message.m('ExportSettingsSaved')
 
-export const AppMessage = S.Union([
-  ChangedRoute,
-  Navigated,
+export const EditorMessage = S.Union([
   FilePickRequested,
   FilePickCancelled,
   SelectedImageFile,
@@ -253,6 +254,6 @@ export const AppMessage = S.Union([
   ExportUrlRevoked,
   ExportSettingsSaved,
 ])
-export type AppMessage = typeof AppMessage.Type
+export type EditorMessage = typeof EditorMessage.Type
 
 export { Layer, type LayerType } from '@lutra/engine'

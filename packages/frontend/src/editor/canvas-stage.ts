@@ -345,7 +345,7 @@ const loadedStage = (h: HtmlBuilder<EditorMessage>, model: Model) => {
 
 /** Center stage: shows an upload dropzone until an image is loaded, then the
  *  rendered canvas with pan/zoom. Which stage shows is the phase machine's
- *  call (app/phase.ts): Empty/Loading → upload zone, Error → error stage,
+ *  call (./phase.ts): Empty/Loading → upload zone, Error → error stage,
  *  Idle/Drafting/Selected → the loaded canvas. */
 export const canvasStage = (h: HtmlBuilder<EditorMessage>, model: Model) =>
   h.main(

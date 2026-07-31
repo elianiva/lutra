@@ -4,9 +4,9 @@ import { Dialog } from '@foldkit/ui'
 import { MockImageBitmap } from '../vitest-setup'
 import { initialModel } from './model'
 import { update } from './update'
-import { view } from '../view'
+import { view } from './view'
 import { Idle } from './phase'
-import { PanZoom, RegisterCanvas } from '../editor/canvas-stage'
+import { PanZoom, RegisterCanvas } from './canvas-stage'
 import { RenderHandle } from '../gpu/backend'
 import {
   SnapshotForExport,

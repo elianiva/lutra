@@ -1,12 +1,11 @@
 import { Schema } from 'effect'
 import { Dialog } from '@foldkit/ui'
-import { EditorRoute } from '../route'
 import { RenderHandle } from '../gpu/backend'
 import { SourceImage, Catalog } from './message'
 import { ExportSettings, defaultExportSettings, LayerIdSchema, Layer } from '@lutra/engine'
 import { EditorPhase, editorMachine } from './phase'
 
-// The editor's interaction mode is a foldkit Machine (app/phase.ts): the
+// The editor's interaction mode is a foldkit Machine (./phase.ts): the
 // `phase` field is its state. The image lifecycle (Empty/Loading/Error), the
 // draft (Drafting), and the focused layer (Selected) are machine states, not
 // model flags — the machine makes "no draft without an image" structural.
@@ -18,11 +17,10 @@ import { EditorPhase, editorMachine } from './phase'
 const ActiveFieldIndex = Schema.Record(LayerIdSchema, Schema.Number)
 
 export const Model = Schema.Struct({
-  route: EditorRoute,
   source: SourceImage,
   // The committed edit chain. Laptop-visible order = render order.
   chain: Schema.Array(Layer),
-  // Editor phase machine state (app/phase.ts): Empty | Loading | Error |
+  // Editor phase machine state (./phase.ts): Empty | Loading | Error |
   // Idle | Drafting | Selected. Owns the image lifecycle, the draft, and the
   // selection — replaced the old draft/selectedLayerId/source.status flags.
   phase: EditorPhase,
@@ -77,7 +75,6 @@ export const Model = Schema.Struct({
 export type Model = typeof Model.Type
 
 export const initialModel = (): Model => ({
-  route: EditorRoute(),
   source: {
     bitmap: null,
     width: 0,

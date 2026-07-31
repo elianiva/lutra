@@ -82,6 +82,9 @@ importers:
       '@lutra/engine':
         specifier: workspace:*
         version: link:../engine
+      '@lutra/store':
+        specifier: workspace:*
+        version: link:../store
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@8.1.5(@types/node@26.1.2)(jiti@2.7.0)(yaml@2.9.0))
@@ -119,6 +122,25 @@ importers:
       vite:
         specifier: ^8.1.5
         version: 8.1.5(@types/node@26.1.2)(jiti@2.7.0)(yaml@2.9.0)
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@26.1.2)(@vitest/browser-preview@4.1.10)(happy-dom@20.11.1)(vite@8.1.5(@types/node@26.1.2)(jiti@2.7.0)(yaml@2.9.0))
+
+  packages/store:
+    dependencies:
+      '@effect/platform-browser':
+        specifier: ^4.0.0-beta.102
+        version: 4.0.0-beta.102(effect@4.0.0-beta.102)
+      '@lutra/engine':
+        specifier: workspace:*
+        version: link:../engine
+      effect:
+        specifier: ^4.0.0-beta.102
+        version: 4.0.0-beta.102
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@26.1.2)(@vitest/browser-preview@4.1.10)(happy-dom@20.11.1)(vite@8.1.5(@types/node@26.1.2)(jiti@2.7.0)(yaml@2.9.0))

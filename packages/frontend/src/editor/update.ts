@@ -20,12 +20,12 @@ import { fileExtension, type ExportSettings, type ImageEncoder, type LayerId } f
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import type { Model } from './model'
 import { GotExportDialogMessage } from './message'
-import type { AppMessage } from './message'
+import type { EditorMessage } from './message'
 
-type Result = readonly [
+export type UpdateReturn = readonly [
   Model,
   ReadonlyArray<
-    Command.Command<AppMessage, never, GpuBackend | LutStore | CanvasRef | ImageEncoder | KeyValueStore>
+    Command.Command<EditorMessage, never, GpuBackend | LutStore | CanvasRef | ImageEncoder | KeyValueStore>
   >,
 ]
 
@@ -39,7 +39,7 @@ const ensureFieldIndex = (
  *  flight, only the revision bump happens — the in-flight render re-triggers
  *  with the newest state when it completes (see the RenderedFrame handler),
  *  which keeps the GPU queue from backing up during slider drags. */
-const renderNow = (model: Model): Result => {
+const renderNow = (model: Model): UpdateReturn => {
   if (!model.source.bitmap) return [model, []]
   // The draft lives in the phase machine (Drafting); the render pipeline
   // still receives it as a plain layer appended after the chain.
@@ -64,12 +64,12 @@ const renderNow = (model: Model): Result => {
 
 /**
  * The editor's update loop. The interaction mode is a foldkit Machine
- * (app/phase.ts): every message steps the machine first, and phase-gated
+ * (./phase.ts): every message steps the machine first, and phase-gated
  * branches bail when the message was `Ignored` (no edge from the current
  * state). Data branches — chain ops, pan/zoom, rendering, export — ignore
  * the machine result and just carry the (unchanged) phase forward.
  */
-export const update = (model: Model, message: AppMessage): Result => {  // Data-level gate the machine can't see: the LUT tool needs the catalog
+export const update = (model: Model, message: EditorMessage): UpdateReturn => {  // Data-level gate the machine can't see: the LUT tool needs the catalog
   // (a LUT draft must reference a real lutId, and the first catalog entry is
   // the default selection). Everything else the editor blocks — no image,
   // loading, error, draft active — is a missing edge in the machine.
@@ -90,12 +90,8 @@ export const update = (model: Model, message: AppMessage): Result => {  // Data-
   const machineCommands = transitioned ? result.commands : []
 
   return Match.value(message).pipe(
-    Match.withReturnType<Result>(),
+    Match.withReturnType<UpdateReturn>(),
     Match.tagsExhaustive({
-      // ---- routing ----
-      ChangedRoute: () => [model, []],
-      Navigated: () => [model, []],
-
       // ---- canvas registration ----
       // The mount already wrote the element into the CanvasRef service; the
       // acknowledgment exists for observability (DevTools, Scene, replay).
@@ -420,11 +416,11 @@ export const update = (model: Model, message: AppMessage): Result => {  // Data-
   )
 }
 
-const toExportDialogMessage = (message: Dialog.Message): AppMessage =>
+const toExportDialogMessage = (message: Dialog.Message): EditorMessage =>
   GotExportDialogMessage({ message })
 
 /** Persist a settings change; the encode waits for the Export press. */
-const settingsChanged = (model: Model, settings: ExportSettings): Result => [
+const settingsChanged = (model: Model, settings: ExportSettings): UpdateReturn => [
   { ...model, exportSettings: settings, exportDownloaded: false },
   [SaveExportSettings({ settings })],
 ]
@@ -435,7 +431,7 @@ const settingsChanged = (model: Model, settings: ExportSettings): Result => [
  * while `exportEncoding`, so at most one encode is in flight; a result that
  * lands after the dialog closed is revoked in ExportPrepared.
  */
-const startEncode = (model: Model): Result => {
+const startEncode = (model: Model): UpdateReturn => {
   if (!model.exportImage) return [model, []]
   return [
     {

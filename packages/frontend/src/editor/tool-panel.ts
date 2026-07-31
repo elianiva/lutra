@@ -26,24 +26,14 @@ export const toolPanel = (h: HtmlBuilder<EditorMessage>, model: Model) =>
       h.nav(
         [h.Class('flex flex-col')],
         LAYER_TYPES_ORDER.map((type) =>
-          toolRow(h, type, canPickTool(model.phase), model.catalog !== import type { HtmlBuilder } from 'foldkit/html'
-import { icon } from '../components/icon'
-import { LAYER_UI, LAYER_TYPES_ORDER } from './layer-meta'
-import { SelectedTool } from './message'
-import type { EditorMessage } from './message'
-import type { Model } from './model'
-import type { EditorPhase } from './phase'
-import type { LayerType } from '@lutra/engine'
-
-/** Left sidebar: all 11 adjustment types as a vertical icon+label list. */
-export const toolPanel = (h: HtmlBuilder<EditorMessage>, model: Model) =>),
+          toolRow(h, type, canPickTool(model.phase), model.catalog !== null),
         ),
       ),
     ],
   )
 
 /** The machine owns the real gate (no SelectedTool edge from Empty/Loading/
- *  Error/Drafting — see app/phase.ts); this mirrors it so the buttons read
+ *  Error/Drafting — see ./phase.ts); this mirrors it so the buttons read
  *  as disabled instead of dead. */
 const canPickTool = (phase: EditorPhase): boolean =>
   phase._tag === 'Idle' || phase._tag === 'Selected'

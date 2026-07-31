@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Effect, Fiber, Option, Ref, Scope, Stream } from 'effect'
-import { CanvasRegistered } from '../app/message'
+import { CanvasRegistered } from '../editor/message'
 import { RegisterCanvas } from '../editor/canvas-stage'
 import { canvasRef } from './canvas-ref'
 

@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "paths": {
+      "@lutra/engine": ["../engine/src/index.ts"],
+      "@lutra/store": ["../store/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*"]
+}

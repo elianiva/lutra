@@ -4,7 +4,7 @@ import { to, when } from 'foldkit/experimental/machine'
 import { ts } from 'foldkit/schema'
 import { Layer, LayerIdSchema } from '@lutra/engine'
 import { createLayerFor, DecodeImage } from './command'
-import { AppMessage } from './message'
+import { EditorMessage } from './message'
 
 // ---- editor phase ----
 // The editor's interaction mode is one state union owning BOTH the image
@@ -44,7 +44,7 @@ export type EditorPhase = typeof EditorPhase.Type
 
 export const editorMachine = Machine.define({
   state: EditorPhase,
-  message: AppMessage,
+  message: EditorMessage,
 })({
   initial: Empty(),
   states: {

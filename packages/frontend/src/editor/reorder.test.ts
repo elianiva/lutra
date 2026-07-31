@@ -12,10 +12,10 @@ import {
   attr,
   findAll,
 } from 'foldkit/scene'
-import { initialModel } from '../app/model'
-import { update } from '../app/update'
-import { view } from '../view'
-import { createLayerFor } from '../app/command'
+import { initialModel } from './model'
+import { update } from './update'
+import { view } from './view'
+import { createLayerFor } from './command'
 
 import { Option } from 'effect'
 import type { Scene } from 'foldkit/test'

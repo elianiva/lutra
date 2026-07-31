@@ -3,9 +3,9 @@ import { Command, Mount, click, expect, given, scene, selector, text } from 'fol
 import { MockImageBitmap } from '../vitest-setup'
 import { initialModel } from './model'
 import { update } from './update'
-import { view } from '../view'
+import { view } from './view'
 import { ErrorState } from './phase'
-import { PanZoom, RegisterCanvas } from '../editor/canvas-stage'
+import { PanZoom, RegisterCanvas } from './canvas-stage'
 import { RenderHandle } from '../gpu/backend'
 import { PickImageFile, DecodeImage, RenderChain, ReadHistogram } from './command'
 import {
