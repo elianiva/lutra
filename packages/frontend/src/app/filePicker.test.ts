@@ -3,8 +3,8 @@ import { Scene } from 'foldkit'
 import { initialModel } from './model'
 import { update } from './update'
 import { view } from '../view'
-import { PanZoom } from '../editor/canvasStage'
-import { PickImageFile, DecodeImage, PaintCanvas } from './command'
+import { PanZoom, PaintInitial } from '../editor/canvasStage'
+import { PickImageFile, DecodeImage } from './command'
 import {
   FilePickCancelled,
   SelectedImageFile,
@@ -169,9 +169,9 @@ describe('Image decode flow', () => {
         ImageDecoded({ bitmap, width: 200, height: 150 }),
       ),
 
-      // Empty chain → PaintCanvas fires, then canvas appears in the DOM
-      Scene.Command.resolve(PaintCanvas, PaintedCanvas()),
-      // PanZoom mount is rendered with the canvas; resolve it so the scene ends cleanly
+      // Empty chain → no GPU work; the canvas mounts and paints the source
+      // itself (PaintInitial). Resolve both mounts so the scene ends cleanly.
+      Scene.Mount.resolve(PaintInitial, PaintedCanvas()),
       Scene.Mount.resolve(PanZoom, ScaledCanvas({ scale: 1, offsetX: 0, offsetY: 0 })),
       Scene.expect(Scene.selector('#lutra-canvas')).toExist(),
       Scene.Command.expectNone(),

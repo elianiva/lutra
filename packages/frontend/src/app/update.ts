@@ -56,10 +56,10 @@ export const update = (model: Model, message: AppMessage): Result =>
           ...model,
           source: { status: 'loaded', bitmap, width, height, error: null },
         }
-        // With an empty chain there's nothing for the GPU to do; paint the
-        // source straight to the canvas so the first image is visible.
+        // With an empty chain there's nothing for the GPU to do; the canvas's
+        // PaintInitial mount paints the source the frame it enters the DOM.
         if (next.chain.length === 0 && next.draft === null) {
-          return [next, [PaintCanvas({ bitmap })]]
+          return [next, []]
         }
         return renderNow(next)
       },

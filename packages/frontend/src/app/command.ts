@@ -104,10 +104,22 @@ export const RenderChain = Command.define(
   }),
 )
 
+/** Resize the canvas backing store to the bitmap and draw it. Shared by the
+ *  PaintCanvas command and the canvas's initial-paint mount. */
+export const paintBitmap = (canvas: HTMLCanvasElement, bitmap: ImageBitmap): void => {
+  if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+    canvas.width = bitmap.width
+    canvas.height = bitmap.height
+  }
+  canvas.getContext('2d')?.drawImage(bitmap, 0, 0)
+}
+
 /**
  * Paint a rendered ImageBitmap onto the center-stage canvas (looked up by id).
- * Per the foldkit guidance, Model-driven DOM behavior after mount uses a
- * Command dispatched from the Message handler that changed the Model.
+ * The canvas is guaranteed to exist by the time this runs for post-mount
+ * renders (RenderedFrame → PaintCanvas); the first paint after an image loads
+ * is handled by the canvas's PaintInitial mount instead, because Commands run
+ * before the next render frame mounts the canvas.
  */
 export const PaintCanvas = Command.define(
   'PaintCanvas',
@@ -116,13 +128,7 @@ export const PaintCanvas = Command.define(
 )(({ bitmap }) =>
   Effect.sync(() => {
     const canvas = document.getElementById('lutra-canvas') as HTMLCanvasElement | null
-    if (canvas) {
-      if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
-        canvas.width = bitmap.width
-        canvas.height = bitmap.height
-      }
-      canvas.getContext('2d')?.drawImage(bitmap, 0, 0)
-    }
+    if (canvas) paintBitmap(canvas, bitmap)
     return PaintedCanvas()
   }),
 )

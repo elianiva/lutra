@@ -4,12 +4,8 @@ import { AppRoute } from '../route'
 import { LayerId, type LayerType } from '@lutra/engine'
 import type { UrlRequest } from 'foldkit/navigation'
 
-// ---- routing ----
-
 export const ChangedRoute = Message.m('ChangedRoute', { route: AppRoute })
 export const Navigated = Message.m('Navigated', { request: S.Unknown })
-
-// ---- image ----
 
 const ImageStatus = S.Literals(['empty', 'loading', 'loaded', 'error'] as const)
 export type ImageStatus = typeof ImageStatus.Type
