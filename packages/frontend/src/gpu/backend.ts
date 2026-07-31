@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from 'effect'
-import { GpuError, WORKGROUP_SIZE, type ChainPass, type ChainShader, type RenderRequest } from '@lutra/engine'
+import { GpuError, WORKGROUP_SIZE, type ChainPass, type LutCube, type RenderRequest } from '@lutra/engine'
 
 // ---- service ----
 
@@ -31,9 +31,6 @@ export class GpuBackend extends Context.Service<GpuBackend, GpuBackendShape>()(
 // moment where dispatching a new Effect fiber is the right escape hatch: the
 // runtime is not on the stack, so route through the default runtime's
 // background fork. Surfaces as a structured log line instead of console.
-const logUncapturedError = (message: string): void => {
-  void Effect.runFork(Effect.logError(`[WebGPU uncapturederror] ${message}`))
-}
 
 // ---- WebGPU device acquisition ----
 
@@ -63,7 +60,9 @@ const acquireDevice = Effect.gen(function* () {
   device.addEventListener('uncapturederror', (event) => {
     // Surface runtime shader errors. Uncaptured errors are the only signal
     // after a pipeline validates successfully, so they must not vanish.
-    logUncapturedError(event.error.message)
+    // Background-fork the log: the event bus fires outside the Effect
+    // runtime's stack, so a raw Effect call here would be lost.
+    void Effect.runFork(Effect.logError(`[WebGPU uncapturederror] ${event.error.message}`))
   })
   return device
 }).pipe(
@@ -166,6 +165,51 @@ export const GpuBackendLive = Layer.effect(
     })
 
     let session: Session | null = null
+
+    // Device-scoped LUT texture cache: a cube uploads once per lutId and
+    // survives image changes (session teardown), because the cube is a
+    // property of the layer, not of the image.
+    const lutTextures = new Map<string, GPUTexture>()
+
+    const ensureLutTexture = (lutId: string, cube: LutCube): GPUTexture => {
+      const cached = lutTextures.get(lutId)
+      if (cached) return cached
+
+      const { size, data } = cube
+      // The cube is rgba32float: it matches the Float32Array upload exactly
+      // (16 bytes/texel, no conversion). Chrome's writeTexture f32→f16
+      // conversion is broken (raw f32 bytes land verbatim in f16 textures,
+      // corrupting rows), so rgba16float is not an option. 32-bit float
+      // textures are not filterable in WebGPU — the shader body does its
+      // own trilinear via textureLoad instead of hardware sampling.
+      // dimension MUST be '3d': without it the texture defaults to a 2D
+      // array (13 layers), which cannot be read as texture_3d and fails
+      // bind-group validation at runtime.
+      const tex = device.createTexture({
+        size: { width: size, height: size, depthOrArrayLayers: size },
+        dimension: '3d',
+        format: 'rgba32float',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      })
+
+      // Stride the size³×3 cube into size³×4 texels (alpha = 1).
+      const texels = new Float32Array(size * size * size * 4)
+      for (let i = 0; i < size * size * size; i++) {
+        texels[i * 4] = data[i * 3]!
+        texels[i * 4 + 1] = data[i * 3 + 1]!
+        texels[i * 4 + 2] = data[i * 3 + 2]!
+        texels[i * 4 + 3] = 1
+      }
+      device.queue.writeTexture(
+        { texture: tex },
+        texels,
+        { bytesPerRow: size * 4 * 4, rowsPerImage: size },
+        { width: size, height: size, depthOrArrayLayers: size },
+      )
+
+      lutTextures.set(lutId, tex)
+      return tex
+    }
 
     const destroySession = (s: Session): void => {
       s.srcTex.destroy()
@@ -279,10 +323,18 @@ export const GpuBackendLive = Layer.effect(
      * Cached per pass source; within a session the same pass source always
      * binds the same src/dst pair, because the pass's position in the chain
      * is fixed and its source encodes linearize/encode/dstFormat, which pin
-     * it to that position.
+     * it to that position. LUT passes vary the bound 3D texture with the
+     * layer's lutId, so their cache key includes it.
      */
-    const getCompute = (s: Session, pass: ChainPass, src: GPUTexture, dst: GPUTexture): ComputeEntry => {
-      const cached = s.compute[pass.source]
+    const getCompute = (
+      s: Session,
+      pass: ChainPass,
+      src: GPUTexture,
+      dst: GPUTexture,
+      luts: ReadonlyMap<string, LutCube>,
+    ): ComputeEntry => {
+      const cacheKey = pass.lutId !== undefined ? `${pass.source}::lut:${pass.lutId}` : pass.source
+      const cached = s.compute[cacheKey]
       if (cached) return cached
 
       const cachedPipeline = pipelineCache[pass.source]
@@ -313,8 +365,9 @@ export const GpuBackendLive = Layer.effect(
       // With `layout: 'auto'` the pipeline only exposes bindings the shader
       // statically uses: binding 3 (frame) exists only when this pass reads
       // `u_frame` (currently grain), binding 4 (params) only when there
-      // are uniform slots, and binding 5 (sampler) only when the body
-      // samples its input filtered (clarity). Entries must mirror that.
+      // are uniform slots, binding 5 (sampler) when the pass samples, and
+      // binding 6 (the 3D LUT texture) only for LUT passes. Entries must
+      // mirror that.
       const entries: Array<GPUBindGroupEntry> = [
         { binding: 0, resource: src.createView() },
         { binding: 1, resource: dst.createView() },
@@ -329,10 +382,23 @@ export const GpuBackendLive = Layer.effect(
       if (pass.usesSampler) {
         entries.push({ binding: 5, resource: sampler })
       }
+      if (pass.lutId !== undefined) {
+        const cube = luts.get(pass.lutId)
+        if (!cube) {
+          throw new GpuError({ message: `LUT cube missing for ${pass.lutId}` })
+        }
+        // The view dimension must be explicit: createView() on a 3D
+        // texture defaults to e2DArray in Chrome, which fails bind-group
+        // validation against the shader's texture_3d (viewDimension e3D).
+        entries.push({
+          binding: 6,
+          resource: ensureLutTexture(pass.lutId, cube).createView({ dimension: '3d' }),
+        })
+      }
 
       const bindGroup = device.createBindGroup({ layout: compiled.layout, entries })
       const entry: ComputeEntry = { paramsBuffer, bindGroup, pipeline: compiled.pipeline }
-      s.compute[pass.source] = entry
+      s.compute[cacheKey] = entry
       return entry
     }
 
@@ -375,7 +441,7 @@ export const GpuBackendLive = Layer.effect(
             const pass = passes[i]!
             const src = i === 0 ? s.srcTex : s.intermediates[(i - 1) % 2]!
             const dst = i === passes.length - 1 ? s.dstTex : s.intermediates[i % 2]!
-            const { paramsBuffer, bindGroup, pipeline } = getCompute(s, pass, src, dst)
+            const { paramsBuffer, bindGroup, pipeline } = getCompute(s, pass, src, dst, request.luts)
 
             if (paramsBuffer) {
               const paramsData = new Float32Array(roundUp(request.uniforms[i]!.length, 4))

@@ -5,7 +5,7 @@ import {
   LayerPatch,
   LAYER_TYPES,
 } from "./index"
-import { ExposureLayer, ContrastLayer } from "./schemas"
+import { ExposureLayer } from "./schemas"
 
 describe("Layer schemas", () => {
   describe("Layer union", () => {
@@ -82,9 +82,10 @@ describe("Layer schemas", () => {
         extraField: 123,
       })
       expect(result.type).toBe("exposure")
-      expect((result as Record<string, unknown>)["stops"]).toBe(0)
+      const record: Record<string, unknown> = result
+      expect(record["stops"]).toBe(0)
       // extraField is stripped by Schema
-      expect((result as Record<string, unknown>)["extraField"]).toBeUndefined()
+      expect(record["extraField"]).toBeUndefined()
     })
 
     it("validates every layer type has a schema", () => {
@@ -101,9 +102,49 @@ describe("Layer schemas", () => {
         else if (t === "vignette") { layer["amount"] = 0; layer["size"] = 0.6 }
         else if (t === "chromaticAberration") layer["amount"] = 0
         else if (t === "clarity") layer["amount"] = 0
+        else if (t === "lut") { layer["lutId"] = "luts/colorslide/fuji_velvia_50.cube"; layer["amount"] = 1 }
 
         const result = Schema.decodeUnknownSync(Layer)(layer)
         expect(result.type).toBe(t)
+      }
+    })
+  })
+
+  describe("LutLayer", () => {
+    it("decodes a valid lut layer with a string reference", () => {
+      const result = Schema.decodeUnknownSync(Layer)({
+        id: "layer-lut",
+        type: "lut",
+        visible: true,
+        lutId: "luts/colorslide/fuji_velvia_50.cube",
+        amount: 0.65,
+      })
+      expect(result.type).toBe("lut")
+      if (result.type === "lut") {
+        expect(result.lutId).toBe("luts/colorslide/fuji_velvia_50.cube")
+        expect(result.amount).toBe(0.65)
+      }
+    })
+
+    it("fails without a lutId", () => {
+      expect(() =>
+        Schema.decodeUnknownSync(Layer)({
+          id: "layer-lut",
+          type: "lut",
+          visible: true,
+          amount: 1,
+        }),
+      ).toThrow()
+    })
+
+    it("decodes a lut patch", () => {
+      const result = Schema.decodeUnknownSync(LayerPatch)({
+        type: "lut",
+        patch: { lutId: "luts/bw/agfa_apx_100.cube", amount: 0.4 },
+      })
+      expect(result.type).toBe("lut")
+      if (result.type === "lut") {
+        expect(result.patch.lutId).toBe("luts/bw/agfa_apx_100.cube")
       }
     })
   })

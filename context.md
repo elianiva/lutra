@@ -18,7 +18,7 @@ Direct port of each SkSL body to WGSL by hand. The mobile SkSL bodies are the re
 
 **Chromatic aberration**: Implemented (not deferred), radial. Each layer runs as its own compute pass, so CA samples the previous pass's output (the accumulated result of earlier layers) at offsets that grow quadratically from the image center — not the source image. A dedicated linearize pass is inserted ahead of the first sampling layer so sampled texels are always linear light.
 
-**GPU pipeline**: Compute shaders for processing, render pipeline for presentation. The chain assembler emits one compute pass per layer; passes ping-pong through linear-light rgba16float intermediates (8-bit intermediates would band), and only the final pass encodes to sRGB and writes the display texture. This enables neighbor-sampling bodies: clarity runs a 9-tap bilinear blur of the previous pass's output (local contrast, unsharp-mask style, midtone-masked), and grain is 3-octave FBM value noise (integer lattice hash, quintic interpolation, animated per frame) — the mobile's per-pixel hash was pure white noise with no spatial coherence. Sampling passes expose a binding-5 sampler and use textureSampleLevel (textureSample is fragment-stage only). Future scatter-write passes (histograms, LUT tetrahedral interpolation) remain unlocked. The processed frame never leaves the GPU on the display path — the final storage texture is blitted to the canvas swapchain by a fullscreen-triangle pass (free bilinear). Readback to an ImageBitmap happens only on export.
+**GPU pipeline**: Compute shaders for processing, render pipeline for presentation. The chain assembler emits one compute pass per layer; passes ping-pong through linear-light rgba16float intermediates (8-bit intermediates would band), and only the final pass encodes to sRGB and writes the display texture. This enables neighbor-sampling bodies: clarity runs a 9-tap bilinear blur of the previous pass's output (local contrast, unsharp-mask style, midtone-masked), and grain is 3-octave FBM value noise (integer lattice hash, quintic interpolation, animated per frame) — the mobile's per-pixel hash was pure white noise with no spatial coherence. Sampling passes expose a binding-5 sampler and use textureSampleLevel (textureSample is fragment-stage only). LUT passes are the exception to the linear-light rule: the vendored film cubes are authored in sRGB space, so a LUT pass decodes its linear input to sRGB, applies the cube via a 13³ 3D texture (manual trilinear — 32-bit float textures are not filterable, so the body reads texels with textureLoad), mixes by strength, and re-encodes to linear — skipping the round-trip at the chain ends, where source and display textures are already sRGB. Future scatter-write passes (histograms) remain unlocked. The processed frame never leaves the GPU on the display path — the final storage texture is blitted to the canvas swapchain by a fullscreen-triangle pass (free bilinear). Readback to an ImageBitmap happens only on export.
 
 **Clarity**: Implemented as local contrast: a 9-tap bilinear box blur (radius 4 px) of the pass input, then unsharp-mask push away from the local mean, masked to midtones. Radius is fixed — a true wide-radius clarity would need a separable blur or mip pyramid.
 
@@ -60,7 +60,11 @@ _Avoid_: "Layer" on its own (ambiguous with Photoshop's parallel composited laye
 
 **Film simulation adjustment**:
 A product-level design constraint, not a feature flag. The prototype intentionally exposes a small palette of adjustments so the user can reach a film look quickly and is gently pushed away from runaway editing. Limitation is the feature.
-_Avoid_: "Presets" (these are built-in looks, distinct from the adjustment primitives the user composes), "filters" (see above).
+_Avoid_: "Presets" (these are built-in looks, distinct from the adjustment primitives the user composes), "filters" (see below).
+
+**LUT library**:
+The vendored collection of film-emulation `.cube` LUTs (296, mirrored from the G'MIC film color presets) that a **LUT layer** selects from via the **LUT picker**. Each LUT is referenced by its file path (`luts/<category>/<name>.cube`) as a stable id.
+_Avoid_: "presets" (see **Film simulation adjustment**), "LUT pack"
 
 **Edit chain**:
 The ordered list of **adjustment layers** applied to a single source image. The chain is the unit of non-destructive persistence: it can be saved, replayed, reordered, and pruned without touching the source image.
@@ -69,7 +73,7 @@ _Avoid_: "Stack" (Snapseed uses this word but it suggests LIFO; the chain is ord
 ### Editor UI
 
 **Tool panel**:
-A persistent panel in the **editor** showing all 10 **adjustment layer** types. Always visible — no distinction between "pinned" and "overflow" tools. Selecting a tool from the panel creates a **draft layer**.
+A persistent panel in the **editor** showing all 11 **adjustment layer** types. Always visible — no distinction between "pinned" and "overflow" tools. Selecting a tool from the panel creates a **draft layer**; the LUT tool stays disabled until the **LUT library** catalog has loaded.
 _Avoid_: "toolbar" (too generic), "tool palette" (desktop jargon)
 
 **Draft layer**:
@@ -80,12 +84,16 @@ _Avoid_: "preview layer" (ambiguous with image preview), "temp layer" (implies t
 The right sidebar of the **editor**, always visible, showing the current **edit chain** as a vertical list. Displays each layer with its icon, label, formatted value, visibility toggle, and delete button. When a layer is selected or a **draft layer** is active, the slider and confirm/cancel controls render inline below the layer entry. Supports drag-to-reorder.
 _Avoid_: "layers panel" (was the old bottom tab), "layer list" (too generic)
 
+**LUT picker**:
+The inline control in the **layer drawer** for choosing the LUT on a **LUT layer** (draft or selected). Expands as per-category accordions showing a thumbnail grid; selecting updates the preview live and keeps the picker open for comparison. The current LUT is shown on a selector row above the grid, with the strength slider below.
+_Avoid_: "preset picker" (presets are built-in looks, distinct from LUTs)
+
 **Upload zone**:
 The empty-state placeholder in the canvas area before an image is loaded. Shows a dashed-border drop target with an icon and the prompt "Drop an image or click to browse." Accepts drag-and-drop and click-to-browse file input. Disappears once an image is loaded.
 
 ### Adjustments
 
-The v1 palette — ten **adjustment layer** types the user can add to the **edit chain**. No LUT yet (see Future). Order is significant.
+The v1 palette — eleven **adjustment layer** types the user can add to the **edit chain**. Order is significant.
 
 Most layers expose a single parameter with one ruler slider. Two layers — **White balance** and **Vignette** — have **toggled parameters**: two parameters sharing one layer, one visible at a time.
 
@@ -99,6 +107,7 @@ Most layers expose a single parameter with one ruler slider. Two layers — **Wh
 8. **Vignette** — toggled: amount (-1 to +1, default 0 = no-op) ↔ size (0.2 to 1, default 0.6).
 9. **Chromatic aberration** — radial R/B channel split (-1 to +1, default 0 = no-op).
 10. **Clarity** — midtone local contrast / structure enhancement (-1 to +1, default 0 = no-op).
+11. **LUT** — applies a film-emulation color cube from the **LUT library** at 0 to 1 strength (default 1 = full apply, 0 = no-op). The cube is applied to sRGB-encoded values — the film LUTs are authored in sRGB space — so the layer round-trips through sRGB at its chain boundaries.
 
 ### Screens
 
@@ -111,7 +120,6 @@ _Avoid_: "color grading menu", "workspace"
 - **Main menu** — a gallery screen at `/` showing saved edits in a grid. The entry point for a multi-edit workflow.
 - **Options screen** — settings surface with storage info and "Clear all" action.
 - **Saved edit** — persisted record of source image + **edit chain** + thumbnail. Stored in IndexedDB (OPFS for source images, JSON for chain metadata).
-- **LUT layer** — a layer type that applies a 3D color cube as a shader pass. The cubes are G'MIC film-emulation LUTs in `.cube` format, vendored from the YahiaAngelo/Film-Luts mirror (MIT) with attribution to the mirror and to G'MIC. Bundled as static assets, loaded on demand.
 - Lift / gain / gamma, masks, blend modes per layer.
 - **Storage management** — soft/hard caps on saved edits, per-edit storage info, cleanup suggestions.
 
@@ -125,5 +133,5 @@ _Avoid_: "color grading menu", "workspace"
 > Dev: "The user added a saturation layer — where does it go in the edit chain?"
 > Expert: "Wherever they put it. If it's after the channel mix, it tints the whole shifted image. If it's before, it tints the pre-look image. Order is part of the look."
 >
-> Dev: "Should we add a LUT layer?"
-> Expert: "Not in v1. LUTs are a future addition — capture it so we don't forget, but it doesn't go in the v1 palette."
+> Dev: "The user picked a LUT from the picker — where does it go in the edit chain?"
+> Expert: "It's a LUT layer like any other adjustment, with its own strength. Two LUT layers grade twice; order is part of the look."

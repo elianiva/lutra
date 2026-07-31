@@ -1,6 +1,7 @@
 import type { IconNode } from 'lucide'
 import {
   Aperture,
+  Boxes,
   CircleDot,
   Contrast,
   Eclipse,
@@ -23,6 +24,7 @@ import {
   renderVignette,
   renderChromaticAberration,
   renderClarity,
+  renderLut,
   type Layer,
   type LayerType,
 } from '@lutra/engine'
@@ -41,6 +43,7 @@ export const ENGINE_REGISTRY = makeRegistry({
   vignette: renderVignette,
   chromaticAberration: renderChromaticAberration,
   clarity: renderClarity,
+  lut: renderLut,
 })
 
 export const fieldBounds = (
@@ -90,8 +93,11 @@ export interface LayerUi {
 
 // Read a numeric field off a heterogeneous Layer without paying for a
 // discriminated-union collapse at every call site.
-const num = (layer: Layer, key: string): number =>
-  (layer as Record<string, unknown>)[key] as number
+const num = (layer: Layer, key: string): number => {
+  const record: Record<string, unknown> = layer
+  const value = record[key]
+  return typeof value === 'number' ? value : NaN
+}
 
 const wbK = (v: number) =>
   v < 0 ? Math.round(6500 - (1 + v) * 4500) : Math.round(6500 + v * 5500)
@@ -184,6 +190,28 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
     fields: { amount: { label: 'CLARITY', format: formatSigned } },
     formatValue: (l) => formatSigned(num(l, 'amount')),
   },
+  lut: {
+    label: 'LUT',
+    icon: Boxes,
+    toggled: false,
+    fields: { amount: { label: 'STRENGTH', format: formatPercent } },
+    // The drawer renders the picker + "Name · %" summary for LUT layers;
+    // the catalog lookup lives there (the model holds the catalog).
+    formatValue: (l) => formatPercent(num(l, 'amount')),
+  },
+}
+
+/**
+ * Human name for a lutId from the catalog, falling back to the bare file
+ * name when the catalog is missing the entry (e.g. a stale reference).
+ */
+export const lutName = (
+  catalog: ReadonlyArray<{ readonly lut_file: string; readonly name: string }> | null,
+  lutId: string,
+): string => {
+  const entry = catalog?.find((e) => e.lut_file === lutId)
+  if (entry) return entry.name
+  return lutId.split('/').pop() ?? lutId
 }
 
 export const LAYER_TYPES_ORDER: ReadonlyArray<LayerType> = [
@@ -197,4 +225,5 @@ export const LAYER_TYPES_ORDER: ReadonlyArray<LayerType> = [
   'vignette',
   'chromaticAberration',
   'clarity',
+  'lut',
 ]

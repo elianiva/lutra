@@ -9,6 +9,11 @@ import { renderGrain } from "../shaders/bodies/grain"
 import { renderVignette } from "../shaders/bodies/vignette"
 import { renderChromaticAberration } from "../shaders/bodies/chromatic-aberration"
 import { renderClarity } from "../shaders/bodies/clarity"
+import { renderLut } from "../shaders/bodies/lut"
+
+/** Statements of a body renderer result, whichever form it took. */
+const bodyOf = (r: string | { stmts: string }): string =>
+  typeof r === "string" ? r : r.stmts
 
 describe("shader bodies", () => {
   describe("renderExposure", () => {
@@ -119,7 +124,7 @@ describe("shader bodies", () => {
 
   describe("renderChromaticAberration", () => {
     it("emits radial source sampling around the image center", () => {
-      const src = renderChromaticAberration(0)
+      const src = bodyOf(renderChromaticAberration(0))
       expect(src).toContain("textureLoad(srcTex")
       expect(src).toContain("u_resolution * 0.5")
       expect(src).toContain("radius * radius")
@@ -127,11 +132,18 @@ describe("shader bodies", () => {
       expect(src).toContain("mix(color.r, rVal, strength)")
       expect(src).toContain("mix(color.b, bVal, strength)")
     })
+
+    it("declares that it samples its input", () => {
+      const result = renderChromaticAberration(0)
+      expect(typeof result).toBe("object")
+      if (typeof result === "string") throw new Error("expected BodySource")
+      expect(result.samplesInput).toBe(true)
+    })
   })
 
   describe("renderClarity", () => {
     it("emits local contrast with a bilinear 9-tap neighborhood", () => {
-      const src = renderClarity(0)
+      const src = bodyOf(renderClarity(0))
       expect(src).toContain("textureSampleLevel(srcTex, samp")
       // Center + 8 neighbors around a 4 px radius
       expect(src).toContain("vec2<f32>(4.0) / u_resolution")
@@ -141,12 +153,40 @@ describe("shader bodies", () => {
       // No longer a placeholder
       expect(src).not.toContain("placeholder")
     })
+
+    it("declares that it samples its input", () => {
+      const result = renderClarity(0)
+      expect(typeof result).toBe("object")
+      if (typeof result === "string") throw new Error("expected BodySource")
+      expect(result.samplesInput).toBe(true)
+    })
+  })
+
+  describe("renderLut", () => {
+    it("emits a trilinear 3D texture lookup mixed by strength", () => {
+      const result = renderLut(0)
+      expect(typeof result).toBe("object")
+      if (typeof result === "string") throw new Error("expected BodySource")
+      // Manual trilinear over textureLoad (32-bit float textures are not
+      // filterable in WebGPU, so hardware sampling is unavailable)
+      expect(result.stmts).toContain("textureLoad(lutTex, vec3<i32>(x0.x, x0.y, x0.z), 0)")
+      expect(result.stmts).toContain("LUT_SIZE - 1.0")
+      expect(result.stmts).toContain("clamp(color, vec3<f32>(0.0), vec3<f32>(1.0))")
+      expect(result.stmts).toContain("mix(color, lutColor, l0_amount)")
+    })
+
+    it("declares that it needs the LUT texture", () => {
+      const result = renderLut(0)
+      expect(typeof result).toBe("object")
+      if (typeof result === "string") throw new Error("expected BodySource")
+      expect(result.needsLut).toBe(true)
+      // A LUT body samples the LUT texture, not its pass input
+      expect(result.samplesInput).toBeUndefined()
+    })
   })
 
   describe("all bodies", () => {
     it("each body emits a non-empty string", () => {
-      const bodyOf = (r: string | { stmts: string }): string =>
-        typeof r === "string" ? r : r.stmts
       const bodies = [
         renderExposure(0),
         renderContrast(0),
@@ -158,6 +198,7 @@ describe("shader bodies", () => {
         renderVignette(0),
         renderChromaticAberration(0),
         renderClarity(0),
+        renderLut(0),
       ]
       for (const b of bodies) {
         expect(bodyOf(b).length).toBeGreaterThan(10)

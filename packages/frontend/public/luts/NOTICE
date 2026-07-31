@@ -1,0 +1,10 @@
+LUT library attribution
+
+The LUT files in this directory originate from the G'MIC film-emulation color
+presets (https://gmic.eu), mirrored by YahiaAngelo/Film-Luts
+(https://github.com/YahiaAngelo/Film-Luts, MIT License, copyright YahiaAngelo).
+The upstream README notes that the LUTs may reference trademarks of their
+respective owners (film stock names), used for informational purposes only.
+
+G'MIC (https://gmic.eu) is distributed under the CeCILL free software license.
+See the upstream LICENSE file for the mirror's terms.

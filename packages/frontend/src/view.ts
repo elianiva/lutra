@@ -24,7 +24,7 @@ const layout = (
       h.div(
         [h.Class('flex min-h-0 flex-1')],
         [
-          toolPanel(h, model.draft !== null),
+          toolPanel(h, model),
           canvasStage(h, model),
           layerDrawer(h, model),
         ],

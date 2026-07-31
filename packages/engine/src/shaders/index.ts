@@ -1,7 +1,7 @@
 export { generateChainSource, WORKGROUP_SIZE } from "./chain-source"
 export type { ChainLayerInfo, ChainPass, ChainShader, UniformSlot } from "./chain-source"
 export { SRGB_TO_LINEAR } from "./colorspace"
-export type { BodyRenderer } from "./types"
+export type { BodyRenderer, BodySource } from "./types"
 
 // Body renderers
 export { renderExposure } from "./bodies/exposure"
@@ -14,3 +14,4 @@ export { renderGrain } from "./bodies/grain"
 export { renderVignette } from "./bodies/vignette"
 export { renderChromaticAberration } from "./bodies/chromatic-aberration"
 export { renderClarity } from "./bodies/clarity"
+export { renderLut } from "./bodies/lut"

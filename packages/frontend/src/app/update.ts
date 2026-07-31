@@ -1,15 +1,16 @@
 import { Match } from 'effect'
 import { Command } from 'foldkit'
 import { GpuBackend } from '../gpu/backend'
+import { LutStore } from '../luts/store'
 import { createLayerFor, PickImageFile, DecodeImage, RenderChain, ExportImage } from './command'
 import { LAYER_UI } from '../editor/layer-meta'
-import type { Layer, LayerType } from '@lutra/engine'
 import type { Model } from './model'
 import type { AppMessage } from './message'
 
-type Result = readonly [Model, ReadonlyArray<Command.Command<AppMessage, never, GpuBackend>>]
-
-const LAYER_TYPES = Object.keys(LAYER_UI)
+type Result = readonly [
+  Model,
+  ReadonlyArray<Command.Command<AppMessage, never, GpuBackend | LutStore>>,
+]
 
 const ensureFieldIndex = (
   index: Record<string, number>,
@@ -53,6 +54,11 @@ export const update = (model: Model, message: AppMessage): Result =>
       // ---- image ----
       FilePickRequested: () => [model, [PickImageFile()]],
       FilePickCancelled: () => [model, []],
+
+      // ---- LUT library ----
+      CatalogLoaded: ({ catalog }) => [{ ...model, catalog }, []],
+      CatalogFailed: () => [model, []],
+
       SelectedImageFile: ({ file }) => [
         { ...model, source: { ...model.source, status: 'loading', error: null } },
         [DecodeImage({ file })],
@@ -94,8 +100,23 @@ export const update = (model: Model, message: AppMessage): Result =>
 
       // ---- tool panel / draft ----
       SelectedTool: ({ type }) => {
-        if (model.draft || !LAYER_TYPES.includes(type)) return [model, []]
-        const layer = createLayerFor(type as LayerType)
+        if (model.draft) return [model, []]
+        // The LUT tool needs the catalog: the draft must reference a real
+        // lutId, and the first catalog entry is the default selection.
+        if (type === 'lut') {
+          const catalog = model.catalog
+          if (!catalog || catalog.length === 0) return [model, []]
+          const layer = createLayerFor(type)
+          const withLut = { ...layer, lutId: catalog[0]!.lut_file }
+          return renderNow({
+            ...model,
+            draft: withLut,
+            selectedLayerId: withLut.id,
+            activeFieldIndex: ensureFieldIndex(model.activeFieldIndex, withLut.id),
+            lutPickerOpen: true,
+          })
+        }
+        const layer = createLayerFor(type)
         const withIndex = {
           ...model,
           draft: layer,
@@ -111,6 +132,7 @@ export const update = (model: Model, message: AppMessage): Result =>
           chain: [...model.chain, model.draft],
           draft: null,
           selectedLayerId: model.draft.id,
+          lutPickerOpen: false,
         })
       },
       CancelledDraft: () => {
@@ -122,19 +144,38 @@ export const update = (model: Model, message: AppMessage): Result =>
           draft: null,
           selectedLayerId: null,
           activeFieldIndex: restIndex,
-        } as Model)
+          lutPickerOpen: false,
+        })
       },
       UpdatedDraftParam: ({ field, value }) => {
         if (!model.draft) return [model, []]
         return renderNow({
           ...model,
-          draft: { ...model.draft, [field]: value } as Layer,
+          draft: { ...model.draft, [field]: value },
         })
+      },
+      ChangedDraftLut: ({ lutId }) => {
+        const draft = model.draft
+        if (!draft || draft.type !== 'lut') return [model, []]
+        return renderNow({
+          ...model,
+          draft: { ...draft, lutId },
+        })
+      },
+      ToggledLutPicker: () => {
+        const draft = model.draft
+        // The picker is only shown for a LUT draft or a selected committed
+        // LUT layer (when no draft is active) — anything else ignores the toggle.
+        const lutDraft = draft?.type === 'lut'
+        const lutSelected =
+          !draft && model.chain.some((l) => l.id === model.selectedLayerId && l.type === 'lut')
+        if (!lutDraft && !lutSelected) return [model, []]
+        return [{ ...model, lutPickerOpen: !model.lutPickerOpen }, []]
       },
 
       // ---- committed chain ----
       SelectedLayer: ({ id }) => [
-        { ...model, selectedLayerId: id, draft: null },
+        { ...model, selectedLayerId: id, draft: null, lutPickerOpen: false },
         [],
       ],
       RemovedLayer: ({ id }) => {
@@ -158,20 +199,27 @@ export const update = (model: Model, message: AppMessage): Result =>
         renderNow({
           ...model,
           chain: model.chain.map((l) =>
-            l.id === id ? ({ ...l, visible: !l.visible } as Layer) : l,
+            l.id === id ? { ...l, ...{ visible: !l.visible } } : l,
           ),
         }),
       UpdatedLayerParam: ({ id, field, value }) =>
         renderNow({
           ...model,
           chain: model.chain.map((l) =>
-            l.id === id ? ({ ...l, [field]: value } as Layer) : l,
+            l.id === id ? { ...l, [field]: value } : l,
+          ),
+        }),
+      ChangedLayerLut: ({ id, lutId }) =>
+        renderNow({
+          ...model,
+          chain: model.chain.map((l) =>
+            l.id === id ? { ...l, ...{ lutId } } : l,
           ),
         }),
       CycledToggledField: ({ id }) => {
         const layer = model.chain.find((l) => l.id === id)
         if (!layer) return [model, []]
-        const ui = LAYER_UI[layer.type as LayerType]
+        const ui = LAYER_UI[layer.type]
         if (!ui.toggled) return [model, []]
         const keys = Object.keys(ui.fields)
         const current = model.activeFieldIndex[id] ?? 0

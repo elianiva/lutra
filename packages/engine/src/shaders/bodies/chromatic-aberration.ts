@@ -10,7 +10,9 @@ import type { BodyRenderer } from "../types"
 // sampled channels are in the same transfer function as `color`.
 // `strength` blends the shifted channel in, so sub-pixel amounts still
 // register smoothly as the slider moves.
-export const renderChromaticAberration: BodyRenderer = (i) => `
+export const renderChromaticAberration: BodyRenderer = (i) => ({
+  samplesInput: true,
+  stmts: `
 // chromatic aberration (radial)
 {
   let d = vec2<f32>(coord) - u_resolution * 0.5;
@@ -27,4 +29,5 @@ export const renderChromaticAberration: BodyRenderer = (i) => `
   color.r = mix(color.r, rVal, strength);
   color.b = mix(color.b, bVal, strength);
 }
-`
+`,
+})

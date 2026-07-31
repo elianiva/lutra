@@ -1,6 +1,7 @@
 import { Effect, Schema } from "effect"
 import type { Layer } from "./layers/schemas"
 import type { LayerEntry } from "./layers/registry"
+import type { LutCube } from "./luts/cube"
 import { generateChainSource, type ChainLayerInfo, type ChainPass, type ChainShader } from "./shaders/chain-source"
 
 // ---- errors ----
@@ -11,6 +12,16 @@ export class GpuError extends Schema.TaggedErrorClass<GpuError>()("GpuError", {
 }) {}
 
 // ---- uniform packing ----
+
+/**
+ * Read a field off a heterogeneous `Layer` union by key. The union
+ * members are plain object types, so a widened annotation (not an
+ * assertion) yields the record view.
+ */
+const readField = (layer: Layer, key: string): unknown => {
+  const record: Record<string, unknown> = layer
+  return record[key]
+}
 
 /**
  * Pack one pass's layer parameter values into a flat Float32Array
@@ -26,7 +37,12 @@ function packUniforms(
   for (const slot of pass.uniforms) {
     const layer = visibleLayers[slot.layerIndex]
     if (layer) {
-      buf[slot.offset] = (layer as Record<string, unknown>)[slot.field] as number
+      const value = readField(layer, slot.field)
+      // Schema-validated layers always carry the field as a number; skip
+      // anything else rather than coerce garbage.
+      if (typeof value === "number") {
+        buf[slot.offset] = value
+      }
     }
   }
 
@@ -50,6 +66,11 @@ export interface RenderRequest {
   readonly uniforms: ReadonlyArray<Float32Array>
   readonly srcBitmap: ImageBitmap
   readonly frame: number
+  /**
+   * Cubes referenced by LUT layers in the chain, keyed by lutId. The GPU
+   * backend uploads each cube to a 3D texture once and caches it.
+   */
+  readonly luts: ReadonlyMap<string, LutCube>
 }
 
 /**
@@ -63,6 +84,7 @@ export function createRenderRequest(
   registry: Record<string, LayerEntry>,
   srcBitmap: ImageBitmap,
   frame: number,
+  luts: ReadonlyMap<string, LutCube>,
 ): Effect.Effect<RenderRequest, GpuError> {
   return Effect.gen(function* () {
     // Build chain-layer info for the assembler
@@ -73,11 +95,31 @@ export function createRenderRequest(
       if (!entry) {
         return yield* Effect.fail(new GpuError({ message: `Unknown layer type: ${l.type}` }))
       }
-      chainLayers.push({
-        type: l.type,
-        body: entry.body,
-        fieldKeys: Object.keys(entry.fields),
-      })
+      // LUT layers carry a cube reference: resolve the id through the
+      // LUT map the caller provided. The engine stays pure — it never
+      // fetches or parses cubes, and an unresolvable id is a hard error.
+      if (l.type === "lut") {
+        const lutId = readField(l, "lutId")
+        if (typeof lutId !== "string") {
+          return yield* Effect.fail(new GpuError({ message: "LUT layer is missing a lutId" }))
+        }
+        const cube = luts.get(lutId)
+        if (!cube) {
+          return yield* Effect.fail(new GpuError({ message: `Unknown LUT: ${lutId}` }))
+        }
+        chainLayers.push({
+          type: l.type,
+          body: entry.body,
+          fieldKeys: Object.keys(entry.fields),
+          lut: { id: lutId, size: cube.size },
+        })
+      } else {
+        chainLayers.push({
+          type: l.type,
+          body: entry.body,
+          fieldKeys: Object.keys(entry.fields),
+        })
+      }
     }
 
     // Assemble the WGSL shader
@@ -91,6 +133,6 @@ export function createRenderRequest(
     // Pack uniforms per pass from layer parameter values
     const uniforms = shader.passes.map((pass) => packUniforms(chain, pass))
 
-    return { shader, uniforms, srcBitmap, frame }
+    return { shader, uniforms, srcBitmap, frame, luts }
   })
 }

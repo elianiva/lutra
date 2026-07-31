@@ -19,6 +19,7 @@ export const LAYER_TYPES = [
   "vignette",
   "chromaticAberration",
   "clarity",
+  "lut",
 ] as const
 
 export type LayerType = (typeof LAYER_TYPES)[number]
@@ -108,6 +109,17 @@ export const ClarityLayer = Schema.Struct({
 })
 export type ClarityLayer = typeof ClarityLayer.Type
 
+export const LutLayer = Schema.Struct({
+  ...LayerCommon.fields,
+  type: Schema.Literal("lut"),
+  // Reference into the LUT library (the vendored file path, e.g.
+  // "luts/colorslide/fuji_velvia_50.cube"). A string, not a uniform — the
+  // engine resolves it to a cube via the render request's LUT map.
+  lutId: Schema.String,
+  amount: Schema.Number,
+})
+export type LutLayer = typeof LutLayer.Type
+
 // ---- discriminated union: the Layer type ----
 
 export const Layer = Schema.Union([
@@ -121,6 +133,7 @@ export const Layer = Schema.Union([
   VignetteLayer,
   ChromaticAberrationLayer,
   ClarityLayer,
+  LutLayer,
 ])
 export type Layer = typeof Layer.Type
 
@@ -160,6 +173,12 @@ export type ChromaticAberrationParams = typeof ChromaticAberrationParams.Type
 export const ClarityParams = Schema.Struct({ amount: Schema.Number })
 export type ClarityParams = typeof ClarityParams.Type
 
+export const LutParams = Schema.Struct({
+  lutId: Schema.String,
+  amount: Schema.Number,
+})
+export type LutParams = typeof LutParams.Type
+
 // ---- patch discriminated union ----
 
 export const LayerPatch = Schema.Union([
@@ -173,5 +192,6 @@ export const LayerPatch = Schema.Union([
   Schema.Struct({ type: Schema.Literal("vignette"), patch: VignetteParams }),
   Schema.Struct({ type: Schema.Literal("chromaticAberration"), patch: ChromaticAberrationParams }),
   Schema.Struct({ type: Schema.Literal("clarity"), patch: ClarityParams }),
+  Schema.Struct({ type: Schema.Literal("lut"), patch: LutParams }),
 ])
 export type LayerPatch = typeof LayerPatch.Type

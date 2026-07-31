@@ -1,13 +1,16 @@
 import type { HtmlBuilder } from 'foldkit/html'
 import { ArrowDown, ArrowUp, Eye, EyeOff, Trash2, X, Check } from 'lucide'
 import { icon } from '../components/icon'
-import { LAYER_UI, fieldBounds } from './layer-meta'
+import { LAYER_UI, fieldBounds, lutName } from './layer-meta'
+import { lutPicker } from './lut-picker'
 import {
   SelectedLayer,
   RemovedLayer,
   ToggledLayerVisibility,
   UpdatedLayerParam,
   UpdatedDraftParam,
+  ChangedDraftLut,
+  ChangedLayerLut,
   ConfirmedDraft,
   CancelledDraft,
   CycledToggledField,
@@ -17,8 +20,17 @@ import type { AppMessage } from '../app/message'
 import type { Model } from '../app/model'
 import type { Layer, LayerType } from '@lutra/engine'
 
-const num = (layer: Layer, key: string): number =>
-  (layer as Record<string, unknown>)[key] as number
+const num = (layer: Layer, key: string): number => {
+  const record: Record<string, unknown> = layer
+  const value = record[key]
+  return typeof value === 'number' ? value : NaN
+}
+
+/** One-line drawer summary: "Fuji Velvia 50 · 65%" for LUT layers. */
+const summary = (model: Model, layer: Layer, ui: (typeof LAYER_UI)[LayerType]): string =>
+  layer.type === 'lut'
+    ? `${lutName(model.catalog, layer.lutId)} · ${ui.formatValue(layer)}`
+    : ui.formatValue(layer)
 
 /** Right sidebar: the edit chain as a vertical list with inline sliders. */
 export const layerDrawer = (h: HtmlBuilder<AppMessage>, model: Model) =>
@@ -41,7 +53,7 @@ export const layerDrawer = (h: HtmlBuilder<AppMessage>, model: Model) =>
         [
           // The draft layer renders first, above the committed chain, with its
           // confirm/cancel controls — it previews on top in the GPU pipeline too.
-          ...(model.draft ? [draftRow(h, model)] : []),
+          ...(model.draft ? [draftRow(h, model, model.draft)] : []),
           ...model.chain
             .map((layer, index) => chainRow(h, model, layer, index))
             .reverse(),
@@ -60,9 +72,8 @@ const emptyState = (h: HtmlBuilder<AppMessage>) =>
     ['No adjustments yet. Pick one from the left.'],
   )
 
-const draftRow = (h: HtmlBuilder<AppMessage>, model: Model) => {
-  const layer = model.draft as Layer
-  const ui = LAYER_UI[layer.type as LayerType]
+const draftRow = (h: HtmlBuilder<AppMessage>, model: Model, layer: Layer) => {
+  const ui = LAYER_UI[layer.type]
   return h.div(
     [
       h.Class('border-b border-border bg-panel-alt'),
@@ -75,7 +86,12 @@ const draftRow = (h: HtmlBuilder<AppMessage>, model: Model) => {
       ),
       h.div(
         [h.Class('flex flex-col gap-3 px-4 pb-3')],
-        Object.keys(ui.fields).map((field) => draftSlider(h, layer, field, ui)),
+        [
+          ...(layer.type === 'lut'
+            ? [lutPicker(h, model, layer.lutId, (lutId) => ChangedDraftLut({ lutId }))]
+            : []),
+          ...Object.keys(ui.fields).map((field) => draftSlider(h, layer, field, ui)),
+        ],
       ),
       h.div([h.Class('flex items-center justify-end gap-2 px-4 py-2')], [
         h.button(
@@ -108,7 +124,7 @@ const draftSlider = (
   ui: (typeof LAYER_UI)[LayerType],
 ) => {
   const fieldUi = ui.fields[field]!
-  const { min, max } = fieldBounds(layer.type as LayerType, field)
+  const { min, max } = fieldBounds(layer.type, field)
   const value = num(layer, field)
   return sliderControl(
     h,
@@ -127,7 +143,7 @@ const chainRow = (
   layer: Layer,
   index: number,
 ) => {
-  const ui = LAYER_UI[layer.type as LayerType]
+  const ui = LAYER_UI[layer.type]
   const selected = model.selectedLayerId === layer.id && model.draft === null
   const total = model.chain.length
   return h.div(
@@ -155,7 +171,7 @@ const chainRow = (
             [h.Class('min-w-0 flex-1 truncate text-sm')],
             [ui.label],
           ),
-          h.span([h.Class('tnum text-xs text-muted')], [ui.formatValue(layer)]),
+          h.span([h.Class('tnum text-xs text-muted')], [summary(model, layer, ui)]),
           h.div([h.Class('flex items-center gap-0.5')], [
             // The chain renders bottom-up (newest at the top), so "Move up"
             // targets a higher chain index and "Move down" a lower one. A row
@@ -181,9 +197,14 @@ const chainRow = (
       selected
         ? h.div(
             [h.Class('flex flex-col gap-3 px-4 pb-4')],
-            Object.keys(ui.fields).map((field) =>
-              chainSlider(h, layer, field, ui, model),
-            ),
+            [
+              ...(layer.type === 'lut'
+                ? [lutPicker(h, model, layer.lutId, (lutId) => ChangedLayerLut({ id: layer.id, lutId }))]
+                : []),
+              ...Object.keys(ui.fields).map((field) =>
+                chainSlider(h, layer, field, ui, model),
+              ),
+            ],
           )
         : null,
     ],
@@ -198,7 +219,7 @@ const chainSlider = (
   model: Model,
 ) => {
   const fieldUi = ui.fields[field]!
-  const { min, max } = fieldBounds(layer.type as LayerType, field)
+  const { min, max } = fieldBounds(layer.type, field)
   const value = num(layer, field)
   // For toggled layers, only the active field's slider is shown; the label
   // is clickable to cycle to the next field.
@@ -268,7 +289,7 @@ export const sliderControl = (
         [
           h.button(
             [
-              ...(toggledLabel ? [h.OnClick(onToggleLabel!())] : []),
+              ...(toggledLabel && onToggleLabel ? [h.OnClick(onToggleLabel())] : []),
               h.Class(
                 `text-[10px] uppercase tracking-[0.14em] text-muted ${toggledLabel ? 'hover:text-ink' : 'cursor-default'}`,
               ),

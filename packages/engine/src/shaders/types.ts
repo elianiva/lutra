@@ -5,12 +5,23 @@
  * is optional module-scope WGSL (function definitions) emitted ahead of
  * the entry point — bodies that need reusable noise/interpolation
  * functions (e.g. FBM grain) return these.
+ *
+ * Resource needs are declared structurally rather than sniffed from the
+ * WGSL text: `samplesInput` marks bodies that read their pass input at
+ * neighbor offsets (the assembler inserts a linearize pass when such a
+ * body is first, and the pass exposes the binding-5 sampler), and
+ * `needsLut` marks LUT bodies, which additionally get the binding-6 3D
+ * LUT texture and the sRGB round-trip pass boundaries.
  */
 export interface BodySource {
   /** Statements inlined into `main` at the layer's index. */
   readonly stmts: string
   /** Module-scope WGSL (functions) emitted before the entry point. */
   readonly helpers?: string
+  /** Body samples its pass input texture (neighbor access). */
+  readonly samplesInput?: boolean
+  /** Body samples the pass's 3D LUT texture (LUT layer). */
+  readonly needsLut?: boolean
 }
 
 /**

@@ -7,6 +7,7 @@ import {
   ExposureLayer,
   GrainLayer,
   HighlightsLayer,
+  LutLayer,
   SaturationLayer,
   ShadowsLayer,
   VignetteLayer,
@@ -24,12 +25,23 @@ export interface FieldMeta {
 // ---- per-layer entry ----
 
 export interface LayerEntry {
+  // The schema type parameter is invariant, so no single concrete type
+  // fits every entry — `any` is deliberate (validated at use sites via
+  // Schema.decode against the per-type schemas).
+  // oxlint-disable-next-line no-explicit-any
   readonly schema: Schema.Schema<any>
   readonly body: BodyRenderer
   readonly label: string
   readonly pinned: boolean
   readonly toggled?: boolean
+  /** Numeric fields: packed as f32 uniforms, one slot per field. */
   readonly fields: Record<string, FieldMeta>
+  /**
+   * String-typed fields (e.g. the LUT layer's `lutId` reference). Not
+   * uniforms — they ride on the layer object and are resolved at render
+   * time. Values are the defaults `createLayer` writes.
+   */
+  readonly stringFields?: Readonly<Record<string, string>>
 }
 
 // ---- field metadata (shared by registry and createLayer) ----
@@ -55,6 +67,8 @@ const FIELD_META = {
   },
   chromaticAberration: { amount: { default: 0, min: -1, max: 1 } },
   clarity: { amount: { default: 0, min: -1, max: 1 } },
+  // LUT defaults to full strength (1): the draft shows the look immediately.
+  lut: { amount: { default: 1, min: 0, max: 1 } },
 } as const satisfies Record<string, Record<string, FieldMeta>>
 
 // ---- registry builder (bodies are injected by the index module) ----
@@ -70,6 +84,7 @@ export interface RegistryInput {
   vignette: BodyRenderer
   chromaticAberration: BodyRenderer
   clarity: BodyRenderer
+  lut: BodyRenderer
 }
 
 export function makeRegistry(bodies: RegistryInput): Record<string, LayerEntry> {
@@ -145,6 +160,17 @@ export function makeRegistry(bodies: RegistryInput): Record<string, LayerEntry> 
       label: "Clarity",
       pinned: false,
       fields: FIELD_META.clarity,
+    },
+    lut: {
+      schema: LutLayer,
+      body: bodies.lut,
+      label: "LUT",
+      pinned: false,
+      fields: FIELD_META.lut,
+      // The engine cannot know which LUTs exist (the catalog is a frontend
+      // asset); the frontend overrides this with the first catalog entry
+      // when creating a layer. An empty id renders as "Unknown LUT".
+      stringFields: { lutId: "" },
     },
   }
 }

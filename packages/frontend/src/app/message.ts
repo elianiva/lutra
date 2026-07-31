@@ -1,8 +1,7 @@
 import { Schema as S } from 'effect'
 import { Message } from 'foldkit'
 import { AppRoute } from '../route'
-import { LayerId, type LayerType } from '@lutra/engine'
-import type { UrlRequest } from 'foldkit/navigation'
+import { LayerId, LAYER_TYPES } from '@lutra/engine'
 
 export const ChangedRoute = Message.m('ChangedRoute', { route: AppRoute })
 export const Navigated = Message.m('Navigated', { request: S.Unknown })
@@ -38,6 +37,23 @@ export const ImageFailedToDecode = Message.m('ImageFailedToDecode', {
 })
 export const ClearedImage = Message.m('ClearedImage')
 
+// ---- LUT library ----
+
+// The catalog shape from the vendored film_luts.json (schema mirrors the
+// store's LutCatalogEntry type so the message can cross the foldkit
+// boundary as a validated value).
+const CatalogEntry = S.Struct({
+  name: S.String,
+  lut_file: S.String,
+  category: S.String,
+  thumbnail: S.String,
+})
+export const Catalog = S.Array(CatalogEntry)
+export type Catalog = typeof Catalog.Type
+
+export const CatalogLoaded = Message.m('CatalogLoaded', { catalog: Catalog })
+export const CatalogFailed = Message.m('CatalogFailed', { error: S.String })
+
 // ---- canvas interaction ----
 
 export const ScaledCanvas = Message.m('ScaledCanvas', {
@@ -49,13 +65,18 @@ export const ScaledCanvas = Message.m('ScaledCanvas', {
 
 // ---- tool panel / draft lifecycle ----
 
-export const SelectedTool = Message.m('SelectedTool', { type: S.String })
+export const SelectedTool = Message.m('SelectedTool', {
+  // Literal union so handlers get a narrowed LayerType without casts.
+  type: S.Literals(LAYER_TYPES),
+})
 export const ConfirmedDraft = Message.m('ConfirmedDraft')
 export const CancelledDraft = Message.m('CancelledDraft')
 export const UpdatedDraftParam = Message.m('UpdatedDraftParam', {
   field: S.String,
   value: S.Number,
 })
+/** Pick a different LUT on the active LUT draft. */
+export const ChangedDraftLut = Message.m('ChangedDraftLut', { lutId: S.String })
 
 // ---- committed chain ----
 
@@ -73,6 +94,10 @@ export const UpdatedLayerParam = Message.m('UpdatedLayerParam', {
   field: S.String,
   value: S.Number,
 })
+/** Pick a different LUT on a committed, selected LUT layer. */
+export const ChangedLayerLut = Message.m('ChangedLayerLut', { id: LayerId, lutId: S.String })
+/** Expand/collapse the inline LUT picker in the layer drawer. */
+export const ToggledLutPicker = Message.m('ToggledLutPicker')
 /** For toggled layers (White Balance, Vignette): cycle the active field shown in the drawer. */
 export const CycledToggledField = Message.m('CycledToggledField', { id: LayerId })
 
@@ -106,16 +131,21 @@ export const AppMessage = S.Union([
   ImageDecoded,
   ImageFailedToDecode,
   ClearedImage,
+  CatalogLoaded,
+  CatalogFailed,
   ScaledCanvas,
   SelectedTool,
   ConfirmedDraft,
   CancelledDraft,
   UpdatedDraftParam,
+  ChangedDraftLut,
   SelectedLayer,
   RemovedLayer,
   ReorderedLayer,
   ToggledLayerVisibility,
   UpdatedLayerParam,
+  ChangedLayerLut,
+  ToggledLutPicker,
   CycledToggledField,
   StartedLayerReorder,
   MovedLayerReorder,

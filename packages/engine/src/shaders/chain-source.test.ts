@@ -9,6 +9,16 @@ import { renderChromaticAberration } from "../shaders/bodies/chromatic-aberratio
 import { renderWhiteBalance } from "../shaders/bodies/white-balance"
 import { renderGrain } from "../shaders/bodies/grain"
 import { renderClarity } from "../shaders/bodies/clarity"
+import { renderLut } from "../shaders/bodies/lut"
+
+/** A 13³ LUT layer as the assembler receives it from the render request. */
+const lutLayer = (over: Partial<ChainLayerInfo> = {}): ChainLayerInfo => ({
+  type: "lut",
+  body: renderLut,
+  fieldKeys: ["amount"],
+  lut: { id: "luts/colorslide/fuji_velvia_50.cube", size: 13 },
+  ...over,
+})
 
 describe("generateChainSource", () => {
   it("emits a single passthrough pass for an empty chain", () => {
@@ -174,6 +184,118 @@ describe("generateChainSource", () => {
     expect(grainResult.passes[0]!.usesFrame).toBe(false)
     expect(grainResult.passes[1]!.usesFrame).toBe(true)
     expect(grainResult.passes[1]!.source).toContain("@group(0) @binding(3) var<uniform> u_frame")
+  })
+
+  it("emits a single sRGB-to-sRGB LUT pass for a lone LUT layer", () => {
+    const result = generateChainSource([lutLayer()])
+    expect(result.passes).toHaveLength(1)
+    const pass = result.passes[0]!
+    // The pass carries the cube id for the frontend's texture binding
+    expect(pass.lutId).toBe("luts/colorslide/fuji_velvia_50.cube")
+    expect(pass.uniforms).toEqual([{ layerIndex: 0, field: "amount", offset: 0 }])
+    // 3D LUT texture binding (no sampler: the body reads via textureLoad)
+    expect(pass.source).not.toContain("@group(0) @binding(5) var samp: sampler")
+    expect(pass.source).toContain("@group(0) @binding(6) var lutTex: texture_3d<f32>")
+    // Baked cube size; the body does manual trilinear via textureLoad
+    // (32-bit float textures are not filterable in WebGPU)
+    expect(pass.source).toContain("const LUT_SIZE: f32 = 13.0;")
+    expect(pass.source).not.toContain("LUT_SCALE")
+    expect(pass.source).not.toContain("LUT_BIAS")
+    expect(pass.source).toContain("textureLoad(lutTex, vec3<i32>(x0.x, x0.y, x0.z), 0)")
+    expect(pass.source).toContain("let lutColor = mix(")
+    expect(pass.source).not.toContain("textureSampleLevel(lutTex")
+    // Both ends are sRGB (source in, display out): no color conversion at all
+    expect(pass.source).not.toContain("linearToSrgb")
+    expect(pass.source).not.toContain("srgbToLinear")
+    expect(pass.source).toContain("var color = src.rgb;")
+    expect(pass.source).toContain("let outColor = color;")
+    // Final pass writes the sRGB display texture
+    expect(pass.source).toContain("rgba8unorm")
+    expect(pass.usesSampler).toBe(false)
+    expect(pass.usesFrame).toBe(false)
+  })
+
+  it("round-trips a middle LUT pass through sRGB", () => {
+    const layers: ChainLayerInfo[] = [
+      { type: "exposure", body: renderExposure, fieldKeys: ["stops"] },
+      lutLayer(),
+      { type: "saturation", body: renderSaturation, fieldKeys: ["amount"] },
+    ]
+    const result = generateChainSource(layers)
+    expect(result.passes).toHaveLength(3)
+    const lut = result.passes[1]!
+    expect(lut.lutId).toBe("luts/colorslide/fuji_velvia_50.cube")
+    // Linear intermediate in → decode to sRGB for the body
+    expect(lut.source).toContain(
+      "var color = linearToSrgb(clamp(src.rgb, vec3<f32>(0.0), vec3<f32>(1.0)));",
+    )
+    // sRGB body output → re-encode to linear for the next pass
+    expect(lut.source).toContain("let outColor = srgbToLinear(color);")
+    // Middle pass: linear intermediate out
+    expect(lut.source).toContain("rgba16float")
+    expect(lut.source).not.toContain("rgba8unorm")
+    // The final pass still encodes to sRGB for the display texture
+    expect(result.passes[2]!.source).toContain("linearToSrgb(clamp")
+    expect(result.passes[2]!.source).toContain("rgba8unorm")
+  })
+
+  it("skips the input decode when the LUT layer is first", () => {
+    const layers: ChainLayerInfo[] = [
+      lutLayer(),
+      { type: "exposure", body: renderExposure, fieldKeys: ["stops"] },
+    ]
+    const result = generateChainSource(layers)
+    expect(result.passes).toHaveLength(2)
+    const lut = result.passes[0]!
+    expect(lut.lutId).toBe("luts/colorslide/fuji_velvia_50.cube")
+    // Reads the sRGB source directly — no decode call (the helper
+    // function is embedded but never invoked)
+    expect(lut.source).toContain("var color = src.rgb;")
+    expect(lut.source).not.toContain("linearToSrgb(clamp(src.rgb")
+    // Not last: re-encodes to linear for the exposure pass
+    expect(lut.source).toContain("let outColor = srgbToLinear(color);")
+    expect(lut.source).toContain("rgba16float")
+  })
+
+  it("does not insert a linearize pass ahead of a LUT-first chain", () => {
+    // The LUT pass reads the sRGB source directly, and a sampling body
+    // after it (clarity) reads the LUT pass's linear output — so no
+    // extra linearize pass is needed.
+    const layers: ChainLayerInfo[] = [
+      lutLayer(),
+      { type: "clarity", body: renderClarity, fieldKeys: ["amount"] },
+    ]
+    const result = generateChainSource(layers)
+    expect(result.passes).toHaveLength(2)
+    expect(result.passes[0]!.lutId).toBe("luts/colorslide/fuji_velvia_50.cube")
+    expect(result.passes[1]!.source).toContain("textureSampleLevel(srcTex, samp")
+    expect(result.passes[1]!.source).not.toContain("srgbToLinear(src.rgb)")
+  })
+
+  it("decodes a LUT pass that follows a sampling first layer", () => {
+    // Clarity first: the assembler inserts a linearize pass, so the LUT
+    // pass's input is a linear intermediate and needs the sRGB decode.
+    const layers: ChainLayerInfo[] = [
+      { type: "clarity", body: renderClarity, fieldKeys: ["amount"] },
+      lutLayer(),
+    ]
+    const result = generateChainSource(layers)
+    expect(result.passes).toHaveLength(3)
+    expect(result.passes[0]!.uniforms).toHaveLength(0)
+    expect(result.passes[0]!.source).toContain("srgbToLinear(src.rgb)")
+    const lut = result.passes[2]!
+    expect(lut.lutId).toBe("luts/colorslide/fuji_velvia_50.cube")
+    expect(lut.source).toContain("var color = linearToSrgb(clamp(src.rgb")
+    // LUT pass is last: output goes straight to the sRGB display texture
+    expect(lut.source).toContain("let outColor = color;")
+    expect(lut.source).toContain("rgba8unorm")
+  })
+
+  it("throws when a LUT body has no cube reference", () => {
+    const layers: ChainLayerInfo[] = [
+      { type: "lut", body: renderLut, fieldKeys: ["amount"] },
+    ]
+    expect(() => generateChainSource(layers)).toThrow(/missing its cube reference/)
   })
 
   it("binds every uniform reference used by a body to u_params", () => {

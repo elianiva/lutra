@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import { EditorRoute } from '../route'
-import { SourceImage } from './message'
+import { SourceImage, Catalog } from './message'
 import { Layer } from '@lutra/engine'
 
 // Surfaced layers (committed) render through the chain; a draft layer renders
@@ -28,6 +28,11 @@ export const Model = Schema.Struct({
   scale: Schema.Number,
   offsetX: Schema.Number,
   offsetY: Schema.Number,
+  // The LUT library catalog; null until the startup fetch lands (the LUT
+  // tool stays disabled while null).
+  catalog: Schema.NullOr(Catalog),
+  // Whether the inline LUT picker is expanded in the layer drawer.
+  lutPickerOpen: Schema.Boolean,
   // True while a RenderChain command is in flight; renderNow skips dispatch
   // while pending so the GPU queue never backs up (the in-flight render
   // re-triggers with the newest state when it completes).
@@ -57,6 +62,8 @@ export const initialModel = (): Model => ({
   scale: 1,
   offsetX: 0,
   offsetY: 0,
+  catalog: null,
+  lutPickerOpen: false,
   renderPending: false,
   renderedStamp: 0,
   revision: 0,

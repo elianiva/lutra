@@ -235,7 +235,7 @@
   </tr>
 </table>
 
-<p>Two consequences of <code>textureLoad</code> matter throughout this codebase. First, there is <strong>no bilinear filtering</strong> in compute — if you want smooth sampling you must write it yourself or use a separate pass with a sampler (Lutra does the latter for display, see §3). Second, you can write to a texture only if it was created with the <em>storage</em> usage flag, and only into formats WebGPU allows for storage.</p>
+<p>Two consequences of <code>textureLoad</code> matter throughout this codebase. First, there is <strong>no bilinear filtering</strong> in compute — if you want smooth sampling you must write it yourself or use a separate pass with a sampler (Lutra does the former in the LUT body, see §7.11, and the latter for display, see §3). Second, you can write to a texture only if it was created with the <em>storage</em> usage flag, and only into formats WebGPU allows for storage.</p>
 
 <p>Everything a shader touches — textures, buffers — is declared at the top of the shader with <code>@group(0) @binding(n)</code> attributes, and then <em>bound</em> at runtime by the frontend. Lutra uses <code>layout: 'auto'</code>, which means WebGPU computes the binding layout from what the shader actually references: declare a binding the shader never uses, and it simply doesn&rsquo;t exist in the layout. The frontend mirrors this — it only attaches bindings the shader statically uses.<label for="sn-auto" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-auto" class="margin-toggle"/><span class="sidenote">This is why the assembler reports <code>usesFrame</code> per pass: the frame-counter binding (binding 3) exists only in passes whose body mentions <code>u_frame</code> — currently only grain. If the frontend attached it anyway, <code>createBindGroup</code> would throw a validation error.</span></p>
 
@@ -259,7 +259,7 @@
 
 <ol>
   <li><strong>Upload.</strong> The source image is copied to the GPU once into <code>srcTex</code>, an <code>rgba8unorm</code> texture. &ldquo;unorm&rdquo; means unsigned normalized: 8 bits per channel, and the shader sees values as floats in [0,1]. Crucially, the bytes are the file&rsquo;s raw values — which are <em>sRGB-encoded</em> (see §4 for why that matters).</li>
-  <li><strong>Compute passes.</strong> Each adjustment layer runs as its own compute pass. Pass 0 (or the first layer pass) decodes sRGB to linear light. Intermediate passes shuttle linear values through <code>rgba16float</code> textures (half-precision floats). The final pass encodes back to sRGB and writes the display texture <code>dstTex</code>.</li>
+  <li><strong>Compute passes.</strong> Each adjustment layer runs as its own compute pass. Pass 0 (or the first layer pass) decodes sRGB to linear light. Intermediate passes shuttle linear values through <code>rgba16float</code> textures (half-precision floats). The final pass encodes back to sRGB and writes the display texture <code>dstTex</code>. The one exception is the LUT layer, whose pass decodes to sRGB, applies the film cube, and re-encodes (§7.11).</li>
   <li><strong>Blit.</strong> A tiny fragment shader draws a fullscreen triangle, sampling <code>dstTex</code> with a bilinear sampler and writing to the canvas swapchain. This is the one place Lutra gets free texture filtering — and it doubles as the upscale/downscale step, since the canvas is sized to the image. No flip is needed: compute and canvas both have their origin at the top-left.</li>
   <li><strong>Export (not shown).</strong> Only on export does a frame leave the GPU: <code>dstTex</code> is copied to a CPU buffer (rows padded to 256-byte alignment — a WebGPU requirement), un-padded, and turned into an <code>ImageBitmap</code> for PNG encoding.</li>
 </ol>
@@ -307,6 +307,8 @@
   <li><strong>0.2140</strong> — the linear value of sRGB <em>mid-grey</em> (the sRGB value 0.5, un-gamma&rsquo;d). It&rsquo;s the pivot for contrast. <label for="sn-pivot" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-pivot" class="margin-toggle"/><span class="sidenote">Photographers often quote 18% grey (0.18 linear) as &ldquo;middle grey&rdquo;; that&rsquo;s a metering standard, not a display midpoint. Lutra pivots on the value that <em>looks</em> halfway between black and white on screen — sRGB 0.5, i.e. 0.2140 linear — which is what a contrast pivot should do.</span></li>
   <li><strong>(0.2126, 0.7152, 0.0722)</strong> — the Rec. 709 <em>luma</em> coefficients: how much each channel contributes to perceived brightness. Green dominates, as your eyes would expect. Every &ldquo;luma&rdquo; in this codebase is this dot product.</li>
 </ul>
+
+<p><strong>The one exception: LUT.</strong> The film-emulation LUT layer deliberately steps out of linear light. Its cube — a 13&sup3; color lookup table from the vendored G&rsquo;MIC film presets (§7.11) — is authored against sRGB-encoded values, because G&rsquo;MIC&rsquo;s working space is sRGB. Apply it to linear values and the film curves land in the wrong place: lifted blacks wash out further, the S-curves shift. So the LUT pass decodes its linear input to sRGB, applies the cube, mixes by strength, and re-encodes to linear — skipping the round-trip at the chain ends, where the source and display textures are already sRGB (see docs/adr/0003). The strength mix happens in sRGB space, which is what &ldquo;50% film look&rdquo; perceptually means.</p>
 
 <h2>5 · Anatomy of a pass</h2>
 
@@ -369,6 +371,8 @@ fn main(@builtin(global_invocation_id) id: vec3&lt;u32&gt;) {
 
 <p>Two textures suffice because passes run strictly in sequence — pass <em>i</em> only needs the output of <em>i&minus;1</em>, which is always on the &ldquo;other&rdquo; texture. Why <code>rgba16float</code> (half precision, 2 bytes per channel) instead of 8-bit like the display texture? Every 8-bit intermediate would re-quantize the image to 256 levels per channel per pass — after ten layers you&rsquo;d see banding in smooth gradients, especially in the dark toe where 8 bits are coarsest. Half floats carry the linear values losslessly enough that the only quantization the viewer ever sees is the final one.</p>
 
+<p><strong>The LUT pass inverts the boundaries.</strong> A LUT layer&rsquo;s pass is the same skeleton with three differences. It declares an extra binding — <code>lutTex</code>, a 13&sup3; <code>texture_3d&lt;f32&gt;</code> (rgba32float) at binding 6 — and it omits the sampler: 32-bit float textures are not filterable in WebGPU, so the body does its own trilinear interpolation with <code>textureLoad</code> over the baked <code>LUT_SIZE</code> (the body maps each color to texel space <code>c·(SIZE−1)</code>, lerps the eight surrounding texels, and never touches edge-adjacent memory, so no bleed outside the cube). And its color-space boundaries are inverted: the input is decoded <em>to</em> sRGB (unless the pass reads the sRGB source directly) and the output is re-encoded <em>from</em> sRGB (unless the pass is last and writes the display texture). The body itself only reads and mixes — and it is the one body that is guaranteed sRGB-encoded input, by contract.</p>
+
 <h2>6 · How a slider value reaches a shader</h2>
 
 <p>When you drag a slider, the flow is:</p>
@@ -382,9 +386,9 @@ fn main(@builtin(global_invocation_id) id: vec3&lt;u32&gt;) {
 
 <p>The frame counter works the same way: <code>u_frame</code> is a tiny uniform written once per render (not per pass), and only passes that mention it get the binding. Grain uses it to animate the noise across frames.</p>
 
-<h2>7 · The ten effects</h2>
+<h2>7 · The eleven effects</h2>
 
-<p>Every effect is a pure function of the pixel&rsquo;s linear <code>color</code> — and, for two of them, of the pass&rsquo;s input texture at other coordinates. The slider ranges come from the registry (<code>registry.ts</code>); the math below is the whole story. <code>l{i}_field</code> means &ldquo;this layer&rsquo;s slider value.&rdquo;</p>
+<p>Every effect is a pure function of the pixel&rsquo;s <code>color</code> — linear light for ten of them, sRGB-encoded for the LUT layer (§7.11) — and, for two of them, of the pass&rsquo;s input texture at other coordinates. The slider ranges come from the registry (<code>registry.ts</code>); the math below is the whole story. <code>l{i}_field</code> means &ldquo;this layer&rsquo;s slider value.&rdquo;</p>
 
 <h3>7.1 Exposure — <code>stops</code> &isin; [&minus;3, 3] <span class="tag good">correct</span></h3>
 
@@ -462,26 +466,25 @@ color = mix(vec3&lt;f32&gt;(luma), color, 1.0 + l0_amount);</code></pre>
 
 <p>The textbook saturation formula: blend each pixel between its <em>gray equivalent</em> (luma everywhere) and itself. <code>mix(a, b, t)</code> is <code>a&middot;(1&minus;t) + b&middot;t</code>, so with <code>t = 1 + amount</code>: amount 0 is identity, &minus;1 makes <code>t = 0</code> and the image goes fully grayscale, +1 makes <code>t = 2</code> — the color is pushed <em>past</em> its gray value, doubling chroma. Linear-light luma mixing keeps hues stable while desaturating, which naive per-channel averaging does not.</p>
 
-<h3>7.7 Grain — <code>amount</code> &isin; [0, 1] <span class="tag note">stepping stone</span></h3>
+<h3>7.7 Grain — <code>texture</code>, <code>size</code>, <code>blur</code> &isin; [0, 1] <span class="tag good">correct</span></h3>
 
-<pre><code>var h: u32 = coord.x * 374761393u + coord.y * 668265263u + u_frame * 974634337u;
-h = (h ^ (h &gt;&gt; 13u)) * 1103515245u;
-h = h ^ (h &gt;&gt; 16u);
-let n = f32(h &amp; 0x00ffffffu) * (1.0 / 16777216.0);   // [0, 1)
-let noise = n - 0.5;                                  // [-0.5, 0.5)
-let L = clamp(dot(color, vec3&lt;f32&gt;(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
-let w = max(1.0 - abs(L - 0.5) * 1.4, 0.35);          // midtone weighting
-color += noise * l0_amount * 0.08 * w;
-color = clamp(color, vec3&lt;f32&gt;(0.0), vec3&lt;f32&gt;(1.0));</code></pre>
+<pre><code>// 3-octave FBM over smooth value noise (integer lattice hash, quintic easing)
+let f = 0.6667 * pow(0.15, l0_size);         // cell: 1.5 px (0) &rarr; 10 px (1), log scale
+let p = 0.6 - 0.45 * l0_blur;                 // octave persistence 0.6 &rarr; 0.15
+let n = grainNoise(coord * f, u_frame) * inv
+    + grainNoise(coord * f * 2 + offset1, u_frame * 3u + 17u) * (p * inv)
+    + grainNoise(coord * f * 4 + offset2, u_frame * 5u + 29u) * (p * p * inv);  // weights sum to 1
+let noise = (n - 0.5) * 2.0;                  // &plusmn;1
+let w = max(1.0 - abs(L - 0.5) * 1.4, 0.35);  // midtone weighting
+color += noise * l0_texture * 0.15 * w;</code></pre>
 
-<p>Grain is deterministic pseudo-random noise per pixel. The random source is an <em>integer hash</em>: a few multiply/xor/shift operations on the pixel coordinate (plus the frame counter) that produce a well-scattered 24-bit value, mapped to [&minus;0.5, 0.5). Integer hashing costs only bit-twiddling — no transcendentals — which matters at 12 megapixels &times; 60 fps. The frame seed makes the noise shimmer between frames, like real film. Two layers of tasteful shaping:</p>
+<p>Grain is three-octave FBM over <em>smooth value noise</em>: the lattice is hashed with an integer hash (a few multiply/xor/shift operations on the pixel coordinate plus the frame counter — no transcendentals), and the hash values are interpolated with quintic easing. Because neighboring pixels share lattice points, the noise is spatially coherent — it clumps and swirls like real film grain, instead of the per-pixel static the mobile version shipped. The frame seed animates the whole field between frames, and octaves 2 and 3 use derived seeds so they decorrelate over time. Three knobs shape it:</p>
 
 <ul>
-  <li><strong>Midtone weighting.</strong> The triangle <code>w</code> peaks at luma 0.5 and falls to a floor of 0.35 at the extremes, so blacks and whites stay relatively clean while grain concentrates where film grain is most visible.</li>
-  <li><strong>Amplitude 0.08.</strong> The maximum swing is &plusmn;0.08 in linear light (&asymp; &plusmn;20 sRGB levels at midtone) at full slider — a visible, film-like grain level that still leaves midtones legible.<label for="sn-grain" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-grain" class="margin-toggle"/><span class="sidenote">Grain is added in linear light, but the display curve stretches dark values — so the same linear amplitude looks larger in the shadows on screen. AMD&rsquo;s &ldquo;Fine Art of Film Grain&rdquo; (GPUOpen) discusses exactly this effect and how real pipelines scale grain with the signal. The midtone floor keeps blacks from lifting outright, but per-signal scaling is a future refinement.</span></li>
+  <li><strong><code>texture</code> — strength.</strong> Amplitude &plusmn;0.15 linear at full slider (&asymp; &plusmn;14 sRGB levels at midtone), masked to midtones: the triangle <code>w</code> peaks at luma 0.5 and falls to a floor of 0.35 at the extremes, so blacks and whites stay relatively clean.<label for="sn-grain" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-grain" class="margin-toggle"/><span class="sidenote">Grain is added in linear light, but the display curve stretches dark values — so the same linear amplitude looks larger in the shadows on screen. AMD&rsquo;s &ldquo;Fine Art of Film Grain&rdquo; (GPUOpen) discusses exactly this effect and how real pipelines scale grain with the signal. The midtone floor keeps blacks from lifting outright, but per-signal scaling is a future refinement.</span></li>
+  <li><strong><code>size</code> — noise cell.</strong> Log scale from 1.5 px fine speckle to 10 px chunky grain.</li>
+  <li><strong><code>blur</code> — octave persistence.</strong> 0.6 &rarr; 0.15; the octave weights are normalized by construction (1, p, p&sup2; &divide; their sum), so blur changes the character of the grain, not its loudness.</li>
 </ul>
-
-<p>This is a deliberate stepping stone: per-pixel white noise has no spatial coherence, so real film grain&rsquo;s clumping is absent. The compute architecture is chosen so a proper FBM (fractal Brownian motion) grain can replace it using workgroup shared memory.</p>
 
 <h3>7.8 Vignette — <code>amount</code>, <code>size</code> <span class="tag good">correct</span></h3>
 
@@ -514,13 +517,32 @@ color.b = mix(color.b, bVal, strength);</code></pre>
 
 <p>Two properties come from the pass architecture rather than from this snippet: <code>srcTex</code> here is the <em>previous pass&rsquo;s output</em> — so the split is applied to the fully graded image, not the raw source — and it is guaranteed linear light, so the sampled channels share the pipeline&rsquo;s transfer function. The assembler inserts the standalone linearize pass when CA is the first layer (§5).</p>
 
-<h3>7.10 Clarity — <code>amount</code> &isin; [&minus;1, 1] <span class="tag warn">placeholder</span></h3>
+<h3>7.10 Clarity — <code>amount</code> &isin; [&minus;1, 1] <span class="tag good">correct</span></h3>
 
-<pre><code>let luma = dot(color, vec3&lt;f32&gt;(0.2126, 0.7152, 0.0722));
+<pre><code>let uv = (vec2&lt;f32&gt;(coord) + vec2&lt;f32&gt;(0.5)) / u_resolution;
+let s = vec2&lt;f32&gt;(4.0) / u_resolution;             // 4 px radius
+let avg = (color                                  // 9-tap box blur, bilinear-sampled
+  + textureSampleLevel(srcTex, samp, uv + vec2&lt;f32&gt;(-s.x, 0.0), 0.0).rgb
+  + textureSampleLevel(srcTex, samp, uv + vec2&lt;f32&gt;(s.x, 0.0), 0.0).rgb
+  + &hellip; 8 neighbors &hellip;) * (1.0 / 9.0);
+let luma = dot(avg, vec3&lt;f32&gt;(0.2126, 0.7152, 0.0722));
 let mask = clamp(1.0 - 4.0 * (luma - 0.5) * (luma - 0.5), 0.0, 1.0);  // midtone tent
-color += l0_amount * mask * 0.15;</code></pre>
+color += l0_amount * mask * (color - avg) * 0.5;  // unsharp-mask push away from the mean</code></pre>
 
-<p>Real clarity is <em>local</em> contrast: it compares each pixel against its neighborhood and sharpens midtone structure — a multi-tap filter. The current implementation is an explicit placeholder: a uniform midtone lift (the tent mask peaks at luma 0.5 and is 0 at black/white), which brightens or darkens midtones globally. It&rsquo;s labeled as a placeholder in code and docs so nobody mistakes it for the real thing. The pass architecture is exactly the foundation the real implementation needs — a pass can read neighboring pixels from its input texture, and workgroup shared memory will make the multi-tap kernel efficient.</p>
+<p>Clarity is <em>local</em> contrast: a 9-tap box blur of the pass input (radius 4 px, sampled bilinearly so the sparse kernel stays smooth), then an unsharp-mask push away from the local mean — positive <code>amount</code> enhances structure, negative flattens it. The midtone mask keeps the effect off deep blacks and blown highlights where halos read as artifacts. This is the neighbor-sampling body the pass architecture exists for: <code>srcTex</code> is the previous pass&rsquo;s output in linear light, so the neighborhood reflects all earlier adjustments. The radius is fixed at 4 px — a true wide-radius clarity would need a separable blur or mip pyramid.</p>
+
+<h3>7.11 LUT — <code>amount</code> &isin; [0, 1] <span class="tag good">correct</span></h3>
+
+<pre><code>// color is sRGB-encoded here, by pass contract (§5)
+let p = clamp(color, vec3&lt;f32&gt;(0.0), vec3&lt;f32&gt;(1.0)) * (LUT_SIZE - 1.0);
+let x0 = vec3&lt;i32&gt;(floor(p));
+let f = p - vec3&lt;f32&gt;(x0);
+let c000 = textureLoad(lutTex, vec3&lt;i32&gt;(x0.x, x0.y, x0.z), 0).rgb;
+// ...seven more corners, lerped by f (manual trilinear)...
+let lutColor = mix(/* ... */);
+color = mix(color, lutColor, l0_amount);</code></pre>
+
+<p>The LUT layer applies a film-emulation color cube — a 13&sup3; lookup table from the vendored G&rsquo;MIC film presets (296 cubes, mirrored from <code>YahiaAngelo/Film-Luts</code>, shipped as static assets and loaded on demand). The cube lives on the GPU as a 13&sup3; rgba32float 3D texture. The format is deliberate: rgba16float would need an f32&rarr;f16 conversion on upload, and Chrome&rsquo;s <code>writeTexture</code> conversion path is broken (raw f32 bytes land verbatim, corrupting rows) — rgba32float matches the Float32Array upload byte-for-byte, and 32-bit float textures are not filterable anyway, so the body reads the cube with <code>textureLoad</code> and performs manual trilinear interpolation over texel coordinates (the same texel-space mapping hardware filtering would use). The body operates on sRGB-encoded values (§4) — the pass boundary handles the round-trip — and <code>amount</code> mixes the graded color with the original in sRGB space, so 0 is identity and 1 is the full look. The LUT id is a layer field, not a uniform: the render request carries an id&rarr;cube map, and an unresolvable id fails the render rather than silently skipping the grade.</p>
 
 <h2>8 · Reference tables</h2>
 
@@ -543,16 +565,16 @@ color += l0_amount * mask * 0.15;</code></pre>
   <tr><td><code>u_resolution</code></td><td>vec2&lt;f32&gt; uniform</td><td>image size for coordinate math</td></tr>
   <tr><td><code>u_frame</code></td><td>u32 uniform</td><td>animation seed (grain); binding exists only when used</td></tr>
   <tr><td><code>u_params</code></td><td>one f32 per layer field</td><td>the slider values; binding exists only when the layer has fields</td></tr>
+  <tr><td><code>lutTex</code></td><td>rgba32float 3D, 13&sup3; (one per applied LUT, cached by id)</td><td>the film color cube; binding 6, only on LUT passes</td></tr>
 </table>
 
 <h2>9 · Known limitations and the roadmap</h2>
 
 <ul>
-  <li><strong>Clarity is a placeholder</strong> — real local contrast needs a multi-tap kernel; the pass architecture is ready for it.</li>
-  <li><strong>Grain is white noise</strong> — FBM grain with neighbor coherence (workgroup shared memory) is the planned replacement; amplitude behavior near black needs per-signal scaling.</li>
   <li><strong>White balance is channel-scale approximation</strong> — the CCT/LMS-based model is the upgrade path.</li>
   <li><strong>Shadows/highlights are additive lifts</strong> — fine for v1; lift/gamma/gain separation would match professional tools.</li>
   <li><strong>Alpha is passed through untouched</strong> — correct for photographs (opaque), a known limitation once compositing appears.</li>
+  <li><strong>LUTs load on demand</strong> — each film cube fetches (~131KB) the first time it is applied, then stays cached in memory and on the GPU; the 296-cube library is vendored, so nothing depends on a third-party server at runtime.</li>
   <li>Every generated pass can be validated against <code>naga</code>, the reference WGSL validator — the shaders are pure strings, so a syntax bug in a generated pass is caught before it ever reaches a browser.</li>
 </ul>
 

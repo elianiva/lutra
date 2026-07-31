@@ -16,7 +16,9 @@ import type { BodyRenderer } from "../types"
 // Uses textureSampleLevel with an explicit LOD: textureSample is
 // fragment-stage only (implicit derivatives), and compute stages must
 // request a level.
-export const renderClarity: BodyRenderer = (i) => `
+export const renderClarity: BodyRenderer = (i) => ({
+  samplesInput: true,
+  stmts: `
 // clarity (local contrast)
 {
   let uv = (vec2<f32>(coord) + vec2<f32>(0.5)) / u_resolution;
@@ -34,4 +36,5 @@ export const renderClarity: BodyRenderer = (i) => `
   let mask = clamp(1.0 - 4.0 * (luma - 0.5) * (luma - 0.5), 0.0, 1.0);
   color += l${i}_amount * mask * (color - avg) * 0.5;
 }
-`
+`,
+})

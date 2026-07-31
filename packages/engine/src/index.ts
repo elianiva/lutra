@@ -36,6 +36,12 @@ export type { ChainError } from "./chain"
 export { createRenderRequest, GpuError } from "./render"
 export type { RenderRequest } from "./render"
 
+// LUT parsing
+// Pure `.cube` text → `LutCube`; fetching bytes and GPU upload are the
+// frontend's concern.
+export { parseCube, LutParseError } from "./luts/cube"
+export type { LutCube } from "./luts/cube"
+
 // Shader generation
 export { generateChainSource, SRGB_TO_LINEAR, WORKGROUP_SIZE } from "./shaders"
 export type { ChainLayerInfo, ChainPass, ChainShader, UniformSlot, BodyRenderer } from "./shaders"
@@ -53,4 +59,5 @@ export {
   renderVignette,
   renderChromaticAberration,
   renderClarity,
+  renderLut,
 } from "./shaders"

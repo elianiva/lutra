@@ -5,7 +5,7 @@ import {
   _resetLayerCounter,
   makeRegistry,
 } from "./layers"
-import type { Layer, LayerId } from "./layers"
+import type { Layer } from "./layers"
 import {
   addLayer,
   removeLayer,
@@ -25,6 +25,7 @@ import {
   renderVignette,
   renderChromaticAberration,
   renderClarity,
+  renderLut,
 } from "./shaders"
 
 // ---- helpers ----
@@ -40,11 +41,14 @@ const registry = makeRegistry({
   vignette: renderVignette,
   chromaticAberration: renderChromaticAberration,
   clarity: renderClarity,
+  lut: renderLut,
 })
 
 /** Read a numeric field from a layer, typed as unknown→number. */
 function field(layer: Layer, key: string): number {
-  return (layer as Record<string, unknown>)[key] as number
+  const record: Record<string, unknown> = layer
+  const value = record[key]
+  return typeof value === "number" ? value : NaN
 }
 
 describe("createLayer", () => {
@@ -88,12 +92,14 @@ describe("createLayer", () => {
   })
 
   it("throws on unknown type", () => {
-    expect(() => createLayer("nonexistent" as unknown as "exposure", registry)).toThrow()
+    // An unknown type key reaches the registry lookup as a runtime string;
+    // Object.create(null) supplies an arbitrary key without an assertion.
+    expect(() => createLayer(Object.create(null), registry)).toThrow()
   })
 
   it("creates every layer type", () => {
     const types = ["exposure", "contrast", "shadows", "highlights", "whiteBalance",
-      "saturation", "grain", "vignette", "chromaticAberration", "clarity"] as const
+      "saturation", "grain", "vignette", "chromaticAberration", "clarity", "lut"] as const
     for (const t of types) {
       const layer = createLayer(t, registry)
       expect(layer.type).toBe(t)
@@ -151,7 +157,8 @@ describe("chain operations", () => {
 
     it("returns same chain if id not found", () => {
       chain = addLayer(chain, "exposure", registry)
-      const result = removeLayer(chain, "nonexistent" as LayerId)
+      // A fresh id from the counter is not in the chain
+      const result = removeLayer(chain, nextLayerId())
       expect(result).toHaveLength(1)
     })
   })
