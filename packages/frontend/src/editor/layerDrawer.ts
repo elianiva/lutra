@@ -157,10 +157,14 @@ const chainRow = (
           ),
           h.span([h.Class('tnum text-xs text-muted')], [ui.formatValue(layer)]),
           h.div([h.Class('flex items-center gap-0.5')], [
-            reorderButton(h, 'Move up', ArrowUp, index < total - 1, () =>
+            // The chain renders bottom-up (newest at the top), so "Move up"
+            // targets a higher chain index and "Move down" a lower one. A row
+            // at the top of the stack can't move up; a row at the bottom can't
+            // move down.
+            reorderButton(h, 'Move up', ArrowUp, index === total - 1, () =>
               ReorderedLayer({ from: index, to: index + 1 }),
             ),
-            reorderButton(h, 'Move down', ArrowDown, index > 0, () =>
+            reorderButton(h, 'Move down', ArrowDown, index === 0, () =>
               ReorderedLayer({ from: index, to: index - 1 }),
             ),
             h.button(
