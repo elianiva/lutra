@@ -1,5 +1,10 @@
 export { VERSION } from "./version"
 
+// Branded primitives — constructors (Brand.nominal) and the schemas
+// (Schema.fromBrand) that decode the same branded types at boundaries.
+// Each name exports both its value (constructor/schema) and type meaning.
+export { LayerId, LayerIdSchema, LutId, LutIdSchema, FieldKey, FieldKeySchema } from "./brands"
+
 // Layer data model
 export {
   createLayer,
@@ -8,7 +13,6 @@ export {
   makeRegistry,
   LAYER_TYPES,
   Layer,
-  LayerId,
   LayerPatch,
 } from "./layers"
 export type {

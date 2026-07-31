@@ -1,5 +1,6 @@
 import type { Schema } from "effect"
 import type { BodyRenderer } from "../shaders/types"
+import type { LayerType } from "./schemas"
 import {
   ChromaticAberrationLayer,
   ClarityLayer,
@@ -87,7 +88,7 @@ export interface RegistryInput {
   lut: BodyRenderer
 }
 
-export function makeRegistry(bodies: RegistryInput): Record<string, LayerEntry> {
+export function makeRegistry(bodies: RegistryInput): Record<LayerType, LayerEntry> {
   return {
     exposure: {
       schema: ExposureLayer,
@@ -175,4 +176,4 @@ export function makeRegistry(bodies: RegistryInput): Record<string, LayerEntry> 
   }
 }
 
-export type LayerRegistry = Record<string, LayerEntry>
+export type LayerRegistry = Record<LayerType, LayerEntry>

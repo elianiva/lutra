@@ -1,10 +1,5 @@
 import { Schema } from "effect"
-
-// ---- branded primitives ----
-
-/** Branded layer identifier. */
-export const LayerId = Schema.String.pipe(Schema.brand("LayerId"))
-export type LayerId = typeof LayerId.Type
+import { LayerIdSchema, LutIdSchema } from "../brands"
 
 // ---- layer type literal ----
 
@@ -27,7 +22,7 @@ export type LayerType = (typeof LAYER_TYPES)[number]
 // ---- common fields ----
 
 const LayerCommon = Schema.Struct({
-  id: LayerId,
+  id: LayerIdSchema,
   visible: Schema.Boolean,
 })
 
@@ -113,9 +108,10 @@ export const LutLayer = Schema.Struct({
   ...LayerCommon.fields,
   type: Schema.Literal("lut"),
   // Reference into the LUT library (the vendored file path, e.g.
-  // "luts/colorslide/fuji_velvia_50.cube"). A string, not a uniform — the
-  // engine resolves it to a cube via the render request's LUT map.
-  lutId: Schema.String,
+  // "luts/colorslide/fuji_velvia_50.cube"). A branded `LutId`, not a
+  // uniform — the engine resolves it to a cube via the render request's
+  // LUT map.
+  lutId: LutIdSchema,
   amount: Schema.Number,
 })
 export type LutLayer = typeof LutLayer.Type
@@ -174,7 +170,7 @@ export const ClarityParams = Schema.Struct({ amount: Schema.Number })
 export type ClarityParams = typeof ClarityParams.Type
 
 export const LutParams = Schema.Struct({
-  lutId: Schema.String,
+  lutId: LutIdSchema,
   amount: Schema.Number,
 })
 export type LutParams = typeof LutParams.Type

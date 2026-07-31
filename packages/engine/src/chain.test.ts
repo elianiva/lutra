@@ -7,6 +7,7 @@ import {
   LAYER_TYPES,
 } from "./layers"
 import type { Layer } from "./layers"
+import { FieldKey } from "./brands"
 import {
   addLayer,
   removeLayer,
@@ -46,7 +47,7 @@ const registry = makeRegistry({
 })
 
 /** Read a numeric field from a layer, typed as unknown→number. */
-function field(layer: Layer, key: string): number {
+function field(layer: Layer, key: FieldKey): number {
   const record: Record<string, unknown> = layer
   const value = record[key]
   return typeof value === "number" ? value : NaN
@@ -79,7 +80,7 @@ describe("createLayer", () => {
       expect(layer.type).toBe(type)
       expect(layer.visible).toBe(true)
       for (const [key, expected] of Object.entries(defaults[type]!)) {
-        expect(field(layer, key)).toBe(expected)
+        expect(field(layer, FieldKey(key))).toBe(expected)
       }
     }
   })
@@ -190,7 +191,7 @@ describe("chain operations", () => {
         type: "exposure",
         patch: { stops: 1.5 },
       })
-      expect(field(result[0]!, "stops")).toBe(1.5)
+      expect(field(result[0]!, FieldKey("stops"))).toBe(1.5)
     })
 
     it("returns unchanged if type not found", () => {
@@ -209,8 +210,8 @@ describe("chain operations", () => {
         type: "exposure",
         patch: { stops: 1.5 },
       })
-      expect(field(chain[0]!, "stops")).toBe(0)
-      expect(field(result[0]!, "stops")).toBe(1.5)
+      expect(field(chain[0]!, FieldKey("stops"))).toBe(0)
+      expect(field(result[0]!, FieldKey("stops"))).toBe(1.5)
     })
   })
 

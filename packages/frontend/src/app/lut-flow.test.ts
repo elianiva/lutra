@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { LutId } from '@lutra/engine'
 import { initialModel } from './model'
 import { update } from './update'
 import { SelectedTool, ChangedDraftLut, ToggledLutPicker, ConfirmedDraft } from './message'
@@ -9,13 +10,13 @@ import type { Catalog } from './message'
 const catalog: Catalog = [
   {
     name: 'Kodak 2393 Cuspclip',
-    lut_file: 'luts/print/kodak_2393_cuspclip.cube',
+    lut_file: LutId('luts/print/kodak_2393_cuspclip.cube'),
     category: 'Print',
     thumbnail: 'thumbnails/print/kodak_2393_cuspclip.jpg',
   },
   {
     name: 'Agfa APX 100',
-    lut_file: 'luts/bw/agfa_apx_100.cube',
+    lut_file: LutId('luts/bw/agfa_apx_100.cube'),
     category: 'Bw',
     thumbnail: 'thumbnails/bw/agfa_apx_100.jpg',
   },
@@ -43,7 +44,7 @@ describe('LUT layer flow', () => {
 
   it('swaps the draft LUT and re-renders', () => {
     const [withDraft] = update(withCatalog, SelectedTool({ type: 'lut' }))
-    const [model] = update(withDraft, ChangedDraftLut({ lutId: 'luts/bw/agfa_apx_100.cube' }))
+    const [model] = update(withDraft, ChangedDraftLut({ lutId: LutId('luts/bw/agfa_apx_100.cube') }))
     if (model.draft?.type === 'lut') {
       expect(model.draft.lutId).toBe('luts/bw/agfa_apx_100.cube')
     }

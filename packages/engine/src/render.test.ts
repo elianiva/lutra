@@ -18,6 +18,7 @@ import {
   renderLut,
 } from "./shaders"
 import type { LutCube } from "./luts/cube"
+import { LutId } from "./brands"
 
 // ---- helpers ----
 
@@ -47,14 +48,14 @@ const fakeBitmap = (): ImageBitmap => new FakeBitmap()
 
 const cube2: LutCube = { size: 2, data: new Float32Array(8 * 3) }
 
-const lutsWith = (lutId: string, cube: LutCube): ReadonlyMap<string, LutCube> => {
-  const luts = new Map<string, LutCube>()
+const lutsWith = (lutId: LutId, cube: LutCube): ReadonlyMap<LutId, LutCube> => {
+  const luts = new Map<LutId, LutCube>()
   luts.set(lutId, cube)
   return luts
 }
 
 // Contextually typed by the return annotation — no assertion needed.
-const lutLayer = (lutId: string): Layer => ({
+const lutLayer = (lutId: LutId): Layer => ({
   id: nextLayerId(),
   visible: true,
   type: "lut",
@@ -62,7 +63,7 @@ const lutLayer = (lutId: string): Layer => ({
   amount: 1,
 })
 
-const VELVIA = "luts/colorslide/fuji_velvia_50.cube"
+const VELVIA = LutId("luts/colorslide/fuji_velvia_50.cube")
 
 // ---- tests ----
 
@@ -98,7 +99,7 @@ describe("createRenderRequest with LUT layers", () => {
   it("fails with GpuError when a LUT layer references an unknown id", () => {
     const message = Effect.runSync(
       Effect.catchTag(
-        createRenderRequest([lutLayer("luts/does/not_exist.cube")], registry, fakeBitmap(), 0, new Map()),
+        createRenderRequest([lutLayer(LutId("luts/does/not_exist.cube"))], registry, fakeBitmap(), 0, new Map()),
         "GpuError",
         (err) => Effect.succeed(err.message),
       ),

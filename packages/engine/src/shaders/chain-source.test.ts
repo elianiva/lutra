@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { generateChainSource, WORKGROUP_SIZE } from "../shaders/chain-source"
 import type { ChainLayerInfo } from "../shaders/chain-source"
+import { FieldKey, LutId } from "../brands"
 import { renderExposure } from "../shaders/bodies/exposure"
 import { renderContrast } from "../shaders/bodies/contrast"
 import { renderSaturation } from "../shaders/bodies/saturation"
@@ -15,8 +16,8 @@ import { renderLut } from "../shaders/bodies/lut"
 const lutLayer = (over: Partial<ChainLayerInfo> = {}): ChainLayerInfo => ({
   type: "lut",
   body: renderLut,
-  fieldKeys: ["amount"],
-  lut: { id: "luts/colorslide/fuji_velvia_50.cube", size: 13 },
+  fieldKeys: [FieldKey("amount")],
+  lut: { id: LutId("luts/colorslide/fuji_velvia_50.cube"), size: 13 },
   ...over,
 })
 
@@ -39,7 +40,7 @@ describe("generateChainSource", () => {
 
   it("merges linearize+encode into the single pass of a one-layer chain", () => {
     const layers: ChainLayerInfo[] = [
-      { type: "exposure", body: renderExposure, fieldKeys: ["stops"] },
+      { type: "exposure", body: renderExposure, fieldKeys: [FieldKey("stops")] },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(1)
@@ -62,9 +63,9 @@ describe("generateChainSource", () => {
 
   it("assigns uniform slots per pass", () => {
     const layers: ChainLayerInfo[] = [
-      { type: "exposure", body: renderExposure, fieldKeys: ["stops"] },
-      { type: "contrast", body: renderContrast, fieldKeys: ["amount"] },
-      { type: "saturation", body: renderSaturation, fieldKeys: ["amount"] },
+      { type: "exposure", body: renderExposure, fieldKeys: [FieldKey("stops")] },
+      { type: "contrast", body: renderContrast, fieldKeys: [FieldKey("amount")] },
+      { type: "saturation", body: renderSaturation, fieldKeys: [FieldKey("amount")] },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(3)
@@ -75,7 +76,7 @@ describe("generateChainSource", () => {
 
   it("keeps multi-field layers in one pass", () => {
     const layers: ChainLayerInfo[] = [
-      { type: "vignette", body: renderVignette, fieldKeys: ["amount", "size"] },
+      { type: "vignette", body: renderVignette, fieldKeys: [FieldKey("amount"), FieldKey("size")] },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(1)
@@ -89,8 +90,8 @@ describe("generateChainSource", () => {
 
   it("uses rgba16float intermediates between passes and sRGB only for the last", () => {
     const layers: ChainLayerInfo[] = [
-      { type: "exposure", body: renderExposure, fieldKeys: ["stops"] },
-      { type: "saturation", body: renderSaturation, fieldKeys: ["amount"] },
+      { type: "exposure", body: renderExposure, fieldKeys: [FieldKey("stops")] },
+      { type: "saturation", body: renderSaturation, fieldKeys: [FieldKey("amount")] },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(2)
@@ -106,7 +107,7 @@ describe("generateChainSource", () => {
 
   it("inserts a linearize pass when the first layer samples the source", () => {
     const layers: ChainLayerInfo[] = [
-      { type: "chromaticAberration", body: renderChromaticAberration, fieldKeys: ["amount"] },
+      { type: "chromaticAberration", body: renderChromaticAberration, fieldKeys: [FieldKey("amount")] },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(2)
@@ -123,8 +124,8 @@ describe("generateChainSource", () => {
 
   it("does not double-linearize when a sampling layer is not first", () => {
     const layers: ChainLayerInfo[] = [
-      { type: "exposure", body: renderExposure, fieldKeys: ["stops"] },
-      { type: "chromaticAberration", body: renderChromaticAberration, fieldKeys: ["amount"] },
+      { type: "exposure", body: renderExposure, fieldKeys: [FieldKey("stops")] },
+      { type: "chromaticAberration", body: renderChromaticAberration, fieldKeys: [FieldKey("amount")] },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(2)
@@ -137,7 +138,7 @@ describe("generateChainSource", () => {
     // must read linear light, so a linearize pass precedes it and its own
     // pass carries the binding-5 sampler.
     const layers: ChainLayerInfo[] = [
-      { type: "clarity", body: renderClarity, fieldKeys: ["amount"] },
+      { type: "clarity", body: renderClarity, fieldKeys: [FieldKey("amount")] },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(2)
@@ -156,7 +157,7 @@ describe("generateChainSource", () => {
 
   it("emits module-scope helpers ahead of the entry point", () => {
     const layers: ChainLayerInfo[] = [
-      { type: "grain", body: renderGrain, fieldKeys: ["texture", "size", "blur"] },
+      { type: "grain", body: renderGrain, fieldKeys: [FieldKey("texture"), FieldKey("size"), FieldKey("blur")] },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(1)
@@ -168,7 +169,7 @@ describe("generateChainSource", () => {
 
   it("flags usesFrame per pass and on the shader", () => {
     const exposure: ChainLayerInfo[] = [
-      { type: "exposure", body: renderExposure, fieldKeys: ["stops"] },
+      { type: "exposure", body: renderExposure, fieldKeys: [FieldKey("stops")] },
     ]
     const result = generateChainSource(exposure)
     expect(result.usesFrame).toBe(false)
@@ -176,8 +177,8 @@ describe("generateChainSource", () => {
     expect(result.passes[0]!.source).not.toContain("u_frame")
 
     const withGrain: ChainLayerInfo[] = [
-      { type: "exposure", body: renderExposure, fieldKeys: ["stops"] },
-      { type: "grain", body: renderGrain, fieldKeys: ["texture", "size", "blur"] },
+      { type: "exposure", body: renderExposure, fieldKeys: [FieldKey("stops")] },
+      { type: "grain", body: renderGrain, fieldKeys: [FieldKey("texture"), FieldKey("size"), FieldKey("blur")] },
     ]
     const grainResult = generateChainSource(withGrain)
     expect(grainResult.usesFrame).toBe(true)
@@ -217,9 +218,9 @@ describe("generateChainSource", () => {
 
   it("round-trips a middle LUT pass through sRGB", () => {
     const layers: ChainLayerInfo[] = [
-      { type: "exposure", body: renderExposure, fieldKeys: ["stops"] },
+      { type: "exposure", body: renderExposure, fieldKeys: [FieldKey("stops")] },
       lutLayer(),
-      { type: "saturation", body: renderSaturation, fieldKeys: ["amount"] },
+      { type: "saturation", body: renderSaturation, fieldKeys: [FieldKey("amount")] },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(3)
@@ -242,7 +243,7 @@ describe("generateChainSource", () => {
   it("skips the input decode when the LUT layer is first", () => {
     const layers: ChainLayerInfo[] = [
       lutLayer(),
-      { type: "exposure", body: renderExposure, fieldKeys: ["stops"] },
+      { type: "exposure", body: renderExposure, fieldKeys: [FieldKey("stops")] },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(2)
@@ -263,7 +264,7 @@ describe("generateChainSource", () => {
     // extra linearize pass is needed.
     const layers: ChainLayerInfo[] = [
       lutLayer(),
-      { type: "clarity", body: renderClarity, fieldKeys: ["amount"] },
+      { type: "clarity", body: renderClarity, fieldKeys: [FieldKey("amount")] },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(2)
@@ -276,7 +277,7 @@ describe("generateChainSource", () => {
     // Clarity first: the assembler inserts a linearize pass, so the LUT
     // pass's input is a linear intermediate and needs the sRGB decode.
     const layers: ChainLayerInfo[] = [
-      { type: "clarity", body: renderClarity, fieldKeys: ["amount"] },
+      { type: "clarity", body: renderClarity, fieldKeys: [FieldKey("amount")] },
       lutLayer(),
     ]
     const result = generateChainSource(layers)
@@ -293,7 +294,7 @@ describe("generateChainSource", () => {
 
   it("throws when a LUT body has no cube reference", () => {
     const layers: ChainLayerInfo[] = [
-      { type: "lut", body: renderLut, fieldKeys: ["amount"] },
+      { type: "lut", body: renderLut, fieldKeys: [FieldKey("amount")] },
     ]
     expect(() => generateChainSource(layers)).toThrow(/missing its cube reference/)
   })
@@ -305,12 +306,12 @@ describe("generateChainSource", () => {
     // the shader fails to compile (unknown identifier), which surfaces in the
     // browser as an invalid BindGroupLayout/pipeline error cascade.
     const layers: ChainLayerInfo[] = [
-      { type: "exposure", body: renderExposure, fieldKeys: ["stops"] },
-      { type: "contrast", body: renderContrast, fieldKeys: ["amount"] },
-      { type: "whiteBalance", body: renderWhiteBalance, fieldKeys: ["temp", "tint"] },
-      { type: "saturation", body: renderSaturation, fieldKeys: ["amount"] },
-      { type: "vignette", body: renderVignette, fieldKeys: ["amount", "size"] },
-      { type: "chromaticAberration", body: renderChromaticAberration, fieldKeys: ["amount"] },
+      { type: "exposure", body: renderExposure, fieldKeys: [FieldKey("stops")] },
+      { type: "contrast", body: renderContrast, fieldKeys: [FieldKey("amount")] },
+      { type: "whiteBalance", body: renderWhiteBalance, fieldKeys: [FieldKey("temp"), FieldKey("tint")] },
+      { type: "saturation", body: renderSaturation, fieldKeys: [FieldKey("amount")] },
+      { type: "vignette", body: renderVignette, fieldKeys: [FieldKey("amount"), FieldKey("size")] },
+      { type: "chromaticAberration", body: renderChromaticAberration, fieldKeys: [FieldKey("amount")] },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(6)

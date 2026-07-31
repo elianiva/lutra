@@ -1,7 +1,7 @@
 import { Schema as S } from 'effect'
 import { Message } from 'foldkit'
 import { AppRoute } from '../route'
-import { LayerId, LAYER_TYPES } from '@lutra/engine'
+import { FieldKeySchema, LAYER_TYPES, LayerIdSchema, LutIdSchema } from '@lutra/engine'
 
 export const ChangedRoute = Message.m('ChangedRoute', { route: AppRoute })
 export const Navigated = Message.m('Navigated', { request: S.Unknown })
@@ -41,10 +41,11 @@ export const ClearedImage = Message.m('ClearedImage')
 
 // The catalog shape from the vendored film_luts.json (schema mirrors the
 // store's LutCatalogEntry type so the message can cross the foldkit
-// boundary as a validated value).
+// boundary as a validated value). lut_file is the LUT library reference —
+// the lutId brand rides it through the message boundary.
 const CatalogEntry = S.Struct({
   name: S.String,
-  lut_file: S.String,
+  lut_file: LutIdSchema,
   category: S.String,
   thumbnail: S.String,
 })
@@ -72,38 +73,38 @@ export const SelectedTool = Message.m('SelectedTool', {
 export const ConfirmedDraft = Message.m('ConfirmedDraft')
 export const CancelledDraft = Message.m('CancelledDraft')
 export const UpdatedDraftParam = Message.m('UpdatedDraftParam', {
-  field: S.String,
+  field: FieldKeySchema,
   value: S.Number,
 })
 /** Pick a different LUT on the active LUT draft. */
-export const ChangedDraftLut = Message.m('ChangedDraftLut', { lutId: S.String })
+export const ChangedDraftLut = Message.m('ChangedDraftLut', { lutId: LutIdSchema })
 
 // ---- committed chain ----
 
-export const SelectedLayer = Message.m('SelectedLayer', { id: S.NullOr(LayerId) })
-export const RemovedLayer = Message.m('RemovedLayer', { id: LayerId })
+export const SelectedLayer = Message.m('SelectedLayer', { id: S.NullOr(LayerIdSchema) })
+export const RemovedLayer = Message.m('RemovedLayer', { id: LayerIdSchema })
 export const ReorderedLayer = Message.m('ReorderedLayer', {
   from: S.Number,
   to: S.Number,
 })
 export const ToggledLayerVisibility = Message.m('ToggledLayerVisibility', {
-  id: LayerId,
+  id: LayerIdSchema,
 })
 export const UpdatedLayerParam = Message.m('UpdatedLayerParam', {
-  id: LayerId,
-  field: S.String,
+  id: LayerIdSchema,
+  field: FieldKeySchema,
   value: S.Number,
 })
 /** Pick a different LUT on a committed, selected LUT layer. */
-export const ChangedLayerLut = Message.m('ChangedLayerLut', { id: LayerId, lutId: S.String })
+export const ChangedLayerLut = Message.m('ChangedLayerLut', { id: LayerIdSchema, lutId: LutIdSchema })
 /** Expand/collapse the inline LUT picker in the layer drawer. */
 export const ToggledLutPicker = Message.m('ToggledLutPicker')
 /** For toggled layers (White Balance, Vignette): cycle the active field shown in the drawer. */
-export const CycledToggledField = Message.m('CycledToggledField', { id: LayerId })
+export const CycledToggledField = Message.m('CycledToggledField', { id: LayerIdSchema })
 
 // ---- layer drawer reorder (drag) ----
 
-export const StartedLayerReorder = Message.m('StartedLayerReorder', { id: LayerId })
+export const StartedLayerReorder = Message.m('StartedLayerReorder', { id: LayerIdSchema })
 export const MovedLayerReorder = Message.m('MovedLayerReorder', { over: S.Number })
 
 // ---- rendering ----

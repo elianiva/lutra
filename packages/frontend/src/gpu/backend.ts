@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from 'effect'
-import { GpuError, WORKGROUP_SIZE, type ChainPass, type LutCube, type RenderRequest } from '@lutra/engine'
+import { GpuError, WORKGROUP_SIZE, type ChainPass, type LutCube, type LutId, type RenderRequest } from '@lutra/engine'
 
 // ---- service ----
 
@@ -169,9 +169,9 @@ export const GpuBackendLive = Layer.effect(
     // Device-scoped LUT texture cache: a cube uploads once per lutId and
     // survives image changes (session teardown), because the cube is a
     // property of the layer, not of the image.
-    const lutTextures = new Map<string, GPUTexture>()
+    const lutTextures = new Map<LutId, GPUTexture>()
 
-    const ensureLutTexture = (lutId: string, cube: LutCube): GPUTexture => {
+    const ensureLutTexture = (lutId: LutId, cube: LutCube): GPUTexture => {
       const cached = lutTextures.get(lutId)
       if (cached) return cached
 
@@ -331,7 +331,7 @@ export const GpuBackendLive = Layer.effect(
       pass: ChainPass,
       src: GPUTexture,
       dst: GPUTexture,
-      luts: ReadonlyMap<string, LutCube>,
+      luts: ReadonlyMap<LutId, LutCube>,
     ): ComputeEntry => {
       const cacheKey = pass.lutId !== undefined ? `${pass.source}::lut:${pass.lutId}` : pass.source
       const cached = s.compute[cacheKey]

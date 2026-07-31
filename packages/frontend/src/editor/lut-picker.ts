@@ -5,6 +5,7 @@ import { lutName } from './layer-meta'
 import { ToggledLutPicker } from '../app/message'
 import type { AppMessage } from '../app/message'
 import type { Model } from '../app/model'
+import type { LutId } from '@lutra/engine'
 import type { LutCatalogEntry } from '../luts/store'
 
 /**
@@ -16,8 +17,8 @@ import type { LutCatalogEntry } from '../luts/store'
 export const lutPicker = (
   h: HtmlBuilder<AppMessage>,
   model: Model,
-  lutId: string,
-  onPick: (lutId: string) => AppMessage,
+  lutId: LutId,
+  onPick: (lutId: LutId) => AppMessage,
 ) => {
   const catalog = model.catalog ?? []
   const current = lutName(catalog, lutId)
@@ -65,8 +66,8 @@ const groupByCategory = (
 const pickerBody = (
   h: HtmlBuilder<AppMessage>,
   catalog: ReadonlyArray<LutCatalogEntry>,
-  lutId: string,
-  onPick: (lutId: string) => AppMessage,
+  lutId: LutId,
+  onPick: (lutId: LutId) => AppMessage,
 ) =>
   h.div(
     [h.Class('flex max-h-72 flex-col gap-1 overflow-y-auto rounded border border-border bg-bg p-2')],
@@ -98,7 +99,7 @@ const lutRow = (
   h: HtmlBuilder<AppMessage>,
   entry: LutCatalogEntry,
   selected: boolean,
-  onPick: (lutId: string) => AppMessage,
+  onPick: (lutId: LutId) => AppMessage,
 ) =>
   h.button(
     [

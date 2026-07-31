@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect"
-import type { Layer } from "./layers/schemas"
+import { FieldKey, LutId } from "./brands"
+import type { Layer, LayerType } from "./layers/schemas"
 import type { LayerEntry } from "./layers/registry"
 import type { LutCube } from "./luts/cube"
 import { generateChainSource, type ChainLayerInfo, type ChainPass, type ChainShader } from "./shaders/chain-source"
@@ -18,7 +19,7 @@ export class GpuError extends Schema.TaggedErrorClass<GpuError>()("GpuError", {
  * members are plain object types, so a widened annotation (not an
  * assertion) yields the record view.
  */
-const readField = (layer: Layer, key: string): unknown => {
+const readField = (layer: Layer, key: FieldKey): unknown => {
   const record: Record<string, unknown> = layer
   return record[key]
 }
@@ -70,7 +71,7 @@ export interface RenderRequest {
    * Cubes referenced by LUT layers in the chain, keyed by lutId. The GPU
    * backend uploads each cube to a 3D texture once and caches it.
    */
-  readonly luts: ReadonlyMap<string, LutCube>
+  readonly luts: ReadonlyMap<LutId, LutCube>
 }
 
 /**
@@ -81,10 +82,10 @@ export interface RenderRequest {
  */
 export function createRenderRequest(
   chain: ReadonlyArray<Layer>,
-  registry: Record<string, LayerEntry>,
+  registry: Record<LayerType, LayerEntry>,
   srcBitmap: ImageBitmap,
   frame: number,
-  luts: ReadonlyMap<string, LutCube>,
+  luts: ReadonlyMap<LutId, LutCube>,
 ): Effect.Effect<RenderRequest, GpuError> {
   return Effect.gen(function* () {
     // Build chain-layer info for the assembler
@@ -99,25 +100,26 @@ export function createRenderRequest(
       // LUT map the caller provided. The engine stays pure — it never
       // fetches or parses cubes, and an unresolvable id is a hard error.
       if (l.type === "lut") {
-        const lutId = readField(l, "lutId")
+        const lutId = readField(l, FieldKey("lutId"))
         if (typeof lutId !== "string") {
           return yield* Effect.fail(new GpuError({ message: "LUT layer is missing a lutId" }))
         }
-        const cube = luts.get(lutId)
+        const id = LutId(lutId)
+        const cube = luts.get(id)
         if (!cube) {
-          return yield* Effect.fail(new GpuError({ message: `Unknown LUT: ${lutId}` }))
+          return yield* Effect.fail(new GpuError({ message: `Unknown LUT: ${id}` }))
         }
         chainLayers.push({
           type: l.type,
           body: entry.body,
-          fieldKeys: Object.keys(entry.fields),
-          lut: { id: lutId, size: cube.size },
+          fieldKeys: Object.keys(entry.fields).map(FieldKey),
+          lut: { id, size: cube.size },
         })
       } else {
         chainLayers.push({
           type: l.type,
           body: entry.body,
-          fieldKeys: Object.keys(entry.fields),
+          fieldKeys: Object.keys(entry.fields).map(FieldKey),
         })
       }
     }

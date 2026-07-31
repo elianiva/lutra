@@ -1,7 +1,7 @@
 import { Schema } from 'effect'
 import { EditorRoute } from '../route'
 import { SourceImage, Catalog } from './message'
-import { Layer } from '@lutra/engine'
+import { LayerIdSchema, Layer } from '@lutra/engine'
 
 // Surfaced layers (committed) render through the chain; a draft layer renders
 // on top in preview and is discarded on cancel, per context.md's draft flow.
@@ -10,7 +10,7 @@ import { Layer } from '@lutra/engine'
 
 // Which field a toggled layer (White Balance, Vignette) currently shows in the
 // drawer. Keyed by layer id so each toggled layer remembers its own selection.
-const ActiveFieldIndex = Schema.Record(Schema.String, Schema.Number)
+const ActiveFieldIndex = Schema.Record(LayerIdSchema, Schema.Number)
 
 export const Model = Schema.Struct({
   route: EditorRoute,
@@ -21,7 +21,7 @@ export const Model = Schema.Struct({
   draft: Schema.NullOr(Layer),
   // Which committed layer the drawer is focused on (the draft takes priority
   // when present).
-  selectedLayerId: Schema.NullOr(Schema.String),
+  selectedLayerId: Schema.NullOr(LayerIdSchema),
   // Per-layer index into the toggled layer's two fields.
   activeFieldIndex: ActiveFieldIndex,
   // Canvas pan/zoom driven by wheel + drag on the center stage.

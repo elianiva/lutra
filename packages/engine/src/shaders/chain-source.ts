@@ -1,5 +1,7 @@
 import { SRGB_TO_LINEAR } from "./colorspace"
 import type { BodyRenderer, BodySource } from "./types"
+import type { FieldKey, LutId } from "../brands"
+import type { LayerType } from "../layers/schemas"
 
 /**
  * Square workgroup dimension for the generated compute shaders. 256
@@ -12,15 +14,15 @@ export const WORKGROUP_SIZE = 16
 
 /** Per-layer entry used by the assembler. */
 export interface ChainLayerInfo {
-  readonly type: string
+  readonly type: LayerType
   readonly body: BodyRenderer
-  readonly fieldKeys: ReadonlyArray<string>
+  readonly fieldKeys: ReadonlyArray<FieldKey>
   /**
    * LUT layers only: the cube reference. The id flows through to the
    * pass so the frontend binds the right texture; the size is baked into
    * the shader as the sampling coordinate scale.
    */
-  readonly lut?: { readonly id: string; readonly size: number }
+  readonly lut?: { readonly id: LutId; readonly size: number }
 }
 
 /** One compute pass: a single layer, or a pure linearize/copy step. */
@@ -50,7 +52,7 @@ export interface ChainPass {
    * LUT layers only: the cube id this pass applies. The frontend binds
    * the matching 3D texture (binding 6) and caches it keyed by this id.
    */
-  readonly lutId?: string
+  readonly lutId?: LutId
 }
 
 /** Result of assembling a chain into an ordered list of WGSL compute passes. */
@@ -73,7 +75,7 @@ export interface UniformSlot {
   /** Layer index in the chain (0-based). */
   readonly layerIndex: number
   /** The field key on the layer (e.g. "stops", "amount"). */
-  readonly field: string
+  readonly field: FieldKey
   /** Offset into this pass's uniform buffer (in f32 slots). */
   readonly offset: number
 }
@@ -235,7 +237,7 @@ interface LutPassOptions {
   readonly helpers: string
   readonly uniforms: ReadonlyArray<UniformSlot>
   /** The cube id (frontend binds the matching 3D texture). */
-  readonly lutId: string
+  readonly lutId: LutId
   /** Cube dimension; baked into the sampling coordinate scale. */
   readonly lutSize: number
   /**

@@ -1,6 +1,6 @@
 import { Data } from "effect"
 import type { Layer, LayerPatch, LayerType } from "./layers/schemas"
-import type { LayerId } from "./layers/schemas"
+import type { LayerId } from "./brands"
 import type { LayerRegistry } from "./layers/registry"
 import { createLayer } from "./layers/defaults"
 

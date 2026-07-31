@@ -18,9 +18,9 @@ import {
 } from '../app/message'
 import type { AppMessage } from '../app/message'
 import type { Model } from '../app/model'
-import type { Layer, LayerType } from '@lutra/engine'
+import { FieldKey, type Layer, type LayerType } from '@lutra/engine'
 
-const num = (layer: Layer, key: string): number => {
+const num = (layer: Layer, key: FieldKey): number => {
   const record: Record<string, unknown> = layer
   const value = record[key]
   return typeof value === 'number' ? value : NaN
@@ -90,7 +90,7 @@ const draftRow = (h: HtmlBuilder<AppMessage>, model: Model, layer: Layer) => {
           ...(layer.type === 'lut'
             ? [lutPicker(h, model, layer.lutId, (lutId) => ChangedDraftLut({ lutId }))]
             : []),
-          ...Object.keys(ui.fields).map((field) => draftSlider(h, layer, field, ui)),
+          ...Object.keys(ui.fields).map((field) => draftSlider(h, layer, FieldKey(field), ui)),
         ],
       ),
       h.div([h.Class('flex items-center justify-end gap-2 px-4 py-2')], [
@@ -120,7 +120,7 @@ const draftRow = (h: HtmlBuilder<AppMessage>, model: Model, layer: Layer) => {
 const draftSlider = (
   h: HtmlBuilder<AppMessage>,
   layer: Layer,
-  field: string,
+  field: FieldKey,
   ui: (typeof LAYER_UI)[LayerType],
 ) => {
   const fieldUi = ui.fields[field]!
@@ -202,7 +202,7 @@ const chainRow = (
                 ? [lutPicker(h, model, layer.lutId, (lutId) => ChangedLayerLut({ id: layer.id, lutId }))]
                 : []),
               ...Object.keys(ui.fields).map((field) =>
-                chainSlider(h, layer, field, ui, model),
+                chainSlider(h, layer, FieldKey(field), ui, model),
               ),
             ],
           )
@@ -214,7 +214,7 @@ const chainRow = (
 const chainSlider = (
   h: HtmlBuilder<AppMessage>,
   layer: Layer,
-  field: string,
+  field: FieldKey,
   ui: (typeof LAYER_UI)[LayerType],
   model: Model,
 ) => {

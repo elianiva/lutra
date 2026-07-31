@@ -1,6 +1,6 @@
 import { Effect, Option, Schema } from 'effect'
 import { Command, File as FoldkitFile, Render } from 'foldkit'
-import { createLayer, createRenderRequest, GpuError, Layer, type LayerType, type LutCube } from '@lutra/engine'
+import { createLayer, createRenderRequest, GpuError, Layer, type LayerType, type LutCube, type LutId } from '@lutra/engine'
 import { GpuBackend } from '../gpu/backend'
 import { LutStore } from '../luts/store'
 import {
@@ -94,10 +94,10 @@ export const LoadCatalog = Command.define('LoadCatalog', {
  */
 const resolveLuts = (
   layers: ReadonlyArray<Layer>,
-): Effect.Effect<ReadonlyMap<string, LutCube>, GpuError, LutStore> =>
+): Effect.Effect<ReadonlyMap<LutId, LutCube>, GpuError, LutStore> =>
   Effect.gen(function* () {
     const store = yield* LutStore
-    const luts = new Map<string, LutCube>()
+    const luts = new Map<LutId, LutCube>()
     for (const layer of layers) {
       if (layer.type !== 'lut') continue
       if (luts.has(layer.lutId)) continue

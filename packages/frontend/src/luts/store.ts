@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from 'effect'
-import { GpuError, parseCube, type LutCube } from '@lutra/engine'
+import { GpuError, parseCube, type LutCube, type LutId } from '@lutra/engine'
 
 // The LUT library lives in the frontend's static assets (vendored from the
 // Film-Luts mirror — see packages/frontend/public/luts/README.md). This
@@ -12,7 +12,8 @@ import { GpuError, parseCube, type LutCube } from '@lutra/engine'
 /** One entry of the upstream film_luts.json, verbatim. */
 export interface LutCatalogEntry {
   readonly name: string
-  readonly lut_file: string
+  /** The LUT library reference — doubles as the layer's lutId. */
+  readonly lut_file: LutId
   readonly category: string
   readonly thumbnail: string
 }
@@ -23,7 +24,7 @@ export interface LutStoreShape {
   /** The LUT library catalog (film_luts.json). Memoized; failures are not cached. */
   readonly getCatalog: () => Effect.Effect<ReadonlyArray<LutCatalogEntry>, GpuError>
   /** Parse the `.cube` for a lutId, memoized per id. Failures are not cached. */
-  readonly getCube: (lutId: string) => Effect.Effect<LutCube, GpuError>
+  readonly getCube: (lutId: LutId) => Effect.Effect<LutCube, GpuError>
 }
 
 export class LutStore extends Context.Service<LutStore, LutStoreShape>()('LutStore') {}
@@ -45,7 +46,7 @@ const fetchText = (path: string): Effect.Effect<string, GpuError> =>
   })
 
 /** Parse `.cube` text, mapping parser throws into GpuError. */
-const parseCubeText = (lutId: string, text: string): Effect.Effect<LutCube, GpuError> =>
+const parseCubeText = (lutId: LutId, text: string): Effect.Effect<LutCube, GpuError> =>
   Effect.try({
     try: () => parseCube(text),
     catch: (cause) =>
@@ -64,7 +65,7 @@ const parseCatalog = (text: string): ReadonlyArray<LutCatalogEntry> => {
 // Memoization: cache the Effect itself so concurrent callers share one
 // fetch; drop the cache entry on failure so a retry re-fetches.
 let catalogEffect: Effect.Effect<ReadonlyArray<LutCatalogEntry>, GpuError> | null = null
-const cubeCache = new Map<string, Effect.Effect<LutCube, GpuError>>()
+const cubeCache = new Map<LutId, Effect.Effect<LutCube, GpuError>>()
 
 export const LutStoreLive = Layer.succeed(LutStore, {
   getCatalog: () => {

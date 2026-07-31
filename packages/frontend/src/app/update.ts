@@ -4,6 +4,7 @@ import { GpuBackend } from '../gpu/backend'
 import { LutStore } from '../luts/store'
 import { createLayerFor, PickImageFile, DecodeImage, RenderChain, ExportImage } from './command'
 import { LAYER_UI } from '../editor/layer-meta'
+import type { LayerId } from '@lutra/engine'
 import type { Model } from './model'
 import type { AppMessage } from './message'
 
@@ -13,9 +14,9 @@ type Result = readonly [
 ]
 
 const ensureFieldIndex = (
-  index: Record<string, number>,
-  layerId: string,
-): Record<string, number> =>
+  index: Record<LayerId, number>,
+  layerId: LayerId,
+): Record<LayerId, number> =>
   index[layerId] === undefined ? { ...index, [layerId]: 0 } : index
 
 /** Fire a RenderChain command for the current chain + draft. Bumps `revision`

@@ -8,7 +8,7 @@ import type { Layer, LayerType } from "./schemas"
  */
 export function createLayer<K extends LayerType>(
   type: K,
-  registry: Record<string, LayerEntry>,
+  registry: Record<LayerType, LayerEntry>,
 ): Extract<Layer, { type: K }> {
   const entry = registry[type]
   if (!entry) {
