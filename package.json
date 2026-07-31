@@ -11,11 +11,13 @@
     "lint": "vp lint",
     "typecheck": "turbo typecheck",
     "test": "turbo test",
-    "infra:deploy": "alchemy deploy --yes",
+    "infra:deploy": "alchemy deploy --stage prod --yes",
     "vendor:luts": "bun scripts/vendor-luts.ts"
   },
   "dependencies": {
-    "alchemy": "2.0.0-beta.66"
+    "@effect/platform-node": "4.0.0-beta.102",
+    "alchemy": "2.0.0-beta.66",
+    "effect": "^4.0.0-beta.102"
   },
   "devDependencies": {
     "@foldkit/oxlint-plugin": "^0.5.0",
@@ -24,5 +26,5 @@
     "typescript": "^7.0.2",
     "vite-plus": "^0.2.6"
   },
-  "packageManager": "pnpm@9.15.4"
+  "packageManager": "pnpm@11.18.0"
 }

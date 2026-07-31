@@ -1,2 +1,5 @@
 packages:
   - 'packages/*'
+allowBuilds:
+  msgpackr-extract: true
+  workerd: true

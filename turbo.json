@@ -5,9 +5,6 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
-    "deploy": {
-      "dependsOn": ["build"]
-    },
     "test": {},
     "typecheck": {},
     "dev": {
