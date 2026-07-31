@@ -16,8 +16,8 @@
   --color-muted: #6b7280;
   --color-accent: #0a0a0b;
 
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
-    sans-serif;
+  --font-sans: 'Electrolize', ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code',
     monospace;
 }
