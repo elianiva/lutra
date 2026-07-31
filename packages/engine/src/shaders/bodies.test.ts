@@ -75,15 +75,34 @@ describe("shader bodies", () => {
   })
 
   describe("renderGrain", () => {
-    it("emits WGSL with integer hash noise", () => {
-      const src = renderGrain(0)
-      expect(src).toContain("374761393u")
-      expect(src).toContain("coord.x")
-      expect(src).toContain("u_frame")
-      expect(src).toContain("l0_amount")
-      // Retuned amplitude: ±0.08 linear at full amount, not ±0.5
-      expect(src).toContain("0.08")
-      expect(src).toContain("clamp(color, vec3<f32>(0.0), vec3<f32>(1.0))")
+    it("emits FBM value-noise helpers and animated statements", () => {
+      const result = renderGrain(0)
+      expect(typeof result).toBe("object")
+      if (typeof result === "string") {
+        throw new Error("expected BodySource")
+      }
+      // Module-scope helpers: lattice hash, quintic easing, value noise
+      expect(result.helpers).toContain("fn grainHash")
+      expect(result.helpers).toContain("fn grainQuintic")
+      expect(result.helpers).toContain("fn grainNoise")
+      expect(result.helpers).toContain("374761393u")
+      // Statements: three octaves, animated via u_frame, midtone-weighted
+      expect(result.stmts).toContain("grainNoise(vec2<f32>(coord) * f, u_frame)")
+      expect(result.stmts).toContain("f * 2.0")
+      expect(result.stmts).toContain("f * 4.0")
+      // Three knobs: texture (strength), size (cell), blur (persistence)
+      expect(result.stmts).toContain("l0_texture")
+      expect(result.stmts).toContain("l0_size")
+      expect(result.stmts).toContain("l0_blur")
+      // Log size mapping: 1.5 px (size 0) → 10 px (size 1)
+      expect(result.stmts).toContain("0.6667 * pow(0.15, l0_size)")
+      // Blur maps to octave persistence 0.6 → 0.15, normalized weights
+      expect(result.stmts).toContain("0.6 - 0.45 * l0_blur")
+      expect(result.stmts).toContain("1.0 + p + p * p")
+      // Amplitude: theoretical ±0.15 linear at full texture
+      expect(result.stmts).toContain("* 0.15 * w")
+      expect(result.stmts).toContain("(n - 0.5) * 2.0")
+      expect(result.stmts).toContain("clamp(color, vec3<f32>(0.0), vec3<f32>(1.0))")
     })
   })
 
@@ -111,15 +130,23 @@ describe("shader bodies", () => {
   })
 
   describe("renderClarity", () => {
-    it("emits WGSL placeholder with midtone lift", () => {
+    it("emits local contrast with a bilinear 9-tap neighborhood", () => {
       const src = renderClarity(0)
-      expect(src).toContain("placeholder")
+      expect(src).toContain("textureSampleLevel(srcTex, samp")
+      // Center + 8 neighbors around a 4 px radius
+      expect(src).toContain("vec2<f32>(4.0) / u_resolution")
+      expect(src).toContain("(1.0 / 9.0)")
       expect(src).toContain("l0_amount")
+      expect(src).toContain("color - avg")
+      // No longer a placeholder
+      expect(src).not.toContain("placeholder")
     })
   })
 
   describe("all bodies", () => {
     it("each body emits a non-empty string", () => {
+      const bodyOf = (r: string | { stmts: string }): string =>
+        typeof r === "string" ? r : r.stmts
       const bodies = [
         renderExposure(0),
         renderContrast(0),
@@ -133,7 +160,7 @@ describe("shader bodies", () => {
         renderClarity(0),
       ]
       for (const b of bodies) {
-        expect(b.length).toBeGreaterThan(10)
+        expect(bodyOf(b).length).toBeGreaterThan(10)
       }
     })
   })

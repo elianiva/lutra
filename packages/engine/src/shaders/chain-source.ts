@@ -1,5 +1,5 @@
 import { SRGB_TO_LINEAR } from "./colorspace"
-import type { BodyRenderer } from "./types"
+import type { BodyRenderer, BodySource } from "./types"
 
 /**
  * Square workgroup dimension for the generated compute shaders. 256
@@ -34,6 +34,13 @@ export interface ChainPass {
    * (and allocate its buffer) only when this is true.
    */
   readonly usesFrame: boolean
+  /**
+   * Whether this pass samples its input with a filtered sampler
+   * (`textureSampleLevel`; `textureSample` is fragment-stage only).
+   * Such passes expose the binding-5 sampler entry; the frontend must
+   * include it exactly when this is true.
+   */
+  readonly usesSampler: boolean
 }
 
 /** Result of assembling a chain into an ordered list of WGSL compute passes. */
@@ -64,6 +71,15 @@ export interface UniformSlot {
 // ---- pass templates ----
 
 /** Pure copy: reads the sRGB source texture and writes it unchanged. */
+/**
+ * A body renderer emits either plain statements (string) or a
+ * `BodySource` with optional module-scope helpers. Normalize to the
+ * struct form so the assembler can place helpers at module scope.
+ */
+function normalizeBody(render: string | BodySource): BodySource {
+  return typeof render === "string" ? { stmts: render } : render
+}
+
 function passthroughPass(): ChainPass {
   const source = `
 @group(0) @binding(0) var srcTex: texture_2d<f32>;
@@ -80,7 +96,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   textureStore(dstTex, coord, src);
 }
 `
-  return { source, uniforms: [], usesFrame: false }
+  return { source, uniforms: [], usesFrame: false, usesSampler: false }
 }
 
 /**
@@ -108,11 +124,13 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   textureStore(dstTex, coord, vec4<f32>(color, src.a));
 }
 `
-  return { source, uniforms: [], usesFrame: false }
+  return { source, uniforms: [], usesFrame: false, usesSampler: false }
 }
 
 interface LayerPassOptions {
   readonly body: string
+  /** Module-scope WGSL (functions) emitted ahead of the entry point. */
+  readonly helpers: string
   readonly uniforms: ReadonlyArray<UniformSlot>
   /** Decode the pass input from sRGB (first layer, when nothing pre-linearized). */
   readonly linearize: boolean
@@ -126,7 +144,14 @@ interface LayerPassOptions {
  * One layer as a compute pass. The body operates on `color` (linear
  * light); the pass owns the colorspace transitions at its boundaries.
  */
-function layerPass({ body, uniforms, linearize, encode, dstFormat }: LayerPassOptions): ChainPass {
+function layerPass({
+  body,
+  helpers,
+  uniforms,
+  linearize,
+  encode,
+  dstFormat,
+}: LayerPassOptions): ChainPass {
   const structFields = uniforms
     .map((u) => `  l${u.layerIndex}_${u.field}: f32,`)
     .join("\n")
@@ -139,7 +164,8 @@ function layerPass({ body, uniforms, linearize, encode, dstFormat }: LayerPassOp
     .map((u) => `  let l${u.layerIndex}_${u.field} = u_params.l${u.layerIndex}_${u.field};`)
     .join("\n")
 
-  const usesFrame = body.includes("u_frame")
+  const usesFrame = body.includes("u_frame") || helpers.includes("u_frame")
+  const usesSampler = body.includes("textureSample")
   const colorspace = linearize || encode ? SRGB_TO_LINEAR : ""
   const srcExpr = linearize ? "srgbToLinear(src.rgb)" : "src.rgb"
   const outExpr = encode
@@ -148,6 +174,9 @@ function layerPass({ body, uniforms, linearize, encode, dstFormat }: LayerPassOp
 
   const frameDecl = usesFrame
     ? "@group(0) @binding(3) var<uniform> u_frame: u32;\n"
+    : ""
+  const samplerDecl = usesSampler
+    ? "@group(0) @binding(5) var samp: sampler;\n"
     : ""
   const paramsDecl =
     uniforms.length > 0 ? "@group(0) @binding(4) var<uniform> u_params: LayerParams;\n" : ""
@@ -158,8 +187,9 @@ ${structDef}
 @group(0) @binding(0) var srcTex: texture_2d<f32>;
 @group(0) @binding(1) var dstTex: texture_storage_2d<${dstFormat}, write>;
 @group(0) @binding(2) var<uniform> u_resolution: vec2<f32>;
-${frameDecl}${paramsDecl}
+${frameDecl}${samplerDecl}${paramsDecl}
 ${colorspace}
+${helpers}
 @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let coord = id.xy;
@@ -179,7 +209,7 @@ ${body}
 }
 `
 
-  return { source, uniforms, usesFrame }
+  return { source, uniforms, usesFrame, usesSampler }
 }
 
 // ---- assembler ----
@@ -200,8 +230,13 @@ export function generateChainSource(layers: ReadonlyArray<ChainLayerInfo>): Chai
     return { passes: [passthroughPass()], usesFrame: false }
   }
 
-  const bodies = layers.map((layer, i) => layer.body(i))
-  const firstBodySamplesSource = bodies[0]!.includes("textureLoad")
+  const bodies = layers.map((layer, i) => normalizeBody(layer.body(i)))
+  // Sampling bodies read their pass input at neighbor offsets: the first
+  // pass's input is the sRGB source, so it needs a linearize pass ahead of
+  // it to keep sampled texels in linear light (textureLoad: CA; also
+  // textureSample: clarity).
+  const firstBodySamplesSource =
+    bodies[0]!.stmts.includes("textureLoad") || bodies[0]!.stmts.includes("textureSample")
 
   const passes: ChainPass[] = []
   if (firstBodySamplesSource) {
@@ -219,7 +254,8 @@ export function generateChainSource(layers: ReadonlyArray<ChainLayerInfo>): Chai
     const isLast = li === layers.length - 1
     passes.push(
       layerPass({
-        body: bodies[li]!,
+        body: bodies[li]!.stmts,
+        helpers: bodies[li]!.helpers ?? "",
         uniforms,
         linearize: li === 0 && !firstBodySamplesSource,
         encode: isLast,

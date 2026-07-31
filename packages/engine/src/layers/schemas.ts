@@ -78,7 +78,11 @@ export type SaturationLayer = typeof SaturationLayer.Type
 export const GrainLayer = Schema.Struct({
   ...LayerCommon.fields,
   type: Schema.Literal("grain"),
-  amount: Schema.Number,
+  // Snapseed-style grain knobs: texture = strength, size = noise cell
+  // size, blur = octave persistence (softness).
+  texture: Schema.Number,
+  size: Schema.Number,
+  blur: Schema.Number,
 })
 export type GrainLayer = typeof GrainLayer.Type
 
@@ -140,7 +144,11 @@ export type WhiteBalanceParams = typeof WhiteBalanceParams.Type
 export const SaturationParams = Schema.Struct({ amount: Schema.Number })
 export type SaturationParams = typeof SaturationParams.Type
 
-export const GrainParams = Schema.Struct({ amount: Schema.Number })
+export const GrainParams = Schema.Struct({
+  texture: Schema.Number,
+  size: Schema.Number,
+  blur: Schema.Number,
+})
 export type GrainParams = typeof GrainParams.Type
 
 export const VignetteParams = Schema.Struct({ amount: Schema.Number, size: Schema.Number })

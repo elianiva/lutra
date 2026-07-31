@@ -312,8 +312,9 @@ export const GpuBackendLive = Layer.effect(
 
       // With `layout: 'auto'` the pipeline only exposes bindings the shader
       // statically uses: binding 3 (frame) exists only when this pass reads
-      // `u_frame` (currently grain), and binding 4 (params) only when there
-      // are uniform slots. Entries must mirror that.
+      // `u_frame` (currently grain), binding 4 (params) only when there
+      // are uniform slots, and binding 5 (sampler) only when the body
+      // samples its input filtered (clarity). Entries must mirror that.
       const entries: Array<GPUBindGroupEntry> = [
         { binding: 0, resource: src.createView() },
         { binding: 1, resource: dst.createView() },
@@ -324,6 +325,9 @@ export const GpuBackendLive = Layer.effect(
       }
       if (paramsBuffer) {
         entries.push({ binding: 4, resource: { buffer: paramsBuffer } })
+      }
+      if (pass.usesSampler) {
+        entries.push({ binding: 5, resource: sampler })
       }
 
       const bindGroup = device.createBindGroup({ layout: compiled.layout, entries })
@@ -415,7 +419,15 @@ export const GpuBackendLive = Layer.effect(
             try: () => device.queue.onSubmittedWorkDone(),
             catch: (cause) => new GpuError({ message: 'GPU work failed', cause }),
           })
-        }),
+        }).pipe(
+          // Any unexpected exception (bind group/layout mismatch, browser-
+          // specific WGSL rejection) must surface as a GpuError. Without
+          // this, a defect escapes the command's catchTag and renderPending
+          // stays true forever — the app silently stops rendering.
+          Effect.catchDefect((cause: unknown) =>
+            Effect.fail(new GpuError({ message: 'Unexpected GPU error', cause })),
+          ),
+        ),
 
       snapshot: () =>
         Effect.gen(function* () {

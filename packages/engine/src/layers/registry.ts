@@ -44,7 +44,11 @@ const FIELD_META = {
     tint: { default: 0, min: -1, max: 1 },
   },
   saturation: { amount: { default: 0, min: -1, max: 1 } },
-  grain: { amount: { default: 0, min: 0, max: 1 } },
+  grain: {
+    texture: { default: 0, min: 0, max: 1 },
+    size: { default: 0, min: 0, max: 1 },
+    blur: { default: 0, min: 0, max: 1 },
+  },
   vignette: {
     amount: { default: 0, min: -1, max: 1 },
     size: { default: 0.6, min: 0.2, max: 1 },

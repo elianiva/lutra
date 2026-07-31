@@ -8,6 +8,7 @@ import { renderVignette } from "../shaders/bodies/vignette"
 import { renderChromaticAberration } from "../shaders/bodies/chromatic-aberration"
 import { renderWhiteBalance } from "../shaders/bodies/white-balance"
 import { renderGrain } from "../shaders/bodies/grain"
+import { renderClarity } from "../shaders/bodies/clarity"
 
 describe("generateChainSource", () => {
   it("emits a single passthrough pass for an empty chain", () => {
@@ -121,6 +122,40 @@ describe("generateChainSource", () => {
     expect(result.passes[1]!.source).not.toContain("srgbToLinear(src.rgb)")
   })
 
+  it("inserts a linearize pass and sampler binding when the first layer samples filtered", () => {
+    // Clarity samples its input with textureSample; as the first layer it
+    // must read linear light, so a linearize pass precedes it and its own
+    // pass carries the binding-5 sampler.
+    const layers: ChainLayerInfo[] = [
+      { type: "clarity", body: renderClarity, fieldKeys: ["amount"] },
+    ]
+    const result = generateChainSource(layers)
+    expect(result.passes).toHaveLength(2)
+    // Pass 0: pure linearize into a linear intermediate
+    expect(result.passes[0]!.source).toContain("srgbToLinear(src.rgb)")
+    expect(result.passes[0]!.source).toContain("rgba16float")
+    expect(result.passes[0]!.usesSampler).toBe(false)
+    // Pass 1: clarity samples the linear intermediate; no decode in-pass
+    expect(result.passes[1]!.source).toContain("textureSampleLevel(srcTex")
+    expect(result.passes[1]!.source).not.toContain("srgbToLinear(src.rgb)")
+    expect(result.passes[1]!.source).toContain("@group(0) @binding(5) var samp: sampler")
+    expect(result.passes[1]!.usesSampler).toBe(true)
+    // Sampler-free passes never declare binding 5
+    expect(result.passes[0]!.source).not.toContain("@group(0) @binding(5)")
+  })
+
+  it("emits module-scope helpers ahead of the entry point", () => {
+    const layers: ChainLayerInfo[] = [
+      { type: "grain", body: renderGrain, fieldKeys: ["texture", "size", "blur"] },
+    ]
+    const result = generateChainSource(layers)
+    expect(result.passes).toHaveLength(1)
+    const source = result.passes[0]!.source
+    const helperIdx = source.indexOf("fn grainNoise")
+    expect(helperIdx).toBeGreaterThanOrEqual(0)
+    expect(helperIdx).toBeLessThan(source.indexOf("@compute"))
+  })
+
   it("flags usesFrame per pass and on the shader", () => {
     const exposure: ChainLayerInfo[] = [
       { type: "exposure", body: renderExposure, fieldKeys: ["stops"] },
@@ -132,7 +167,7 @@ describe("generateChainSource", () => {
 
     const withGrain: ChainLayerInfo[] = [
       { type: "exposure", body: renderExposure, fieldKeys: ["stops"] },
-      { type: "grain", body: renderGrain, fieldKeys: ["amount"] },
+      { type: "grain", body: renderGrain, fieldKeys: ["texture", "size", "blur"] },
     ]
     const grainResult = generateChainSource(withGrain)
     expect(grainResult.usesFrame).toBe(true)

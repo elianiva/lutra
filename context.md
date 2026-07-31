@@ -18,9 +18,9 @@ Direct port of each SkSL body to WGSL by hand. The mobile SkSL bodies are the re
 
 **Chromatic aberration**: Implemented (not deferred), radial. Each layer runs as its own compute pass, so CA samples the previous pass's output (the accumulated result of earlier layers) at offsets that grow quadratically from the image center — not the source image. A dedicated linearize pass is inserted ahead of the first sampling layer so sampled texels are always linear light.
 
-**GPU pipeline**: Compute shaders for processing, render pipeline for presentation. The chain assembler emits one compute pass per layer; passes ping-pong through linear-light rgba16float intermediates (8-bit intermediates would band), and only the final pass encodes to sRGB and writes the display texture. This unlocks: real clarity (local contrast with neighbor access across passes), proper film-grain (FBM noise with neighbor coherence), and future scatter-write passes (histograms, LUT tetrahedral interpolation). Grain is a priority — the mobile's cheap per-pixel hash is not acceptable for the web engine. The processed frame never leaves the GPU on the display path — the final storage texture is blitted to the canvas swapchain by a fullscreen-triangle pass (free bilinear). Readback to an ImageBitmap happens only on export.
+**GPU pipeline**: Compute shaders for processing, render pipeline for presentation. The chain assembler emits one compute pass per layer; passes ping-pong through linear-light rgba16float intermediates (8-bit intermediates would band), and only the final pass encodes to sRGB and writes the display texture. This enables neighbor-sampling bodies: clarity runs a 9-tap bilinear blur of the previous pass's output (local contrast, unsharp-mask style, midtone-masked), and grain is 3-octave FBM value noise (integer lattice hash, quintic interpolation, animated per frame) — the mobile's per-pixel hash was pure white noise with no spatial coherence. Sampling passes expose a binding-5 sampler and use textureSampleLevel (textureSample is fragment-stage only). Future scatter-write passes (histograms, LUT tetrahedral interpolation) remain unlocked. The processed frame never leaves the GPU on the display path — the final storage texture is blitted to the canvas swapchain by a fullscreen-triangle pass (free bilinear). Readback to an ImageBitmap happens only on export.
 
-**Clarity**: Placeholder for now (midtone lift, same as mobile). Real local contrast is deferred despite compute-shader capability.
+**Clarity**: Implemented as local contrast: a 9-tap bilinear box blur (radius 4 px) of the pass input, then unsharp-mask push away from the local mean, masked to midtones. Radius is fixed — a true wide-radius clarity would need a separable blur or mip pyramid.
 
 **Scaffolding order**:
 1. Layer data model (Schema definitions, registry, `createLayer`)
@@ -95,10 +95,10 @@ Most layers expose a single parameter with one ruler slider. Two layers — **Wh
 4. **Highlights** — lifts bright tones (-1 to +1, default 0 = no-op).
 5. **White balance** — toggled: temperature (-1 to +1, default 0, cool → warm) ↔ tint (-1 to +1, default 0). Approximated with direct linear-light channel scaling (R/B ±30%, G ±20% at full slider), not a CCT-based model.
 6. **Saturation** — multiplier (-1 to +1, default 0 = no-op).
-7. **Grain** — film-grain noise overlay (0 to 1, default 0 = no-op). Hash-based, no texture.
+7. **Grain** — three Snapseed-style knobs, all 0–1 default 0 (no-op): **texture** (strength), **size** (base noise cell, log 1.5→10 px), **blur** (softness). 3-octave FBM value noise over an integer lattice hash, animated per frame. Amplitude ±0.15 linear at full texture, midtone-weighted.
 8. **Vignette** — toggled: amount (-1 to +1, default 0 = no-op) ↔ size (0.2 to 1, default 0.6).
 9. **Chromatic aberration** — radial R/B channel split (-1 to +1, default 0 = no-op).
-10. **Clarity** — midtone contrast / structure enhancement (-1 to +1, default 0 = no-op).
+10. **Clarity** — midtone local contrast / structure enhancement (-1 to +1, default 0 = no-op).
 
 ### Screens
 
@@ -111,7 +111,7 @@ _Avoid_: "color grading menu", "workspace"
 - **Main menu** — a gallery screen at `/` showing saved edits in a grid. The entry point for a multi-edit workflow.
 - **Options screen** — settings surface with storage info and "Clear all" action.
 - **Saved edit** — persisted record of source image + **edit chain** + thumbnail. Stored in IndexedDB (OPFS for source images, JSON for chain metadata).
-- **LUT layer** — a layer type that applies a 3D color cube (`.cube` format) as a shader pass. Downloaded at runtime, not bundled.
+- **LUT layer** — a layer type that applies a 3D color cube as a shader pass. The cubes are G'MIC film-emulation LUTs in `.cube` format, vendored from the YahiaAngelo/Film-Luts mirror (MIT) with attribution to the mirror and to G'MIC. Bundled as static assets, loaded on demand.
 - Lift / gain / gamma, masks, blend modes per layer.
 - **Storage management** — soft/hard caps on saved edits, per-edit storage info, cleanup suggestions.
 

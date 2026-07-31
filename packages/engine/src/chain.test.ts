@@ -74,9 +74,11 @@ describe("createLayer", () => {
     expect(field(layer, "size")).toBe(0.6)
   })
 
-  it("creates a grain layer with default 0", () => {
+  it("creates a grain layer with all defaults 0", () => {
     const layer = createLayer("grain", registry)
-    expect(field(layer, "amount")).toBe(0)
+    expect(field(layer, "texture")).toBe(0)
+    expect(field(layer, "size")).toBe(0)
+    expect(field(layer, "blur")).toBe(0)
   })
 
   it("assigns unique ids", () => {

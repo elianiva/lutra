@@ -97,7 +97,7 @@ describe("Layer schemas", () => {
         else if (t === "highlights") layer["amount"] = 0
         else if (t === "whiteBalance") { layer["temp"] = 0; layer["tint"] = 0 }
         else if (t === "saturation") layer["amount"] = 0
-        else if (t === "grain") layer["amount"] = 0
+        else if (t === "grain") { layer["texture"] = 0; layer["size"] = 0; layer["blur"] = 0 }
         else if (t === "vignette") { layer["amount"] = 0; layer["size"] = 0.6 }
         else if (t === "chromaticAberration") layer["amount"] = 0
         else if (t === "clarity") layer["amount"] = 0

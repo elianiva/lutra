@@ -152,8 +152,13 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
     label: 'Grain',
     icon: Shirt,
     toggled: false,
-    fields: { amount: { label: 'GRAIN', format: formatPercent } },
-    formatValue: (l) => formatPercent(num(l, 'amount')),
+    fields: {
+      texture: { label: 'TEXTURE', format: formatPercent },
+      size: { label: 'SIZE', format: formatPercent },
+      blur: { label: 'BLUR', format: formatPercent },
+    },
+    formatValue: (l) =>
+      `T ${formatPercent(num(l, 'texture'))} · S ${formatPercent(num(l, 'size'))} · B ${formatPercent(num(l, 'blur'))}`,
   },
   vignette: {
     label: 'Vignette',
