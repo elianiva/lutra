@@ -1,7 +1,8 @@
-import { Effect, Schema } from 'effect'
-import { Command } from 'foldkit'
+import { Effect, Option, Schema } from 'effect'
+import { Command, File as FoldkitFile } from 'foldkit'
 import { render, createLayer, type Layer, type LayerType } from '@lutra/engine'
 import {
+  FilePickCancelled,
   ImageDecoded,
   ImageFailedToDecode,
   RenderedFrame,
@@ -10,6 +11,7 @@ import {
   ExportFinished,
   ExportFailed,
 } from './message'
+import { SelectedImageFile } from './message'
 import { ENGINE_REGISTRY } from '../editor/layerMeta'
 
 // The engine owns the WGSL body renderers; the frontend owns the WebGPU
@@ -19,6 +21,26 @@ import { ENGINE_REGISTRY } from '../editor/layerMeta'
 // no duplicate layer definitions — it consumes the engine's registry.
 export const createLayerFor = (type: LayerType): Layer =>
   createLayer(type, ENGINE_REGISTRY)
+
+/**
+ * Opens the native file picker restricted to image files. If the user selects
+ * a file, dispatches `SelectedImageFile`; if they cancel, dispatches
+ * `FilePickCancelled`.
+ */
+export const PickImageFile = Command.define(
+  'PickImageFile',
+  SelectedImageFile,
+  FilePickCancelled,
+)(
+  FoldkitFile.select(['image/*', '.jpg', '.jpeg', '.png', '.webp', '.avif']).pipe(
+    Effect.map(
+      Option.match({
+        onNone: () => FilePickCancelled(),
+        onSome: (file) => SelectedImageFile({ file }),
+      }),
+    ),
+  ),
+)
 
 const errMsg = (cause: unknown): string =>
   cause instanceof Error ? cause.message : String(cause)

@@ -26,6 +26,9 @@ export const SourceImage = S.Struct({
 })
 export type SourceImage = typeof SourceImage.Type
 
+export const FilePickRequested = Message.m('FilePickRequested')
+export const FilePickCancelled = Message.m('FilePickCancelled')
+
 export const SelectedImageFile = Message.m('SelectedImageFile', {
   file: S.instanceOf(File),
 })
@@ -101,6 +104,8 @@ export const ExportFailed = Message.m('ExportFailed', { reason: S.String })
 export const AppMessage = S.Union([
   ChangedRoute,
   Navigated,
+  FilePickRequested,
+  FilePickCancelled,
   SelectedImageFile,
   ImageDecoded,
   ImageFailedToDecode,

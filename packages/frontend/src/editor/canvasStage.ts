@@ -2,12 +2,13 @@ import { Effect, Schema as S, Stream, Queue } from 'effect'
 import { Mount } from 'foldkit'
 import type { HtmlBuilder } from 'foldkit/html'
 import type { AppMessage } from '../app/message'
-import { ScaledCanvas, SelectedImageFile } from '../app/message'
+import { FilePickRequested, ScaledCanvas, SelectedImageFile } from '../app/message'
 import type { Model } from '../app/model'
 
 // ---- mount: pan & zoom on the image canvas ----
 
-const PanZoom = Mount.defineStream('PanZoom', ScaledCanvas)((element) =>
+/** Pan & zoom mount for the image canvas. Exported for Scene test resolution. */
+export const PanZoom = Mount.defineStream('PanZoom', ScaledCanvas)((element) =>
   Stream.callback<typeof ScaledCanvas.Type>((queue) =>
     Effect.gen(function* () {
       const stage = element as HTMLElement
@@ -70,7 +71,14 @@ const PanZoom = Mount.defineStream('PanZoom', ScaledCanvas)((element) =>
 // ---- sub-views ----
 
 const emptyStage = (h: HtmlBuilder<AppMessage>) =>
-  h.div([h.Class('flex flex-col items-center justify-center gap-3 text-sm text-muted select-none')], [
+  h.div([
+    h.Class('flex flex-col items-center justify-center gap-3 text-sm text-muted select-none'),
+    h.AllowDrop(),
+    h.OnDropFiles((files) => {
+      const file = files[0]
+      return file ? SelectedImageFile({ file }) : FilePickRequested()
+    }),
+  ], [
     h.div([h.Class('flex h-16 w-16 items-center justify-center border border-border text-muted')], [
       h.span([h.Class('text-2xl')], ['↑']),
     ]),
@@ -79,7 +87,7 @@ const emptyStage = (h: HtmlBuilder<AppMessage>) =>
       h.button(
         [
           h.Class('cursor-pointer text-foreground underline underline-offset-2'),
-          h.OnClick(SelectedImageFile({ file: new File([], '') })),
+          h.OnClick(FilePickRequested()),
         ],
         ['browse'],
       ),
@@ -93,7 +101,7 @@ const errorStage = (h: HtmlBuilder<AppMessage>, error: string) =>
     h.button(
       [
         h.Class('cursor-pointer text-foreground underline underline-offset-2'),
-        h.OnClick(SelectedImageFile({ file: new File([], '') })),
+        h.OnClick(FilePickRequested()),
       ],
       ['Try another'],
     ),

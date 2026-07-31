@@ -1,7 +1,7 @@
 import { Match } from 'effect'
 import { Command } from 'foldkit'
 import { GpuBackend } from '@lutra/engine'
-import { createLayerFor, DecodeImage, RenderChain, PaintCanvas, ExportImage } from './command'
+import { createLayerFor, PickImageFile, DecodeImage, RenderChain, PaintCanvas, ExportImage } from './command'
 import { LAYER_UI } from '../editor/layerMeta'
 import type { Layer, LayerType } from '@lutra/engine'
 import type { Model } from './model'
@@ -45,6 +45,8 @@ export const update = (model: Model, message: AppMessage): Result =>
       Navigated: () => [model, []],
 
       // ---- image ----
+      FilePickRequested: () => [model, [PickImageFile()]],
+      FilePickCancelled: () => [model, []],
       SelectedImageFile: ({ file }) => [
         { ...model, source: { ...model.source, status: 'loading', error: null } },
         [DecodeImage({ file })],
