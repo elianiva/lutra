@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { generateChainSource } from "../shaders/chain-source"
+import { generateChainSource, WORKGROUP_SIZE } from "../shaders/chain-source"
 import type { ChainLayerInfo } from "../shaders/chain-source"
 import { renderExposure } from "../shaders/bodies/exposure"
 import { renderContrast } from "../shaders/bodies/contrast"
@@ -13,7 +13,7 @@ describe("generateChainSource", () => {
   it("generates a passthrough shader for empty chain", () => {
     const result = generateChainSource([])
     expect(result.source).toContain("@compute")
-    expect(result.source).toContain("@workgroup_size(8, 8)")
+    expect(result.source).toContain(`@workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})`)
     expect(result.source).toContain("textureLoad(srcTex")
     expect(result.source).toContain("textureStore(dstTex")
     expect(result.uniforms).toHaveLength(0)

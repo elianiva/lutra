@@ -2,9 +2,8 @@ import { Effect, Schema as S, Stream, Queue } from 'effect'
 import { Mount } from 'foldkit'
 import type { HtmlBuilder } from 'foldkit/html'
 import type { AppMessage } from '../app/message'
-import { FilePickRequested, PaintedCanvas, ScaledCanvas, SelectedImageFile } from '../app/message'
+import { FilePickRequested, ScaledCanvas, SelectedImageFile } from '../app/message'
 import type { Model } from '../app/model'
-import { paintBitmap } from '../app/command'
 
 const ZOOM_SPEED = 0.01
 
@@ -139,21 +138,6 @@ export const PanZoom = Mount.defineStream(
   ),
 )
 
-/** Paints the source bitmap once when the canvas first enters the DOM. The
- *  ImageDecoded handler can't paint via a Command — Commands run before the
- *  next render frame mounts the canvas — so the initial paint lives here, on
- *  the element's own lifecycle. Subsequent renders paint via PaintCanvas. */
-export const PaintInitial = Mount.define(
-  'PaintInitial',
-  { bitmap: S.instanceOf(ImageBitmap) },
-  PaintedCanvas,
-)(({ bitmap }) => (element) =>
-  Effect.sync(() => {
-    paintBitmap(element as HTMLCanvasElement, bitmap)
-    return PaintedCanvas()
-  }),
-)
-
 // ---- sub-views ----
 
 const emptyStage = (h: HtmlBuilder<AppMessage>) =>
@@ -193,7 +177,7 @@ const errorStage = (h: HtmlBuilder<AppMessage>, error: string) =>
     ),
   ])
 
-const loadedStage = (h: HtmlBuilder<AppMessage>, model: Model, bitmap: ImageBitmap) => {
+const loadedStage = (h: HtmlBuilder<AppMessage>, model: Model) => {
   const src = model.source
   return h.div(
     [
@@ -216,12 +200,12 @@ const loadedStage = (h: HtmlBuilder<AppMessage>, model: Model, bitmap: ImageBitm
           h.canvas(
             [
               h.Id('lutra-canvas'),
+              // width/height attributes size both the CSS layout and (via
+              // configure) the WebGPU swapchain; the GPU backend blits every
+              // rendered frame straight onto this canvas.
               h.Attribute('width', String(src.width)),
               h.Attribute('height', String(src.height)),
               h.Class('block'),
-              // First paint happens here, on the canvas's own lifecycle:
-              // Commands run before the next render frame mounts this element.
-              h.OnMount(PaintInitial({ bitmap })),
             ],
             [],
           ),
@@ -238,7 +222,7 @@ export const canvasStage = (h: HtmlBuilder<AppMessage>, model: Model) =>
     [h.Class('relative flex min-w-0 flex-1 items-center justify-center overflow-hidden bg-bg')],
     [
       model.source.status === 'loaded' && model.source.bitmap
-        ? loadedStage(h, model, model.source.bitmap)
+        ? loadedStage(h, model)
         : model.source.status === 'error'
           ? errorStage(h, model.source.error ?? 'Unknown error')
           : emptyStage(h),

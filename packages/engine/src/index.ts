@@ -31,11 +31,13 @@ export {
 export type { ChainError } from "./chain"
 
 // Render pipeline
-export { render, GpuBackend, GpuError, EmptyChainError } from "./render"
-export type { RenderError, GpuBackendShape } from "./render"
+// The engine builds a render request (shader + uniforms + source + frame);
+// execution and canvas presentation live in the frontend's GPU backend.
+export { createRenderRequest, GpuError } from "./render"
+export type { RenderRequest } from "./render"
 
 // Shader generation
-export { generateChainSource, SRGB_TO_LINEAR } from "./shaders"
+export { generateChainSource, SRGB_TO_LINEAR, WORKGROUP_SIZE } from "./shaders"
 export type { ChainLayerInfo, ChainShader, UniformSlot, BodyRenderer } from "./shaders"
 
 // Shader body renderers — one per layer type. Consumers build a registry

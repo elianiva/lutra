@@ -72,9 +72,10 @@ describe("shader bodies", () => {
   })
 
   describe("renderGrain", () => {
-    it("emits WGSL with hash noise", () => {
+    it("emits WGSL with integer hash noise", () => {
       const src = renderGrain(0)
-      expect(src).toContain("fract(sin(dot(")
+      expect(src).toContain("374761393u")
+      expect(src).toContain("coord.x")
       expect(src).toContain("u_frame")
       expect(src).toContain("l0_amount")
       expect(src).toContain("clamp(color, vec3<f32>(0.0), vec3<f32>(1.0))")

@@ -18,7 +18,7 @@ Direct port of each SkSL body to WGSL by hand. The mobile SkSL bodies are the re
 
 **Chromatic aberration**: Implemented (not deferred). The chain shader exposes both the accumulated `color` and the source texture coordinate so CA can sample the input texture at offset positions. The assembler contract supports per-body source-texture access.
 
-**GPU pipeline**: Compute shaders, not render pipelines. Unlocks: real clarity (local contrast with workgroup shared memory), proper film-grain (FBM noise with neighbor coherence), and future scatter-write passes (histograms, LUT tetrahedral interpolation). Grain is a priority — the mobile's cheap per-pixel hash is not acceptable for the web engine.
+**GPU pipeline**: Compute shaders for processing, render pipeline for presentation. Unlocks: real clarity (local contrast with workgroup shared memory), proper film-grain (FBM noise with neighbor coherence), and future scatter-write passes (histograms, LUT tetrahedral interpolation). Grain is a priority — the mobile's cheap per-pixel hash is not acceptable for the web engine. The processed frame is written to a storage texture and blitted to the canvas swapchain by a fullscreen-triangle pass (free bilinear); it never leaves the GPU on the display path. Readback to an ImageBitmap happens only on export.
 
 **Clarity**: Placeholder for now (midtone lift, same as mobile). Real local contrast is deferred despite compute-shader capability.
 
@@ -28,8 +28,9 @@ Direct port of each SkSL body to WGSL by hand. The mobile SkSL bodies are the re
 3. Shader bodies (10 WGSL body renderers)
 4. Chain source assembler
 5. Chain operations (add/remove/reorder/update param)
-6. Render pipeline (Effect-based `render`, `GpuBackend` service)
-7. Tests — written alongside each workstream, not as a separate phase
+6. Render request (`createRenderRequest`, pure: shader + packed uniforms + source + frame)
+7. GPU backend (frontend): persistent per-image resources, compute + blit execution, export snapshot
+8. Tests — written alongside each workstream, not as a separate phase
 
 **Engine package structure**:
 ```
@@ -43,11 +44,11 @@ engine/src/
     chain-source.ts  ← assembler (concatenates bodies into one shader)
     colorspace.ts    ← sRGB↔linear WGSL functions
   chain.ts           ← Chain abstraction (add, remove, reorder, update param)
-  render.ts          ← Effect-based render pipeline
+  render.ts          ← createRenderRequest (pure assembly + uniform packing)
   index.ts           ← public API surface
 ```
 
-**Public API**: Effect-based. The engine defines `Chain` operations (add/remove/reorder/update), a `render` Effect that processes an image through a chain, and a service interface (`GpuBackend`) that the frontend implements via Effect Context. The frontend calls `render(chain, imageSource)` and gets back a result — it doesn't touch WGSL, binding groups, or shader internals.
+**Public API**: The engine defines `Chain` operations (add/remove/reorder/update) and `createRenderRequest` (assembles a chain into a `RenderRequest`: shader + packed uniforms + source bitmap + frame counter). The frontend calls `createRenderRequest`, then hands the request and the canvas to its own `GpuBackend` service (Effect Context resource) — the backend executes the compute pass, blits to the canvas, and provides `snapshot` for export. The frontend doesn't touch WGSL or binding groups; the engine doesn't touch the DOM or WebGPU.
 
 **Data model**: Effect Schema is the source of truth. Each layer type is a `Schema.Struct` defining its parameters with constraints (min, max, defaults). Types are derived via `typeof Schema.Type`. The registry maps layer type keys to their Schema + shader body + metadata (label, icon reference). Runtime validation uses `Schema.decode` at persistence boundaries.
 

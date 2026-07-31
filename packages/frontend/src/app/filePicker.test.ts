@@ -3,14 +3,14 @@ import { Scene } from 'foldkit'
 import { initialModel } from './model'
 import { update } from './update'
 import { view } from '../view'
-import { PanZoom, PaintInitial } from '../editor/canvasStage'
-import { PickImageFile, DecodeImage } from './command'
+import { PanZoom } from '../editor/canvasStage'
+import { PickImageFile, DecodeImage, RenderChain } from './command'
 import {
   FilePickCancelled,
   SelectedImageFile,
   ImageDecoded,
   ImageFailedToDecode,
-  PaintedCanvas,
+  RenderedFrame,
   ScaledCanvas,
 } from './message'
 
@@ -169,9 +169,12 @@ describe('Image decode flow', () => {
         ImageDecoded({ bitmap, width: 200, height: 150 }),
       ),
 
-      // Empty chain → no GPU work; the canvas mounts and paints the source
-      // itself (PaintInitial). Resolve both mounts so the scene ends cleanly.
-      Scene.Mount.resolve(PaintInitial, PaintedCanvas()),
+      // Empty chain → the passthrough render presents the source on the
+      // canvas. The update dispatches RenderChain (stamp = revision 1); the
+      // command's own effect would wait for the canvas to commit, but in the
+      // scene we resolve it manually.
+      Scene.Command.expectHas(RenderChain),
+      Scene.Command.resolve(RenderChain, RenderedFrame({ stamp: 1 })),
       Scene.Mount.resolve(PanZoom, ScaledCanvas({ scale: 1, offsetX: 0, offsetY: 0 })),
       Scene.expect(Scene.selector('#lutra-canvas')).toExist(),
       Scene.Command.expectNone(),

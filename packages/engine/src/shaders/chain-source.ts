@@ -1,6 +1,13 @@
 import { SRGB_TO_LINEAR } from "./colorspace"
 import type { BodyRenderer } from "./types"
 
+/**
+ * Square workgroup dimension for the generated compute shader. 256
+ * invocations per workgroup (16×16) schedules better than 64 (8×8) on
+ * most desktop GPUs; the frontend dispatches with this same value.
+ */
+export const WORKGROUP_SIZE = 16
+
 // ---- public types ----
 
 /** Per-layer entry used by the assembler. */
@@ -54,7 +61,7 @@ export function generateChainSource(layers: ReadonlyArray<ChainLayerInfo>): Chai
 @group(0) @binding(2) var<uniform> u_resolution: vec2<f32>;
 @group(0) @binding(3) var<uniform> u_frame: u32;
 
-@compute @workgroup_size(8, 8)
+@compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let coord = id.xy;
   if (coord.x >= u32(u_resolution.x) || coord.y >= u32(u_resolution.y)) {
@@ -110,7 +117,7 @@ ${structDef}
 
 ${SRGB_TO_LINEAR}
 
-@compute @workgroup_size(8, 8)
+@compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let coord = id.xy;
   if (coord.x >= u32(u_resolution.x) || coord.y >= u32(u_resolution.y)) {

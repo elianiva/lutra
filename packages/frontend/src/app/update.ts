@@ -1,7 +1,7 @@
 import { Match } from 'effect'
 import { Command } from 'foldkit'
-import { GpuBackend } from '@lutra/engine'
-import { createLayerFor, PickImageFile, DecodeImage, RenderChain, PaintCanvas, ExportImage } from './command'
+import { GpuBackend } from '../gpu/backend'
+import { createLayerFor, PickImageFile, DecodeImage, RenderChain, ExportImage } from './command'
 import { LAYER_UI } from '../editor/layerMeta'
 import type { Layer, LayerType } from '@lutra/engine'
 import type { Model } from './model'
@@ -18,13 +18,19 @@ const ensureFieldIndex = (
   index[layerId] === undefined ? { ...index, [layerId]: 0 } : index
 
 /** Fire a RenderChain command for the current chain + draft. Bumps `revision`
- *  so stale render results can be dropped. */
+ *  so stale render results can be dropped. When a render is already in
+ *  flight, only the revision bump happens — the in-flight render re-triggers
+ *  with the newest state when it completes (see the RenderedFrame handler),
+ *  which keeps the GPU queue from backing up during slider drags. */
 const renderNow = (model: Model): Result => {
   if (!model.source.bitmap) return [model, []]
   const next: Model = { ...model, revision: model.revision + 1 }
   const stamp = next.revision
+  if (model.renderPending) {
+    return [next, []]
+  }
   return [
-    next,
+    { ...next, renderPending: true },
     [
       RenderChain({
         layers: model.chain,
@@ -51,15 +57,14 @@ export const update = (model: Model, message: AppMessage): Result =>
         { ...model, source: { ...model.source, status: 'loading', error: null } },
         [DecodeImage({ file })],
       ],
+      // Always render after decode — with an empty chain the assembler emits a
+      // passthrough shader, so the canvas presents the source itself. The
+      // RenderChain command yields `Render.afterCommit`, so the canvas is
+      // mounted by the time it runs.
       ImageDecoded: ({ bitmap, width, height }) => {
         const next: Model = {
           ...model,
           source: { status: 'loaded', bitmap, width, height, error: null },
-        }
-        // With an empty chain there's nothing for the GPU to do; the canvas's
-        // PaintInitial mount paints the source the frame it enters the DOM.
-        if (next.chain.length === 0 && next.draft === null) {
-          return [next, []]
         }
         return renderNow(next)
       },
@@ -75,7 +80,7 @@ export const update = (model: Model, message: AppMessage): Result =>
           draft: null,
           selectedLayerId: null,
           activeFieldIndex: {},
-          renderedBitmap: null,
+          renderPending: false,
           renderedStamp: 0,
         },
         [],
@@ -187,23 +192,22 @@ export const update = (model: Model, message: AppMessage): Result =>
       MovedLayerReorder: () => [model, []],
 
       // ---- rendering ----
-      RenderedFrame: ({ bitmap, stamp }) => {
-        if (stamp < model.revision) return [model, []] // stale render
-        return [
-          { ...model, renderedBitmap: bitmap, renderedStamp: stamp },
-          [PaintCanvas({ bitmap })],
-        ]
+      RenderedFrame: ({ stamp }) => {
+        const cleared: Model = { ...model, renderPending: false }
+        // A newer mutation arrived while this render was in flight — render
+        // again with the newest chain+draft instead of dropping the work.
+        if (stamp < cleared.revision) return renderNow(cleared)
+        return [{ ...cleared, renderedStamp: stamp }, []]
       },
       RenderFailed: ({ reason }) => [
-        { ...model, source: { ...model.source, error: reason } },
+        { ...model, renderPending: false, source: { ...model.source, error: reason } },
         [],
       ],
-      PaintedCanvas: () => [model, []],
 
       // ---- export ----
       ExportRequested: () => {
-        if (!model.renderedBitmap) return [model, []]
-        return [model, [ExportImage({ bitmap: model.renderedBitmap })]]
+        if (model.renderedStamp === 0) return [model, []]
+        return [model, [ExportImage()]]
       },
       ExportFinished: () => [model, []],
       ExportFailed: () => [model, []],

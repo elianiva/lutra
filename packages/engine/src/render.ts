@@ -1,45 +1,14 @@
-import { Context, Data, Effect } from "effect"
+import { Effect, Schema } from "effect"
 import type { Layer } from "./layers/schemas"
 import type { LayerEntry } from "./layers/registry"
 import { generateChainSource, type ChainLayerInfo, type ChainShader } from "./shaders/chain-source"
 
-// ---- service interface ----
-
-/**
- * A GPU backend capable of executing a chain shader.
- * The frontend implements this service via Effect Context.
- *
- * Use `Context.Service<GpuBackendShape>()("GpuBackend")` style or the
- * class-based `Context.Service` pattern to create the key.
- */
-export interface GpuBackendShape {
-  /**
-   * Compile and execute a chain shader. The backend receives the
-   * complete WGSL source, uniform slot layout, source texture, and
-   * frame counter. Returns the output as an ImageBitmap.
-   */
-  readonly execute: (
-    shader: ChainShader,
-    uniforms: Float32Array,
-    srcBitmap: ImageBitmap,
-    frame: number,
-  ) => Effect.Effect<ImageBitmap, GpuError>
-}
-
-export class GpuBackend extends Context.Service<GpuBackend, GpuBackendShape>()(
-  "GpuBackend",
-) {}
-
 // ---- errors ----
 
-export class GpuError extends Data.TaggedError("GpuError")<{
-  message: string
-  cause?: unknown
-}> {}
-
-export class EmptyChainError extends Data.TaggedError("EmptyChainError")<{}> {}
-
-export type RenderError = GpuError | EmptyChainError
+export class GpuError extends Schema.TaggedErrorClass<GpuError>()("GpuError", {
+  message: Schema.String,
+  cause: Schema.optional(Schema.Unknown),
+}) {}
 
 // ---- uniform packing ----
 
@@ -64,26 +33,37 @@ function packUniforms(
   return buf
 }
 
-// ---- render effect ----
+// ---- render request ----
 
 /**
- * Render a source image through an ordered chain of adjustment layers.
+ * Everything the GPU backend needs to render one frame: the assembled
+ * chain shader, the packed uniforms, the source image, and a frame
+ * counter (seeds `u_frame` for animated bodies like grain).
  *
- * The chain is assembled into a single WGSL compute shader, uniforms
- * are packed into a flat Float32Array following the slot layout, and
- * the result is dispatched to the GpuBackend for execution.
+ * The engine stops at building the request — WebGPU execution, canvas
+ * presentation, and readback are the frontend's concern (it owns the
+ * device and the canvas).
  */
-export function render(
+export interface RenderRequest {
+  readonly shader: ChainShader
+  readonly uniforms: Float32Array
+  readonly srcBitmap: ImageBitmap
+  readonly frame: number
+}
+
+/**
+ * Build a render request for the given ordered chain of adjustment
+ * layers. An empty chain (or all layers hidden) is valid — the
+ * assembler emits a passthrough shader, so the request presents the
+ * source image unchanged.
+ */
+export function createRenderRequest(
   chain: ReadonlyArray<Layer>,
   registry: Record<string, LayerEntry>,
   srcBitmap: ImageBitmap,
   frame: number,
-): Effect.Effect<ImageBitmap, RenderError, GpuBackend> {
+): Effect.Effect<RenderRequest, GpuError> {
   return Effect.gen(function* () {
-    if (chain.length === 0) {
-      return yield* Effect.fail(new EmptyChainError())
-    }
-
     // Build chain-layer info for the assembler
     const chainLayers: ChainLayerInfo[] = []
     for (const l of chain) {
@@ -99,10 +79,6 @@ export function render(
       })
     }
 
-    if (chainLayers.length === 0) {
-      return yield* Effect.fail(new EmptyChainError())
-    }
-
     // Assemble the WGSL shader
     let shader: ChainShader
     try {
@@ -114,8 +90,6 @@ export function render(
     // Pack uniforms from layer parameter values
     const uniforms = packUniforms(chain, shader)
 
-    // Dispatch to the backend
-    const backend = yield* GpuBackend
-    return yield* backend.execute(shader, uniforms, srcBitmap, frame)
+    return { shader, uniforms, srcBitmap, frame }
   })
 }

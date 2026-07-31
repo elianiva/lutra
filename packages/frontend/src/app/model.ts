@@ -28,10 +28,12 @@ export const Model = Schema.Struct({
   scale: Schema.Number,
   offsetX: Schema.Number,
   offsetY: Schema.Number,
-  // Most recent rendered output, painted to the canvas by an OnMount effect.
-  renderedBitmap: Schema.NullOr(Schema.instanceOf(ImageBitmap)),
-  // Stamp of the chain+draft the current bitmap was rendered for; lets update
-  // ignore renders that arrived after a newer mutation.
+  // True while a RenderChain command is in flight; renderNow skips dispatch
+  // while pending so the GPU queue never backs up (the in-flight render
+  // re-triggers with the newest state when it completes).
+  renderPending: Schema.Boolean,
+  // Stamp of the chain+draft the currently displayed frame was rendered for;
+  // lets update ignore renders that arrived after a newer mutation.
   renderedStamp: Schema.Number,
   // Monotonic counter hashed into the render trigger stamp.
   revision: Schema.Number,
@@ -55,7 +57,7 @@ export const initialModel = (): Model => ({
   scale: 1,
   offsetX: 0,
   offsetY: 0,
-  renderedBitmap: null,
+  renderPending: false,
   renderedStamp: 0,
   revision: 0,
 })

@@ -1,24 +1,25 @@
 import { Effect, Option, Schema } from 'effect'
-import { Command, File as FoldkitFile } from 'foldkit'
-import { render, createLayer, type Layer, type LayerType } from '@lutra/engine'
+import { Command, File as FoldkitFile, Render } from 'foldkit'
+import { createLayer, createRenderRequest, GpuError, type Layer, type LayerType } from '@lutra/engine'
+import { GpuBackend } from '../gpu/backend'
 import {
   FilePickCancelled,
   ImageDecoded,
   ImageFailedToDecode,
   RenderedFrame,
   RenderFailed,
-  PaintedCanvas,
   ExportFinished,
   ExportFailed,
 } from './message'
 import { SelectedImageFile } from './message'
 import { ENGINE_REGISTRY } from '../editor/layerMeta'
 
-// The engine owns the WGSL body renderers; the frontend owns the WebGPU
-// device. `render` assembles the chain source, packs uniforms from the
-// layers, and hands the compiled shader + uniforms + source bitmap to the
-// `GpuBackend` (provided as a runtime resource in main.ts). The frontend has
-// no duplicate layer definitions — it consumes the engine's registry.
+// The engine owns the WGSL body renderers and builds the render request
+// (shader + uniforms + source); the frontend owns the WebGPU device and the
+// canvas. `createRenderRequest` assembles the chain source and packs
+// uniforms, then `GpuBackend.execute` runs it and blits the result onto the
+// center-stage canvas. The frontend has no duplicate layer definitions — it
+// consumes the engine's registry.
 export const createLayerFor = (type: LayerType): Layer =>
   createLayer(type, ENGINE_REGISTRY)
 
@@ -47,8 +48,8 @@ const errMsg = (cause: unknown): string =>
 
 /**
  * Decode a user-selected File into an ImageBitmap at its native resolution.
- * Errors are caught and surfaced as `ImageFailedToDecode` so the command's
- * Effect error channel is `never` (required by the runtime's Command type).
+ * A decode error becomes `ImageFailedToDecode`; any defect (a bug) crashes
+ * rather than being relabeled.
  */
 export const DecodeImage = Command.define(
   'DecodeImage',
@@ -63,17 +64,26 @@ export const DecodeImage = Command.define(
     Effect.map((bitmap) =>
       ImageDecoded({ bitmap, width: bitmap.width, height: bitmap.height }),
     ),
-    Effect.catchCause((cause) =>
-      Effect.succeed(ImageFailedToDecode({ error: errMsg(cause) })),
+    Effect.catchIf(
+      (err): err is Error => err instanceof Error,
+      (err) => Effect.succeed(ImageFailedToDecode({ error: errMsg(err) })),
     ),
   ),
 )
 
 /**
  * Render the current chain (plus an optional draft appended last) through
- * WebGPU. `stamp` is the model revision at dispatch time so a render that
- * arrives after a newer mutation can be ignored by `update`. Render errors
- * become `RenderFailed` successes.
+ * WebGPU straight into the center-stage canvas. `stamp` is the model revision
+ * at dispatch time so a render that arrives after a newer mutation can be
+ * ignored (or re-triggered) by `update`.
+ *
+ * The command yields `Render.afterCommit` first: it is dispatched by the
+ * message that mounted the canvas (e.g. `ImageDecoded`), and must not query
+ * the DOM until that render has committed.
+ *
+ * Failure cases are handled separately: a missing canvas is reported inline;
+ * `GpuError`s (unknown layer type, shader generation, device/canvas failures)
+ * become `RenderFailed`. Defects crash.
  */
 export const RenderChain = Command.define(
   'RenderChain',
@@ -87,64 +97,43 @@ export const RenderChain = Command.define(
   RenderFailed,
 )(({ layers, draft, bitmap, stamp }) =>
   Effect.gen(function* () {
+    yield* Render.afterCommit
+    const canvas = document.getElementById('lutra-canvas') as HTMLCanvasElement | null
+    if (!canvas) return RenderFailed({ reason: 'Canvas not ready' })
+
     const chain: Layer[] = [...(layers as ReadonlyArray<Layer>)]
     if (draft) chain.push(draft as Layer)
-    if (chain.length === 0) {
-      return RenderFailed({ reason: 'No layers to render' })
-    }
-    return yield* render(chain, ENGINE_REGISTRY, bitmap, stamp).pipe(
-      Effect.map((b) => RenderedFrame({ bitmap: b, stamp })),
-      Effect.catchCause((cause) => {
-        const err = cause as { message?: string; _tag?: string }
-        return Effect.succeed(
-          RenderFailed({ reason: err._tag ?? err.message ?? 'Render failed' }),
-        )
-      }),
-    )
-  }),
-)
 
-/** Resize the canvas backing store to the bitmap and draw it. Shared by the
- *  PaintCanvas command and the canvas's initial-paint mount. */
-export const paintBitmap = (canvas: HTMLCanvasElement, bitmap: ImageBitmap): void => {
-  if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
-    canvas.width = bitmap.width
-    canvas.height = bitmap.height
-  }
-  canvas.getContext('2d')?.drawImage(bitmap, 0, 0)
-}
-
-/**
- * Paint a rendered ImageBitmap onto the center-stage canvas (looked up by id).
- * The canvas is guaranteed to exist by the time this runs for post-mount
- * renders (RenderedFrame → PaintCanvas); the first paint after an image loads
- * is handled by the canvas's PaintInitial mount instead, because Commands run
- * before the next render frame mounts the canvas.
- */
-export const PaintCanvas = Command.define(
-  'PaintCanvas',
-  { bitmap: Schema.instanceOf(ImageBitmap) },
-  PaintedCanvas,
-)(({ bitmap }) =>
-  Effect.sync(() => {
-    const canvas = document.getElementById('lutra-canvas') as HTMLCanvasElement | null
-    if (canvas) paintBitmap(canvas, bitmap)
-    return PaintedCanvas()
-  }),
+    const request = yield* createRenderRequest(chain, ENGINE_REGISTRY, bitmap, stamp)
+    const backend = yield* GpuBackend
+    yield* backend.execute(request, canvas)
+    return RenderedFrame({ stamp })
+  }).pipe(
+    Effect.catchTag('GpuError', (err: GpuError) =>
+      Effect.succeed(RenderFailed({ reason: err.message })),
+    ),
+  ),
 )
 
 /**
- * Encode the rendered bitmap as PNG and trigger a browser download. Uses
- * `HTMLCanvasElement.toBlob` (callback) wrapped in a promise since the DOM
- * canvas lacks `convertToBlob` (that's an `OffscreenCanvas` method).
+ * Encode the last rendered frame as PNG and trigger a browser download. The
+ * GPU backend reads the frame back to an ImageBitmap (the one place the
+ * display path's no-readback rule is relaxed — export is a button click, not
+ * a slider tick). Uses `HTMLCanvasElement.toBlob` (callback) wrapped in a
+ * promise since the DOM canvas lacks `convertToBlob` (that's an
+ * `OffscreenCanvas` method).
+ *
+ * Failure cases are handled separately: the snapshot `GpuError`, the missing
+ * 2d context, and the encode error each map to `ExportFailed`. Defects crash.
  */
 export const ExportImage = Command.define(
   'ExportImage',
-  { bitmap: Schema.instanceOf(ImageBitmap) },
   ExportFinished,
   ExportFailed,
-)(({ bitmap }) =>
+)(
   Effect.gen(function* () {
+    const backend = yield* GpuBackend
+    const bitmap = yield* backend.snapshot()
     const canvas = document.createElement('canvas')
     canvas.width = bitmap.width
     canvas.height = bitmap.height
@@ -166,10 +155,22 @@ export const ExportImage = Command.define(
     a.href = url
     a.download = 'lutra-edit.png'
     a.click()
-    yield* Effect.sleep('500 millis')
+    // Delay the revoke: browsers start the download asynchronously, and
+    // revoking the object URL in the same tick can abort it.
+    yield* Effect.callback<void>((resume) => {
+      const handle = setTimeout(() => resume(Effect.void), 500)
+      return Effect.sync(() => clearTimeout(handle))
+    })
     URL.revokeObjectURL(url)
     return ExportFinished({ url })
   }).pipe(
-    Effect.catchCause((cause) => Effect.succeed(ExportFailed({ reason: errMsg(cause) }))),
+    Effect.catchIf(
+      (err): err is GpuError => err instanceof GpuError,
+      (err) => Effect.succeed(ExportFailed({ reason: err.message })),
+    ),
+    Effect.catchIf(
+      (err): err is Error => err instanceof Error,
+      (err) => Effect.succeed(ExportFailed({ reason: errMsg(err) })),
+    ),
   ),
 )

@@ -83,13 +83,13 @@ export const MovedLayerReorder = Message.m('MovedLayerReorder', { over: S.Number
 
 // ---- rendering ----
 
+// The rendered frame is presented directly to the canvas by the GPU backend;
+// the message only carries the model revision it was rendered for, so update
+// can drop (or re-trigger) renders that arrived after a newer mutation.
 export const RenderedFrame = Message.m('RenderedFrame', {
-  bitmap: S.instanceOf(ImageBitmap),
-  // The chain+draft hash this frame was rendered for; lets update dedupe stale renders.
   stamp: S.Number,
 })
 export const RenderFailed = Message.m('RenderFailed', { reason: S.String })
-export const PaintedCanvas = Message.m('PaintedCanvas')
 
 // ---- export ----
 
@@ -121,7 +121,6 @@ export const AppMessage = S.Union([
   MovedLayerReorder,
   RenderedFrame,
   RenderFailed,
-  PaintedCanvas,
   ExportRequested,
   ExportFinished,
   ExportFailed,
