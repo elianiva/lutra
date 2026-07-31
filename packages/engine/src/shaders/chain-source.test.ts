@@ -117,9 +117,17 @@ describe("generateChainSource", () => {
     expect(result.passes[0]!.source).toContain("rgba16float")
     expect(result.passes[0]!.source).not.toContain("LayerParams")
     // Pass 1: CA samples the linear intermediate, no decode call in the pass itself
-    expect(result.passes[1]!.source).toContain("textureLoad(srcTex")
+    expect(result.passes[1]!.source).toContain("textureSampleLevel(srcTex")
     expect(result.passes[1]!.source).not.toContain("srgbToLinear(src.rgb)")
     expect(result.passes[1]!.source).toContain("rgba8unorm")
+    // Bilinear sampling at continuous offsets needs the binding-5 sampler
+    expect(result.passes[1]!.usesSampler).toBe(true)
+    expect(result.passes[1]!.source).toContain("@group(0) @binding(5) var samp: sampler")
+    // The shift is in UV space so the fringe scales with the frame — a
+    // fixed pixel offset would shrink relative to the image as
+    // resolution grows and disappear on high-res photos at full view
+    expect(result.passes[1]!.source).toContain("uv + dir * shift")
+    expect(result.passes[1]!.source).not.toContain("(dir * shift) / u_resolution")
   })
 
   it("does not double-linearize when a sampling layer is not first", () => {

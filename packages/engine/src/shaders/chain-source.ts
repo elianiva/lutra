@@ -43,9 +43,9 @@ export interface ChainPass {
    */
   readonly usesFrame: boolean
   /**
-   * Whether this pass uses a filtered sampler (binding 5) — either to
-   * sample its input (`samplesInput` bodies like clarity) or to sample
-   * the LUT texture (LUT layers).
+   * Whether this pass uses a filtered sampler (binding 5) — e.g.
+   * clarity, which samples its input with `textureSampleLevel`.
+   * `textureLoad`-based bodies (chromatic aberration) do not set it.
    */
   readonly usesSampler: boolean
   /**
@@ -148,8 +148,10 @@ interface LayerPassOptions {
   readonly linearize: boolean
   /** Encode the pass output to sRGB (last layer, writing the display texture). */
   readonly encode: boolean
-  /** Body samples its pass input at neighbor offsets (needs the sampler). */
+  /** Body samples its pass input at neighbor offsets (linearize pass when first). */
   readonly samplesInput: boolean
+  /** Body samples through the filtered sampler (declares binding 5). */
+  readonly needsSampler: boolean
   /** Storage format of the pass output. */
   readonly dstFormat: "rgba8unorm" | "rgba16float"
 }
@@ -165,6 +167,7 @@ function layerPass({
   linearize,
   encode,
   samplesInput,
+  needsSampler,
   dstFormat,
 }: LayerPassOptions): ChainPass {
   const structFields = uniforms
@@ -180,9 +183,13 @@ function layerPass({
     .join("\n")
 
   const usesFrame = body.includes("u_frame") || helpers.includes("u_frame")
-  // Structural flag, not WGSL text sniffing: the LUT body also contains
-  // `textureSampleLevel` but samples the LUT texture, not its input.
-  const usesSampler = samplesInput
+  // Structural flag, not WGSL text sniffing: a body that samples its
+  // input with `textureLoad` (chromatic aberration) still sets
+  // `samplesInput` for the linearize pass, but only `usesSampler`
+  // bodies get the binding-5 sampler declaration — the auto pipeline
+  // layout omits declared-but-unused bindings, so an entry for a
+  // sampler the shader never references fails bind-group validation.
+  const usesSampler = needsSampler
   const colorspace = linearize || encode ? SRGB_TO_LINEAR : ""
   const srcExpr = linearize ? "srgbToLinear(src.rgb)" : "src.rgb"
   const outExpr = encode
@@ -356,9 +363,9 @@ export function generateChainSource(layers: ReadonlyArray<ChainLayerInfo>): Chai
   const bodies = layers.map((layer, i) => normalizeBody(layer.body(i)))
   // Sampling bodies read their pass input at neighbor offsets: the first
   // pass's input is the sRGB source, so it needs a linearize pass ahead of
-  // it to keep sampled texels in linear light (textureLoad: CA; also
-  // textureSample: clarity). Declared structurally by the body, never
-  // sniffed from WGSL text.
+  // it to keep sampled texels in linear light (CA at continuous radial
+  // offsets, clarity in a 9-tap blur — both via textureSampleLevel).
+  // Declared structurally by the body, never sniffed from WGSL text.
   const firstBodySamplesSource = bodies[0]!.samplesInput === true
 
   const passes: ChainPass[] = []
@@ -403,6 +410,7 @@ export function generateChainSource(layers: ReadonlyArray<ChainLayerInfo>): Chai
           helpers: body.helpers ?? "",
           uniforms,
           samplesInput: body.samplesInput === true,
+          needsSampler: body.usesSampler === true,
           linearize: li === 0 && !firstBodySamplesSource,
           encode: isLast,
           dstFormat: isLast ? "rgba8unorm" : "rgba16float",
