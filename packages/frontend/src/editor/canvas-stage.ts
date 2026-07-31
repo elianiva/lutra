@@ -1,8 +1,9 @@
-import { Effect, Schema as S, Stream, Queue } from 'effect'
+import { Effect, Option, Ref, Schema as S, Stream, Queue } from 'effect'
 import { Mount } from 'foldkit'
 import type { HtmlBuilder } from 'foldkit/html'
 import type { AppMessage } from '../app/message'
-import { FilePickRequested, ScaledCanvas, SelectedImageFile } from '../app/message'
+import { FilePickRequested, ScaledCanvas, SelectedImageFile, CanvasRegistered } from '../app/message'
+import { CanvasRef } from '../gpu/canvas-ref'
 import type { Model } from '../app/model'
 
 const ZOOM_SPEED = 0.01
@@ -146,6 +147,40 @@ export const PanZoom = Mount.defineStream(
   ),
 )
 
+// ---- canvas registration ----
+
+/**
+ * One-shot mount on the render canvas: registers the element in the
+ * `CanvasRef` service so render commands resolve the canvas from the app
+ * context instead of a global DOM query. The registration lives for the
+ * element's lifetime (acquireRelease): when the canvas unmounts, the ref is
+ * cleared unless a newer canvas already replaced it.
+ */
+export const RegisterCanvas = Mount.define('RegisterCanvas', CanvasRegistered)(
+  (element) =>
+    Effect.gen(function* () {
+      const canvasRef = yield* Effect.serviceOption(CanvasRef)
+      if (element instanceof HTMLCanvasElement) {
+        yield* Option.match(canvasRef, {
+          onNone: () => Effect.void,
+          onSome: (ref) =>
+            Effect.acquireRelease(
+              Ref.set(ref, Option.some(element)),
+              () =>
+                Ref.get(ref).pipe(
+                  Effect.flatMap((current) =>
+                    Option.isSome(current) && current.value === element
+                      ? Ref.set(ref, Option.none())
+                      : Effect.void,
+                  ),
+                ),
+            ),
+        })
+      }
+      return CanvasRegistered()
+    }),
+)
+
 // ---- sub-views ----
 
 const emptyStage = (h: HtmlBuilder<AppMessage>) =>
@@ -208,6 +243,10 @@ const loadedStage = (h: HtmlBuilder<AppMessage>, model: Model) => {
           h.canvas(
             [
               h.Id('lutra-canvas'),
+              // Register this element in the CanvasRef service on mount, so
+              // render commands resolve it from the app context (no global
+              // getElementById lookup).
+              h.OnMount(RegisterCanvas()),
               // width/height attributes size both the CSS layout and (via
               // configure) the WebGPU swapchain; the GPU backend blits every
               // rendered frame straight onto this canvas.

@@ -1,4 +1,4 @@
-import { Context, Effect, Layer } from 'effect'
+import { Context, Effect, Layer, Option, Ref } from 'effect'
 import { GpuError, parseCube, type LutCube, type LutId } from '@lutra/engine'
 
 // The LUT library lives in the frontend's static assets (vendored from the
@@ -62,47 +62,71 @@ const parseCatalog = (text: string): ReadonlyArray<LutCatalogEntry> => {
   return parsed.filmLUTs
 }
 
-// Memoization: cache the Effect itself so concurrent callers share one
-// fetch; drop the cache entry on failure so a retry re-fetches.
-let catalogEffect: Effect.Effect<ReadonlyArray<LutCatalogEntry>, GpuError> | null = null
-const cubeCache = new Map<LutId, Effect.Effect<LutCube, GpuError>>()
+/**
+ * Memoization lives inside the Layer as Refs, not module globals: the cache
+ * is scoped to the service instance, so a rebuilt Layer (test, HMR, a second
+ * app instance) starts fresh. The Effect itself is cached so concurrent
+ * callers share one fetch; a failure drops the entry so a retry re-fetches.
+ */
+export const LutStoreLive = Layer.effect(
+  LutStore,
+  Effect.gen(function* () {
+    const catalogRef = yield* Ref.make<
+      Option.Option<Effect.Effect<ReadonlyArray<LutCatalogEntry>, GpuError>>
+    >(Option.none())
+    const cubeCacheRef = yield* Ref.make(new Map<LutId, Effect.Effect<LutCube, GpuError>>())
 
-export const LutStoreLive = Layer.succeed(LutStore, {
-  getCatalog: () => {
-    let effect = catalogEffect
-    if (!effect) {
-      effect = fetchText('/luts/film_luts.json').pipe(
-        Effect.flatMap((text) =>
-          Effect.try({
-            try: () => parseCatalog(text),
-            catch: (cause) =>
-              new GpuError({
-                message: `Failed to parse LUT catalog: ${cause instanceof Error ? cause.message : String(cause)}`,
-                cause,
+    return LutStore.of({
+      getCatalog: () =>
+        Effect.gen(function* () {
+          const cached = yield* Ref.get(catalogRef)
+          if (Option.isSome(cached)) {
+            return yield* cached.value
+          }
+
+          const effect = fetchText('/luts/film_luts.json').pipe(
+            Effect.flatMap((text) =>
+              Effect.try({
+                try: () => parseCatalog(text),
+                catch: (cause) =>
+                  new GpuError({
+                    message: `Failed to parse LUT catalog: ${cause instanceof Error ? cause.message : String(cause)}`,
+                    cause,
+                  }),
               }),
-          }),
-        ),
-        Effect.catch((err) => {
-          catalogEffect = null
-          return Effect.fail(err)
+            ),
+            // A failed fetch must not be memoized: drop the entry so the
+            // next caller re-fetches.
+            Effect.tapError(() => Ref.set(catalogRef, Option.none())),
+          )
+          yield* Ref.set(catalogRef, Option.some(effect))
+          return yield* effect
         }),
-      )
-      catalogEffect = effect
-    }
-    return effect
-  },
 
-  getCube: (lutId) => {
-    const cached = cubeCache.get(lutId)
-    if (cached) return cached
-    const effect = fetchText(`/luts/${lutId}`).pipe(
-      Effect.flatMap((text) => parseCubeText(lutId, text)),
-      Effect.catch((err) => {
-        cubeCache.delete(lutId)
-        return Effect.fail(err)
-      }),
-    )
-    cubeCache.set(lutId, effect)
-    return effect
-  },
-})
+      getCube: (lutId) =>
+        Effect.gen(function* () {
+          const cached = yield* Ref.get(cubeCacheRef).pipe(Effect.map((cache) => cache.get(lutId)))
+          if (cached) {
+            return yield* cached
+          }
+
+          const effect = fetchText(`/luts/${lutId}`).pipe(
+            Effect.flatMap((text) => parseCubeText(lutId, text)),
+            Effect.tapError(() =>
+              Ref.update(cubeCacheRef, (cache) => {
+                const next = new Map(cache)
+                next.delete(lutId)
+                return next
+              }),
+            ),
+          )
+          yield* Ref.update(cubeCacheRef, (cache) => {
+            const next = new Map(cache)
+            next.set(lutId, effect)
+            return next
+          })
+          return yield* effect
+        }),
+    })
+  }),
+)

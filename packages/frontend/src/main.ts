@@ -8,6 +8,7 @@ import { update } from './app/update'
 import { view } from './view'
 import { parseRoute, EditorRoute } from './route'
 import { GpuBackendLive } from './gpu/backend'
+import { CanvasRefLive } from './gpu/canvas-ref'
 import { LutStoreLive } from './luts/store'
 import { LoadCatalog } from './app/command'
 
@@ -24,7 +25,7 @@ export const application = Runtime.makeApplication({
   update,
   view,
   container: document.getElementById('root'),
-  resources: Layer.merge(GpuBackendLive, LutStoreLive),
+  resources: Layer.merge(GpuBackendLive, Layer.merge(LutStoreLive, CanvasRefLive)),
   routing: {
     onUrlRequest: (request: UrlRequest) => Navigated({ request }),
     onUrlChange: (url: Url.Url) => {

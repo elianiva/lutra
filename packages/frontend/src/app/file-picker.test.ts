@@ -4,7 +4,8 @@ import { MockImageBitmap } from '../vitest-setup'
 import { initialModel } from './model'
 import { update } from './update'
 import { view } from '../view'
-import { PanZoom } from '../editor/canvas-stage'
+import { PanZoom, RegisterCanvas } from '../editor/canvas-stage'
+import { RenderHandle } from '../gpu/backend'
 import { PickImageFile, DecodeImage, RenderChain } from './command'
 import {
   FilePickCancelled,
@@ -13,6 +14,7 @@ import {
   ImageFailedToDecode,
   RenderedFrame,
   ScaledCanvas,
+  CanvasRegistered,
 } from './message'
 
 /** A 1×1 transparent PNG as a File. Used to test the decode path. */
@@ -162,10 +164,16 @@ describe('Image decode flow', () => {
       // Empty chain → the passthrough render presents the source on the
       // canvas. The update dispatches RenderChain (stamp = revision 1); the
       // command's own effect would wait for the canvas to commit, but in the
-      // scene we resolve it manually.
+      // scene we resolve it manually. The handle is a stub — the scene never
+      // executes GPU work, so only its type flows through the model.
       Command.expectHas(RenderChain),
-      Command.resolve(RenderChain, RenderedFrame({ stamp: 1 })),
+      Command.resolve(
+        RenderChain,
+        // oxlint-disable-next-line consistent-type-assertions
+        RenderedFrame({ stamp: 1, handle: new RenderHandle({} as GPUTexture, 200, 150) }),
+      ),
       Mount.resolve(PanZoom, ScaledCanvas({ scale: 1, offsetX: 0, offsetY: 0 })),
+      Mount.resolve(RegisterCanvas, CanvasRegistered()),
       expect(selector('#lutra-canvas')).toExist(),
       Command.expectNone(),
     )

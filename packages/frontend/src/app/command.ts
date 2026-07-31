@@ -1,7 +1,8 @@
-import { Effect, Option, Schema } from 'effect'
+import { Effect, Option, Ref, Schema } from 'effect'
 import { Command, File as FoldkitFile, Render } from 'foldkit'
 import { createLayer, createRenderRequest, GpuError, Layer, type LayerType, type LutCube, type LutId } from '@lutra/engine'
-import { GpuBackend } from '../gpu/backend'
+import { GpuBackend, RenderHandle } from '../gpu/backend'
+import { CanvasRef } from '../gpu/canvas-ref'
 import { LutStore } from '../luts/store'
 import {
   FilePickCancelled,
@@ -134,9 +135,14 @@ export const RenderChain = Command.define('RenderChain', {
   execute: ({ layers, draft, bitmap, stamp }) =>
     Effect.gen(function* () {
       yield* Render.afterCommit
-      const el = document.getElementById('lutra-canvas')
-      const canvas = el instanceof HTMLCanvasElement ? el : null
-      if (!canvas) return RenderFailed({ reason: 'Canvas not ready' })
+      // The canvas is registered into the CanvasRef service when it mounts;
+      // resolve it from the app context instead of a global DOM query. The
+      // afterCommit wait guarantees the mount that registered it has run
+      // (mounts fork right after the patch; afterCommit resumes a frame
+      // later).
+      const canvasRef = yield* CanvasRef
+      const canvas = yield* Ref.get(canvasRef)
+      if (Option.isNone(canvas)) return RenderFailed({ reason: 'Canvas not ready' })
 
       const chain: Layer[] = [...layers]
       if (draft) chain.push(draft)
@@ -144,8 +150,8 @@ export const RenderChain = Command.define('RenderChain', {
       const luts = yield* resolveLuts(chain)
       const request = yield* createRenderRequest(chain, ENGINE_REGISTRY, bitmap, stamp, luts)
       const backend = yield* GpuBackend
-      yield* backend.execute(request, canvas)
-      return RenderedFrame({ stamp })
+      const handle = yield* backend.execute(request, canvas.value)
+      return RenderedFrame({ stamp, handle })
     }).pipe(
       Effect.catchTag('GpuError', (err: GpuError) =>
         Effect.succeed(RenderFailed({ reason: err.message })),
@@ -165,40 +171,47 @@ export const RenderChain = Command.define('RenderChain', {
  * 2d context, and the encode error each map to `ExportFailed`. Defects crash.
  */
 export const ExportImage = Command.define('ExportImage', {
+  args: {
+    // The exact frame to export — the model holds the handle of the last
+    // rendered frame and hands it to this command (see update's
+    // ExportRequested handler).
+    handle: Schema.instanceOf(RenderHandle),
+  },
   messages: [ExportFinished, ExportFailed],
-  execute: Effect.gen(function* () {
-    const backend = yield* GpuBackend
-    const bitmap = yield* backend.snapshot()
-    const canvas = document.createElement('canvas')
-    canvas.width = bitmap.width
-    canvas.height = bitmap.height
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return ExportFailed({ reason: 'No 2d context for export' })
-    ctx.drawImage(bitmap, 0, 0)
-    const blob = yield* Effect.tryPromise({
-      try: () =>
-        new Promise<Blob>((resolve, reject) => {
-          canvas.toBlob((b) => {
-            if (b) resolve(b)
-            else reject(new Error('Export encode failed'))
-          }, 'image/png')
-        }),
-      catch: (cause) => new Error(errMsg(cause)),
-    })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'lutra-edit.png'
-    a.click()
-    // Delay the revoke: browsers start the download asynchronously, and
-    // revoking the object URL in the same tick can abort it.
-    yield* Effect.callback<void>((resume) => {
-      const handle = setTimeout(() => resume(Effect.void), 500)
-      return Effect.sync(() => clearTimeout(handle))
-    })
-    URL.revokeObjectURL(url)
-    return ExportFinished({ url })
-  }).pipe(
+  execute: ({ handle }) =>
+    Effect.gen(function* () {
+      const backend = yield* GpuBackend
+      const bitmap = yield* backend.snapshot(handle)
+      const canvas = document.createElement('canvas')
+      canvas.width = bitmap.width
+      canvas.height = bitmap.height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return ExportFailed({ reason: 'No 2d context for export' })
+      ctx.drawImage(bitmap, 0, 0)
+      const blob = yield* Effect.tryPromise({
+        try: () =>
+          new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob((b) => {
+              if (b) resolve(b)
+              else reject(new Error('Export encode failed'))
+            }, 'image/png')
+          }),
+        catch: (cause) => new Error(errMsg(cause)),
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'lutra-edit.png'
+      a.click()
+      // Delay the revoke: browsers start the download asynchronously, and
+      // revoking the object URL in the same tick can abort it.
+      yield* Effect.callback<void>((resume) => {
+        const handle = setTimeout(() => resume(Effect.void), 500)
+        return Effect.sync(() => clearTimeout(handle))
+      })
+      URL.revokeObjectURL(url)
+      return ExportFinished({ url })
+    }).pipe(
     Effect.catchIf(
       (err): err is GpuError => err instanceof GpuError,
       (err) => Effect.succeed(ExportFailed({ reason: err.message })),

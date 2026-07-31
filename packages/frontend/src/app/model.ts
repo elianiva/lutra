@@ -1,5 +1,6 @@
 import { Schema } from 'effect'
 import { EditorRoute } from '../route'
+import { RenderHandle } from '../gpu/backend'
 import { SourceImage, Catalog } from './message'
 import { LayerIdSchema, Layer } from '@lutra/engine'
 
@@ -40,6 +41,9 @@ export const Model = Schema.Struct({
   // Stamp of the chain+draft the currently displayed frame was rendered for;
   // lets update ignore renders that arrived after a newer mutation.
   renderedStamp: Schema.Number,
+  // The GPU frame handle of the last rendered frame; export snapshots from
+  // exactly this frame (never an implicit backend "last session").
+  lastRender: Schema.NullOr(Schema.instanceOf(RenderHandle)),
   // Monotonic counter hashed into the render trigger stamp.
   revision: Schema.Number,
 })
@@ -66,5 +70,6 @@ export const initialModel = (): Model => ({
   lutPickerOpen: false,
   renderPending: false,
   renderedStamp: 0,
+  lastRender: null,
   revision: 0,
 })

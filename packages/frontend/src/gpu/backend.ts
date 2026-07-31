@@ -1,26 +1,40 @@
-import { Context, Effect, Layer } from 'effect'
-import { GpuError, WORKGROUP_SIZE, type ChainPass, type LutCube, type LutId, type RenderRequest } from '@lutra/engine'
+import { Context, Effect, Layer, Option, Ref } from 'effect'
+import { GpuError, WORKGROUP_SIZE, type ChainPass, type LutCube, type RenderRequest } from '@lutra/engine'
 
 // ---- service ----
+
+/**
+ * A handle to the frame a render produced: the output storage texture plus
+ * its dimensions. `execute` returns one per render; it flows through the app
+ * (RenderedFrame message → model) so `snapshot` never reads an implicit
+ * "last session" — export snapshots exactly the frame it was handed.
+ */
+export class RenderHandle {
+  constructor(
+    readonly dstTex: GPUTexture,
+    readonly width: number,
+    readonly height: number,
+  ) {}
+}
 
 export interface GpuBackendShape {
   /**
    * Execute a render request: run the chain compute shader over the source
    * image, then blit the result straight onto the given canvas. The image
-   * never leaves the GPU — no readback on the display path. Resolves when
-   * the submitted GPU work has completed, so callers can coalesce renders
-   * (one in flight at a time) without a CPU stall.
+   * never leaves the GPU — no readback on the display path. Resolves with a
+   * `RenderHandle` when the submitted GPU work has completed, so callers can
+   * coalesce renders (one in flight at a time) without a CPU stall.
    */
   readonly execute: (
     request: RenderRequest,
     canvas: HTMLCanvasElement,
-  ) => Effect.Effect<void, GpuError>
+  ) => Effect.Effect<RenderHandle, GpuError>
   /**
-   * Read the most recently rendered frame back to the CPU as an ImageBitmap.
+   * Read the frame identified by `handle` back to the CPU as an ImageBitmap.
    * Used only by export (PNG encoding needs CPU pixels); never on the
    * display path.
    */
-  readonly snapshot: () => Effect.Effect<ImageBitmap, GpuError>
+  readonly snapshot: (handle: RenderHandle) => Effect.Effect<ImageBitmap, GpuError>
 }
 
 export class GpuBackend extends Context.Service<GpuBackend, GpuBackendShape>()(
@@ -141,14 +155,32 @@ interface Session {
   readonly compute: Record<string, ComputeEntry>
 }
 
+/**
+ * All mutable state lives in Refs scoped to this Layer instance — no module
+ * globals, so a rebuilt Layer (test, HMR, a second app instance) starts
+ * fresh. The Ref contents:
+ *
+ * - `sessionRef`: the current image session (canvas + textures). Written by
+ *   `ensureSession`, read by `execute`; `snapshot` no longer reaches into
+ *   the backend for "the last frame" — it reads the handle `execute`
+ *   returned and the app passed along.
+ * - `pipelineCache`: compute pipelines keyed by pass source (finite: one
+ *   entry per distinct chain layout).
+ * - `lutTextures`: uploaded LUT cubes keyed by lutId. A cube is a property
+ *   of the layer, not of the image, so entries survive session teardown;
+ *   bounded by the vendored catalog.
+ */
 export const GpuBackendLive = Layer.effect(
   GpuBackend,
   Effect.gen(function* () {
     const device = yield* acquireDevice
-    const pipelineCache: Record<
-      string,
-      { readonly pipeline: GPUComputePipeline; readonly layout: GPUBindGroupLayout }
-    > = {}
+
+    const sessionRef = yield* Ref.make<Option.Option<Session>>(Option.none())
+    const pipelineCacheRef = yield* Ref.make<
+      Record<string, { readonly pipeline: GPUComputePipeline; readonly layout: GPUBindGroupLayout }>
+    >({})
+    const lutTexturesRef = yield* Ref.make(new Map<string, GPUTexture>())
+
     const sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' })
 
     const blitModule = device.createShaderModule({ code: BLIT_SOURCE })
@@ -164,52 +196,53 @@ export const GpuBackendLive = Layer.effect(
       primitive: { topology: 'triangle-list' },
     })
 
-    let session: Session | null = null
-
     // Device-scoped LUT texture cache: a cube uploads once per lutId and
     // survives image changes (session teardown), because the cube is a
     // property of the layer, not of the image.
-    const lutTextures = new Map<LutId, GPUTexture>()
+    const ensureLutTexture = (lutId: string, cube: LutCube): Effect.Effect<GPUTexture, GpuError> =>
+      Effect.gen(function* () {
+        const cached = yield* Ref.get(lutTexturesRef).pipe(Effect.map((cache) => cache.get(lutId)))
+        if (cached) return cached
 
-    const ensureLutTexture = (lutId: LutId, cube: LutCube): GPUTexture => {
-      const cached = lutTextures.get(lutId)
-      if (cached) return cached
+        const { size, data } = cube
+        // The cube is rgba32float: it matches the Float32Array upload exactly
+        // (16 bytes/texel, no conversion). Chrome's writeTexture f32→f16
+        // conversion is broken (raw f32 bytes land verbatim in f16 textures,
+        // corrupting rows), so rgba16float is not an option. 32-bit float
+        // textures are not filterable in WebGPU — the shader body does its
+        // own trilinear via textureLoad instead of hardware sampling.
+        // dimension MUST be '3d': without it the texture defaults to a 2D
+        // array (13 layers), which cannot be read as texture_3d and fails
+        // bind-group validation at runtime.
+        const tex = device.createTexture({
+          size: { width: size, height: size, depthOrArrayLayers: size },
+          dimension: '3d',
+          format: 'rgba32float',
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        })
 
-      const { size, data } = cube
-      // The cube is rgba32float: it matches the Float32Array upload exactly
-      // (16 bytes/texel, no conversion). Chrome's writeTexture f32→f16
-      // conversion is broken (raw f32 bytes land verbatim in f16 textures,
-      // corrupting rows), so rgba16float is not an option. 32-bit float
-      // textures are not filterable in WebGPU — the shader body does its
-      // own trilinear via textureLoad instead of hardware sampling.
-      // dimension MUST be '3d': without it the texture defaults to a 2D
-      // array (13 layers), which cannot be read as texture_3d and fails
-      // bind-group validation at runtime.
-      const tex = device.createTexture({
-        size: { width: size, height: size, depthOrArrayLayers: size },
-        dimension: '3d',
-        format: 'rgba32float',
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        // Stride the size³×3 cube into size³×4 texels (alpha = 1).
+        const texels = new Float32Array(size * size * size * 4)
+        for (let i = 0; i < size * size * size; i++) {
+          texels[i * 4] = data[i * 3]!
+          texels[i * 4 + 1] = data[i * 3 + 1]!
+          texels[i * 4 + 2] = data[i * 3 + 2]!
+          texels[i * 4 + 3] = 1
+        }
+        device.queue.writeTexture(
+          { texture: tex },
+          texels,
+          { bytesPerRow: size * 4 * 4, rowsPerImage: size },
+          { width: size, height: size, depthOrArrayLayers: size },
+        )
+
+        yield* Ref.update(lutTexturesRef, (cache) => {
+          const next = new Map(cache)
+          next.set(lutId, tex)
+          return next
+        })
+        return tex
       })
-
-      // Stride the size³×3 cube into size³×4 texels (alpha = 1).
-      const texels = new Float32Array(size * size * size * 4)
-      for (let i = 0; i < size * size * size; i++) {
-        texels[i * 4] = data[i * 3]!
-        texels[i * 4 + 1] = data[i * 3 + 1]!
-        texels[i * 4 + 2] = data[i * 3 + 2]!
-        texels[i * 4 + 3] = 1
-      }
-      device.queue.writeTexture(
-        { texture: tex },
-        texels,
-        { bytesPerRow: size * 4 * 4, rowsPerImage: size },
-        { width: size, height: size, depthOrArrayLayers: size },
-      )
-
-      lutTextures.set(lutId, tex)
-      return tex
-    }
 
     const destroySession = (s: Session): void => {
       s.srcTex.destroy()
@@ -223,17 +256,17 @@ export const GpuBackendLive = Layer.effect(
       }
     }
 
-    const ensureSession = (
+    /**
+     * Allocate every image-scoped resource for one canvas+image pair. Throws
+     * `GpuError` when the canvas has no WebGPU context; device calls may
+     * throw raw exceptions, which `ensureSession` wraps.
+     */
+    const buildSession = (
       canvas: HTMLCanvasElement,
       width: number,
       height: number,
       srcBitmap: ImageBitmap,
     ): Session => {
-      if (session && session.canvas === canvas && session.width === width && session.height === height) {
-        return session
-      }
-      if (session) destroySession(session)
-
       const ctx = canvas.getContext('webgpu')
       if (!ctx) {
         throw new GpuError({ message: 'WebGPU canvas context unavailable' })
@@ -302,7 +335,7 @@ export const GpuBackendLive = Layer.effect(
         ],
       })
 
-      session = {
+      return {
         canvas,
         ctx,
         width,
@@ -315,8 +348,44 @@ export const GpuBackendLive = Layer.effect(
         blitGroup,
         compute: {},
       }
-      return session
     }
+
+    /**
+     * Get the session for a canvas+image, rebuilding it when the canvas or
+     * dimensions change (destroying the previous session's resources). The
+     * session lives in `sessionRef`; a failed rebuild leaves the ref empty
+     * rather than pointing at half-destroyed resources.
+     */
+    const ensureSession = (
+      canvas: HTMLCanvasElement,
+      width: number,
+      height: number,
+      srcBitmap: ImageBitmap,
+    ): Effect.Effect<Session, GpuError> =>
+      Effect.gen(function* () {
+        const current = yield* Ref.get(sessionRef)
+        if (
+          Option.isSome(current) &&
+          current.value.canvas === canvas &&
+          current.value.width === width &&
+          current.value.height === height
+        ) {
+          return current.value
+        }
+        if (Option.isSome(current)) {
+          destroySession(current.value)
+          yield* Ref.set(sessionRef, Option.none())
+        }
+        const s = yield* Effect.try({
+          try: () => buildSession(canvas, width, height, srcBitmap),
+          catch: (cause) =>
+            cause instanceof GpuError
+              ? cause
+              : new GpuError({ message: 'Failed to prepare canvas', cause }),
+        })
+        yield* Ref.set(sessionRef, Option.some(s))
+        return s
+      })
 
     /**
      * Get (or lazily create) the pipeline + bind group for one compute pass.
@@ -331,16 +400,17 @@ export const GpuBackendLive = Layer.effect(
       pass: ChainPass,
       src: GPUTexture,
       dst: GPUTexture,
-      luts: ReadonlyMap<LutId, LutCube>,
-    ): ComputeEntry => {
-      const cacheKey = pass.lutId !== undefined ? `${pass.source}::lut:${pass.lutId}` : pass.source
-      const cached = s.compute[cacheKey]
-      if (cached) return cached
+      luts: ReadonlyMap<string, LutCube>,
+    ): Effect.Effect<ComputeEntry, GpuError> =>
+      Effect.gen(function* () {
+        const cacheKey = pass.lutId !== undefined ? `${pass.source}::lut:${pass.lutId}` : pass.source
+        const cached = s.compute[cacheKey]
+        if (cached) return cached
 
-      const cachedPipeline = pipelineCache[pass.source]
-      const compiled =
-        cachedPipeline ??
-        (() => {
+        const pipelines = yield* Ref.get(pipelineCacheRef)
+        const cachedPipeline = pipelines[pass.source]
+        let compiled = cachedPipeline
+        if (!compiled) {
           const module = device.createShaderModule({ code: pass.source })
           const pipeline = device.createComputePipeline({
             layout: 'auto',
@@ -350,57 +420,58 @@ export const GpuBackendLive = Layer.effect(
             pipeline,
             layout: pipeline.getBindGroupLayout(0),
           }
-          pipelineCache[pass.source] = built
-          return built
-        })()
-
-      const hasParams = pass.uniforms.length > 0
-      const paramsBuffer = hasParams
-        ? device.createBuffer({
-            size: roundUp(pass.uniforms.length * 4, 16),
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-          })
-        : null
-
-      // With `layout: 'auto'` the pipeline only exposes bindings the shader
-      // statically uses: binding 3 (frame) exists only when this pass reads
-      // `u_frame` (currently grain), binding 4 (params) only when there
-      // are uniform slots, binding 5 (sampler) when the pass samples, and
-      // binding 6 (the 3D LUT texture) only for LUT passes. Entries must
-      // mirror that.
-      const entries: Array<GPUBindGroupEntry> = [
-        { binding: 0, resource: src.createView() },
-        { binding: 1, resource: dst.createView() },
-        { binding: 2, resource: { buffer: s.resolutionBuffer } },
-      ]
-      if (pass.usesFrame) {
-        entries.push({ binding: 3, resource: { buffer: s.frameBuffer } })
-      }
-      if (paramsBuffer) {
-        entries.push({ binding: 4, resource: { buffer: paramsBuffer } })
-      }
-      if (pass.usesSampler) {
-        entries.push({ binding: 5, resource: sampler })
-      }
-      if (pass.lutId !== undefined) {
-        const cube = luts.get(pass.lutId)
-        if (!cube) {
-          throw new GpuError({ message: `LUT cube missing for ${pass.lutId}` })
+          yield* Ref.update(pipelineCacheRef, (cache) => ({ ...cache, [pass.source]: built }))
+          compiled = built
         }
-        // The view dimension must be explicit: createView() on a 3D
-        // texture defaults to e2DArray in Chrome, which fails bind-group
-        // validation against the shader's texture_3d (viewDimension e3D).
-        entries.push({
-          binding: 6,
-          resource: ensureLutTexture(pass.lutId, cube).createView({ dimension: '3d' }),
-        })
-      }
 
-      const bindGroup = device.createBindGroup({ layout: compiled.layout, entries })
-      const entry: ComputeEntry = { paramsBuffer, bindGroup, pipeline: compiled.pipeline }
-      s.compute[cacheKey] = entry
-      return entry
-    }
+        const hasParams = pass.uniforms.length > 0
+        const paramsBuffer = hasParams
+          ? device.createBuffer({
+              size: roundUp(pass.uniforms.length * 4, 16),
+              usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            })
+          : null
+
+        // With `layout: 'auto'` the pipeline only exposes bindings the shader
+        // statically uses: binding 3 (frame) exists only when this pass reads
+        // `u_frame` (currently grain), binding 4 (params) only when there
+        // are uniform slots, binding 5 (sampler) when the pass samples, and
+        // binding 6 (the 3D LUT texture) only for LUT passes. Entries must
+        // mirror that.
+        const entries: Array<GPUBindGroupEntry> = [
+          { binding: 0, resource: src.createView() },
+          { binding: 1, resource: dst.createView() },
+          { binding: 2, resource: { buffer: s.resolutionBuffer } },
+        ]
+        if (pass.usesFrame) {
+          entries.push({ binding: 3, resource: { buffer: s.frameBuffer } })
+        }
+        if (paramsBuffer) {
+          entries.push({ binding: 4, resource: { buffer: paramsBuffer } })
+        }
+        if (pass.usesSampler) {
+          entries.push({ binding: 5, resource: sampler })
+        }
+        if (pass.lutId !== undefined) {
+          const cube = luts.get(pass.lutId)
+          if (!cube) {
+            return yield* Effect.fail(new GpuError({ message: `LUT cube missing for ${pass.lutId}` }))
+          }
+          // The view dimension must be explicit: createView() on a 3D
+          // texture defaults to e2DArray in Chrome, which fails bind-group
+          // validation against the shader's texture_3d (viewDimension e3D).
+          const lutTex = yield* ensureLutTexture(pass.lutId, cube)
+          entries.push({
+            binding: 6,
+            resource: lutTex.createView({ dimension: '3d' }),
+          })
+        }
+
+        const bindGroup = device.createBindGroup({ layout: compiled.layout, entries })
+        const entry: ComputeEntry = { paramsBuffer, bindGroup, pipeline: compiled.pipeline }
+        s.compute[cacheKey] = entry
+        return entry
+      })
 
     return GpuBackend.of({
       execute: (request, canvas) =>
@@ -411,16 +482,7 @@ export const GpuBackendLive = Layer.effect(
             return yield* Effect.fail(new GpuError({ message: 'Empty source bitmap' }))
           }
 
-          let s: Session
-          try {
-            s = ensureSession(canvas, width, height, request.srcBitmap)
-          } catch (e) {
-            return yield* Effect.fail(
-              e instanceof GpuError
-                ? e
-                : new GpuError({ message: 'Failed to prepare canvas', cause: e }),
-            )
-          }
+          const s = yield* ensureSession(canvas, width, height, request.srcBitmap)
 
           const passes = request.shader.passes
 
@@ -441,7 +503,13 @@ export const GpuBackendLive = Layer.effect(
             const pass = passes[i]!
             const src = i === 0 ? s.srcTex : s.intermediates[(i - 1) % 2]!
             const dst = i === passes.length - 1 ? s.dstTex : s.intermediates[i % 2]!
-            const { paramsBuffer, bindGroup, pipeline } = getCompute(s, pass, src, dst, request.luts)
+            const { paramsBuffer, bindGroup, pipeline } = yield* getCompute(
+              s,
+              pass,
+              src,
+              dst,
+              request.luts,
+            )
 
             if (paramsBuffer) {
               const paramsData = new Float32Array(roundUp(request.uniforms[i]!.length, 4))
@@ -485,6 +553,8 @@ export const GpuBackendLive = Layer.effect(
             try: () => device.queue.onSubmittedWorkDone(),
             catch: (cause) => new GpuError({ message: 'GPU work failed', cause }),
           })
+
+          return new RenderHandle(s.dstTex, s.width, s.height)
         }).pipe(
           // Any unexpected exception (bind group/layout mismatch, browser-
           // specific WGSL rejection) must surface as a GpuError. Without
@@ -495,13 +565,9 @@ export const GpuBackendLive = Layer.effect(
           ),
         ),
 
-      snapshot: () =>
+      snapshot: (handle) =>
         Effect.gen(function* () {
-          const s = session
-          if (!s) {
-            return yield* Effect.fail(new GpuError({ message: 'Nothing rendered yet' }))
-          }
-          const { dstTex, width, height } = s
+          const { dstTex, width, height } = handle
 
           const bytesPerRowPadded = roundUp(width * 4, 256)
           const readBuffer = device.createBuffer({

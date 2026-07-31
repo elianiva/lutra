@@ -1,6 +1,7 @@
 import { Match } from 'effect'
 import { Command } from 'foldkit'
 import { GpuBackend } from '../gpu/backend'
+import { CanvasRef } from '../gpu/canvas-ref'
 import { LutStore } from '../luts/store'
 import { createLayerFor, PickImageFile, DecodeImage, RenderChain, ExportImage } from './command'
 import { LAYER_UI } from '../editor/layer-meta'
@@ -10,7 +11,7 @@ import type { AppMessage } from './message'
 
 type Result = readonly [
   Model,
-  ReadonlyArray<Command.Command<AppMessage, never, GpuBackend | LutStore>>,
+  ReadonlyArray<Command.Command<AppMessage, never, GpuBackend | LutStore | CanvasRef>>,
 ]
 
 const ensureFieldIndex = (
@@ -52,6 +53,11 @@ export const update = (model: Model, message: AppMessage): Result =>
       ChangedRoute: () => [model, []],
       Navigated: () => [model, []],
 
+      // ---- canvas registration ----
+      // The mount already wrote the element into the CanvasRef service; the
+      // acknowledgment exists for observability (DevTools, Scene, replay).
+      CanvasRegistered: () => [model, []],
+
       // ---- image ----
       FilePickRequested: () => [model, [PickImageFile()]],
       FilePickCancelled: () => [model, []],
@@ -89,6 +95,7 @@ export const update = (model: Model, message: AppMessage): Result =>
           activeFieldIndex: {},
           renderPending: false,
           renderedStamp: 0,
+          lastRender: null,
         },
         [],
       ],
@@ -241,12 +248,18 @@ export const update = (model: Model, message: AppMessage): Result =>
       MovedLayerReorder: () => [model, []],
 
       // ---- rendering ----
-      RenderedFrame: ({ stamp }) => {
-        const cleared: Model = { ...model, renderPending: false }
+      RenderedFrame: ({ stamp, handle }) => {
         // A newer mutation arrived while this render was in flight — render
         // again with the newest chain+draft instead of dropping the work.
-        if (stamp < cleared.revision) return renderNow(cleared)
-        return [{ ...cleared, renderedStamp: stamp }, []]
+        // The stale frame's handle is NOT stored: `lastRender` always points
+        // at the frame the canvas is actually showing.
+        if (stamp < model.revision) {
+          return renderNow({ ...model, renderPending: false })
+        }
+        return [
+          { ...model, renderPending: false, renderedStamp: stamp, lastRender: handle },
+          [],
+        ]
       },
       RenderFailed: ({ reason }) => [
         { ...model, renderPending: false, source: { ...model.source, error: reason } },
@@ -255,8 +268,10 @@ export const update = (model: Model, message: AppMessage): Result =>
 
       // ---- export ----
       ExportRequested: () => {
-        if (model.renderedStamp === 0) return [model, []]
-        return [model, [ExportImage()]]
+        // Export snapshots exactly the frame the model holds: no render yet,
+        // or no frame, means nothing to export.
+        if (model.renderedStamp === 0 || !model.lastRender) return [model, []]
+        return [model, [ExportImage({ handle: model.lastRender })]]
       },
       ExportFinished: () => [model, []],
       ExportFailed: () => [model, []],

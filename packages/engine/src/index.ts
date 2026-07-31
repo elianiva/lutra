@@ -9,7 +9,6 @@ export { LayerId, LayerIdSchema, LutId, LutIdSchema, FieldKey, FieldKeySchema } 
 export {
   createLayer,
   nextLayerId,
-  _resetLayerCounter,
   makeRegistry,
   LAYER_TYPES,
   Layer,

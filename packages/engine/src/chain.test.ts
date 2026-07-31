@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from "vitest"
 import {
   createLayer,
   nextLayerId,
-  _resetLayerCounter,
   makeRegistry,
   LAYER_TYPES,
 } from "./layers"
@@ -54,10 +53,6 @@ function field(layer: Layer, key: FieldKey): number {
 }
 
 describe("createLayer", () => {
-  beforeEach(() => {
-    _resetLayerCounter()
-  })
-
   it("creates every layer type with its registry defaults", () => {
     // Defaults are a product contract (e.g. vignette size 0.6, LUT amount 1
     // = full apply), so every type is pinned, not just a sample. LAYER_TYPES
@@ -102,7 +97,6 @@ describe("chain operations", () => {
   let chain: Layer[]
 
   beforeEach(() => {
-    _resetLayerCounter()
     chain = []
   })
 

@@ -1,5 +1,5 @@
 export { createLayer } from "./defaults"
-export { nextLayerId, _resetLayerCounter } from "./id"
+export { nextLayerId } from "./id"
 export { makeRegistry } from "./registry"
 export { LAYER_TYPES, Layer, LayerPatch } from "./schemas"
 export type { LayerType } from "./schemas"

@@ -1,6 +1,7 @@
 import { Schema as S } from 'effect'
 import { Message } from 'foldkit'
 import { AppRoute } from '../route'
+import { RenderHandle } from '../gpu/backend'
 import { FieldKeySchema, LAYER_TYPES, LayerIdSchema, LutIdSchema } from '@lutra/engine'
 
 export const ChangedRoute = Message.m('ChangedRoute', { route: AppRoute })
@@ -110,12 +111,23 @@ export const MovedLayerReorder = Message.m('MovedLayerReorder', { over: S.Number
 // ---- rendering ----
 
 // The rendered frame is presented directly to the canvas by the GPU backend;
-// the message only carries the model revision it was rendered for, so update
-// can drop (or re-trigger) renders that arrived after a newer mutation.
+// the message carries the model revision it was rendered for (so update can
+// drop — or re-trigger — renders that arrived after a newer mutation) and
+// the RenderHandle export snapshots from. The handle makes the backend's
+// data flow explicit: `snapshot` reads the frame the app handed it, never an
+// implicit "last session".
 export const RenderedFrame = Message.m('RenderedFrame', {
   stamp: S.Number,
+  handle: S.instanceOf(RenderHandle),
 })
 export const RenderFailed = Message.m('RenderFailed', { reason: S.String })
+
+// ---- canvas registration ----
+
+// One-shot acknowledgment from the canvas mount: the side effect (registering
+// the element in the CanvasRef service) already happened in the mount; this
+// message exists so the mount stays observable (DevTools, Scene, replay).
+export const CanvasRegistered = Message.m('CanvasRegistered')
 
 // ---- export ----
 
@@ -152,6 +164,7 @@ export const AppMessage = S.Union([
   MovedLayerReorder,
   RenderedFrame,
   RenderFailed,
+  CanvasRegistered,
   ExportRequested,
   ExportFinished,
   ExportFailed,
