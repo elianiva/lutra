@@ -3,7 +3,7 @@ import { Runtime, Url } from 'foldkit'
 import { overlay } from '@foldkit/devtools'
 import { BrowserKeyValueStore } from '@effect/platform-browser'
 import type { UrlRequest } from 'foldkit/navigation'
-import { EditStoreNoopLive } from '@lutra/store'
+import { EditStoreIndexedDb } from '@lutra/store'
 import { ChangedRoute, Navigated, RootMessage } from './root/message'
 import { Model } from './root/model'
 import { init } from './root/init'
@@ -38,9 +38,8 @@ export const application = Runtime.makeApplication({
           ImageEncoderWorkerLive,
           Layer.merge(
             BrowserKeyValueStore.layerLocalStorage,
-            // The local IndexedDB EditStoreLive lands in the save/store slice;
-            // the no-op backend exercises the seam today (docs/adr/0008).
-            EditStoreNoopLive,
+            // The local IndexedDB EditStore backend (docs/adr/0007, 0008).
+            EditStoreIndexedDb,
           ),
         ),
       ),

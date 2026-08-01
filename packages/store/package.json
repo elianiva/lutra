@@ -13,6 +13,7 @@
     "effect": "^4.0.0-beta.102"
   },
   "devDependencies": {
+    "fake-indexeddb": "^6.2.5",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   }
