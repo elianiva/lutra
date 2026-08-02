@@ -9,6 +9,7 @@ import {
   ExportSettings,
   FieldKeySchema,
   LAYER_TYPES,
+  Layer,
   LayerIdSchema,
   LutIdSchema,
 } from '@lutra/engine'
@@ -48,6 +49,21 @@ export const ImageFailedToDecode = Message.m('ImageFailedToDecode', {
   error: S.String,
 })
 export const ClearedImage = Message.m('ClearedImage')
+
+// ---- attached edit (opened from the gallery) ----
+
+// The Edit attached to this editor route (`/edit/:id`) finished loading: its
+// chain and its source image decoded from the stored bytes. Seeding happens
+// in update (source + chain + phase), exactly as a fresh `ImageDecoded`
+// would — an opened Edit is the existing Idle phase, never a new one
+// (CONTEXT.md "Attached edit").
+export const EditLoaded = Message.m('EditLoaded', {
+  chain: S.Array(Layer),
+  bitmap: S.instanceOf(ImageBitmap),
+  width: S.Number,
+  height: S.Number,
+})
+export const EditLoadFailed = Message.m('EditLoadFailed', { error: S.String })
 
 // ---- LUT library ----
 
@@ -216,6 +232,8 @@ export const EditorMessage = S.Union([
   ImageDecoded,
   ImageFailedToDecode,
   ClearedImage,
+  EditLoaded,
+  EditLoadFailed,
   CatalogLoaded,
   CatalogFailed,
   ScaledCanvas,

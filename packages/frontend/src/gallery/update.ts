@@ -3,7 +3,7 @@ import { Command } from 'foldkit'
 import { EditStore } from '@lutra/store'
 import type { GalleryMessage, GalleryOutMessage } from './message'
 import { OpenedEdit } from './message'
-import { DeleteEdit, ListEdits } from './command'
+import { DeleteEdit, ListEdits, OpenPhoto } from './command'
 import { Model, editList } from './model'
 
 export type UpdateReturn = readonly [
@@ -23,7 +23,7 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
     M.withReturnType<UpdateReturn>(),
     M.tags({
       EditsListed: ({ summaries }) => [
-        { ...model, grid: editList.Success({ data: summaries }) },
+        { ...model, grid: editList.Success({ data: summaries }), notice: null },
         [],
         Option.none(),
       ],
@@ -40,7 +40,19 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
       DeleteRequested: ({ id }) => [model, [DeleteEdit({ id })], Option.none()],
       EditDeleted: () => [model, [ListEdits()], Option.none()],
       DeleteFailed: ({ error }) => [
-        { ...model, grid: editList.Failure({ error }) },
+        { ...model, notice: `Delete failed: ${error}` },
+        [],
+        Option.none(),
+      ],
+
+      // ---- open a photo (new edit) ----
+      OpenPhotoRequested: () => [model, [OpenPhoto()], Option.none()],
+      PhotoPickCancelled: () => [model, [], Option.none()],
+      // A new Edit persisted: surface it upward — the root pushes the editor
+      // URL, exactly as if the user had clicked the tile.
+      PhotoCreated: ({ id }) => [model, [], Option.some(OpenedEdit({ id }))],
+      PhotoCreateFailed: ({ error }) => [
+        { ...model, notice: `Could not open photo: ${error}` },
         [],
         Option.none(),
       ],

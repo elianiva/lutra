@@ -8,6 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@lutra/engine': path.resolve(here, '../engine/src/index.ts'),
+      '@lutra/store': path.resolve(here, '../store/src/index.ts'),
     },
   },
   test: {

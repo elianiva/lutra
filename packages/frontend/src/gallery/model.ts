@@ -19,9 +19,12 @@ export const editList = EditList
 
 export const Model = S.Struct({
   grid: EditList.schema,
+  // A transient banner message (e.g. a failed photo create), null when clean.
+  notice: S.NullOr(S.String),
 })
 export type Model = typeof Model.Type
 
 export const initialModel = (): Model => ({
   grid: EditList.Idle(),
+  notice: null,
 })

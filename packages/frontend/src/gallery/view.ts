@@ -1,7 +1,7 @@
 import { Submodel } from 'foldkit'
 import type { HtmlBuilder } from 'foldkit/html'
 import { AsyncData } from 'foldkit'
-import { ClickedEdit, DeleteRequested, RefreshRequested } from './message'
+import { ClickedEdit, DeleteRequested, OpenPhotoRequested, RefreshRequested } from './message'
 import type { GalleryMessage } from './message'
 import type { Model } from './model'
 import type { EditSummary, EditId } from '@lutra/store'
@@ -11,11 +11,10 @@ import type { EditSummary, EditId } from '@lutra/store'
  * embeds under the root through `h.submodel`, with `h` typed to the Gallery's
  * own Message union. Renders the grid of Edit summaries ordered by `savedAt`.
  *
- * Thumbnails: `EditSummary.thumbnail` is encoded bytes. The store returns
- * `[]` during the foundation slice, so this path is currently dormant — a
- * per-summary object URL is created from the bytes and memoized by id. The
- * lifecycle (revoking on unmount / delete) is refined in the save/store slice
- * per the thumbnail contract (docs/adr/0007).
+ * Thumbnails: `EditSummary.thumbnail` is encoded bytes. A per-summary object
+ * URL is created from the bytes and memoized by id. The lifecycle (revoking
+ * on unmount / delete) is refined in the editor save-flow slice per the
+ * thumbnail contract (docs/adr/0007).
  */
 export const view = Submodel.defineView<Model, GalleryMessage>((model, h) => {
   const grid: AsyncData.AsyncData<ReadonlyArray<EditSummary>, string> = model.grid
@@ -23,24 +22,42 @@ export const view = Submodel.defineView<Model, GalleryMessage>((model, h) => {
     [h.Class('flex h-full flex-col bg-bg text-ink')],
     [
       header(h),
+      notice(model.notice, h),
       h.main([h.Class('flex min-h-0 flex-1')], [gridBody(h, grid)]),
     ],
   )
 })
+
+const notice = (message: string | null, h: HtmlBuilder<GalleryMessage>) =>
+  message === null
+    ? null
+    : h.div([h.Class('border-b border-border bg-panel px-4 py-1 text-xs text-accent')], [message])
 
 const header = (h: HtmlBuilder<GalleryMessage>) =>
   h.header(
     [h.Class('flex items-center justify-between border-b border-border bg-panel px-4 py-2')],
     [
       h.h1([h.Class('text-sm font-semibold tracking-[0.3em] text-accent')], ['LUTRA']),
-      h.button(
-        [
-          h.OnClick(RefreshRequested()),
-          h.AriaLabel('Refresh'),
-          h.Class('px-2 text-xs text-muted hover:text-ink'),
-        ],
-        ['Refresh'],
-      ),
+      h.div([h.Class('flex items-center gap-2')], [
+        h.button(
+          [
+            h.OnClick(OpenPhotoRequested()),
+            h.AriaLabel('Open a photo to start a new edit'),
+            h.Class(
+              'rounded border border-accent px-3 py-1 text-xs text-accent hover:border-ink hover:text-ink',
+            ),
+          ],
+          ['Open photo'],
+        ),
+        h.button(
+          [
+            h.OnClick(RefreshRequested()),
+            h.AriaLabel('Refresh'),
+            h.Class('px-2 text-xs text-muted hover:text-ink'),
+          ],
+          ['Refresh'],
+        ),
+      ]),
     ],
   )
 
@@ -69,8 +86,16 @@ const emptyState = (h: HtmlBuilder<GalleryMessage>) =>
     [h.Class('flex flex-1 flex-col items-center justify-center gap-3 text-sm text-muted')],
     [
       h.p([], ['No saved edits yet.']),
+      h.button(
+        [
+          h.OnClick(OpenPhotoRequested()),
+          h.AriaLabel('Open a photo to start a new edit'),
+          h.Class('rounded bg-accent px-4 py-2 text-xs text-ink hover:opacity-80'),
+        ],
+        ['Open a photo to start editing'],
+      ),
       h.p([h.Class('text-xs text-muted')], [
-        'Open a photo in the editor and use Save / Save as to build your gallery.',
+        'Your edits will appear here.',
       ]),
     ],
   )

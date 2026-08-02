@@ -4,12 +4,13 @@ import type { CanvasRef } from '../gpu/canvas-ref'
 import type { LutStore } from '../luts/store'
 import type { ImageEncoder } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
+import { EditStore } from '@lutra/store'
 import type { EditorMessage } from './message'
 import type { Model } from './model'
 import type { AppRoute } from '../route'
-import { LoadCatalog, LoadExportSettings } from './command'
+import { LoadCatalog, LoadEdit, LoadExportSettings } from './command'
 
-type Resource = GpuBackend | LutStore | CanvasRef | ImageEncoder | KeyValueStore
+type Resource = GpuBackend | LutStore | CanvasRef | ImageEncoder | KeyValueStore | EditStore
 
 /**
  * The parent's hook for a route change that resolves to the Editor. Per the
@@ -18,16 +19,19 @@ type Resource = GpuBackend | LutStore | CanvasRef | ImageEncoder | KeyValueStore
  * instead of dispatching an Editor Message.
  *
  * Fire the one-time startup loads that are still missing (catalog, export
- * settings), so arriving at the editor from the gallery builds them if a
- * cold start never reached the editor. In this foundation slice there is no
- * per-edit state to re-derive; when attached-edit loading lands, this will
- * re-load the Edit when the `editId` in the URL changes.
+ * settings), and re-load the attached Edit when the route carries an
+ * `editId` — arriving from the gallery after an open-photo flow (or from a
+ * reload) hydrates the editor from the stored Edit. Arriving without an id
+ * (gallery route) leaves the editor as-is; it is persistent cross-route
+ * state per ADR 0009.
  */
 export type RouteChangedReturn = readonly [
   Model,
   ReadonlyArray<Command.Command<EditorMessage, never, Resource>>,
 ]
-export const informRouteChanged = (model: Model, _route: AppRoute): RouteChangedReturn => [
-  model,
-  [LoadCatalog(), LoadExportSettings()],
-]
+export const informRouteChanged = (model: Model, route: AppRoute): RouteChangedReturn => {
+  const boot = [LoadCatalog(), LoadExportSettings()]
+  const commands =
+    route._tag === 'Editor' ? [LoadEdit({ id: route.editId }), ...boot] : boot
+  return [model, commands]
+}

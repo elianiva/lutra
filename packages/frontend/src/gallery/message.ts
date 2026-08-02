@@ -24,6 +24,15 @@ export const DeleteRequested = Message.m('DeleteRequested', { id: EditIdSchema }
 export const EditDeleted = Message.m('EditDeleted')
 export const DeleteFailed = Message.m('DeleteFailed', { error: S.String })
 
+// ---- open a photo (new edit) ----
+/** The user pressed "Open photo": fire the native file picker and create a new Edit. */
+export const OpenPhotoRequested = Message.m('OpenPhotoRequested')
+/** The picker was dismissed without a selection — a no-op. */
+export const PhotoPickCancelled = Message.m('PhotoPickCancelled')
+/** A new Edit was persisted; the root navigates the editor onto it. */
+export const PhotoCreated = Message.m('PhotoCreated', { id: EditIdSchema })
+export const PhotoCreateFailed = Message.m('PhotoCreateFailed', { error: S.String })
+
 export const GalleryMessage = S.Union([
   EditsListed,
   ListFailed,
@@ -32,6 +41,10 @@ export const GalleryMessage = S.Union([
   DeleteRequested,
   EditDeleted,
   DeleteFailed,
+  OpenPhotoRequested,
+  PhotoPickCancelled,
+  PhotoCreated,
+  PhotoCreateFailed,
 ])
 export type GalleryMessage = typeof GalleryMessage.Type
 

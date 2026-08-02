@@ -39,7 +39,7 @@ export const init = (url: Url.Url): InitReturn => {
   const route = parseRoute(url)
 
   const [gallery, galleryCommands] = Gallery.init(route)
-  const [editor, editorCommands] = Editor.init()
+  const [editor, editorCommands] = Editor.init(route)
 
   const commands = (() => {
     switch (route._tag) {

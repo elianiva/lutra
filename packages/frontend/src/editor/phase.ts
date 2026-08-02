@@ -59,6 +59,10 @@ export const editorMachine = Machine.define({
           () => Loading(),
           ({ message }) => [DecodeImage({ file: message.file })],
         ),
+        // The attached edit's load (gallery → /edit/:id) lands the editor
+        // straight in Idle — the source + chain are seeded by update.
+        EditLoaded: to('Idle', () => Idle()),
+        EditLoadFailed: to('Error', () => ErrorState()),
       },
     },
     Loading: {
@@ -73,6 +77,9 @@ export const editorMachine = Machine.define({
         ImageDecoded: to('Idle', () => Idle()),
         ImageFailedToDecode: to('Error', () => ErrorState()),
         ClearedImage: to('Empty', () => Empty()),
+        // An attached-edit load landing mid-decode supersedes the pick.
+        EditLoaded: to('Idle', () => Idle()),
+        EditLoadFailed: to('Error', () => ErrorState()),
       },
     },
     Error: {
@@ -88,6 +95,8 @@ export const editorMachine = Machine.define({
         // stale success can never resurrect a cleared image.
         ImageDecoded: to('Idle', () => Idle()),
         ClearedImage: to('Empty', () => Empty()),
+        EditLoaded: to('Idle', () => Idle()),
+        EditLoadFailed: to('Error', () => ErrorState()),
       },
     },
     Idle: {
@@ -110,6 +119,9 @@ export const editorMachine = Machine.define({
           ),
         ],
         ClearedImage: to('Empty', () => Empty()),
+        // Navigating to a different attached edit re-loads in place.
+        EditLoaded: to('Idle', () => Idle()),
+        EditLoadFailed: to('Error', () => ErrorState()),
       },
     },
     Drafting: {
@@ -130,6 +142,9 @@ export const editorMachine = Machine.define({
           ),
         ],
         ClearedImage: to('Empty', () => Empty()),
+        // A different attached edit discards the draft.
+        EditLoaded: to('Idle', () => Idle()),
+        EditLoadFailed: to('Error', () => ErrorState()),
       },
     },
     Selected: {
@@ -156,6 +171,9 @@ export const editorMachine = Machine.define({
           ),
         ],
         ClearedImage: to('Empty', () => Empty()),
+        // A different attached edit clears the selection.
+        EditLoaded: to('Idle', () => Idle()),
+        EditLoadFailed: to('Error', () => ErrorState()),
       },
     },
   },

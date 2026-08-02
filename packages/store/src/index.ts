@@ -3,7 +3,7 @@
 // A future server/account-side EditStoreLive lands here too.
 
 // Edit domain
-export { EditId, EditIdSchema } from './edit/edit-id'
+export { EditId, EditIdSchema, newEditId } from './edit/edit-id'
 export type { EditId as EditIdType } from './edit/edit-id'
 export { Edit } from './edit/edit'
 export type { Edit as EditType } from './edit/edit'

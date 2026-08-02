@@ -30,3 +30,11 @@ export const EditIdSchema = Schema.fromBrand('EditId', EditId)(Schema.String).pi
     message: 'must be a valid UUID',
   }),
 )
+
+/**
+ * Generate a fresh, format-valid Edit id. `crypto.randomUUID` emits a
+ * version-4 UUID, which the UUID_REGEXP above accepts (version nibble
+ * `[1-8]`, variant nibble `[89ab]`). Used when a new Edit is created — the
+ * gallery's "open a photo" flow, and the editor's Save-as fork.
+ */
+export const newEditId = (): EditId => EditId(crypto.randomUUID())

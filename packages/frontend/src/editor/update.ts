@@ -18,6 +18,7 @@ import { editorMachine } from './phase'
 import { LAYER_UI } from '../editor/layer-meta'
 import { fileExtension, type ExportSettings, type ImageEncoder, type LayerId } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
+import { EditStore } from '@lutra/store'
 import type { Model } from './model'
 import { GotExportDialogMessage } from './message'
 import type { EditorMessage } from './message'
@@ -25,7 +26,11 @@ import type { EditorMessage } from './message'
 export type UpdateReturn = readonly [
   Model,
   ReadonlyArray<
-    Command.Command<EditorMessage, never, GpuBackend | LutStore | CanvasRef | ImageEncoder | KeyValueStore>
+    Command.Command<
+      EditorMessage,
+      never,
+      GpuBackend | LutStore | CanvasRef | ImageEncoder | KeyValueStore | EditStore
+    >
   >,
 ]
 
@@ -141,6 +146,36 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
         },
         [],
       ],
+
+      // ---- attached edit (gallery → /edit/:id) ----
+      // The machine moved to Idle (or ignored the message); the branch seeds
+      // the loaded chain + source bitmap and renders it — the same shape a
+      // fresh `ImageDecoded` produces, so the editor cannot tell whether it
+      // was seeded from a pick or a load.
+      EditLoaded: ({ chain, bitmap, width, height }) => {
+        if (!transitioned) return [model, []]
+        return renderNow({
+          ...model,
+          phase,
+          chain,
+          source: { bitmap, width, height, error: null },
+          activeFieldIndex: {},
+          lutPickerOpen: false,
+        })
+      },
+      EditLoadFailed: ({ error }) => {
+        if (!transitioned) return [model, []]
+        return [
+          {
+            ...model,
+            phase,
+            source: { ...model.source, error },
+            chain: [],
+            activeFieldIndex: {},
+          },
+          [],
+        ]
+      },
 
       // ---- canvas ----
       ScaledCanvas: ({ scale, offsetX, offsetY }) => [

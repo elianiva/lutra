@@ -1,6 +1,7 @@
 import { Effect, Option, Ref, Schema } from 'effect'
 import { Command, File as FoldkitFile, Render } from 'foldkit'
 import * as Persistence from 'effect/unstable/persistence/KeyValueStore'
+import { EditStore, EditIdSchema, StoreError } from '@lutra/store'
 import {
   createLayer,
   createRenderRequest,
@@ -22,6 +23,8 @@ import {
   FilePickCancelled,
   ImageDecoded,
   ImageFailedToDecode,
+  EditLoaded,
+  EditLoadFailed,
   RenderedFrame,
   RenderFailed,
   HistogramComputed,
@@ -88,6 +91,49 @@ export const DecodeImage = Command.define('DecodeImage', {
       Effect.catchIf(
         (err): err is Error => err instanceof Error,
         (err) => Effect.succeed(ImageFailedToDecode({ error: errMsg(err) })),
+      ),
+    ),
+})
+
+/**
+ * Load the Edit attached to this editor route (`/edit/:id`) and decode its
+ * source bytes, so the editor seeds exactly what a freshly picked photo
+ * would — an opened Edit reuses the existing Idle phase (CONTEXT.md
+ * "Attached edit"). A missing id (stale URL, deleted tile) or an
+ * undecodable source becomes `EditLoadFailed`; the error stage shows.
+ */
+export const LoadEdit = Command.define('LoadEdit', {
+  args: { id: EditIdSchema },
+  messages: [EditLoaded, EditLoadFailed],
+  execute: ({ id }) =>
+    Effect.gen(function* () {
+      const store = yield* EditStore
+      const maybeEdit = yield* store.load(id)
+      if (Option.isNone(maybeEdit)) {
+        return EditLoadFailed({ error: 'edit not found' })
+      }
+      const edit = maybeEdit.value
+      const bitmap = yield* Effect.tryPromise({
+        // The bytes' buffer came from the store as a transferred ArrayBuffer;
+        // TS can't know that, hence the BlobPart assertion (as in PrepareExport).
+        // oxlint-disable-next-line consistent-type-assertions
+        try: () => createImageBitmap(new Blob([edit.source as BlobPart])),
+        catch: (cause) => new Error(`Failed to decode saved image: ${String(cause)}`),
+      })
+      return EditLoaded({
+        chain: edit.chain,
+        bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+      })
+    }).pipe(
+      Effect.catchIf(
+        (err): err is StoreError => err instanceof StoreError,
+        (err) => Effect.succeed(EditLoadFailed({ error: err.message })),
+      ),
+      Effect.catchIf(
+        (err): err is Error => err instanceof Error,
+        (err) => Effect.succeed(EditLoadFailed({ error: errMsg(err) })),
       ),
     ),
 })
