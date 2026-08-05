@@ -4,7 +4,7 @@ import { AsyncData } from 'foldkit'
 import { ClickedEdit, DeleteRequested, OpenPhotoRequested, RefreshRequested } from './message'
 import type { GalleryMessage } from './message'
 import type { Model } from './model'
-import type { EditSummary, EditId } from '@lutra/store'
+import type { EditSummary, EditId, StoreError } from '@lutra/store'
 
 /**
  * The Gallery Submodel's view (docs/adr/0009). Branded via `defineView` so it
@@ -17,7 +17,7 @@ import type { EditSummary, EditId } from '@lutra/store'
  * thumbnail contract (docs/adr/0007).
  */
 export const view = Submodel.defineView<Model, GalleryMessage>((model, h) => {
-  const grid: AsyncData.AsyncData<ReadonlyArray<EditSummary>, string> = model.grid
+  const grid: AsyncData.AsyncData<ReadonlyArray<EditSummary>, StoreError> = model.grid
   return h.div(
     [h.Class('flex h-full flex-col bg-bg text-ink')],
     [
@@ -63,7 +63,7 @@ const header = (h: HtmlBuilder<GalleryMessage>) =>
 
 const gridBody = (
   h: HtmlBuilder<GalleryMessage>,
-  grid: AsyncData.AsyncData<ReadonlyArray<EditSummary>, string>,
+  grid: AsyncData.AsyncData<ReadonlyArray<EditSummary>, StoreError>,
 ) =>
   AsyncData.match(grid, {
     onIdle: () => spinner(h),
@@ -71,7 +71,7 @@ const gridBody = (
     onRefreshing: () => spinner(h),
     onSuccess: (summaries) =>
       summaries.length === 0 ? emptyState(h) : gridTiles(h, summaries),
-    onFailure: (error) => errorState(h, error),
+    onFailure: (error) => errorState(h, error.message),
     onStale: () => spinner(h),
   })
 

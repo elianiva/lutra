@@ -5,6 +5,7 @@ import { Idle, editorMachine } from './phase'
 import { initialModel } from './model'
 import { update } from './update'
 import { createLayerFor } from './command'
+import { ImageDecodeError } from '../errors'
 import {
   SelectedTool,
   SelectedLayer,
@@ -61,7 +62,7 @@ describe('editor phase machine', () => {
 
   it('ignores tool selection after a decode failure', () => {
     const [loading] = update(initialModel(), SelectedImageFile({ file: file() }))
-    const [errored] = update(loading, ImageFailedToDecode({ error: 'Corrupt' }))
+    const [errored] = update(loading, ImageFailedToDecode({ error: new ImageDecodeError({ message: 'Corrupt' }) }))
     expect(errored.phase._tag).toBe('Error')
     const [model] = update(errored, SelectedTool({ type: 'exposure' }))
     expect(model.phase._tag).toBe('Error')
@@ -126,7 +127,7 @@ describe('editor phase machine', () => {
   it('drops a stale decode failure that lands after the image was cleared', () => {
     const [loading] = update(initialModel(), SelectedImageFile({ file: file() }))
     const [cleared] = update(loading, ClearedImage())
-    const [model] = update(cleared, ImageFailedToDecode({ error: 'Late failure' }))
+    const [model] = update(cleared, ImageFailedToDecode({ error: new ImageDecodeError({ message: 'Late failure' }) }))
     expect(model.phase._tag).toBe('Empty')
     expect(model.source.error).toBeNull()
   })
@@ -140,7 +141,7 @@ describe('editor phase machine', () => {
     const b1 = bitmap(1, 1)
     const [first] = update(stillLoading, ImageDecoded({ bitmap: b1, width: 1, height: 1, source: bytes() }))
     expect(first.source.bitmap).toBe(b1)
-    const [failed] = update(first, ImageFailedToDecode({ error: 'Second pick failed' }))
+    const [failed] = update(first, ImageFailedToDecode({ error: new ImageDecodeError({ message: 'Second pick failed' }) }))
     expect(failed.phase._tag).toBe('Error')
 
     // Both succeed: the last one to land wins.
@@ -151,7 +152,7 @@ describe('editor phase machine', () => {
     expect(second.phase._tag).toBe('Idle')
 
     // First pick fails, second succeeds: the success still lands.
-    const [errored] = update(stillLoading, ImageFailedToDecode({ error: 'First pick failed' }))
+    const [errored] = update(stillLoading, ImageFailedToDecode({ error: new ImageDecodeError({ message: 'First pick failed' }) }))
     expect(errored.phase._tag).toBe('Error')
     const [recovered] = update(errored, ImageDecoded({ bitmap: b2, width: 2, height: 2, source: bytes() }))
     expect(recovered.source.bitmap).toBe(b2)

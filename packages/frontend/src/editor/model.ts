@@ -1,7 +1,7 @@
 import { Schema } from 'effect'
 import { Dialog } from '@foldkit/ui'
 import { RenderHandle } from '../gpu/backend'
-import { SourceImage, Catalog } from './message'
+import { SourceImage, Catalog, SaveError, ExportError } from './message'
 import { ExportSettings, defaultExportSettings, LayerIdSchema, Layer } from '@lutra/engine'
 import { EditIdSchema } from '@lutra/store'
 import { EditorPhase, editorMachine } from './phase'
@@ -37,7 +37,7 @@ const SaveStatus = Schema.Union([
   Schema.Struct({ _tag: Schema.Literal('idle') }),
   Schema.Struct({ _tag: Schema.Literal('saving') }),
   Schema.Struct({ _tag: Schema.Literal('saved'), at: Schema.Number }),
-  Schema.Struct({ _tag: Schema.Literal('failed'), error: Schema.String }),
+  Schema.Struct({ _tag: Schema.Literal('failed'), error: SaveError }),
 ])
 
 export const Model = Schema.Struct({
@@ -96,7 +96,7 @@ export const Model = Schema.Struct({
   exportSize: Schema.NullOr(Schema.Number),
   exportUrl: Schema.NullOr(Schema.String),
   // Encode failure reason, shown in the dialog.
-  exportError: Schema.NullOr(Schema.String),
+  exportError: Schema.NullOr(ExportError),
   // True after a successful download, until the next settings change.
   exportDownloaded: Schema.Boolean,
 })

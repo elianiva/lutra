@@ -1,7 +1,25 @@
+import { Schema } from "effect"
 import { SRGB_TO_LINEAR } from "./colorspace"
 import type { BodyRenderer, BodySource } from "./types"
 import type { FieldKey, LutId } from "../brands"
 import type { LayerType } from "../layers/schemas"
+
+// ---- errors ----
+
+/**
+ * The assembler hit a LUT pass whose layer carries no cube reference. The
+ * caller-facing boundary (`createRenderRequest`) validates LUT references
+ * before assembling, so reaching this throw means the invariant was broken
+ * upstream — a defect, not a recoverable failure; it is thrown, not
+ * Effect-failed.
+ */
+export class MissingLutReferenceError extends Schema.TaggedErrorClass<MissingLutReferenceError>()(
+  "MissingLutReferenceError",
+  {
+    message: Schema.String,
+    cause: Schema.optional(Schema.Unknown),
+  },
+) {}
 
 /**
  * Square workgroup dimension for the generated compute shaders. 256
@@ -389,7 +407,9 @@ export function generateChainSource(layers: ReadonlyArray<ChainLayerInfo>): Chai
       // the way out, skipping either end when it is already sRGB.
       const lut = layer.lut
       if (!lut) {
-        throw new Error(`LUT layer at index ${li} is missing its cube reference`)
+        throw new MissingLutReferenceError({
+          message: `LUT layer at index ${li} is missing its cube reference`,
+        })
       }
       passes.push(
         lutPass({

@@ -4,7 +4,7 @@ import { Command } from 'foldkit'
 import { Command as SceneCommand, Mount, click, expect as sceneExpect, expectOutMessage, given, scene, text } from 'foldkit/scene'
 import { MockImageBitmap } from '../vitest-setup'
 import { RenderHandle } from '../gpu/backend'
-import { EditId } from '@lutra/store'
+import { EditId, StoreError } from '@lutra/store'
 import { initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
@@ -124,9 +124,12 @@ describe('editor: save flow (Save / Save as)', () => {
   it('SaveFailed records the reason for the top bar', () => {
     const [model, commands, out] = update(
       loaded({ id: id(), source: source() }),
-      SaveFailed({ error: 'quota exceeded' }),
+      SaveFailed({ error: new StoreError({ message: 'quota exceeded' }) }),
     )
-    expect(model.saveStatus).toEqual({ _tag: 'failed', error: 'quota exceeded' })
+    expect(model.saveStatus).toEqual({
+      _tag: 'failed',
+      error: new StoreError({ message: 'quota exceeded' }),
+    })
     expect(commands).toEqual([])
     expect(Option.isNone(out)).toBe(true)
   })

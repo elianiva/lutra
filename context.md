@@ -102,6 +102,21 @@ The timestamp stored on an **Edit** that orders the **main menu**. Because the l
 The tagged error type a failed **Edit store** operation raises (a genuine failure — quota, blocked access, corruption — not a missing record, which `load` reports as `Option.None`). Its purpose is to give the frontend a channel to surface failures (in the **main menu** or **Options screen**) and to let future sync distinguish local from server failure.
 _Avoid_: reusing the engine's `GpuError`/`EncodeError` — storage failures are a distinct defect class in a distinct package.
 
+**Image decode error**:
+The tagged error a failed image load raises — reading a picked file's bytes, decoding it into an `ImageBitmap`, or decoding a saved **Edit**'s source bytes. One concept whether the browser API failed or the file is corrupt: the user-visible failure is the same — the image cannot be opened. It surfaces in the editor's **error stage** and the gallery's photo-create failure.
+_Avoid_: plain `Error` (the pre-taxonomy slop), "invalid image" (implies the file is at fault when a plain read can fail too).
+
+**LUT load error**:
+The tagged error a failed **LUT library** fetch raises — an HTTP failure of the catalog or a `.cube` file, or a corrupt catalog JSON. Distinct from a **LUT parse error**: a load error means the bytes never arrived; a parse error means the engine rejected the bytes it got.
+_Avoid_: reusing `GpuError` — the historical mislabel; loading a LUT is not a GPU operation.
+
+**LUT parse error**:
+The tagged error `parseCube` raises on malformed `.cube` text — a missing or invalid `LUT_3D_SIZE` header, malformed data lines. The engine's pure parse boundary; the frontend passes it through rather than re-tagging it.
+
+**Thumbnail encode error**:
+The tagged error a failed **Edit summary** thumbnail encode raises — a 2d context unavailable, a `convertToBlob` failure. Distinct from the engine's `EncodeError` (the export encoder's contract): thumbnails are downscaled by canvas 2D, exports by the worker encoder.
+_Avoid_: reusing `EncodeError` — the thumbnail pipeline is a different mechanism.
+
 ### Editor UI
 
 **Tool panel**:

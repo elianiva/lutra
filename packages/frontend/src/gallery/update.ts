@@ -40,7 +40,7 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
       DeleteRequested: ({ id }) => [model, [DeleteEdit({ id })], Option.none()],
       EditDeleted: () => [model, [ListEdits()], Option.none()],
       DeleteFailed: ({ error }) => [
-        { ...model, notice: `Delete failed: ${error}` },
+        { ...model, notice: `Delete failed: ${error.message}` },
         [],
         Option.none(),
       ],
@@ -52,7 +52,7 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
       // URL, exactly as if the user had clicked the tile.
       PhotoCreated: ({ id }) => [model, [], Option.some(OpenedEdit({ id }))],
       PhotoCreateFailed: ({ error }) => [
-        { ...model, notice: `Could not open photo: ${error}` },
+        { ...model, notice: `Could not open photo: ${error.message}` },
         [],
         Option.none(),
       ],

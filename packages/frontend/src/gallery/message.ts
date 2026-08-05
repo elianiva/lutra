@@ -1,6 +1,7 @@
 import { Schema as S } from 'effect'
 import { Message } from 'foldkit'
-import { EditSummary, EditIdSchema } from '@lutra/store'
+import { EditSummary, EditIdSchema, StoreError } from '@lutra/store'
+import { ImageDecodeError, ThumbnailEncodeError } from '../errors'
 
 /**
  * The Gallery Submodel's message union (docs/adr/0009). These are internal to
@@ -12,7 +13,7 @@ import { EditSummary, EditIdSchema } from '@lutra/store'
 // ---- grid ----
 /** A fresh list of summaries landed from the EditStore (a ListEdits result). */
 export const EditsListed = Message.m('EditsListed', { summaries: S.Array(EditSummary) })
-export const ListFailed = Message.m('ListFailed', { error: S.String })
+export const ListFailed = Message.m('ListFailed', { error: StoreError })
 /** The user asked to re-fetch the grid. */
 export const RefreshRequested = Message.m('RefreshRequested')
 
@@ -22,7 +23,7 @@ export const ClickedEdit = Message.m('ClickedEdit', { id: EditIdSchema })
 /** A tile's delete control was pressed. */
 export const DeleteRequested = Message.m('DeleteRequested', { id: EditIdSchema })
 export const EditDeleted = Message.m('EditDeleted')
-export const DeleteFailed = Message.m('DeleteFailed', { error: S.String })
+export const DeleteFailed = Message.m('DeleteFailed', { error: StoreError })
 
 // ---- open a photo (new edit) ----
 /** The user pressed "Open photo": fire the native file picker and create a new Edit. */
@@ -31,7 +32,9 @@ export const OpenPhotoRequested = Message.m('OpenPhotoRequested')
 export const PhotoPickCancelled = Message.m('PhotoPickCancelled')
 /** A new Edit was persisted; the root navigates the editor onto it. */
 export const PhotoCreated = Message.m('PhotoCreated', { id: EditIdSchema })
-export const PhotoCreateFailed = Message.m('PhotoCreateFailed', { error: S.String })
+export const PhotoCreateFailed = Message.m('PhotoCreateFailed', {
+  error: S.Union([ImageDecodeError, ThumbnailEncodeError, StoreError]),
+})
 
 export const GalleryMessage = S.Union([
   EditsListed,

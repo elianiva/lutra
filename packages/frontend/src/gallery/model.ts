@@ -1,6 +1,6 @@
 import { Schema as S } from 'effect'
 import { AsyncData } from 'foldkit'
-import { EditSummary } from '@lutra/store'
+import { EditSummary, StoreError } from '@lutra/store'
 
 /**
  * The Gallery Submodel's model (docs/adr/0009): the list of saved Edits
@@ -13,7 +13,7 @@ import { EditSummary } from '@lutra/store'
 export const GalleryRoute = S.Struct({})
 
 /** The summaries `list()` returns, held as AsyncData (source bytes excluded). */
-export const EditList = AsyncData.Schema(S.Array(EditSummary), S.String)
+export const EditList = AsyncData.Schema(S.Array(EditSummary), StoreError)
 /** The schema's typed constructors (`EditList.Success` etc.). */
 export const editList = EditList
 

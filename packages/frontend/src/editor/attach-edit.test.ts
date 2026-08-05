@@ -7,6 +7,7 @@ import { init } from './init'
 import { informRouteChanged } from './inform-route-changed'
 import { createLayerFor } from './command'
 import { EditLoaded, EditLoadFailed } from './message'
+import { EditNotFoundError } from '../errors'
 import { Idle } from './phase'
 
 // ---- helpers ----
@@ -91,9 +92,13 @@ describe('attached edit load (gallery → /edit/:id)', () => {
   })
 
   it('EditLoadFailed lands the error stage with the reason', () => {
-    const [model, commands] = update(initialModel(), EditLoadFailed({ error: 'edit not found' }))
+    const [model, commands] = update(
+      initialModel(),
+      EditLoadFailed({ error: new EditNotFoundError({ message: 'edit not found' }) }),
+    )
     expect(model.phase._tag).toBe('Error')
-    expect(model.source.error).toBe('edit not found')
+    expect(model.source.error).toBeInstanceOf(EditNotFoundError)
+    expect(model.source.error?.message).toBe('edit not found')
     expect(commands).toEqual([])
   })
 })

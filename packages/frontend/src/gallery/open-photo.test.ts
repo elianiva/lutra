@@ -10,7 +10,7 @@ import {
   scene,
   text,
 } from 'foldkit/scene'
-import { EditId } from '@lutra/store'
+import { EditId, StoreError } from '@lutra/store'
 import { initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
@@ -70,7 +70,10 @@ describe('gallery: open a photo (new edit)', () => {
   })
 
   it('a failed create sets the notice banner instead of losing the photo silently', () => {
-    const [model, commands, out] = update(initialModel(), PhotoCreateFailed({ error: 'quota' }))
+    const [model, commands, out] = update(
+      initialModel(),
+      PhotoCreateFailed({ error: new StoreError({ message: 'quota' }) }),
+    )
     expect(model.notice).toBe('Could not open photo: quota')
     expect(commands).toEqual([])
     expect(Option.isNone(out)).toBe(true)

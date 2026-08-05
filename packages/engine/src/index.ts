@@ -13,6 +13,7 @@ export {
   LAYER_TYPES,
   Layer,
   LayerPatch,
+  UnknownLayerTypeError,
 } from "./layers"
 export type {
   FieldMeta,
@@ -31,7 +32,6 @@ export {
   toggleLayerVisibility,
   replaceChain,
 } from "./chain"
-export type { ChainError } from "./chain"
 
 // Render pipeline
 // The engine builds a render request (shader + uniforms + source + frame);
@@ -46,7 +46,12 @@ export { parseCube, LutParseError } from "./luts/cube"
 export type { LutCube } from "./luts/cube"
 
 // Shader generation
-export { generateChainSource, SRGB_TO_LINEAR, WORKGROUP_SIZE } from "./shaders"
+export {
+  generateChainSource,
+  SRGB_TO_LINEAR,
+  WORKGROUP_SIZE,
+  MissingLutReferenceError,
+} from "./shaders"
 export type { ChainLayerInfo, ChainPass, ChainShader, UniformSlot, BodyRenderer } from "./shaders"
 
 // Shader body renderers — one per layer type. Consumers build a registry

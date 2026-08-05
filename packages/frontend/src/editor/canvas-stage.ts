@@ -10,6 +10,7 @@ import {
 } from './message'
 import { hasImage } from './phase'
 import { canvasRef, registerCanvas } from '../gpu/canvas-ref'
+import { MountElementError } from '../errors'
 import type { Model } from './model'
 
 const ZOOM_SPEED = 0.01
@@ -19,7 +20,7 @@ const ZOOM_SPEED = 0.01
  *  assertion so the linter's assertion ban stays satisfied. */
 const asHtmlElement = (element: Element): HTMLElement => {
   if (element instanceof HTMLElement) return element
-  throw new Error('PanZoom stage must be an HTMLElement')
+  throw new MountElementError({ message: 'PanZoom stage must be an HTMLElement' })
 }
 
 /** Pan & zoom mount for the image canvas. Exported for Scene test resolution.
@@ -354,7 +355,7 @@ export const canvasStage = (h: HtmlBuilder<EditorMessage>, model: Model) =>
       hasImage(model.phase)
         ? loadedStage(h, model)
         : model.phase._tag === 'Error'
-          ? errorStage(h, model.source.error ?? 'Unknown error')
+          ? errorStage(h, model.source.error?.message ?? 'Unknown error')
           : emptyStage(h),
     ],
   )

@@ -422,12 +422,12 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
           Option.none(),
         ]
       },
-      RenderFailed: ({ reason }) => [
+      RenderFailed: ({ error }) => [
         {
           ...model,
           phase,
           renderPending: false,
-          source: { ...model.source, error: reason },
+          source: { ...model.source, error },
         },
         [],
         Option.none(),
@@ -487,8 +487,8 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
         if (!model.exportDialog.isOpen) return [model, [], Option.none()]
         return [{ ...model, phase, exportImage: image, exportError: null }, [], Option.none()]
       },
-      ExportSnapshotFailed: ({ reason }) => [
-        { ...model, phase, exportError: reason },
+      ExportSnapshotFailed: ({ error }) => [
+        { ...model, phase, exportError: error },
         [],
         Option.none(),
       ],
@@ -524,8 +524,8 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
           Option.none(),
         ]
       },
-      ExportEncodeFailed: ({ reason }) => [
-        { ...model, phase, exportEncoding: false, exportError: reason },
+      ExportEncodeFailed: ({ error }) => [
+        { ...model, phase, exportEncoding: false, exportError: error },
         [],
         Option.none(),
       ],

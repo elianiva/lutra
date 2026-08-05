@@ -8,6 +8,7 @@ import { view } from './view'
 import { Idle } from './phase'
 import { PanZoom, RegisterCanvas } from './canvas-stage'
 import { RenderHandle } from '../gpu/backend'
+import { EncodeError } from '@lutra/engine'
 import {
   SnapshotForExport,
   PrepareExport,
@@ -194,7 +195,7 @@ describe('Export dialog', () => {
       click(text('Export')),
       Command.resolve(
         PrepareExport,
-        ExportEncodeFailed({ reason: 'encode exploded' }),
+        ExportEncodeFailed({ error: new EncodeError({ message: 'encode exploded' }) }),
       ),
       expect(text('encode exploded')).toExist(),
 

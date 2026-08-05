@@ -1,6 +1,25 @@
+import { Schema } from "effect"
 import { nextLayerId } from "./id"
 import type { LayerEntry } from "./registry"
 import type { Layer, LayerType } from "./schemas"
+
+// ---- errors ----
+
+/**
+ * A layer factory was asked for a type the registry does not define. The
+ * registries are static and the UI only picks from `LAYER_TYPES`, so this
+ * is a defect (a programmer error), not a recoverable failure — it is
+ * thrown, not Effect-failed. Distinct from `GpuError`'s "Unknown layer
+ * type" case in `createRenderRequest`, where the chain is user data
+ * crossing the persistence boundary and the failure is recoverable.
+ */
+export class UnknownLayerTypeError extends Schema.TaggedErrorClass<UnknownLayerTypeError>()(
+  "UnknownLayerTypeError",
+  {
+    message: Schema.String,
+    cause: Schema.optional(Schema.Unknown),
+  },
+) {}
 
 /**
  * Create a new layer of the given type with all fields set to their
@@ -12,7 +31,7 @@ export function createLayer<K extends LayerType>(
 ): Extract<Layer, { type: K }> {
   const entry = registry[type]
   if (!entry) {
-    throw new Error(`Unknown layer type: ${type}`)
+    throw new UnknownLayerTypeError({ message: `Unknown layer type: ${type}` })
   }
 
   const fields: Record<string, number> = {}

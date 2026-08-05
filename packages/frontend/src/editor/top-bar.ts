@@ -88,7 +88,7 @@ const saveStatusText = (h: HtmlBuilder<EditorMessage>, model: Model) => {
     ])
   }
   if (status._tag === 'failed') {
-    return h.span([h.Class('pr-1 text-[10px] text-accent'), h.Title(status.error)], [
+    return h.span([h.Class('pr-1 text-[10px] text-accent'), h.Title(status.error.message)], [
       'Save failed',
     ])
   }

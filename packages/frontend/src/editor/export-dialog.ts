@@ -196,7 +196,7 @@ const resolutionSection = (h: HtmlBuilder<EditorMessage>, model: Model) => {
 const statusSection = (h: HtmlBuilder<EditorMessage>, model: Model) => {
   let content: string
   if (model.exportError) {
-    content = model.exportError
+    content = model.exportError.message
   } else if (model.exportEncoding) {
     content = 'Encoding…'
   } else if (model.exportDownloaded && model.exportSize !== null) {

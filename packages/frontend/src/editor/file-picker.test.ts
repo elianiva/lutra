@@ -7,6 +7,7 @@ import { view } from './view'
 import { ErrorState } from './phase'
 import { PanZoom, RegisterCanvas } from './canvas-stage'
 import { RenderHandle } from '../gpu/backend'
+import { ImageDecodeError } from '../errors'
 import { PickImageFile, DecodeImage, RenderChain, ReadHistogram } from './command'
 import {
   FilePickCancelled,
@@ -143,7 +144,7 @@ describe('Error state', () => {
         bitmap: null,
         width: 0,
         height: 0,
-        error: 'Failed to decode image',
+        error: new ImageDecodeError({ message: 'Failed to decode image' }),
       },
     }
     scene(
@@ -163,7 +164,7 @@ describe('Error state', () => {
         bitmap: null,
         width: 0,
         height: 0,
-        error: 'Something went wrong',
+        error: new ImageDecodeError({ message: 'Something went wrong' }),
       },
     }
     scene(
@@ -190,7 +191,7 @@ describe('File picker command resolution', () => {
       // After file selected, the model goes to 'loading' and DecodeImage fires
       Command.expectHas(DecodeImage),
       // Resolve DecodeImage to end cleanly
-      Command.resolve(DecodeImage, ImageFailedToDecode({ error: 'Cancelled in test' })),
+      Command.resolve(DecodeImage, ImageFailedToDecode({ error: new ImageDecodeError({ message: 'Cancelled in test' }) })),
       Command.expectNone(),
     )
   })
@@ -245,7 +246,7 @@ describe('Image decode flow', () => {
       Command.resolve(PickImageFile, SelectedImageFile({ file: mockPngFile })),
 
       // Resolve decode with failure
-      Command.resolve(DecodeImage, ImageFailedToDecode({ error: 'Corrupt image file' })),
+      Command.resolve(DecodeImage, ImageFailedToDecode({ error: new ImageDecodeError({ message: 'Corrupt image file' }) })),
 
       // Error text should be visible
       expect(text('Failed to load image: Corrupt image file')).toExist(),

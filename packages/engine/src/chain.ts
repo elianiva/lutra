@@ -1,21 +1,7 @@
-import { Data } from "effect"
 import type { Layer, LayerPatch, LayerType } from "./layers/schemas"
 import type { LayerId } from "./brands"
 import type { LayerRegistry } from "./layers/registry"
 import { createLayer } from "./layers/defaults"
-
-// ---- errors ----
-
-export class LayerNotFoundError extends Data.TaggedError("LayerNotFoundError")<{
-  layerId: LayerId
-}> {}
-
-export class InvalidPositionError extends Data.TaggedError("InvalidPositionError")<{
-  index: number
-  chainLength: number
-}> {}
-
-export type ChainError = LayerNotFoundError | InvalidPositionError
 
 // ---- operations ----
 

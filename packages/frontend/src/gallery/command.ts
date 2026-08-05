@@ -1,6 +1,7 @@
 import { Effect, Option } from 'effect'
 import { Command, File as FoldkitFile } from 'foldkit'
 import { EditStore, EditIdSchema, Edit, newEditId, StoreError } from '@lutra/store'
+import { ImageDecodeError, ThumbnailEncodeError } from '../errors'
 import {
   EditsListed,
   ListFailed,
@@ -23,9 +24,8 @@ export const ListEdits = Command.define('ListEdits', {
     const summaries = yield* store.list()
     return EditsListed({ summaries })
   }).pipe(
-    Effect.catchIf(
-      (err): err is StoreError => err instanceof StoreError,
-      (err) => Effect.succeed(ListFailed({ error: err.message })),
+    Effect.catchTag('StoreError', (err: StoreError) =>
+      Effect.succeed(ListFailed({ error: err })),
     ),
   ),
 })
@@ -44,9 +44,8 @@ export const DeleteEdit = Command.define('DeleteEdit', {
       yield* store.delete(id)
       return EditDeleted()
     }).pipe(
-      Effect.catchIf(
-        (err): err is StoreError => err instanceof StoreError,
-        (err) => Effect.succeed(DeleteFailed({ error: err.message })),
+      Effect.catchTag('StoreError', (err: StoreError) =>
+        Effect.succeed(DeleteFailed({ error: err })),
       ),
     ),
 })
@@ -57,10 +56,14 @@ export const DeleteEdit = Command.define('DeleteEdit', {
 const IMAGE_TYPES = ['image/*', '.jpg', '.jpeg', '.png', '.webp', '.avif']
 
 /** The picked file's bytes — the Edit's source image, stored verbatim. */
-const readBytes = (file: File): Effect.Effect<Uint8Array, Error> =>
+const readBytes = (file: File): Effect.Effect<Uint8Array, ImageDecodeError> =>
   Effect.tryPromise({
     try: () => file.arrayBuffer(),
-    catch: (cause) => new Error(`failed to read the picked photo: ${String(cause)}`),
+    catch: (cause) =>
+      new ImageDecodeError({
+        message: `failed to read the picked photo: ${String(cause)}`,
+        cause,
+      }),
   }).pipe(Effect.map((buffer) => new Uint8Array(buffer)))
 
 /**
@@ -68,11 +71,18 @@ const readBytes = (file: File): Effect.Effect<Uint8Array, Error> =>
  * new Edit's thumbnail. An empty chain renders the source as-is, so the
  * thumbnail is the raw photo (like the mobile's preview-as-thumbnail).
  */
-const thumbnailBytes = (file: File, maxDim = 320): Effect.Effect<Uint8Array, Error> =>
+const thumbnailBytes = (
+  file: File,
+  maxDim = 320,
+): Effect.Effect<Uint8Array, ImageDecodeError | ThumbnailEncodeError> =>
   Effect.gen(function* () {
     const bitmap = yield* Effect.tryPromise({
       try: () => createImageBitmap(file),
-      catch: (cause) => new Error(`failed to decode the picked photo: ${String(cause)}`),
+      catch: (cause) =>
+        new ImageDecodeError({
+          message: `failed to decode the picked photo: ${String(cause)}`,
+          cause,
+        }),
     })
     try {
       const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height))
@@ -84,11 +94,19 @@ const thumbnailBytes = (file: File, maxDim = 320): Effect.Effect<Uint8Array, Err
       ctx.drawImage(bitmap, 0, 0, width, height)
       const blob = yield* Effect.tryPromise({
         try: () => canvas.convertToBlob({ type: 'image/jpeg', quality: 0.85 }),
-        catch: (cause) => new Error(`failed to encode the thumbnail: ${String(cause)}`),
+        catch: (cause) =>
+          new ThumbnailEncodeError({
+            message: `failed to encode the thumbnail: ${String(cause)}`,
+            cause,
+          }),
       })
       const buffer = yield* Effect.tryPromise({
         try: () => blob.arrayBuffer(),
-        catch: (cause) => new Error(`failed to encode the thumbnail: ${String(cause)}`),
+        catch: (cause) =>
+          new ThumbnailEncodeError({
+            message: `failed to encode the thumbnail: ${String(cause)}`,
+            cause,
+          }),
       })
       return new Uint8Array(buffer)
     } finally {
@@ -128,13 +146,14 @@ export const OpenPhoto = Command.define('OpenPhoto', {
     )
     return PhotoCreated({ id })
   }).pipe(
-    Effect.catchIf(
-      (err): err is StoreError => err instanceof StoreError,
-      (err) => Effect.succeed(PhotoCreateFailed({ error: err.message })),
+    Effect.catchTag('StoreError', (err: StoreError) =>
+      Effect.succeed(PhotoCreateFailed({ error: err })),
     ),
-    Effect.catchIf(
-      (err): err is Error => err instanceof Error,
-      (err) => Effect.succeed(PhotoCreateFailed({ error: err.message })),
+    Effect.catchTag('ImageDecodeError', (err: ImageDecodeError) =>
+      Effect.succeed(PhotoCreateFailed({ error: err })),
+    ),
+    Effect.catchTag('ThumbnailEncodeError', (err: ThumbnailEncodeError) =>
+      Effect.succeed(PhotoCreateFailed({ error: err })),
     ),
   ),
 })

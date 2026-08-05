@@ -2,18 +2,28 @@ import { Schema as S } from 'effect'
 import { Message } from 'foldkit'
 import { Dialog } from '@foldkit/ui'
 import { RenderHandle } from '../gpu/backend'
-import { EditIdSchema } from '@lutra/store'
+import { EditIdSchema, StoreError } from '@lutra/store'
+import { LutLoadError } from '../luts/store'
 import {
+  EncodeError,
   ExportFormat,
   ExportQuality,
   ExportScale,
   ExportSettings,
   FieldKeySchema,
+  GpuError,
   LAYER_TYPES,
   Layer,
   LayerIdSchema,
   LutIdSchema,
+  LutParseError,
 } from '@lutra/engine'
+import {
+  CanvasUnavailableError,
+  EditNotFoundError,
+  ImageDecodeError,
+  ThumbnailEncodeError,
+} from '../errors'
 
 // ---- the editor's message union ----
 // The Editor is a foldkit Submodel (docs/adr/0009): it owns its own Model,
@@ -21,6 +31,30 @@ import {
 // Messages are all internal to the editor — routing (`ChangedRoute`,
 // `Navigated`) lives at the root, and the editor surfaces its domain facts
 // upward via an `OutMessage` when it needs to.
+
+// A failure message carries its tagged error, never a flattened string
+// (docs/adr/0010). The unions below name the failure sets; the model
+// reuses them (model.ts) so a stored failure stays typed end to end.
+
+/** Every error the editor can land in `source.error` (decode, load, render). */
+export const SourceError = S.Union([
+  ImageDecodeError,
+  EditNotFoundError,
+  StoreError,
+  GpuError,
+  LutLoadError,
+  LutParseError,
+  CanvasUnavailableError,
+])
+export type SourceError = typeof SourceError.Type
+
+/** Every failure a Save can surface: snapshot, thumbnail encode, or store. */
+export const SaveError = S.Union([GpuError, StoreError, ThumbnailEncodeError])
+export type SaveError = typeof SaveError.Type
+
+/** Every failure the export dialog can surface: snapshot readback or encode. */
+export const ExportError = S.Union([GpuError, EncodeError])
+export type ExportError = typeof ExportError.Type
 
 // A decoded source bitmap plus its pixel size. The bitmap is held in the model
 // as a plain ImageBitmap (`instanceOf` bypasses structural validation) so the
@@ -31,7 +65,7 @@ export const SourceImage = S.Struct({
   bitmap: S.NullOr(S.instanceOf(ImageBitmap)),
   width: S.Number,
   height: S.Number,
-  error: S.NullOr(S.String),
+  error: S.NullOr(SourceError),
 })
 export type SourceImage = typeof SourceImage.Type
 
@@ -52,7 +86,7 @@ export const ImageDecoded = Message.m('ImageDecoded', {
   source: S.Uint8Array,
 })
 export const ImageFailedToDecode = Message.m('ImageFailedToDecode', {
-  error: S.String,
+  error: ImageDecodeError,
 })
 export const ClearedImage = Message.m('ClearedImage')
 
@@ -74,7 +108,9 @@ export const EditLoaded = Message.m('EditLoaded', {
   height: S.Number,
   source: S.Uint8Array,
 })
-export const EditLoadFailed = Message.m('EditLoadFailed', { error: S.String })
+export const EditLoadFailed = Message.m('EditLoadFailed', {
+  error: S.Union([EditNotFoundError, StoreError, ImageDecodeError]),
+})
 
 // ---- LUT library ----
 
@@ -92,7 +128,7 @@ export const Catalog = S.Array(CatalogEntry)
 export type Catalog = typeof Catalog.Type
 
 export const CatalogLoaded = Message.m('CatalogLoaded', { catalog: Catalog })
-export const CatalogFailed = Message.m('CatalogFailed', { error: S.String })
+export const CatalogFailed = Message.m('CatalogFailed', { error: LutLoadError })
 
 // ---- canvas interaction ----
 
@@ -161,7 +197,9 @@ export const RenderedFrame = Message.m('RenderedFrame', {
   stamp: S.Number,
   handle: S.instanceOf(RenderHandle),
 })
-export const RenderFailed = Message.m('RenderFailed', { reason: S.String })
+export const RenderFailed = Message.m('RenderFailed', {
+  error: S.Union([CanvasUnavailableError, GpuError, LutLoadError, LutParseError]),
+})
 
 // ---- histogram overlay ----
 
@@ -175,7 +213,7 @@ export const HistogramComputed = Message.m('HistogramComputed', {
 })
 // Bins readback failure — observability only (the frame itself is already
 // on the canvas; a 1KB map cannot be retried or shown).
-export const HistogramFailed = Message.m('HistogramFailed', { reason: S.String })
+export const HistogramFailed = Message.m('HistogramFailed', { error: GpuError })
 
 // ---- canvas registration ----
 
@@ -211,7 +249,7 @@ export const ExportSnapshotted = Message.m('ExportSnapshotted', {
   image: S.instanceOf(ImageData),
 })
 export const ExportSnapshotFailed = Message.m('ExportSnapshotFailed', {
-  reason: S.String,
+  error: GpuError,
 })
 // An encode completed: size + object URL of the encoded blob. The download
 // is triggered from here — encoding happens on Export press, not on
@@ -221,7 +259,7 @@ export const ExportPrepared = Message.m('ExportPrepared', {
   url: S.String,
 })
 export const ExportEncodeFailed = Message.m('ExportEncodeFailed', {
-  reason: S.String,
+  error: EncodeError,
 })
 // The user asked to download the current blob (the button in the dialog).
 export const ExportDownloadRequested = Message.m('ExportDownloadRequested')
@@ -249,7 +287,7 @@ export const SaveAsRequested = Message.m('SaveAsRequested')
 // it) and emits `EditCreated` when that id is new. `savedAt` is the
 // timestamp written to the record, which the top bar shows.
 export const EditSaved = Message.m('EditSaved', { id: EditIdSchema, savedAt: S.Number })
-export const SaveFailed = Message.m('SaveFailed', { error: S.String })
+export const SaveFailed = Message.m('SaveFailed', { error: SaveError })
 
 export const EditorMessage = S.Union([
   FilePickRequested,

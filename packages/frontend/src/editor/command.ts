@@ -12,13 +12,20 @@ import {
   GpuError,
   ImageEncoder,
   Layer,
+  LutParseError,
   type LayerType,
   type LutCube,
   type LutId,
 } from '@lutra/engine'
 import { GpuBackend, RenderHandle } from '../gpu/backend'
 import { CanvasRef } from '../gpu/canvas-ref'
-import { LutStore } from '../luts/store'
+import { LutLoadError, LutStore } from '../luts/store'
+import {
+  CanvasUnavailableError,
+  EditNotFoundError,
+  ImageDecodeError,
+  ThumbnailEncodeError,
+} from '../errors'
 import {
   FilePickCancelled,
   ImageDecoded,
@@ -71,13 +78,10 @@ export const PickImageFile = Command.define('PickImageFile', {
   ),
 })
 
-const errMsg = (cause: unknown): string =>
-  cause instanceof Error ? cause.message : String(cause)
-
 /**
  * Decode a user-selected File into an ImageBitmap at its native resolution.
- * A decode error becomes `ImageFailedToDecode`; any defect (a bug) crashes
- * rather than being relabeled.
+ * A decode error becomes `ImageFailedToDecode` carrying the domain error;
+ * any defect (a bug) crashes rather than being relabeled.
  */
 export const DecodeImage = Command.define('DecodeImage', {
   args: { file: Schema.instanceOf(File) },
@@ -89,11 +93,19 @@ export const DecodeImage = Command.define('DecodeImage', {
       // without holding the File (the store's carrier is bytes).
       const source = yield* Effect.tryPromise({
         try: () => file.arrayBuffer(),
-        catch: (cause) => new Error(`Failed to read image: ${String(cause)}`),
+        catch: (cause) =>
+          new ImageDecodeError({
+            message: `Failed to read image: ${String(cause)}`,
+            cause,
+          }),
       })
       const bitmap = yield* Effect.tryPromise({
         try: () => createImageBitmap(file),
-        catch: (cause) => new Error(`Failed to decode image: ${String(cause)}`),
+        catch: (cause) =>
+          new ImageDecodeError({
+            message: `Failed to decode image: ${String(cause)}`,
+            cause,
+          }),
       })
       return ImageDecoded({
         bitmap,
@@ -102,9 +114,8 @@ export const DecodeImage = Command.define('DecodeImage', {
         source: new Uint8Array(source),
       })
     }).pipe(
-      Effect.catchIf(
-        (err): err is Error => err instanceof Error,
-        (err) => Effect.succeed(ImageFailedToDecode({ error: errMsg(err) })),
+      Effect.catchTag('ImageDecodeError', (err: ImageDecodeError) =>
+        Effect.succeed(ImageFailedToDecode({ error: err })),
       ),
     ),
 })
@@ -124,7 +135,7 @@ export const LoadEdit = Command.define('LoadEdit', {
       const store = yield* EditStore
       const maybeEdit = yield* store.load(id)
       if (Option.isNone(maybeEdit)) {
-        return EditLoadFailed({ error: 'edit not found' })
+        return EditLoadFailed({ error: new EditNotFoundError({ message: 'edit not found' }) })
       }
       const edit = maybeEdit.value
       const bitmap = yield* Effect.tryPromise({
@@ -132,7 +143,11 @@ export const LoadEdit = Command.define('LoadEdit', {
         // TS can't know that, hence the BlobPart assertion (as in PrepareExport).
         // oxlint-disable-next-line consistent-type-assertions
         try: () => createImageBitmap(new Blob([edit.source as BlobPart])),
-        catch: (cause) => new Error(`Failed to decode saved image: ${String(cause)}`),
+        catch: (cause) =>
+          new ImageDecodeError({
+            message: `Failed to decode saved image: ${String(cause)}`,
+            cause,
+          }),
       })
       return EditLoaded({
         id: edit.id,
@@ -144,13 +159,11 @@ export const LoadEdit = Command.define('LoadEdit', {
         source: edit.source,
       })
     }).pipe(
-      Effect.catchIf(
-        (err): err is StoreError => err instanceof StoreError,
-        (err) => Effect.succeed(EditLoadFailed({ error: err.message })),
+      Effect.catchTag('StoreError', (err: StoreError) =>
+        Effect.succeed(EditLoadFailed({ error: err })),
       ),
-      Effect.catchIf(
-        (err): err is Error => err instanceof Error,
-        (err) => Effect.succeed(EditLoadFailed({ error: errMsg(err) })),
+      Effect.catchTag('ImageDecodeError', (err: ImageDecodeError) =>
+        Effect.succeed(EditLoadFailed({ error: err })),
       ),
     ),
 })
@@ -166,7 +179,7 @@ export const LoadEdit = Command.define('LoadEdit', {
 const thumbnailFromFrame = (
   frame: ImageData,
   maxDim = 320,
-): Effect.Effect<Uint8Array, Error> =>
+): Effect.Effect<Uint8Array, ThumbnailEncodeError> =>
   Effect.tryPromise({
     try: async () => {
       const scale = Math.min(1, maxDim / Math.max(frame.width, frame.height))
@@ -174,7 +187,7 @@ const thumbnailFromFrame = (
       const height = Math.max(1, Math.round(frame.height * scale))
       const canvas = new OffscreenCanvas(width, height)
       const ctx = canvas.getContext('2d')
-      if (!ctx) throw new Error('2d context unavailable')
+      if (!ctx) throw new ThumbnailEncodeError({ message: '2d context unavailable' })
       // ImageData → ImageBitmap (ImageData itself is not a CanvasImageSource
       // in this TS lib); close the bitmap when the draw is done.
       const bitmap = await createImageBitmap(frame)
@@ -186,7 +199,13 @@ const thumbnailFromFrame = (
       const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.85 })
       return new Uint8Array(await blob.arrayBuffer())
     },
-    catch: (cause) => new Error(`Failed to encode thumbnail: ${String(cause)}`),
+    catch: (cause) =>
+      cause instanceof ThumbnailEncodeError
+        ? cause
+        : new ThumbnailEncodeError({
+            message: `Failed to encode thumbnail: ${String(cause)}`,
+            cause,
+          }),
   })
 
 /**
@@ -223,17 +242,14 @@ export const SaveEdit = Command.define('SaveEdit', {
       yield* store.save(Edit.make({ id: editId, chain, source, thumbnail, savedAt }))
       return EditSaved({ id: editId, savedAt })
     }).pipe(
-      Effect.catchIf(
-        (err): err is GpuError => err instanceof GpuError,
-        (err) => Effect.succeed(SaveFailed({ error: err.message })),
+      Effect.catchTag('GpuError', (err: GpuError) =>
+        Effect.succeed(SaveFailed({ error: err })),
       ),
-      Effect.catchIf(
-        (err): err is StoreError => err instanceof StoreError,
-        (err) => Effect.succeed(SaveFailed({ error: err.message })),
+      Effect.catchTag('StoreError', (err: StoreError) =>
+        Effect.succeed(SaveFailed({ error: err })),
       ),
-      Effect.catchIf(
-        (err): err is Error => err instanceof Error,
-        (err) => Effect.succeed(SaveFailed({ error: errMsg(err) })),
+      Effect.catchTag('ThumbnailEncodeError', (err: ThumbnailEncodeError) =>
+        Effect.succeed(SaveFailed({ error: err })),
       ),
     ),
 })
@@ -250,8 +266,8 @@ export const LoadCatalog = Command.define('LoadCatalog', {
     const catalog = yield* store.getCatalog()
     return CatalogLoaded({ catalog })
   }).pipe(
-    Effect.catchTag('GpuError', (err: GpuError) =>
-      Effect.succeed(CatalogFailed({ error: err.message })),
+    Effect.catchTag('LutLoadError', (err: LutLoadError) =>
+      Effect.succeed(CatalogFailed({ error: err })),
     ),
   ),
 })
@@ -263,7 +279,7 @@ export const LoadCatalog = Command.define('LoadCatalog', {
  */
 const resolveLuts = (
   layers: ReadonlyArray<Layer>,
-): Effect.Effect<ReadonlyMap<LutId, LutCube>, GpuError, LutStore> =>
+): Effect.Effect<ReadonlyMap<LutId, LutCube>, LutLoadError | LutParseError, LutStore> =>
   Effect.gen(function* () {
     const store = yield* LutStore
     const luts = new Map<LutId, LutCube>()
@@ -310,7 +326,9 @@ export const RenderChain = Command.define('RenderChain', {
       // later).
       const canvasRef = yield* CanvasRef
       const canvas = yield* Ref.get(canvasRef)
-      if (Option.isNone(canvas)) return RenderFailed({ reason: 'Canvas not ready' })
+      if (Option.isNone(canvas)) {
+        return RenderFailed({ error: new CanvasUnavailableError({ message: 'Canvas not ready' }) })
+      }
 
       const chain: Layer[] = [...layers]
       if (draft) chain.push(draft)
@@ -321,9 +339,13 @@ export const RenderChain = Command.define('RenderChain', {
       const handle = yield* backend.execute(request, canvas.value)
       return RenderedFrame({ stamp, handle })
     }).pipe(
-      Effect.catchTag('GpuError', (err: GpuError) =>
-        Effect.succeed(RenderFailed({ reason: err.message })),
-      ),
+      // Every failure of this command surfaces as RenderFailed; the message
+      // schema names the failure set.
+      Effect.catchTags({
+        GpuError: (err) => Effect.succeed(RenderFailed({ error: err })),
+        LutLoadError: (err) => Effect.succeed(RenderFailed({ error: err })),
+        LutParseError: (err) => Effect.succeed(RenderFailed({ error: err })),
+      }),
     ),
 })
 
@@ -344,9 +366,8 @@ export const ReadHistogram = Command.define('ReadHistogram', {
       const bins = yield* backend.readHistogram(handle)
       return HistogramComputed({ bins, stamp })
     }).pipe(
-      Effect.catchIf(
-        (err): err is GpuError => err instanceof GpuError,
-        (err) => Effect.succeed(HistogramFailed({ reason: err.message })),
+      Effect.catchTag('GpuError', (err: GpuError) =>
+        Effect.succeed(HistogramFailed({ error: err })),
       ),
     ),
 })
@@ -369,9 +390,8 @@ export const SnapshotForExport = Command.define('SnapshotForExport', {
       const image = yield* backend.snapshot(handle)
       return ExportSnapshotted({ image })
     }).pipe(
-      Effect.catchIf(
-        (err): err is GpuError => err instanceof GpuError,
-        (err) => Effect.succeed(ExportSnapshotFailed({ reason: err.message })),
+      Effect.catchTag('GpuError', (err: GpuError) =>
+        Effect.succeed(ExportSnapshotFailed({ error: err })),
       ),
     ),
 })
@@ -401,9 +421,8 @@ export const PrepareExport = Command.define('PrepareExport', {
       const url = URL.createObjectURL(blob)
       return ExportPrepared({ sizeBytes: bytes.byteLength, url })
     }).pipe(
-      Effect.catchIf(
-        (err): err is EncodeError => err instanceof EncodeError,
-        (err) => Effect.succeed(ExportEncodeFailed({ reason: err.message })),
+      Effect.catchTag('EncodeError', (err: EncodeError) =>
+        Effect.succeed(ExportEncodeFailed({ error: err })),
       ),
     ),
 })

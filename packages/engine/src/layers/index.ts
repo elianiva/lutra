@@ -1,4 +1,4 @@
-export { createLayer } from "./defaults"
+export { createLayer, UnknownLayerTypeError } from "./defaults"
 export { nextLayerId } from "./id"
 export { makeRegistry } from "./registry"
 export { LAYER_TYPES, Layer, LayerPatch } from "./schemas"

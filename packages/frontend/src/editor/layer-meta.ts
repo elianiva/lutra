@@ -26,10 +26,12 @@ import {
   renderChromaticAberration,
   renderClarity,
   renderLut,
+  UnknownLayerTypeError,
   type Layer,
   type LayerType,
   type LutId,
 } from '@lutra/engine'
+import { UnknownFieldError } from '../errors'
 
 // The engine registry owns min/max/default per field; the UI metadata below
 // owns only presentation (icon, label, formatter). `fieldBounds` joins them so
@@ -53,9 +55,9 @@ export const fieldBounds = (
   field: FieldKey,
 ): { readonly min: number; readonly max: number } => {
   const entry = ENGINE_REGISTRY[type]
-  if (!entry) throw new Error(`Unknown layer type ${type}`)
+  if (!entry) throw new UnknownLayerTypeError({ message: `Unknown layer type ${type}` })
   const meta = entry.fields[field]
-  if (!meta) throw new Error(`Unknown field ${field} on ${type}`)
+  if (!meta) throw new UnknownFieldError({ message: `Unknown field ${field} on ${type}` })
   return { min: meta.min, max: meta.max }
 }
 
