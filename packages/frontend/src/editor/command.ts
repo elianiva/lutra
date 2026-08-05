@@ -1,7 +1,7 @@
 import { Effect, Option, Ref, Schema } from 'effect'
 import { Command, File as FoldkitFile, Render } from 'foldkit'
 import * as Persistence from 'effect/unstable/persistence/KeyValueStore'
-import { EditStore, EditIdSchema, StoreError } from '@lutra/store'
+import { Edit, EditStore, EditIdSchema, StoreError, newEditId } from '@lutra/store'
 import {
   createLayer,
   createRenderRequest,
@@ -37,6 +37,8 @@ import {
   ExportSettingsLoaded,
   ExportUrlRevoked,
   ExportSettingsSaved,
+  SaveFailed,
+  EditSaved,
   CatalogLoaded,
   CatalogFailed,
 } from './message'
@@ -81,13 +83,25 @@ export const DecodeImage = Command.define('DecodeImage', {
   args: { file: Schema.instanceOf(File) },
   messages: [ImageDecoded, ImageFailedToDecode],
   execute: ({ file }) =>
-    Effect.tryPromise({
-      try: () => createImageBitmap(file),
-      catch: (cause) => new Error(`Failed to decode image: ${String(cause)}`),
+    Effect.gen(function* () {
+      // Read the picked file's stored bytes alongside the decode: they are
+      // the Edit's source image, so a later Save-as-new can persist them
+      // without holding the File (the store's carrier is bytes).
+      const source = yield* Effect.tryPromise({
+        try: () => file.arrayBuffer(),
+        catch: (cause) => new Error(`Failed to read image: ${String(cause)}`),
+      })
+      const bitmap = yield* Effect.tryPromise({
+        try: () => createImageBitmap(file),
+        catch: (cause) => new Error(`Failed to decode image: ${String(cause)}`),
+      })
+      return ImageDecoded({
+        bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+        source: new Uint8Array(source),
+      })
     }).pipe(
-      Effect.map((bitmap) =>
-        ImageDecoded({ bitmap, width: bitmap.width, height: bitmap.height }),
-      ),
       Effect.catchIf(
         (err): err is Error => err instanceof Error,
         (err) => Effect.succeed(ImageFailedToDecode({ error: errMsg(err) })),
@@ -121,10 +135,13 @@ export const LoadEdit = Command.define('LoadEdit', {
         catch: (cause) => new Error(`Failed to decode saved image: ${String(cause)}`),
       })
       return EditLoaded({
+        id: edit.id,
         chain: edit.chain,
         bitmap,
         width: bitmap.width,
         height: bitmap.height,
+        // The stored source bytes: Save writes them back untouched.
+        source: edit.source,
       })
     }).pipe(
       Effect.catchIf(
@@ -134,6 +151,89 @@ export const LoadEdit = Command.define('LoadEdit', {
       Effect.catchIf(
         (err): err is Error => err instanceof Error,
         (err) => Effect.succeed(EditLoadFailed({ error: errMsg(err) })),
+      ),
+    ),
+})
+
+// ---- save ----
+
+/**
+ * A small JPEG of the graded frame, downscaled to fit `maxDim`, to refresh
+ * the Edit's thumbnail on every save — the gallery tile shows the graded
+ * result, not the raw photo. The readback happens once per save, like the
+ * export snapshot (a live preview is not worth a readback per slider tick).
+ */
+const thumbnailFromFrame = (
+  frame: ImageData,
+  maxDim = 320,
+): Effect.Effect<Uint8Array, Error> =>
+  Effect.tryPromise({
+    try: async () => {
+      const scale = Math.min(1, maxDim / Math.max(frame.width, frame.height))
+      const width = Math.max(1, Math.round(frame.width * scale))
+      const height = Math.max(1, Math.round(frame.height * scale))
+      const canvas = new OffscreenCanvas(width, height)
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error('2d context unavailable')
+      // ImageData → ImageBitmap (ImageData itself is not a CanvasImageSource
+      // in this TS lib); close the bitmap when the draw is done.
+      const bitmap = await createImageBitmap(frame)
+      try {
+        ctx.drawImage(bitmap, 0, 0, width, height)
+      } finally {
+        bitmap.close()
+      }
+      const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.85 })
+      return new Uint8Array(await blob.arrayBuffer())
+    },
+    catch: (cause) => new Error(`Failed to encode thumbnail: ${String(cause)}`),
+  })
+
+/**
+ * Persist the committed chain as an Edit through the store seam. `id` null
+ * creates a new Edit (fresh id) — the fresh in-editor pick case and Save as;
+ * `id` present saves in place. The source bytes pass through untouched
+ * (Save never re-encodes the source; Save as duplicates them under a new id)
+ * and `savedAt` bumps so the gallery reorders by recency.
+ *
+ * The thumbnail is regenerated from the graded frame `handle` identifies:
+ * one readback + JPEG encode, then `store.save`. Any failure — snapshot,
+ * encode, or store (quota, blocked access) — becomes `SaveFailed`; the top
+ * bar shows it instead of dropping the save silently.
+ */
+export const SaveEdit = Command.define('SaveEdit', {
+  args: {
+    // The attached Edit's id, or null to create a new Edit.
+    id: Schema.NullOr(EditIdSchema),
+    chain: Schema.Array(Layer),
+    // The source image in its stored encoding (unchanged by save).
+    source: Schema.Uint8Array,
+    // The displayed frame's handle — the thumbnail is graded result.
+    handle: Schema.instanceOf(RenderHandle),
+  },
+  messages: [EditSaved, SaveFailed],
+  execute: ({ id, chain, source, handle }) =>
+    Effect.gen(function* () {
+      const backend = yield* GpuBackend
+      const frame = yield* backend.snapshot(handle)
+      const thumbnail = yield* thumbnailFromFrame(frame)
+      const store = yield* EditStore
+      const editId = id ?? newEditId()
+      const savedAt = Date.now()
+      yield* store.save(Edit.make({ id: editId, chain, source, thumbnail, savedAt }))
+      return EditSaved({ id: editId, savedAt })
+    }).pipe(
+      Effect.catchIf(
+        (err): err is GpuError => err instanceof GpuError,
+        (err) => Effect.succeed(SaveFailed({ error: err.message })),
+      ),
+      Effect.catchIf(
+        (err): err is StoreError => err instanceof StoreError,
+        (err) => Effect.succeed(SaveFailed({ error: err.message })),
+      ),
+      Effect.catchIf(
+        (err): err is Error => err instanceof Error,
+        (err) => Effect.succeed(SaveFailed({ error: errMsg(err) })),
       ),
     ),
 })

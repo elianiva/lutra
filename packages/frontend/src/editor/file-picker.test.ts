@@ -209,7 +209,7 @@ describe('Image decode flow', () => {
       Command.resolve(PickImageFile, SelectedImageFile({ file: mockPngFile })),
 
       // Resolve decode — image decoded successfully
-      Command.resolve(DecodeImage, ImageDecoded({ bitmap, width: 200, height: 150 })),
+      Command.resolve(DecodeImage, ImageDecoded({ bitmap, width: 200, height: 150, source: new Uint8Array([1]) })),
 
       // Empty chain → the passthrough render presents the source on the
       // canvas. The update dispatches RenderChain (stamp = revision 1); the

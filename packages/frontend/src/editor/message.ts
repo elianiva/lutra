@@ -2,6 +2,7 @@ import { Schema as S } from 'effect'
 import { Message } from 'foldkit'
 import { Dialog } from '@foldkit/ui'
 import { RenderHandle } from '../gpu/backend'
+import { EditIdSchema } from '@lutra/store'
 import {
   ExportFormat,
   ExportQuality,
@@ -44,6 +45,11 @@ export const ImageDecoded = Message.m('ImageDecoded', {
   bitmap: S.instanceOf(ImageBitmap),
   width: S.Number,
   height: S.Number,
+  // The picked file's stored byte encoding — the Edit's source image. Read
+  // at pick time so a later Save (which creates a new Edit for a fresh pick)
+  // can persist it without holding the File (the store's carrier is bytes,
+  // docs/adr/0007).
+  source: S.Uint8Array,
 })
 export const ImageFailedToDecode = Message.m('ImageFailedToDecode', {
   error: S.String,
@@ -58,10 +64,15 @@ export const ClearedImage = Message.m('ClearedImage')
 // would — an opened Edit is the existing Idle phase, never a new one
 // (CONTEXT.md "Attached edit").
 export const EditLoaded = Message.m('EditLoaded', {
+  // The attached Edit's identity + stored source bytes: the model keeps them
+  // so Save writes back through the same id (in place) or forks it
+  // (CONTEXT.md "Attached edit" — id + source bytes are model data).
+  id: EditIdSchema,
   chain: S.Array(Layer),
   bitmap: S.instanceOf(ImageBitmap),
   width: S.Number,
   height: S.Number,
+  source: S.Uint8Array,
 })
 export const EditLoadFailed = Message.m('EditLoadFailed', { error: S.String })
 
@@ -225,6 +236,21 @@ export const ExportSettingsLoaded = Message.m('ExportSettingsLoaded', {
 export const ExportUrlRevoked = Message.m('ExportUrlRevoked')
 export const ExportSettingsSaved = Message.m('ExportSettingsSaved')
 
+// ---- save ----
+
+// The user pressed Save: persist the committed chain through the Edit store
+// — in place when the editor has an attached Edit, as a new Edit (fresh id,
+// duplicated source) when the image was picked fresh in-editor.
+export const SaveRequested = Message.m('SaveRequested')
+// The user pressed Save as: always fork a new Edit, even when attached.
+export const SaveAsRequested = Message.m('SaveAsRequested')
+// A save completed. `id` is the persisted Edit's id — update attaches the
+// model to it (a fresh-pick Save creates the attachment; Save as re-points
+// it) and emits `EditCreated` when that id is new. `savedAt` is the
+// timestamp written to the record, which the top bar shows.
+export const EditSaved = Message.m('EditSaved', { id: EditIdSchema, savedAt: S.Number })
+export const SaveFailed = Message.m('SaveFailed', { error: S.String })
+
 export const EditorMessage = S.Union([
   FilePickRequested,
   FilePickCancelled,
@@ -271,7 +297,21 @@ export const EditorMessage = S.Union([
   ExportSettingsLoaded,
   ExportUrlRevoked,
   ExportSettingsSaved,
+  SaveRequested,
+  SaveAsRequested,
+  EditSaved,
+  SaveFailed,
 ])
 export type EditorMessage = typeof EditorMessage.Type
+
+/**
+ * The fact the editor surfaces to the root (docs/adr/0009). Narrow and
+ * semantic, like the gallery's `OpenedEdit`: a Save created a NEW Edit (a
+ * fresh-pick Save or a Save as) — the root pushes the `/edit/:id` URL so a
+ * reload re-attaches the editor to the saved Edit. In-place saves (Save on
+ * an attached Edit) emit nothing — the URL already addresses the Edit.
+ */
+export const EditCreated = Message.m('EditCreated', { id: EditIdSchema })
+export type EditorOutMessage = typeof EditCreated.Type
 
 export { Layer, type LayerType } from '@lutra/engine'

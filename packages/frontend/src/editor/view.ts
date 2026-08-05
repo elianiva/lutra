@@ -23,7 +23,7 @@ const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
   return h.div(
     [h.Class('flex h-full flex-col bg-bg text-ink')],
     [
-      topBar(h, imageLoaded),
+      topBar(h, model, imageLoaded),
       h.div(
         [h.Class('flex min-h-0 flex-1')],
         [toolPanel(h, model), canvasStage(h, model), layerDrawer(h, model)],

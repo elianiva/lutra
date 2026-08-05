@@ -40,7 +40,14 @@ describe('attached edit load (gallery → /edit/:id)', () => {
     const exposure = createLayerFor('exposure')
     const [model, commands] = update(
       initialModel(),
-      EditLoaded({ chain: [exposure], bitmap: bitmap(), width: 640, height: 480 }),
+      EditLoaded({
+        id: id(),
+        chain: [exposure],
+        bitmap: bitmap(),
+        width: 640,
+        height: 480,
+        source: new Uint8Array([9, 9]),
+      }),
     )
 
     // The machine landed in Idle (the opened-Edit phase), never a new phase.
@@ -50,6 +57,8 @@ describe('attached edit load (gallery → /edit/:id)', () => {
     expect(model.source.height).toBe(480)
     expect(model.source.error).toBeNull()
     expect(model.chain).toEqual([exposure])
+    // The loaded Edit's identity + stored bytes become the attachment.
+    expect(model.attachedEdit).toEqual({ id: id(), source: new Uint8Array([9, 9]) })
     // The loaded edit is rendered immediately (renderNow), like a fresh pick.
     expect(commands[0]!.name).toBe('RenderChain')
   })
@@ -67,10 +76,18 @@ describe('attached edit load (gallery → /edit/:id)', () => {
     // …is discarded when EditLoaded lands (the machine edge Drafting → Idle).
     const [model] = update(
       drafting,
-      EditLoaded({ chain: [], bitmap: bitmap(), width: 640, height: 480 }),
+      EditLoaded({
+        id: id(),
+        chain: [],
+        bitmap: bitmap(),
+        width: 640,
+        height: 480,
+        source: new Uint8Array([9, 9]),
+      }),
     )
     expect(model.phase._tag).toBe('Idle')
     expect(model.chain).toEqual([])
+    expect(model.attachedEdit).toEqual({ id: id(), source: new Uint8Array([9, 9]) })
   })
 
   it('EditLoadFailed lands the error stage with the reason', () => {

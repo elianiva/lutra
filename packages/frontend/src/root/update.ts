@@ -83,9 +83,19 @@ export const update = (model: Model, message: RootMessage): UpdateReturn => {
       })
     }
     case 'GotEditorMessage': {
-      const [nextEditor, cmds] = Editor.update(model.editor, message.message)
+      const [nextEditor, cmds, out] = Editor.update(model.editor, message.message)
       const mapped = Command.mapMessages(cmds, (m) => GotEditorMessage({ message: m }))
-      return [evo(model, { editor: (_) => nextEditor }), mapped]
+      return Option.match(out, {
+        onNone: () => [evo(model, { editor: (_) => nextEditor }), mapped],
+        // A save created a new Edit (fresh-pick Save or Save as): push the
+        // editor URL for it, exactly as for a gallery tile — reload then
+        // re-attaches to the saved Edit (the URL always addresses the
+        // editor's attachment).
+        onSome: ({ id }) => [
+          evo(model, { editor: (_) => nextEditor }),
+          [...mapped, NavigateToEdit({ id })],
+        ],
+      })
     }
     case 'NavigatedTo':
       return [model, []]

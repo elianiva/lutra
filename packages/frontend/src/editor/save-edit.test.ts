@@ -1,0 +1,236 @@
+import { describe, it, expect } from 'vitest'
+import { Option } from 'effect'
+import { Command } from 'foldkit'
+import { Command as SceneCommand, Mount, click, expect as sceneExpect, expectOutMessage, given, scene, text } from 'foldkit/scene'
+import { MockImageBitmap } from '../vitest-setup'
+import { RenderHandle } from '../gpu/backend'
+import { EditId } from '@lutra/store'
+import { initialModel } from './model'
+import { update } from './update'
+import { view } from './view'
+import { PanZoom, RegisterCanvas } from './canvas-stage'
+import { SaveEdit } from './command'
+import {
+  ClearedImage,
+  EditCreated,
+  EditLoaded,
+  EditSaved,
+  ImageDecoded,
+  SaveAsRequested,
+  SaveFailed,
+  SaveRequested,
+} from './message'
+import { Idle, Loading } from './phase'
+
+// ---- helpers ----
+
+const id = () => EditId('11111111-1111-4111-8111-111111111111')
+const otherId = () => EditId('22222222-2222-4222-8222-222222222222')
+const bitmap = (width = 640, height = 480) => new MockImageBitmap(width, height)
+const source = () => new Uint8Array([1, 2, 3])
+const handle = () =>
+  // oxlint-disable-next-line consistent-type-assertions
+  new RenderHandle({} as GPUTexture, 200, 150, { buffer: {} as GPUBuffer, map: null })
+
+/** An editor with a loaded, rendered image and an attached-edit record. */
+const loaded = (attached: { id: EditId | null; source: Uint8Array }) => ({
+  ...initialModel(),
+  phase: Idle(),
+  source: { bitmap: bitmap(), width: 640, height: 480, error: null },
+  lastRender: handle(),
+  renderedStamp: 1,
+  attachedEdit: attached,
+})
+
+/** The SaveEdit command among a command list, if one was dispatched. */
+const saveEditOf = (commands: ReadonlyArray<Command.Command<unknown, unknown, unknown>>) =>
+  commands.find((c) => c.name === 'SaveEdit')
+
+// ---- tests ----
+
+describe('editor: save flow (Save / Save as)', () => {
+  it('SaveRequested without an image dispatches nothing', () => {
+    const [model, commands, out] = update(initialModel(), SaveRequested())
+    expect(model).toEqual(initialModel())
+    expect(commands).toEqual([])
+    expect(Option.isNone(out)).toBe(true)
+  })
+
+  it('SaveRequested saves in place when the editor is attached', () => {
+    const [model, commands, out] = update(loaded({ id: id(), source: source() }), SaveRequested())
+    expect(model.saveStatus).toEqual({ _tag: 'saving' })
+    expect(saveEditOf(commands)?.args?.id).toBe(id())
+    expect(Option.isNone(out)).toBe(true)
+  })
+
+  it('SaveRequested creates a new Edit when the image was picked fresh in-editor', () => {
+    const [, commands] = update(loaded({ id: null, source: source() }), SaveRequested())
+    const save = saveEditOf(commands)
+    // The picked file's bytes are the new Edit's source — unchanged.
+    expect(save?.args?.id).toBeNull()
+    expect(save?.args?.source).toEqual(source())
+    expect(save?.args?.chain).toEqual([])
+  })
+
+  it('SaveAsRequested always forks a new Edit, even when attached', () => {
+    const [, commands] = update(loaded({ id: id(), source: source() }), SaveAsRequested())
+    expect(saveEditOf(commands)?.args?.id).toBeNull()
+  })
+
+  it('Save as on a fresh pick forks like Save', () => {
+    const [, commands] = update(loaded({ id: null, source: source() }), SaveAsRequested())
+    expect(saveEditOf(commands)?.args?.id).toBeNull()
+  })
+
+  it('a save in flight ignores further save requests (at most one at a time)', () => {
+    const busy = {
+      ...loaded({ id: id(), source: source() }),
+      saveStatus: { _tag: 'saving' } as const,
+    }
+    const [model, commands] = update(busy, SaveRequested())
+    expect(model).toEqual(busy)
+    expect(commands).toEqual([])
+  })
+
+  it('EditSaved attaches the model to a fresh-pick save and surfaces EditCreated', () => {
+    const [model, commands, out] = update(
+      loaded({ id: null, source: source() }),
+      EditSaved({ id: id(), savedAt: 1234 }),
+    )
+    expect(model.attachedEdit).toEqual({ id: id(), source: source() })
+    expect(model.saveStatus).toEqual({ _tag: 'saved', at: 1234 })
+    expect(commands).toEqual([])
+    expect(out).toEqual(Option.some(EditCreated({ id: id() })))
+  })
+
+  it('an in-place save keeps the attachment and emits no EditCreated', () => {
+    const [model, , out] = update(
+      loaded({ id: id(), source: source() }),
+      EditSaved({ id: id(), savedAt: 1234 }),
+    )
+    expect(model.attachedEdit).toEqual({ id: id(), source: source() })
+    expect(out).toEqual(Option.none())
+  })
+
+  it('a Save as result re-points the attachment and surfaces EditCreated', () => {
+    const [model, , out] = update(
+      loaded({ id: id(), source: source() }),
+      EditSaved({ id: otherId(), savedAt: 5 }),
+    )
+    expect(model.attachedEdit).toEqual({ id: otherId(), source: source() })
+    expect(out).toEqual(Option.some(EditCreated({ id: otherId() })))
+  })
+
+  it('SaveFailed records the reason for the top bar', () => {
+    const [model, commands, out] = update(
+      loaded({ id: id(), source: source() }),
+      SaveFailed({ error: 'quota exceeded' }),
+    )
+    expect(model.saveStatus).toEqual({ _tag: 'failed', error: 'quota exceeded' })
+    expect(commands).toEqual([])
+    expect(Option.isNone(out)).toBe(true)
+  })
+
+  it('ImageDecoded records the picked bytes as an unattached source record', () => {
+    const [model] = update(
+      { ...initialModel(), phase: Loading() },
+      ImageDecoded({ bitmap: bitmap(), width: 640, height: 480, source: source() }),
+    )
+    expect(model.attachedEdit).toEqual({ id: null, source: source() })
+    expect(model.saveStatus).toEqual({ _tag: 'idle' })
+  })
+
+  it('EditLoaded records the stored id + source bytes as the attachment', () => {
+    const [model] = update(
+      initialModel(),
+      EditLoaded({
+        id: id(),
+        chain: [],
+        bitmap: bitmap(),
+        width: 640,
+        height: 480,
+        source: source(),
+      }),
+    )
+    expect(model.attachedEdit).toEqual({ id: id(), source: source() })
+    expect(model.saveStatus).toEqual({ _tag: 'idle' })
+  })
+
+  it('ClearedImage drops the attachment and resets the save status', () => {
+    const [model] = update(loaded({ id: id(), source: source() }), ClearedImage())
+    expect(model.attachedEdit).toBeNull()
+    expect(model.saveStatus).toEqual({ _tag: 'idle' })
+  })
+})
+
+// ---- top bar (scene) ----
+
+const config = {
+  update,
+  view,
+} as const
+
+// The canvas stage mounts these when an image is showing; resolve them so the
+// scene ends cleanly (as in file-picker.test.ts).
+const settleCanvasMounts = [
+  Mount.resolve(PanZoom, { _tag: 'ScaledCanvas', scale: 1, offsetX: 0, offsetY: 0 }),
+  Mount.resolve(RegisterCanvas, { _tag: 'CanvasRegistered' }),
+] as const
+
+describe('editor: top bar save controls', () => {
+  it('renders Save / Save as and dispatches SaveEdit on click, then shows the saved time', () => {
+    scene(
+      config,
+      given(loaded({ id: id(), source: source() })),
+      ...settleCanvasMounts,
+      sceneExpect(text('Save')).toExist(),
+      sceneExpect(text('Save as')).toExist(),
+      click(text('Save')),
+      // The button flips to Saving… while the command is in flight.
+      sceneExpect(text('Saving…')).toExist(),
+      SceneCommand.expectHas(SaveEdit),
+      SceneCommand.resolve(SaveEdit, EditSaved({ id: id(), savedAt: 1234 })),
+      // The top bar shows the last save's time; an in-place save emits no
+      // OutMessage (the URL already addresses the Edit).
+      sceneExpect(text('Saved', { exact: false })).toExist(),
+      SceneCommand.expectNone(),
+    )
+  })
+
+  it('Save as stays disabled without an attached Edit; Save stays enabled (it creates)', () => {
+    scene(
+      config,
+      given(loaded({ id: null, source: source() })),
+      ...settleCanvasMounts,
+      sceneExpect(text('Save as')).toBeDisabled(),
+      sceneExpect(text('Save')).toBeEnabled(),
+      SceneCommand.expectNone(),
+    )
+  })
+
+  it('both buttons are disabled while a save is in flight', () => {
+    scene(
+      config,
+      given({ ...loaded({ id: id(), source: source() }), saveStatus: { _tag: 'saving' } as const }),
+      ...settleCanvasMounts,
+      // The Save button shows the in-flight label; both are disabled.
+      sceneExpect(text('Saving…')).toBeDisabled(),
+      sceneExpect(text('Save as')).toBeDisabled(),
+      SceneCommand.expectNone(),
+    )
+  })
+
+  it('a Save as click surfaces EditCreated for the root', () => {
+    scene(
+      config,
+      given(loaded({ id: id(), source: source() })),
+      ...settleCanvasMounts,
+      click(text('Save as')),
+      SceneCommand.expectHas(SaveEdit),
+      SceneCommand.resolve(SaveEdit, EditSaved({ id: otherId(), savedAt: 1234 })),
+      sceneExpect(text('Saved', { exact: false })).toExist(),
+      expectOutMessage(EditCreated({ id: otherId() })),
+      SceneCommand.expectNone(),
+    )
+  })
+})

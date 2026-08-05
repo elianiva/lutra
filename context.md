@@ -170,7 +170,7 @@ Most layers expose a single parameter with one ruler slider. Two layers — **Wh
 ### Screens
 
 **Editor**:
-The screen at `/editor` (current root behaviour). Three-column Lightroom-style layout: left sidebar (**tool panel**, ~240px), center (**canvas** with pannable/zoomable image), right sidebar (**layer drawer**, ~280px). Top bar: app wordmark (**LUTRA**) left-aligned, export button right-aligned.
+The screen at `/editor` (current root behaviour). Three-column Lightroom-style layout: left sidebar (**tool panel**, ~240px), center (**canvas** with pannable/zoomable image), right sidebar (**layer drawer**, ~280px). Top bar: app wordmark (**LUTRA**) left-aligned; right-aligned are the **Save** / **Save as** controls, the export button, and the start-over button.
 _Avoid_: "color grading menu", "workspace"
 
 **Main menu**:
@@ -178,7 +178,7 @@ The gallery screen at `/` (the app's entry point). Shows saved **edits** as a gr
 _Avoid_: "Gallery" (ambiguous with the image-processing sense of the word), "landing page".
 
 **Attached edit**:
-The state of the **Editor** when it was opened from a **Main menu** tile: the editor is tied to that **Edit id**, its source image, and its **edit chain**. In this state, **Save** updates that Edit in place (chain only) and **Save as** forks. When the editor is instead seeded from a fresh in-editor file pick, there is no attached edit and **Save** creates a new one. Opening a photo from the **Main menu** is persist-first: the gallery creates the **Edit** (fresh id, empty chain) and navigates the editor onto it, so the editor always has an attached edit there. The attached edit is model data (id + source bytes), not a new editor phase — an opened Edit is the existing `Idle` phase. Through the **Edit store** seam both write modes are the same call: **Save** is `save(edit)` with the existing id, **Save as** is `save(edit)` with a freshly generated id and duplicated source bytes.
+The state of the **Editor** when it was opened from a **Main menu** tile: the editor is tied to that **Edit id**, its source image, and its **edit chain**. In this state, **Save** updates that Edit in place (source image untouched, thumbnail refreshed from the graded result) and **Save as** forks. When the editor is instead seeded from a fresh in-editor file pick, there is no attached edit and **Save** creates a new one. Opening a photo from the **Main menu** is persist-first: the gallery creates the **Edit** (fresh id, empty chain) and navigates the editor onto it, so the editor always has an attached edit there. The attached edit is model data (id + source bytes), not a new editor phase — an opened Edit is the existing `Idle` phase. Through the **Edit store** seam both write modes are the same call: **Save** is `save(edit)` with the existing id, **Save as** is `save(edit)` with a freshly generated id and duplicated source bytes.
 _Avoid_: "opened edit" (ambiguous), "edit session".
 
 ### Future (not in v1)

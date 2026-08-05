@@ -3,6 +3,7 @@ import { Dialog } from '@foldkit/ui'
 import { RenderHandle } from '../gpu/backend'
 import { SourceImage, Catalog } from './message'
 import { ExportSettings, defaultExportSettings, LayerIdSchema, Layer } from '@lutra/engine'
+import { EditIdSchema } from '@lutra/store'
 import { EditorPhase, editorMachine } from './phase'
 
 // The editor's interaction mode is a foldkit Machine (./phase.ts): the
@@ -15,6 +16,29 @@ import { EditorPhase, editorMachine } from './phase'
 // Which field a toggled layer (White Balance, Vignette) currently shows in the
 // drawer. Keyed by layer id so each toggled layer remembers its own selection.
 const ActiveFieldIndex = Schema.Record(LayerIdSchema, Schema.Number)
+
+// The persisted record identity of the current image (CONTEXT.md "Attached
+// edit"): the Edit id it is attached to — null when the image was picked
+// fresh in-editor — and the source image in its stored byte encoding (the
+// picked file's bytes or the attached Edit's stored bytes). Save writes
+// through this: in place when the id is present, creating a new Edit when
+// null. Null while no image is loaded.
+const AttachedEdit = Schema.NullOr(
+  Schema.Struct({
+    id: Schema.NullOr(EditIdSchema),
+    source: Schema.Uint8Array,
+  }),
+)
+
+// The save flow's bookkeeping: idle, an in-flight save, the last successful
+// save (the top bar shows its time), or the last failure (the top bar shows
+// the reason). Reset to idle when a new image loads.
+const SaveStatus = Schema.Union([
+  Schema.Struct({ _tag: Schema.Literal('idle') }),
+  Schema.Struct({ _tag: Schema.Literal('saving') }),
+  Schema.Struct({ _tag: Schema.Literal('saved'), at: Schema.Number }),
+  Schema.Struct({ _tag: Schema.Literal('failed'), error: Schema.String }),
+])
 
 export const Model = Schema.Struct({
   source: SourceImage,
@@ -33,6 +57,11 @@ export const Model = Schema.Struct({
   // The LUT library catalog; null until the startup fetch lands (the LUT
   // tool stays disabled while null).
   catalog: Schema.NullOr(Catalog),
+  // The attached Edit's identity + stored source bytes (null while no image
+  // is loaded — see AttachedEdit above).
+  attachedEdit: AttachedEdit,
+  // Save flow bookkeeping (see SaveStatus above).
+  saveStatus: SaveStatus,
   // Whether the inline LUT picker is expanded in the layer drawer.
   lutPickerOpen: Schema.Boolean,
   // True while a RenderChain command is in flight; renderNow skips dispatch
@@ -88,6 +117,8 @@ export const initialModel = (): Model => ({
   offsetX: 0,
   offsetY: 0,
   catalog: null,
+  attachedEdit: null,
+  saveStatus: { _tag: 'idle' },
   lutPickerOpen: false,
   renderPending: false,
   renderedStamp: 0,
