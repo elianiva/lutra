@@ -52,7 +52,7 @@ export const PanZoom = Mount.defineStream(
           const emit = (scale: number, offsetX: number, offsetY: number) =>
             Queue.offerUnsafe(queue, ScaledCanvas({ scale, offsetX, offsetY }))
 
-          /** Scale + offsets that center the image in the stage at ≤ 100%. */
+          /** Scale + offsets that center the image in the stage. */
           const fitToStage = () => {
             const rect = stage.getBoundingClientRect()
             if (rect.width === 0 || rect.height === 0 || imageWidth === 0 || imageHeight === 0) {
@@ -66,7 +66,6 @@ export const PanZoom = Mount.defineStream(
             }
           }
 
-          // Initial view: fit the whole image into the stage.
           const fit = fitToStage()
           if (fit) {
             state.scale = fit.scale

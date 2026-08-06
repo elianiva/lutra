@@ -100,7 +100,6 @@ export interface UniformSlot {
 
 // ---- pass templates ----
 
-/** Pure copy: reads the sRGB source texture and writes it unchanged. */
 /**
  * A body renderer emits either plain statements (string) or a
  * `BodySource` with optional module-scope helpers. Normalize to the
@@ -110,6 +109,7 @@ function normalizeBody(render: string | BodySource): BodySource {
   return typeof render === "string" ? { stmts: render } : render
 }
 
+/** Pure copy: reads the sRGB source texture and writes it unchanged. */
 function passthroughPass(): ChainPass {
   const source = `
 @group(0) @binding(0) var srcTex: texture_2d<f32>;

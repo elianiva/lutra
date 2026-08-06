@@ -151,7 +151,6 @@ export const UpdatedDraftParam = Message.m('UpdatedDraftParam', {
   field: FieldKeySchema,
   value: S.Number,
 })
-/** Pick a different LUT on the active LUT draft. */
 export const ChangedDraftLut = Message.m('ChangedDraftLut', { lutId: LutIdSchema })
 
 // ---- committed chain ----
@@ -170,12 +169,10 @@ export const UpdatedLayerParam = Message.m('UpdatedLayerParam', {
   field: FieldKeySchema,
   value: S.Number,
 })
-/** Pick a different LUT on a committed, selected LUT layer. */
 export const ChangedLayerLut = Message.m('ChangedLayerLut', {
   id: LayerIdSchema,
   lutId: LutIdSchema,
 })
-/** Expand/collapse the inline LUT picker in the layer drawer. */
 export const ToggledLutPicker = Message.m('ToggledLutPicker')
 /** For toggled layers (White Balance, Vignette): cycle the active field shown in the drawer. */
 export const CycledToggledField = Message.m('CycledToggledField', { id: LayerIdSchema })
@@ -224,7 +221,7 @@ export const CanvasRegistered = Message.m('CanvasRegistered')
 
 // ---- export dialog ----
 
-// Opens the export dialog (no longer an immediate download).
+// Opens the export dialog instead of downloading immediately.
 export const ExportRequested = Message.m('ExportRequested')
 
 // The dialog is a foldkit submodel (@foldkit/ui). Its messages arrive

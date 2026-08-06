@@ -52,12 +52,8 @@ import {
 import { SelectedImageFile } from './message'
 import { ENGINE_REGISTRY } from '../editor/layer-meta'
 
-// The engine owns the WGSL body renderers and builds the render request
-// (shader + uniforms + source); the frontend owns the WebGPU device and the
-// canvas. `createRenderRequest` assembles the chain source and packs
-// uniforms, then `GpuBackend.execute` runs it and blits the result onto the
-// center-stage canvas. The frontend has no duplicate layer definitions — it
-// consumes the engine's registry.
+// The frontend consumes the engine's registry directly — no duplicate layer
+// definitions.
 export const createLayerFor = (type: LayerType): Layer =>
   createLayer(type, ENGINE_REGISTRY)
 
@@ -222,12 +218,9 @@ const thumbnailFromFrame = (
  */
 export const SaveEdit = Command.define('SaveEdit', {
   args: {
-    // The attached Edit's id, or null to create a new Edit.
     id: Schema.NullOr(EditIdSchema),
     chain: Schema.Array(Layer),
-    // The source image in its stored encoding (unchanged by save).
     source: Schema.Uint8Array,
-    // The displayed frame's handle — the thumbnail is graded result.
     handle: Schema.instanceOf(RenderHandle),
   },
   messages: [EditSaved, SaveFailed],

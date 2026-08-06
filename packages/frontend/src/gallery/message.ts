@@ -14,13 +14,11 @@ import { ImageDecodeError, ThumbnailEncodeError } from '../errors'
 /** A fresh list of summaries landed from the EditStore (a ListEdits result). */
 export const EditsListed = Message.m('EditsListed', { summaries: S.Array(EditSummary) })
 export const ListFailed = Message.m('ListFailed', { error: StoreError })
-/** The user asked to re-fetch the grid. */
 export const RefreshRequested = Message.m('RefreshRequested')
 
 // ---- tile actions ----
 /** A tile was clicked. The update emits the `OpenedEdit` OutMessage for the root. */
 export const ClickedEdit = Message.m('ClickedEdit', { id: EditIdSchema })
-/** A tile's delete control was pressed. */
 export const DeleteRequested = Message.m('DeleteRequested', { id: EditIdSchema })
 export const EditDeleted = Message.m('EditDeleted')
 export const DeleteFailed = Message.m('DeleteFailed', { error: StoreError })

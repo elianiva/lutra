@@ -1,13 +1,7 @@
 import type { IconNode } from 'lucide'
 import type { HtmlBuilder } from 'foldkit/html'
 
-/**
- * Render a lucide `IconNode` (the framework-agnostic array of `[tag, attrs]`
- * tuples) into the foldkit `Html` builder. Mirrors the Dearly helper so the
- * tool panel, layer rows, and top bar share one icon implementation.
- *
- * @param size - Icon width/height in px. Defaults to 16 for a compact look.
- */
+/** Mirrors the Dearly helper so the tool panel, layer rows, and top bar share one icon implementation. */
 export const icon = <Message>(
   h: HtmlBuilder<Message>,
   node: IconNode,

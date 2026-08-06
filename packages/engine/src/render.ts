@@ -88,7 +88,6 @@ export function createRenderRequest(
   luts: ReadonlyMap<LutId, LutCube>,
 ): Effect.Effect<RenderRequest, GpuError> {
   return Effect.gen(function* () {
-    // Build chain-layer info for the assembler
     const chainLayers: ChainLayerInfo[] = []
     for (const l of chain) {
       if (!l.visible) continue
@@ -124,7 +123,6 @@ export function createRenderRequest(
       }
     }
 
-    // Assemble the WGSL shader
     let shader: ChainShader
     try {
       shader = generateChainSource(chainLayers)
@@ -132,7 +130,6 @@ export function createRenderRequest(
       return yield* Effect.fail(new GpuError({ message: "Shader generation failed", cause: e }))
     }
 
-    // Pack uniforms per pass from layer parameter values
     const uniforms = shader.passes.map((pass) => packUniforms(chain, pass))
 
     return { shader, uniforms, srcBitmap, frame, luts }

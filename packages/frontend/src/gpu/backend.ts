@@ -4,12 +4,6 @@ import { GpuError, WORKGROUP_SIZE, type ChainPass, type LutCube, type RenderRequ
 // ---- service ----
 
 /**
- * A handle to the frame a render produced: the output storage texture plus
- * its dimensions. `execute` returns one per render; it flows through the app
- * (RenderedFrame message → model) so `snapshot` never reads an implicit
- * "last session" — export snapshots exactly the frame it was handed.
- */
-/**
  * One slot of the histogram readback ring. `execute` copies a frame's bins
  * into `buffer` and issues `map` once the frame's submit completed — so the
  * map never queues behind a later render — then `readHistogram` consumes it
@@ -21,6 +15,12 @@ interface HistogramSlot {
   map: Promise<void> | null
 }
 
+/**
+ * A handle to the frame a render produced: the output storage texture plus
+ * its dimensions. `execute` returns one per render; it flows through the app
+ * (RenderedFrame message → model) so `snapshot` never reads an implicit
+ * "last session" — export snapshots exactly the frame it was handed.
+ */
 export class RenderHandle {
   constructor(
     readonly dstTex: GPUTexture,

@@ -7,7 +7,6 @@ import type { Model } from './model'
 import type { EditorPhase } from './phase'
 import type { LayerType } from '@lutra/engine'
 
-/** Left sidebar: all 11 adjustment types as a vertical icon+label list. */
 export const toolPanel = (h: HtmlBuilder<EditorMessage>, model: Model) =>
   h.aside(
     [

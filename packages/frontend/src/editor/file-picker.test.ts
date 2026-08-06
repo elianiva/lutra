@@ -183,12 +183,9 @@ describe('File picker command resolution', () => {
     scene(
       config,
       given(initialModel()),
-      // Click browse
       click(text('browse')),
       Command.expectHas(PickImageFile),
-      // Resolve the file picker — user selected a file
       Command.resolve(PickImageFile, SelectedImageFile({ file: mockPngFile })),
-      // After file selected, the model goes to 'loading' and DecodeImage fires
       Command.expectHas(DecodeImage),
       // Resolve DecodeImage to end cleanly
       Command.resolve(DecodeImage, ImageFailedToDecode({ error: new ImageDecodeError({ message: 'Cancelled in test' }) })),
@@ -205,11 +202,9 @@ describe('Image decode flow', () => {
       config,
       given(initialModel()),
 
-      // Click browse, resolve file pick
       click(text('browse')),
       Command.resolve(PickImageFile, SelectedImageFile({ file: mockPngFile })),
 
-      // Resolve decode — image decoded successfully
       Command.resolve(DecodeImage, ImageDecoded({ bitmap, width: 200, height: 150, source: new Uint8Array([1]) })),
 
       // Empty chain → the passthrough render presents the source on the
@@ -248,7 +243,6 @@ describe('Image decode flow', () => {
       // Resolve decode with failure
       Command.resolve(DecodeImage, ImageFailedToDecode({ error: new ImageDecodeError({ message: 'Corrupt image file' }) })),
 
-      // Error text should be visible
       expect(text('Failed to load image: Corrupt image file')).toExist(),
       expect(text('Try another')).toExist(),
       Command.expectNone(),

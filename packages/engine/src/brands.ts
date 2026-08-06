@@ -17,7 +17,6 @@ export type LayerId = string & Brand.Brand<"LayerId">
 
 export const LayerId = Brand.nominal<LayerId>()
 
-/** Decodes a string into a `LayerId` at schema boundaries. */
 export const LayerIdSchema = Schema.fromBrand("LayerId", LayerId)(Schema.String)
 
 // ---- LutId ----
@@ -27,7 +26,6 @@ export type LutId = string & Brand.Brand<"LutId">
 
 export const LutId = Brand.nominal<LutId>()
 
-/** Decodes a string into a `LutId` at schema boundaries. */
 export const LutIdSchema = Schema.fromBrand("LutId", LutId)(Schema.String)
 
 // ---- FieldKey ----
@@ -37,5 +35,4 @@ export type FieldKey = string & Brand.Brand<"FieldKey">
 
 export const FieldKey = Brand.nominal<FieldKey>()
 
-/** Decodes a string into a `FieldKey` at schema boundaries. */
 export const FieldKeySchema = Schema.fromBrand("FieldKey", FieldKey)(Schema.String)

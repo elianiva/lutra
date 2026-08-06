@@ -26,7 +26,6 @@ export const lutPicker = (
   return h.div(
     [h.Class('flex flex-col gap-2')],
     [
-      // Selector row
       h.button(
         [
           h.OnClick(ToggledLutPicker()),

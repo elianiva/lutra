@@ -5,7 +5,6 @@ import { Schema } from "effect"
 /** The file formats the export dialog offers, in display order. */
 export const EXPORT_FORMATS = ["png", "jpeg", "webp", "avif"] as const
 
-/** The file formats the export dialog offers. */
 export const ExportFormat = Schema.Literals(EXPORT_FORMATS)
 export type ExportFormat = typeof ExportFormat.Type
 
@@ -42,13 +41,10 @@ export const defaultExportSettings = (): ExportSettings => ({
   scale: 1,
 })
 
-/** Whether a format carries a quality knob (lossy). */
 export const isLossy = (format: ExportFormat): boolean => format !== "png"
 
-/** The file extension for a format — also its filename suffix. */
 export const fileExtension = (format: ExportFormat): string => format
 
-/** The MIME type for a format's encoded bytes. */
 export const mimeFor = (format: ExportFormat): string =>
   format === "png"
     ? "image/png"

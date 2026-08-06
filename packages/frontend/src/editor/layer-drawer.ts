@@ -32,7 +32,6 @@ const summary = (model: Model, layer: Layer, ui: (typeof LAYER_UI)[LayerType]): 
     ? `${lutName(model.catalog, layer.lutId)} · ${ui.formatValue(layer)}`
     : ui.formatValue(layer)
 
-/** Right sidebar: the edit chain as a vertical list with inline sliders. */
 export const layerDrawer = (h: HtmlBuilder<EditorMessage>, model: Model) =>
   h.aside(
     [h.Class('flex w-72 shrink-0 flex-col border-l border-border bg-panel'), h.AriaLabel('Layers')],
@@ -55,15 +54,14 @@ export const layerDrawer = (h: HtmlBuilder<EditorMessage>, model: Model) =>
           // confirm/cancel controls — it previews on top in the GPU pipeline
           // too. The draft itself lives in the phase machine (Drafting).
           ...(model.phase._tag === 'Drafting' ? [draftRow(h, model, model.phase.layer)] : []),
+          // The chain renders bottom-up (newest at the top, like Lightroom's
+          // history) so the most recent adjustment sits at eye level.
           ...model.chain.map((layer, index) => chainRow(h, model, layer, index)).reverse(),
           ...(model.chain.length === 0 && model.phase._tag !== 'Drafting' ? [emptyState(h)] : []),
         ],
       ),
     ],
   )
-
-// The chain renders bottom-up (newest at the top, like Lightroom's history) so
-// the most recent adjustment sits at eye level.
 
 const emptyState = (h: HtmlBuilder<EditorMessage>) =>
   h.div(
@@ -250,7 +248,6 @@ const reorderButton = (
     [icon(h, node, label)],
   )
 
-/** One labelled slider row: label, numeric readout, range input. */
 export const sliderControl = (
   h: HtmlBuilder<EditorMessage>,
   label: string,

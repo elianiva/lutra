@@ -12,8 +12,6 @@ export const encodeImage = async (
 ): Promise<Uint8Array> => {
   let source = image
   if (settings.scale !== 1) {
-    // Codecs load lazily per format so their wasm downloads only when the
-    // format is first used (ADR-0006).
     // oxlint-disable-next-line ts-no-dynamic-import
     const { default: resize } = await import("@jsquash/resize")
     source = await resize(image, {

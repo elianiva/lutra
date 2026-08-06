@@ -5,12 +5,10 @@ import { createLayer } from "./layers/defaults"
 
 // ---- operations ----
 
-/** Find a layer by id. Returns the index or -1. */
 function findIndex(chain: ReadonlyArray<Layer>, id: LayerId): number {
   return chain.findIndex((l) => l.id === id)
 }
 
-/** Append a new layer of the given type at the end of the chain. */
 export function addLayer(
   chain: ReadonlyArray<Layer>,
   type: LayerType,
@@ -19,7 +17,6 @@ export function addLayer(
   return [...chain, createLayer(type, registry)]
 }
 
-/** Remove a layer by id. Returns the chain unchanged if not found. */
 export function removeLayer(
   chain: ReadonlyArray<Layer>,
   id: LayerId,
@@ -29,7 +26,6 @@ export function removeLayer(
   return [...chain.slice(0, idx), ...chain.slice(idx + 1)]
 }
 
-/** Move a layer from one position to another. */
 export function reorderLayer(
   chain: ReadonlyArray<Layer>,
   id: LayerId,
@@ -45,7 +41,6 @@ export function reorderLayer(
   return result
 }
 
-/** Update one or more parameters on a layer. */
 export function updateLayerParam(
   chain: ReadonlyArray<Layer>,
   patch: LayerPatch,
@@ -60,7 +55,6 @@ export function updateLayerParam(
   return result
 }
 
-/** Toggle the visibility of a layer by id. */
 export function toggleLayerVisibility(
   chain: ReadonlyArray<Layer>,
   id: LayerId,
@@ -74,7 +68,6 @@ export function toggleLayerVisibility(
   return result
 }
 
-/** Replace the entire chain. */
 export function replaceChain(_chain: ReadonlyArray<Layer>, layers: Layer[]): Layer[] {
   return [...layers]
 }

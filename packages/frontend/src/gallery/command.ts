@@ -15,7 +15,7 @@ import {
 /**
  * Fetch the gallery grid (`EditStore.list`): the Edit summaries, source bytes
  * excluded. A backend failure surfaces as `ListFailed` so the grid can show
- * an error state. The no-op backend returns `[]` during the foundation slice.
+ * an error state.
  */
 export const ListEdits = Command.define('ListEdits', {
   messages: [EditsListed, ListFailed],

@@ -21,10 +21,6 @@ export class UnknownLayerTypeError extends Schema.TaggedErrorClass<UnknownLayerT
   },
 ) {}
 
-/**
- * Create a new layer of the given type with all fields set to their
- * defaults as defined in the registry.
- */
 export function createLayer<K extends LayerType>(
   type: K,
   registry: Record<LayerType, LayerEntry>,
