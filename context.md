@@ -155,7 +155,7 @@ The editor's before/after viewing feature, controlled from a segmented control f
 _Avoid_: "before/after" (a descriptive phrase, not the feature name), "compare view"
 
 **Split position**:
-The location of the divider in **Split** mode, in image space — it pans and zooms with the photo. Persists while the image is loaded; a new image resets it to 50%.
+The location of the divider in **Split** mode, in image space — it pans and zooms with the photo. The divider widget counter-scales its own size by the zoom, so its grab strip, line, and handle stay a constant screen size at any zoom (an image-space-sized strip would shrink to a few pixels on a zoomed-out photo and become undraggable). Persists while the image is loaded; a new image resets it to 50%.
 _Avoid_: "divider position" (the divider is the widget; the split position is the value)
 
 **LUT picker**:

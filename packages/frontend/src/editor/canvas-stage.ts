@@ -253,23 +253,42 @@ export const CompareDivider = Mount.defineStream(
 /**
  * The Split-mode divider: a draggable strip (with a visible 1px line and a
  * center handle) positioned at the split position in image space, so it
- * pans and zooms with the photo (CONTEXT.md "Split position"). Rendered
- * only in Split mode; the canvas blit draws the before/after boundary
- * underneath it.
+ * pans and zooms with the photo (CONTEXT.md "Split position"). Its sizes
+ * are counter-scaled by the current zoom (strip/handle 12/scale px, line
+ * 1/scale px), keeping the whole divider a constant ~12 screen px no
+ * matter how far the photo is zoomed out — at the fit zoom of a large
+ * photo an unscaled 12px strip shrinks to a couple of pixels and becomes
+ * effectively undraggable. Rendered only in Split mode; the canvas blit
+ * draws the before/after boundary underneath it.
  */
 const splitDivider = (h: HtmlBuilder<EditorMessage>, model: Model) =>
   h.div(
     [
-      h.Class('absolute inset-y-0 z-10 w-3 -translate-x-1/2 cursor-col-resize'),
-      h.Style({ left: `${model.compareSplitAt * 100}%` }),
+      h.Class('absolute inset-y-0 z-10 -translate-x-1/2 cursor-col-resize'),
+      h.Style({
+        left: `${model.compareSplitAt * 100}%`,
+        width: `${12 / model.scale}px`,
+      }),
       h.OnMount(CompareDivider()),
       h.Attribute('data-compare-divider', 'true'),
     ],
     [
-      h.div([h.Class('absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-ink/60')], []),
-      h.div([h.Class(
-          'absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 border border-ink bg-panel',
-        )], []),
+      h.div(
+        [
+          h.Class('absolute inset-y-0 left-1/2 -translate-x-1/2 bg-ink/60'),
+          h.Style({ width: `${1 / model.scale}px` }),
+        ],
+        [],
+      ),
+      h.div(
+        [
+          h.Class(
+            'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 border border-ink bg-panel',
+          ),
+          h.Style({ width: `${12 / model.scale}px`, height: `${12 / model.scale}px` }),
+        ],
+        [],
+      ),
     ],
   )
 

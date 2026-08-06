@@ -151,6 +151,32 @@ describe('compare control view', () => {
       sceneExpect(selector('[data-compare-divider]')).toExist(),
       // The divider sits at the split position, in image space.
       sceneExpect(selector('[data-compare-divider]')).toHaveStyle('left', '30%'),
+      // Counter-scaled by the zoom: at scale 1 the grab strip is 12px, so
+      // it stays a constant screen size (and grabbable) when zoomed out.
+      sceneExpect(selector('[data-compare-divider]')).toHaveStyle('width', '12px'),
+      Command.expectNone(),
+    )
+  })
+
+  it('counter-scales the divider so its screen size is constant under zoom', () => {
+    scene(
+      sceneConfig,
+      given({
+        ...initialModel(),
+        phase: Idle(),
+        source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
+        compareMode: 'split',
+        compareSplitAt: 0.3,
+      }),
+      // The zoomed view comes from the PanZoom mount, like a real stage
+      // measure: a 2× scale lands in the model and flows into the divider.
+      Mount.resolve(PanZoom, ScaledCanvas({ scale: 2, offsetX: 0, offsetY: 0 })),
+      Mount.resolve(RegisterCanvas, CanvasRegistered()),
+      Mount.resolve(CompareDivider, ChangedSplitPosition({ position: 0.3 })),
+      Command.resolve(PresentFrame, FramePresented()),
+      // Half the layout size (12px / scale) — same ~12px on screen.
+      sceneExpect(selector('[data-compare-divider]')).toHaveStyle('width', '6px'),
+      sceneExpect(selector('[data-compare-divider]')).toHaveStyle('left', '30%'),
       Command.expectNone(),
     )
   })
