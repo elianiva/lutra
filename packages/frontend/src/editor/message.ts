@@ -182,6 +182,37 @@ export const CycledToggledField = Message.m('CycledToggledField', { id: LayerIdS
 export const StartedLayerReorder = Message.m('StartedLayerReorder', { id: LayerIdSchema })
 export const MovedLayerReorder = Message.m('MovedLayerReorder', { over: S.Number })
 
+// ---- compare (before/after viewing) ----
+
+// The editor's compare modes (CONTEXT.md "Compare"): Off is the normal
+// view; Toggle flips the whole canvas between the source image and the
+// graded output; Split shows both separated by a draggable divider; Side by
+// side shows both next to each other in the canvas.
+export const CompareMode = S.Literals(['off', 'toggle', 'split', 'side-by-side'])
+export type CompareMode = typeof CompareMode.Type
+
+// The presentation state the blit needs, carried by every render and by the
+// blit-only PresentFrame command (docs/adr/0011): the mode, the split
+// position in image space (0..1), and which side Toggle currently shows.
+export const PresentState = S.Struct({
+  mode: CompareMode,
+  splitAt: S.Number,
+  showBefore: S.Boolean,
+})
+export type PresentState = typeof PresentState.Type
+
+// Selecting a compare mode. Selecting Toggle while already in Toggle flips
+// the view (the segment is the flip button); entering Toggle reveals the
+// source image first (CONTEXT.md "Compare"). Presentation-only — dispatches
+// PresentFrame, never a chain render.
+export const ChangedCompareMode = Message.m('ChangedCompareMode', { mode: CompareMode })
+// The divider was dragged (or double-clicked to reset): the split position
+// in image space, 0..1. Presentation-only, like ChangedCompareMode.
+export const ChangedSplitPosition = Message.m('ChangedSplitPosition', { position: S.Number })
+// Ack for the blit-only present command (observability, like
+// CanvasRegistered) — the frame was re-presented without re-rendering.
+export const FramePresented = Message.m('FramePresented')
+
 // ---- rendering ----
 
 // The rendered frame is presented directly to the canvas by the GPU backend;
@@ -313,6 +344,9 @@ export const EditorMessage = S.Union([
   CycledToggledField,
   StartedLayerReorder,
   MovedLayerReorder,
+  ChangedCompareMode,
+  ChangedSplitPosition,
+  FramePresented,
   RenderedFrame,
   RenderFailed,
   HistogramComputed,

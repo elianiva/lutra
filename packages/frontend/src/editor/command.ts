@@ -48,6 +48,8 @@ import {
   EditSaved,
   CatalogLoaded,
   CatalogFailed,
+  FramePresented,
+  PresentState,
 } from './message'
 import { SelectedImageFile } from './message'
 import { ENGINE_REGISTRY } from '../editor/layer-meta'
@@ -307,9 +309,12 @@ export const RenderChain = Command.define('RenderChain', {
     draft: Schema.NullOr(Layer),
     bitmap: Schema.instanceOf(ImageBitmap),
     stamp: Schema.Number,
+    // The compare presentation state (docs/adr/0011): the render's final
+    // blit applies the current mode and split position.
+    present: PresentState,
   },
   messages: [RenderedFrame, RenderFailed],
-  execute: ({ layers, draft, bitmap, stamp }) =>
+  execute: ({ layers, draft, bitmap, stamp, present }) =>
     Effect.gen(function* () {
       yield* Render.afterCommit
       // The canvas is registered into the CanvasRef service when it mounts;
@@ -329,7 +334,7 @@ export const RenderChain = Command.define('RenderChain', {
       const luts = yield* resolveLuts(chain)
       const request = yield* createRenderRequest(chain, ENGINE_REGISTRY, bitmap, stamp, luts)
       const backend = yield* GpuBackend
-      const handle = yield* backend.execute(request, canvas.value)
+      const handle = yield* backend.execute(request, canvas.value, present)
       return RenderedFrame({ stamp, handle })
     }).pipe(
       // Every failure of this command surfaces as RenderFailed; the message
@@ -339,6 +344,38 @@ export const RenderChain = Command.define('RenderChain', {
         LutLoadError: (err) => Effect.succeed(RenderFailed({ error: err })),
         LutParseError: (err) => Effect.succeed(RenderFailed({ error: err })),
       }),
+    ),
+})
+
+/**
+ * Re-present the last rendered frame with a new compare presentation state
+ * — the blit-only counterpart to RenderChain (docs/adr/0011). Presentation
+ * changes (mode flip, divider drag) never re-run the chain; this command
+ * costs one fullscreen triangle. Dispatched by ChangedCompareMode and
+ * ChangedSplitPosition; the model's lastRender, bins, and renderedStamp are
+ * untouched. A missing canvas or session is a no-op (the next render or
+ * present re-blits anyway).
+ */
+export const PresentFrame = Command.define('PresentFrame', {
+  args: { present: PresentState },
+  messages: [FramePresented],
+  execute: ({ present }) =>
+    Effect.gen(function* () {
+      yield* Render.afterCommit
+      const canvasRef = yield* CanvasRef
+      const canvas = yield* Ref.get(canvasRef)
+      if (Option.isNone(canvas)) {
+        return FramePresented()
+      }
+      const backend = yield* GpuBackend
+      yield* backend.present(canvas.value, present)
+      return FramePresented()
+    }).pipe(
+      // A present failure (a defect surfaced as GpuError) is best-effort by
+      // nature: the next render or present re-blits anyway, so there is
+      // nothing to surface and nothing that wedges — unlike a failed
+      // RenderChain, which must clear renderPending.
+      Effect.catchTag('GpuError', () => Effect.succeed(FramePresented())),
     ),
 })
 

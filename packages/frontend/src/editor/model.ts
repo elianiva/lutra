@@ -1,7 +1,7 @@
 import { Schema } from 'effect'
 import { Dialog } from '@foldkit/ui'
 import { RenderHandle } from '../gpu/backend'
-import { SourceImage, Catalog, SaveError, ExportError } from './message'
+import { SourceImage, CompareMode, Catalog, SaveError, ExportError } from './message'
 import { ExportSettings, defaultExportSettings, LayerIdSchema, Layer } from '@lutra/engine'
 import { EditIdSchema } from '@lutra/store'
 import { EditorPhase, editorMachine } from './phase'
@@ -64,6 +64,13 @@ export const Model = Schema.Struct({
   saveStatus: SaveStatus,
   // Whether the inline LUT picker is expanded in the layer drawer.
   lutPickerOpen: Schema.Boolean,
+  // Compare (before/after viewing) state — CONTEXT.md "Compare": the active
+  // mode, the split position in image space (0..1), and which side Toggle
+  // shows (entering Toggle reveals the source first). The mode persists
+  // across image changes; a new image resets the split position to 50%.
+  compareMode: CompareMode,
+  compareSplitAt: Schema.Number,
+  compareToggleBefore: Schema.Boolean,
   // True while a RenderChain command is in flight; renderNow skips dispatch
   // while pending so the GPU queue never backs up (the in-flight render
   // re-triggers with the newest state when it completes).
@@ -120,6 +127,9 @@ export const initialModel = (): Model => ({
   attachedEdit: null,
   saveStatus: { _tag: 'idle' },
   lutPickerOpen: false,
+  compareMode: 'off',
+  compareSplitAt: 0.5,
+  compareToggleBefore: false,
   renderPending: false,
   renderedStamp: 0,
   lastRender: null,

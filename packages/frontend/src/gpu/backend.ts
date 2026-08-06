@@ -31,18 +31,44 @@ export class RenderHandle {
   ) {}
 }
 
+/**
+ * The compare presentation state the blit applies (docs/adr/0011): which
+ * Compare mode is active, where the Split divider sits (image space, 0..1),
+ * and which side Toggle shows. Mirrors the frontend's PresentState schema —
+ * the backend stays a plain structural service, so the schema lives at the
+ * message boundary only.
+ */
+export interface ComparePresent {
+  readonly mode: 'off' | 'toggle' | 'split' | 'side-by-side'
+  readonly splitAt: number
+  readonly showBefore: boolean
+}
+
 export interface GpuBackendShape {
   /**
    * Execute a render request: run the chain compute shader over the source
    * image, then blit the result straight onto the given canvas. The image
    * never leaves the GPU — no readback on the display path. Resolves with a
    * `RenderHandle` when the submitted GPU work has completed, so callers can
-   * coalesce renders (one in flight at a time) without a CPU stall.
+   * coalesce renders (one in flight at a time) without a CPU stall. The
+   * final blit applies the given compare presentation state.
    */
   readonly execute: (
     request: RenderRequest,
     canvas: HTMLCanvasElement,
+    present: ComparePresent,
   ) => Effect.Effect<RenderHandle, GpuError>
+  /**
+   * Re-present the last rendered frame with a new compare presentation state
+   * — a blit-only pass that never re-runs the chain (docs/adr/0011). The
+   * only GPU work is one fullscreen triangle, so divider drags and mode
+   * flips stay cheap on large images. No-op when no frame has rendered for
+   * the canvas yet.
+   */
+  readonly present: (
+    canvas: HTMLCanvasElement,
+    present: ComparePresent,
+  ) => Effect.Effect<void, GpuError>
   /**
    * Read the frame identified by `handle` back to the CPU as `ImageData`.
    * Used only by export (encoding needs CPU pixels); never on the display
@@ -122,11 +148,20 @@ const acquireDevice = Effect.gen(function* () {
  * Fragment `@builtin(position)` is in framebuffer pixels with the origin at
  * the top-left and y pointing down — the same orientation as the compute
  * dstTex, so no flip is needed.
+ *
+ * Compare presentation (docs/adr/0011): the blit samples the display texture
+ * (dstTex) or the source image (srcTex) per `u_present` — mode 0 graded,
+ * 1 source (Toggle showing before), 2 Split (source left of the divider,
+ * graded right), 3 Side by side (source in the left half, graded in the
+ * right). The canvas is image-sized, so the divider and the halves live in
+ * image space and pan/zoom with the photo.
  */
 const BLIT_SOURCE = `
-@group(0) @binding(0) var srcTex: texture_2d<f32>;
+@group(0) @binding(0) var dstTex: texture_2d<f32>;
 @group(0) @binding(1) var samp: sampler;
 @group(0) @binding(2) var<uniform> u_resolution: vec2<f32>;
+@group(0) @binding(3) var srcTex: texture_2d<f32>;
+@group(0) @binding(4) var<uniform> u_present: vec4<f32>;
 
 @vertex
 fn vs(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4<f32> {
@@ -141,7 +176,33 @@ fn vs(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4<f32> {
 @fragment
 fn fs(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
   let uv = pos.xy / u_resolution;
-  return textureSample(srcTex, samp, uv);
+  let mode = u_present.x;
+  let splitAt = u_present.y;
+  if (mode == 3.0) {
+    // Side by side: source in the left half, graded in the right half,
+    // each scaled to fill its half of the image-sized canvas (half-
+    // resolution per side — the framing view; Split is the full-res
+    // inspection view). Both samples run in uniform control flow (mode is
+    // uniform); the half selection is a select expression, not control
+    // flow — textureSample must not be called from flow that depends on
+    // the non-uniform fragment position. Out-of-range coordinates clamp.
+    let left = textureSample(srcTex, samp, vec2<f32>(uv.x * 2.0, uv.y));
+    let right = textureSample(dstTex, samp, vec2<f32>(uv.x * 2.0 - 1.0, uv.y));
+    return select(right, left, uv.x < 0.5);
+  }
+  if (mode == 2.0) {
+    // Split: source left of the divider, graded right. select evaluates
+    // both samples unconditionally, which is fine (both textures bound).
+    return select(
+      textureSample(dstTex, samp, uv),
+      textureSample(srcTex, samp, uv),
+      uv.x < splitAt,
+    );
+  }
+  if (mode == 1.0) {
+    return textureSample(srcTex, samp, uv);
+  }
+  return textureSample(dstTex, samp, uv);
 }
 `
 
@@ -217,6 +278,8 @@ interface Session {
   readonly intermediates: [GPUTexture, GPUTexture]
   readonly resolutionBuffer: GPUBuffer
   readonly frameBuffer: GPUBuffer
+  /** Compare presentation uniform (mode + split position), written per blit. */
+  readonly presentBuffer: GPUBuffer
   readonly blitGroup: GPUBindGroup
   /** Histogram bins accumulator (STORAGE | COPY_SRC) — the pass atomicAdds into this. */
   readonly binsBuffer: GPUBuffer
@@ -340,6 +403,7 @@ export const GpuBackendLive = Layer.effect(
       s.intermediates[1].destroy()
       s.resolutionBuffer.destroy()
       s.frameBuffer.destroy()
+      s.presentBuffer.destroy()
       s.binsBuffer.destroy()
       for (const slot of s.readbacks) {
         slot.buffer.destroy()
@@ -419,12 +483,21 @@ export const GpuBackendLive = Layer.effect(
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       })
 
+      // Compare presentation uniform: [wgslMode, splitAt, 0, 0], rewritten
+      // before every blit (chain renders and present-only re-blits alike).
+      const presentBuffer = device.createBuffer({
+        size: 16,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      })
+
       const blitGroup = device.createBindGroup({
         layout: blitPipeline.getBindGroupLayout(0),
         entries: [
           { binding: 0, resource: dstTex.createView() },
           { binding: 1, resource: sampler },
           { binding: 2, resource: { buffer: resolutionBuffer } },
+          { binding: 3, resource: srcTex.createView() },
+          { binding: 4, resource: { buffer: presentBuffer } },
         ],
       })
 
@@ -467,6 +540,7 @@ export const GpuBackendLive = Layer.effect(
         intermediates,
         resolutionBuffer,
         frameBuffer,
+        presentBuffer,
         blitGroup,
         binsBuffer,
         binsZeros: new Uint32Array(HISTOGRAM_BINS),
@@ -599,8 +673,49 @@ export const GpuBackendLive = Layer.effect(
         return entry
       })
 
+    /**
+     * Present the session's display texture onto the canvas swapchain,
+     * applying the compare presentation state (docs/adr/0011). The only GPU
+     * work is one fullscreen triangle — presentation changes (mode flip,
+     * divider drag) never touch the chain compute output, so they cost a
+     * blit, not a re-render. Shared by `execute` (the render's final blit)
+     * and `present` (the blit-only re-present).
+     */
+    const blit = (encoder: GPUCommandEncoder, s: Session, present: ComparePresent): void => {
+      const wgslMode =
+        present.mode === 'off'
+          ? 0
+          : present.mode === 'toggle'
+            ? present.showBefore
+              ? 1
+              : 0
+            : present.mode === 'split'
+              ? 2
+              : 3
+      device.queue.writeBuffer(
+        s.presentBuffer,
+        0,
+        new Float32Array([wgslMode, present.splitAt, 0, 0]),
+      )
+      const canvasTexture = s.ctx.getCurrentTexture()
+      const renderPass = encoder.beginRenderPass({
+        colorAttachments: [
+          {
+            view: canvasTexture.createView(),
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+            loadOp: 'clear',
+            storeOp: 'store',
+          },
+        ],
+      })
+      renderPass.setPipeline(blitPipeline)
+      renderPass.setBindGroup(0, s.blitGroup)
+      renderPass.draw(3, 1, 0, 0)
+      renderPass.end()
+    }
+
     return GpuBackend.of({
-      execute: (request, canvas) =>
+      execute: (request, canvas, present) =>
         Effect.gen(function* () {
           const width = request.srcBitmap.width
           const height = request.srcBitmap.height
@@ -685,22 +800,9 @@ export const GpuBackendLive = Layer.effect(
           histogramPass.end()
           encoder.copyBufferToBuffer(s.binsBuffer, 0, slot.buffer, 0, HISTOGRAM_BINS * 4)
 
-          // Finally: blit dstTex onto the canvas swapchain texture.
-          const canvasTexture = s.ctx.getCurrentTexture()
-          const renderPass = encoder.beginRenderPass({
-            colorAttachments: [
-              {
-                view: canvasTexture.createView(),
-                clearValue: { r: 0, g: 0, b: 0, a: 1 },
-                loadOp: 'clear',
-                storeOp: 'store',
-              },
-            ],
-          })
-          renderPass.setPipeline(blitPipeline)
-          renderPass.setBindGroup(0, s.blitGroup)
-          renderPass.draw(3, 1, 0, 0)
-          renderPass.end()
+          // Finally: blit dstTex (or the compare view of srcTex/dstTex) onto
+          // the canvas swapchain texture.
+          blit(encoder, s, present)
 
           device.queue.submit([encoder.finish()])
 
@@ -729,6 +831,26 @@ export const GpuBackendLive = Layer.effect(
           // stays true forever — the app silently stops rendering.
           Effect.catchDefect((cause: unknown) =>
             Effect.fail(new GpuError({ message: 'Unexpected GPU error', cause })),
+          ),
+        ),
+
+      // Blit-only re-present (docs/adr/0011): re-blit the last rendered
+      // frame with a new compare presentation state, without re-running the
+      // chain. Uses the current session's textures as-is; no-op when no
+      // session exists for the canvas (nothing has rendered yet).
+      present: (canvas, present) =>
+        Effect.gen(function* () {
+          const current = yield* Ref.get(sessionRef)
+          if (Option.isNone(current) || current.value.canvas !== canvas) {
+            return
+          }
+          const s = current.value
+          const encoder = device.createCommandEncoder()
+          blit(encoder, s, present)
+          device.queue.submit([encoder.finish()])
+        }).pipe(
+          Effect.catchDefect((cause: unknown) =>
+            Effect.fail(new GpuError({ message: 'Unexpected GPU error during present', cause })),
           ),
         ),
 

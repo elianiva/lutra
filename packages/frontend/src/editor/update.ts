@@ -12,6 +12,7 @@ import {
   SaveExportSettings,
   PickImageFile,
   RenderChain,
+  PresentFrame,
   ReadHistogram,
   SaveEdit,
 } from './command'
@@ -22,7 +23,7 @@ import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import { EditStore } from '@lutra/store'
 import type { Model } from './model'
 import { GotExportDialogMessage, EditCreated } from './message'
-import type { EditorMessage, EditorOutMessage } from './message'
+import type { EditorMessage, EditorOutMessage, PresentState } from './message'
 
 export type UpdateReturn = readonly [
   Model,
@@ -40,6 +41,15 @@ const ensureFieldIndex = (
   index: Record<LayerId, number>,
   layerId: LayerId,
 ): Record<LayerId, number> => (index[layerId] === undefined ? { ...index, [layerId]: 0 } : index)
+
+/** The compare presentation state (docs/adr/0011) the blit needs: the mode,
+ *  the split position in image space, and the toggle side. Carried by every
+ *  RenderChain (the render's final blit) and by PresentFrame (blit-only). */
+const presentState = (model: Model): PresentState => ({
+  mode: model.compareMode,
+  splitAt: model.compareSplitAt,
+  showBefore: model.compareToggleBefore,
+})
 
 /** Fire a RenderChain command for the current chain + draft. Bumps `revision`
  *  so stale render results can be dropped. When a render is already in
@@ -64,6 +74,7 @@ const renderNow = (model: Model): UpdateReturn => {
         draft,
         bitmap: model.source.bitmap,
         stamp,
+        present: presentState(model),
       }),
     ],
     Option.none(),
@@ -190,6 +201,9 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
           renderedStamp: 0,
           lastRender: null,
           bins: null,
+          // A new image starts the split position over at 50% (the compare
+          // mode itself persists across images).
+          compareSplitAt: 0.5,
           attachedEdit: null,
           saveStatus: { _tag: 'idle' },
         },
@@ -212,6 +226,9 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
           source: { bitmap, width, height, error: null },
           activeFieldIndex: {},
           lutPickerOpen: false,
+          // A new image starts the split position over at 50% (the compare
+          // mode itself persists across images).
+          compareSplitAt: 0.5,
           attachedEdit: { id, source },
           saveStatus: { _tag: 'idle' },
         })
@@ -403,6 +420,33 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
       // ---- reorder drag (drag operations reshuffle via ReorderedLayer) ----
       StartedLayerReorder: () => [model, [], Option.none()],
       MovedLayerReorder: () => [model, [], Option.none()],
+
+      // ---- compare (before/after viewing) ----
+      // Presentation-only state (docs/adr/0011): mode and split changes
+      // dispatch the blit-only PresentFrame, never a chain render — the
+      // graded side keeps showing the last rendered frame.
+      ChangedCompareMode: ({ mode }) => {
+        if (!model.source.bitmap) return [model, [], Option.none()]
+        // The Toggle segment is a flip button while active: selecting Toggle
+        // again flips the canvas between the source image and the graded
+        // output. Entering Toggle reveals the source first (the act of
+        // enabling = "show me before" — CONTEXT.md "Compare").
+        const next =
+          mode === 'toggle' && model.compareMode === 'toggle'
+            ? { ...model, phase, compareToggleBefore: !model.compareToggleBefore }
+            : { ...model, phase, compareMode: mode, compareToggleBefore: mode === 'toggle' }
+        return [next, [PresentFrame({ present: presentState(next) })], Option.none()]
+      },
+      ChangedSplitPosition: ({ position }) => {
+        if (!model.source.bitmap) return [model, [], Option.none()]
+        const next = {
+          ...model,
+          phase,
+          compareSplitAt: Math.min(1, Math.max(0, position)),
+        }
+        return [next, [PresentFrame({ present: presentState(next) })], Option.none()]
+      },
+      FramePresented: () => [model, [], Option.none()],
 
       // ---- rendering ----
       RenderedFrame: ({ stamp, handle }) => {

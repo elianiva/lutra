@@ -1,17 +1,22 @@
 import { Effect, Schema as S, Stream, Queue } from 'effect'
 import { Mount } from 'foldkit'
 import type { HtmlBuilder } from 'foldkit/html'
+import { Eye, EyeOff, SquareSplitHorizontal, Columns2, type IconNode } from 'lucide'
 import type { EditorMessage } from './message'
 import {
   FilePickRequested,
   ScaledCanvas,
   SelectedImageFile,
   CanvasRegistered,
+  ChangedCompareMode,
+  ChangedSplitPosition,
+  type CompareMode,
 } from './message'
 import { hasImage } from './phase'
 import { canvasRef, registerCanvas } from '../gpu/canvas-ref'
 import { MountElementError } from '../errors'
 import type { Model } from './model'
+import { icon } from '../components/icon'
 
 const ZOOM_SPEED = 0.01
 
@@ -182,6 +187,138 @@ export const RegisterCanvas = Mount.define(
   }),
 )
 
+// ---- compare (before/after viewing) ----
+
+/**
+ * Pointer mount for the Split-mode divider: dragging moves the split
+ * position, double-clicking resets it to 50%. The divider element lives
+ * inside the panned/zoomed image container, so the position is measured in
+ * image space — a fraction of the container's width — and pans/zooms with
+ * the photo. Pointer events are stopped at the element so the stage's
+ * pan/zoom drag never starts while grabbing the divider.
+ */
+export const CompareDivider = Mount.defineStream(
+  'CompareDivider',
+  ChangedSplitPosition,
+)((element) =>
+  Stream.callback<typeof ChangedSplitPosition.Type>((queue) =>
+    Effect.gen(function* () {
+      const divider = asHtmlElement(element)
+      const container = divider.parentElement
+      const emit = (position: number) => Queue.offerUnsafe(queue, ChangedSplitPosition({ position }))
+
+      let dragging = false
+
+      const onDown = (e: PointerEvent) => {
+        if (e.button !== 0) return
+        // The stage's pan/zoom mount listens on the stage element; stopping
+        // the event here keeps a divider grab from becoming a pan.
+        e.stopPropagation()
+        dragging = true
+        divider.setPointerCapture(e.pointerId)
+      }
+      const onMove = (e: PointerEvent) => {
+        if (!dragging || !container) return
+        const rect = container.getBoundingClientRect()
+        if (rect.width === 0) return
+        emit((e.clientX - rect.left) / rect.width)
+      }
+      const onUp = (e: PointerEvent) => {
+        dragging = false
+        divider.releasePointerCapture(e.pointerId)
+      }
+      const onDblClick = () => emit(0.5)
+
+      yield* Effect.acquireRelease(
+        Effect.sync(() => {
+          divider.addEventListener('pointerdown', onDown)
+          divider.addEventListener('pointermove', onMove)
+          divider.addEventListener('pointerup', onUp)
+          divider.addEventListener('dblclick', onDblClick)
+          return { onDown, onMove, onUp, onDblClick }
+        }),
+        ({ onDown, onMove, onUp, onDblClick }) =>
+          Effect.sync(() => {
+            divider.removeEventListener('pointerdown', onDown)
+            divider.removeEventListener('pointermove', onMove)
+            divider.removeEventListener('pointerup', onUp)
+            divider.removeEventListener('dblclick', onDblClick)
+          }),
+      )
+      return yield* Effect.never
+    }),
+  ),
+)
+
+/**
+ * The Split-mode divider: a draggable strip (with a visible 1px line and a
+ * center handle) positioned at the split position in image space, so it
+ * pans and zooms with the photo (CONTEXT.md "Split position"). Rendered
+ * only in Split mode; the canvas blit draws the before/after boundary
+ * underneath it.
+ */
+const splitDivider = (h: HtmlBuilder<EditorMessage>, model: Model) =>
+  h.div(
+    [
+      h.Class('absolute inset-y-0 z-10 w-3 -translate-x-1/2 cursor-col-resize'),
+      h.Style({ left: `${model.compareSplitAt * 100}%` }),
+      h.OnMount(CompareDivider()),
+      h.Attribute('data-compare-divider', 'true'),
+    ],
+    [
+      h.div([h.Class('absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-ink/60')], []),
+      h.div([h.Class(
+          'absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 border border-ink bg-panel',
+        )], []),
+    ],
+  )
+
+const COMPARE_MODES: ReadonlyArray<{
+  readonly mode: CompareMode
+  readonly label: string
+  readonly icon: IconNode
+}> = [
+  { mode: 'off', label: 'Off', icon: EyeOff },
+  { mode: 'toggle', label: 'Toggle', icon: Eye },
+  { mode: 'split', label: 'Split', icon: SquareSplitHorizontal },
+  { mode: 'side-by-side', label: 'Side by side', icon: Columns2 },
+]
+
+/**
+ * The Compare control (CONTEXT.md "Compare"): a segmented Off / Toggle /
+ * Split / Side by side picker floating at the bottom-center of the canvas
+ * stage. Presentation-only — selecting a mode dispatches PresentFrame,
+ * never a chain render (docs/adr/0011). Dimmed until an image is loaded. In
+ * Toggle mode the segment doubles as the flip button (update flips the
+ * side).
+ */
+const compareControl = (h: HtmlBuilder<EditorMessage>, model: Model, hasImage: boolean) =>
+  h.div(
+    [
+      h.Class(
+        'absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-stretch divide-x divide-border border border-border bg-panel',
+      ),
+      h.AriaLabel('Compare modes'),
+    ],
+    COMPARE_MODES.map(({ mode, label, icon: Icon }) => {
+      const active = model.compareMode === mode
+      return h.button(
+        [
+          h.Class(
+            active
+              ? 'flex items-center gap-1.5 bg-accent px-3 py-1.5 text-ink'
+              : 'flex items-center gap-1.5 px-3 py-1.5 text-muted hover:bg-panel-alt hover:text-ink',
+          ),
+          h.Disabled(!hasImage),
+          h.OnClick(ChangedCompareMode({ mode })),
+          h.AriaLabel(label),
+          h.Title(label),
+        ],
+        [icon(h, Icon, label, 14), h.span([h.Class('text-xs')], [label])],
+      )
+    }),
+  )
+
 // ---- sub-views ----
 
 const emptyStage = (h: HtmlBuilder<EditorMessage>) =>
@@ -313,7 +450,12 @@ const loadedStage = (h: HtmlBuilder<EditorMessage>, model: Model) => {
     [
       h.div(
         [
-          h.Class('origin-top-left'),
+          // relative: the containing block for image-space children (the
+          // compare divider's `left: N%` resolves against the image width,
+          // not the stage — CONTEXT.md "Split position"). w-fit: the
+          // container wraps the image-sized canvas instead of stretching
+          // to the stage, so percentages mean image pixels.
+          h.Class('relative w-fit origin-top-left'),
           h.Attribute(
             'style',
             `transform: translate(${model.offsetX}px, ${model.offsetY}px) scale(${model.scale})`,
@@ -336,6 +478,10 @@ const loadedStage = (h: HtmlBuilder<EditorMessage>, model: Model) => {
             ],
             [],
           ),
+          // The divider sits in image space, so it moves with the image
+          // under pan/zoom; the blit draws the before/after boundary right
+          // under it.
+          model.compareMode === 'split' ? splitDivider(h, model) : null,
         ],
       ),
       histogramOverlay(h, model.bins),
@@ -344,17 +490,21 @@ const loadedStage = (h: HtmlBuilder<EditorMessage>, model: Model) => {
 }
 
 /** Center stage: shows an upload dropzone until an image is loaded, then the
- *  rendered canvas with pan/zoom. Which stage shows is the phase machine's
- *  call (./phase.ts): Empty/Loading → upload zone, Error → error stage,
+ *  rendered canvas with pan/zoom, and always the Compare control (dimmed
+ *  without an image). Which stage shows is the phase machine's call
+ *  (./phase.ts): Empty/Loading → upload zone, Error → error stage,
  *  Idle/Drafting/Selected → the loaded canvas. */
-export const canvasStage = (h: HtmlBuilder<EditorMessage>, model: Model) =>
-  h.main(
+export const canvasStage = (h: HtmlBuilder<EditorMessage>, model: Model) => {
+  const imageLoaded = hasImage(model.phase)
+  return h.main(
     [h.Class('relative flex min-w-0 flex-1 items-center justify-center overflow-hidden bg-bg')],
     [
-      hasImage(model.phase)
+      imageLoaded
         ? loadedStage(h, model)
         : model.phase._tag === 'Error'
           ? errorStage(h, model.source.error?.message ?? 'Unknown error')
           : emptyStage(h),
+      compareControl(h, model, imageLoaded),
     ],
   )
+}

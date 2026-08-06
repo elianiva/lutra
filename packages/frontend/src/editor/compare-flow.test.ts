@@ -1,0 +1,157 @@
+import { describe, it, expect } from 'vitest'
+import { Command, Mount, given, scene, selector, label, expect as sceneExpect } from 'foldkit/scene'
+import { MockImageBitmap } from '../vitest-setup'
+import { initialModel } from './model'
+import { update } from './update'
+import { view } from './view'
+import { Idle } from './phase'
+import {
+  ChangedCompareMode,
+  ChangedSplitPosition,
+  ClearedImage,
+  RemovedLayer,
+  CanvasRegistered,
+  ScaledCanvas,
+  FramePresented,
+} from './message'
+import { PanZoom, RegisterCanvas, CompareDivider } from './canvas-stage'
+import { createLayerFor, PresentFrame } from './command'
+
+// ---- helpers ----
+
+/** A model with an image loaded (Idle phase) so compare messages land. */
+const loadedModel = () => ({
+  ...initialModel(),
+  phase: Idle(),
+  source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
+})
+
+/** The compare presentation state on a dispatched PresentFrame, if any. */
+const presented = (commands: ReadonlyArray<{ readonly name: string; readonly args?: Record<string, unknown> }>) =>
+  commands.find((c) => c.name === 'PresentFrame')?.args?.present
+
+// ---- update flow ----
+
+describe('compare flow', () => {
+  it('entering Toggle reveals the source and presents without rendering', () => {
+    const [model, commands] = update(loadedModel(), ChangedCompareMode({ mode: 'toggle' }))
+    expect(model.compareMode).toBe('toggle')
+    expect(model.compareToggleBefore).toBe(true)
+    expect(commands.some((c) => c.name === 'PresentFrame')).toBe(true)
+    expect(commands.some((c) => c.name === 'RenderChain')).toBe(false)
+    expect(presented(commands)).toEqual({ mode: 'toggle', splitAt: 0.5, showBefore: true })
+  })
+
+  it('clicking the active Toggle segment flips back to the graded output', () => {
+    const [toggled] = update(loadedModel(), ChangedCompareMode({ mode: 'toggle' }))
+    const [model, commands] = update(toggled, ChangedCompareMode({ mode: 'toggle' }))
+    expect(model.compareMode).toBe('toggle')
+    expect(model.compareToggleBefore).toBe(false)
+    expect(presented(commands)).toEqual({ mode: 'toggle', splitAt: 0.5, showBefore: false })
+  })
+
+  it('switching modes keeps the split position and shows the graded side', () => {
+    const [split] = update(loadedModel(), ChangedCompareMode({ mode: 'split' }))
+    const [moved] = update(split, ChangedSplitPosition({ position: 0.3 }))
+    const [model] = update(moved, ChangedCompareMode({ mode: 'off' }))
+    expect(model.compareMode).toBe('off')
+    expect(model.compareSplitAt).toBe(0.3)
+  })
+
+  it('clamps the split position to [0, 1]', () => {
+    const [model] = update(loadedModel(), ChangedSplitPosition({ position: 1.5 }))
+    expect(model.compareSplitAt).toBe(1)
+    const [model2] = update(model, ChangedSplitPosition({ position: -0.2 }))
+    expect(model2.compareSplitAt).toBe(0)
+  })
+
+  it('does not present without an image', () => {
+    const [model, commands] = update(initialModel(), ChangedCompareMode({ mode: 'split' }))
+    expect(model.compareMode).toBe('off')
+    expect(commands).toHaveLength(0)
+  })
+
+  it('a new image resets the split position but keeps the mode', () => {
+    const [split] = update(loadedModel(), ChangedCompareMode({ mode: 'split' }))
+    const [moved] = update(split, ChangedSplitPosition({ position: 0.7 }))
+    const [cleared] = update(moved, ClearedImage())
+    expect(cleared.compareMode).toBe('split')
+    expect(cleared.compareSplitAt).toBe(0.5)
+  })
+
+  it('carries the compare state into every chain render', () => {
+    const [split] = update(loadedModel(), ChangedCompareMode({ mode: 'split' }))
+    const [moved] = update(split, ChangedSplitPosition({ position: 0.3 }))
+    const [toggled] = update(moved, ChangedCompareMode({ mode: 'toggle' }))
+    const [, commands] = update(toggled, RemovedLayer({ id: createLayerFor('exposure').id }))
+    const render = commands.find((c) => c.name === 'RenderChain')
+    expect(render?.args?.present).toEqual({
+      mode: 'toggle',
+      splitAt: 0.3,
+      showBefore: true,
+    })
+  })
+})
+
+// ---- view (scene) ----
+
+const sceneConfig = { update, view } as const
+
+const loadedStageMounts = [
+  Mount.resolve(PanZoom, ScaledCanvas({ scale: 1, offsetX: 0, offsetY: 0 })),
+  Mount.resolve(RegisterCanvas, CanvasRegistered()),
+]
+
+describe('compare control view', () => {
+  it('renders the four mode segments', () => {
+    scene(
+      sceneConfig,
+      given({
+        ...initialModel(),
+        phase: Idle(),
+        source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
+      }),
+      ...loadedStageMounts,
+      sceneExpect(label('Off')).toExist(),
+      sceneExpect(label('Toggle')).toExist(),
+      sceneExpect(label('Split')).toExist(),
+      sceneExpect(label('Side by side')).toExist(),
+      // Off is active by default.
+      sceneExpect(label('Off')).toHaveClass('bg-accent'),
+      Command.expectNone(),
+    )
+  })
+
+  it('renders the control dimmed without an image', () => {
+    scene(
+      sceneConfig,
+      given(initialModel()),
+      sceneExpect(label('Split')).toExist(),
+      // Without an image the control is inert.
+      sceneExpect(label('Split')).toBeDisabled(),
+      Command.expectNone(),
+    )
+  })
+
+  it('renders the divider in Split mode at the split position', () => {
+    scene(
+      sceneConfig,
+      given({
+        ...initialModel(),
+        phase: Idle(),
+        source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
+        compareMode: 'split',
+        compareSplitAt: 0.3,
+      }),
+      ...loadedStageMounts,
+      // Resolving the mount feeds its message through update, which
+      // dispatches the blit-only PresentFrame — resolve that too.
+      Mount.resolve(CompareDivider, ChangedSplitPosition({ position: 0.3 })),
+      Command.resolve(PresentFrame, FramePresented()),
+      sceneExpect(selector('[data-compare-divider]')).toExist(),
+      // The divider sits at the split position, in image space.
+      sceneExpect(selector('[data-compare-divider]')).toHaveStyle('left', '30%'),
+      Command.expectNone(),
+    )
+  })
+})

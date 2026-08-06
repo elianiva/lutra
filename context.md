@@ -150,6 +150,14 @@ _Avoid_: "layers panel" (was the old bottom tab), "layer list" (too generic)
 The small histogram drawn in the bottom-right corner of the **canvas stage**, on top of the image. A pure display widget — no interaction, never blocks pan/zoom. Fixed to the stage, not the image: panning or zooming the photo does not move it. Shows the luminance distribution (Rec.709 luma, same coefficients as the shader bodies) of the currently displayed frame: the source after the full **edit chain** (the graded output), not the source. Luminance only — no per-channel traces. Linear max-bin normalization (the tallest bin fills the height).
 _Avoid_: "chart", "waveform" (video terminology)
 
+**Compare**:
+The editor's before/after viewing feature, controlled from a segmented control floating on the **canvas stage**. Four modes: **Off** (normal view), **Toggle** (the whole canvas flips between the **source image** and the **graded output**), **Split** (both at once, separated by a draggable divider — see **split position**), and **Side by side** (both images shown next to each other in the canvas). The graded side always shows the *last rendered frame*: presentation changes — flipping, dragging the divider — re-present it without re-rendering the **edit chain** (docs/adr/0011).
+_Avoid_: "before/after" (a descriptive phrase, not the feature name), "compare view"
+
+**Split position**:
+The location of the divider in **Split** mode, in image space — it pans and zooms with the photo. Persists while the image is loaded; a new image resets it to 50%.
+_Avoid_: "divider position" (the divider is the widget; the split position is the value)
+
 **LUT picker**:
 The inline control in the **layer drawer** for choosing the LUT on a **LUT layer** (draft or selected). Expands as per-category accordions showing a thumbnail grid; selecting updates the preview live and keeps the picker open for comparison. The current LUT is shown on a selector row above the grid, with the strength slider below.
 _Avoid_: "preset picker" (presets are built-in looks, distinct from LUTs)
