@@ -153,15 +153,18 @@ const acquireDevice = Effect.gen(function* () {
  * (dstTex) or the source image (srcTex) per `u_present` — mode 0 graded,
  * 1 source (Toggle showing before), 2 Split (source left of the divider,
  * graded right), 3 Side by side (source in the left half, graded in the
- * right). The canvas is image-sized, so the divider and the halves live in
+ * right). `u_canvas` is the canvas drawing-buffer size the uv derivation
+ * needs — it equals the image size except in Side by side, where the canvas
+ * is 2× the image width so both halves show at native resolution (the
+ * session is rebuilt on the size change). The divider and the halves live in
  * image space and pan/zoom with the photo.
  */
 const BLIT_SOURCE = `
 @group(0) @binding(0) var dstTex: texture_2d<f32>;
 @group(0) @binding(1) var samp: sampler;
-@group(0) @binding(2) var<uniform> u_resolution: vec2<f32>;
 @group(0) @binding(3) var srcTex: texture_2d<f32>;
 @group(0) @binding(4) var<uniform> u_present: vec4<f32>;
+@group(0) @binding(5) var<uniform> u_canvas: vec2<f32>;
 
 @vertex
 fn vs(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4<f32> {
@@ -175,13 +178,14 @@ fn vs(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4<f32> {
 
 @fragment
 fn fs(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
-  let uv = pos.xy / u_resolution;
+  let uv = pos.xy / u_canvas;
   let mode = u_present.x;
   let splitAt = u_present.y;
   if (mode == 3.0) {
-    // Side by side: source in the left half, graded in the right half,
-    // each scaled to fill its half of the image-sized canvas (half-
-    // resolution per side — the framing view; Split is the full-res
+    // Side by side: source in the left half, graded in the right. The
+    // canvas is 2× the image width in this mode, so uv ∈ [0, 1) covers
+    // both halves and the doubled sample coordinates map each half 1:1
+    // (native resolution — the framing view; Split is the full-res
     // inspection view). Both samples run in uniform control flow (mode is
     // uniform); the half selection is a select expression, not control
     // flow — textureSample must not be called from flow that depends on
@@ -268,6 +272,21 @@ interface Session {
   readonly ctx: GPUCanvasContext
   readonly width: number
   readonly height: number
+  /**
+   * The canvas drawing-buffer size the swapchain was configured at. Equals
+   * the image size except in Side by side, where the canvas is 2× the image
+   * width (both halves at native resolution); the blit derives its uv from
+   * these via `u_canvas`. A change here (a compare-mode toggle) rebuilds the
+   * session.
+   */
+  readonly canvasWidth: number
+  readonly canvasHeight: number
+  /**
+   * The uploaded source bitmap, retained so `present` can rebuild the
+   * session when the canvas size changes (a Side by side toggle) without
+   * the original render request.
+   */
+  readonly srcBitmap: ImageBitmap
   readonly srcTex: GPUTexture
   readonly dstTex: GPUTexture
   /**
@@ -277,6 +296,8 @@ interface Session {
    */
   readonly intermediates: [GPUTexture, GPUTexture]
   readonly resolutionBuffer: GPUBuffer
+  /** Canvas-size uniform for the blit (u_canvas), written once at build. */
+  readonly canvasSizeBuffer: GPUBuffer
   readonly frameBuffer: GPUBuffer
   /** Compare presentation uniform (mode + split position), written per blit. */
   readonly presentBuffer: GPUBuffer
@@ -402,6 +423,7 @@ export const GpuBackendLive = Layer.effect(
       s.intermediates[0].destroy()
       s.intermediates[1].destroy()
       s.resolutionBuffer.destroy()
+      s.canvasSizeBuffer.destroy()
       s.frameBuffer.destroy()
       s.presentBuffer.destroy()
       s.binsBuffer.destroy()
@@ -478,6 +500,18 @@ export const GpuBackendLive = Layer.effect(
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       })
       device.queue.writeBuffer(resolutionBuffer, 0, new Float32Array([width, height]))
+      // Canvas-size uniform for the blit: the swapchain size the blit
+      // derives its uv from (2× the image width in Side by side), which can
+      // differ from the image-sized `u_resolution` the compute passes use.
+      const canvasSizeBuffer = device.createBuffer({
+        size: 16,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      })
+      device.queue.writeBuffer(
+        canvasSizeBuffer,
+        0,
+        new Float32Array([canvas.width, canvas.height]),
+      )
       const frameBuffer = device.createBuffer({
         size: 16,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -490,14 +524,18 @@ export const GpuBackendLive = Layer.effect(
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       })
 
+      // The blit group mirrors the shader's bindings: dstTex (0), sampler
+      // (1), srcTex (3), the present uniform (4), and the canvas size (5).
+      // Note there is no u_resolution (2) here — the blit derives its uv
+      // from u_canvas, not the image-sized resolution the compute passes use.
       const blitGroup = device.createBindGroup({
         layout: blitPipeline.getBindGroupLayout(0),
         entries: [
           { binding: 0, resource: dstTex.createView() },
           { binding: 1, resource: sampler },
-          { binding: 2, resource: { buffer: resolutionBuffer } },
           { binding: 3, resource: srcTex.createView() },
           { binding: 4, resource: { buffer: presentBuffer } },
+          { binding: 5, resource: { buffer: canvasSizeBuffer } },
         ],
       })
 
@@ -535,10 +573,14 @@ export const GpuBackendLive = Layer.effect(
         ctx,
         width,
         height,
+        canvasWidth: canvas.width,
+        canvasHeight: canvas.height,
+        srcBitmap,
         srcTex,
         dstTex,
         intermediates,
         resolutionBuffer,
+        canvasSizeBuffer,
         frameBuffer,
         presentBuffer,
         blitGroup,
@@ -551,10 +593,12 @@ export const GpuBackendLive = Layer.effect(
     }
 
     /**
-     * Get the session for a canvas+image, rebuilding it when the canvas or
-     * dimensions change (destroying the previous session's resources). The
-     * session lives in `sessionRef`; a failed rebuild leaves the ref empty
-     * rather than pointing at half-destroyed resources.
+     * Get the session for a canvas+image, rebuilding it when the canvas,
+     * the image dimensions, or the canvas drawing-buffer size change (the
+     * latter on a Side by side toggle, which doubles the canvas width;
+     * destroying the previous session's resources). The session lives in
+     * `sessionRef`; a failed rebuild leaves the ref empty rather than
+     * pointing at half-destroyed resources.
      */
     const ensureSession = (
       canvas: HTMLCanvasElement,
@@ -568,7 +612,9 @@ export const GpuBackendLive = Layer.effect(
           Option.isSome(current) &&
           current.value.canvas === canvas &&
           current.value.width === width &&
-          current.value.height === height
+          current.value.height === height &&
+          current.value.canvasWidth === canvas.width &&
+          current.value.canvasHeight === canvas.height
         ) {
           return current.value
         }
@@ -845,8 +891,17 @@ export const GpuBackendLive = Layer.effect(
             return
           }
           const s = current.value
+          // The canvas drawing-buffer size may have changed since the
+          // session was built — Side by side doubles the canvas width — and
+          // the swapchain size is fixed at build (ctx.configure). Rebuild
+          // with the stored source bitmap, then blit into the resized
+          // canvas.
+          const session =
+            s.canvasWidth === canvas.width && s.canvasHeight === canvas.height
+              ? s
+              : yield* ensureSession(canvas, s.width, s.height, s.srcBitmap)
           const encoder = device.createCommandEncoder()
-          blit(encoder, s, present)
+          blit(encoder, session, present)
           device.queue.submit([encoder.finish()])
         }).pipe(
           Effect.catchDefect((cause: unknown) =>

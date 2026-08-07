@@ -57,27 +57,50 @@ export const PanZoom = Mount.defineStream(
           const emit = (scale: number, offsetX: number, offsetY: number) =>
             Queue.offerUnsafe(queue, ScaledCanvas({ scale, offsetX, offsetY }))
 
-          /** Scale + offsets that center the image in the stage. */
+          /** Scale + offsets that center the content in the stage. */
           const fitToStage = () => {
             const rect = stage.getBoundingClientRect()
-            if (rect.width === 0 || rect.height === 0 || imageWidth === 0 || imageHeight === 0) {
-              return null
-            }
-            const scale = Math.min(rect.width / imageWidth, rect.height / imageHeight, 1)
+            if (rect.width === 0 || rect.height === 0) return null
+            const content = contentSize() ?? { width: imageWidth, height: imageHeight }
+            if (content.width === 0 || content.height === 0) return null
+            const scale = Math.min(rect.width / content.width, rect.height / content.height, 1)
             return {
               scale,
-              offsetX: (rect.width - imageWidth * scale) / 2,
-              offsetY: (rect.height - imageHeight * scale) / 2,
+              offsetX: (rect.width - content.width * scale) / 2,
+              offsetY: (rect.height - content.height * scale) / 2,
             }
           }
 
-          const fit = fitToStage()
-          if (fit) {
+          /**
+           * The panned/zoomed content's layout size. The stage's first child
+           * is the w-fit transform container around the canvas, so its layout
+           * size IS the content size — and it changes with the canvas: Side by
+           * side doubles the canvas width. (Transforms never affect layout, so
+           * measuring the container is immune to the pan/zoom itself.) Falls
+           * back to the mount-time props when the container is missing or not
+           * laid out yet.
+           */
+          const contentSize = () => {
+            const container = stage.firstElementChild
+            if (!container) return null
+            const width = container.clientWidth
+            const height = container.clientHeight
+            if (width === 0 || height === 0) return null
+            return { width, height }
+          }
+
+          /** Re-fit the view, unless the user has taken over (zoomed/panned). */
+          const refit = () => {
+            if (state.touched) return
+            const fit = fitToStage()
+            if (!fit) return
             state.scale = fit.scale
             state.offsetX = fit.offsetX
             state.offsetY = fit.offsetY
             emit(fit.scale, fit.offsetX, fit.offsetY)
           }
+
+          refit()
 
           const onWheel = (e: WheelEvent) => {
             e.preventDefault()
@@ -127,16 +150,16 @@ export const PanZoom = Mount.defineStream(
 
           // Re-fit when the stage resizes, as long as the user hasn't panned or
           // zoomed since the last fit.
-          const resizeObserver = new ResizeObserver(() => {
-            if (state.touched) return
-            const fit = fitToStage()
-            if (!fit) return
-            state.scale = fit.scale
-            state.offsetX = fit.offsetX
-            state.offsetY = fit.offsetY
-            emit(fit.scale, fit.offsetX, fit.offsetY)
-          })
+          const resizeObserver = new ResizeObserver(refit)
           resizeObserver.observe(stage)
+          // The canvas itself resizes when the compare mode changes (Side by
+          // side doubles the canvas width) — the stage does not. Observe the
+          // content container so the wider strip is re-fitted into view. The
+          // observer's initial callback re-emits the mount-time fit, which is
+          // a no-op (same values).
+          const container = stage.firstElementChild
+          const contentObserver = container ? new ResizeObserver(refit) : null
+          if (contentObserver && container) contentObserver.observe(container)
 
           yield* Effect.acquireRelease(
             Effect.sync(() => {
@@ -144,15 +167,16 @@ export const PanZoom = Mount.defineStream(
               stage.addEventListener('pointerdown', onDown)
               stage.addEventListener('pointermove', onMove)
               stage.addEventListener('pointerup', onUp)
-              return { onWheel, onDown, onMove, onUp, resizeObserver }
+              return { onWheel, onDown, onMove, onUp, resizeObserver, contentObserver }
             }),
-            ({ onWheel, onDown, onMove, onUp, resizeObserver }) =>
+            ({ onWheel, onDown, onMove, onUp, resizeObserver, contentObserver }) =>
               Effect.sync(() => {
                 stage.removeEventListener('wheel', onWheel)
                 stage.removeEventListener('pointerdown', onDown)
                 stage.removeEventListener('pointermove', onMove)
                 stage.removeEventListener('pointerup', onUp)
                 resizeObserver.disconnect()
+                contentObserver?.disconnect()
               }),
           )
           return yield* Effect.never
@@ -458,13 +482,18 @@ const histogramOverlay = (h: HtmlBuilder<EditorMessage>, bins: Uint32Array | nul
 
 const loadedStage = (h: HtmlBuilder<EditorMessage>, model: Model) => {
   const src = model.source
+  // Side by side shows both halves at native resolution: the canvas is 2×
+  // the image width (source left, graded right), so neither side is
+  // stretched. The GPU backend rebuilds its session on the size change and
+  // the blit maps each half 1:1; PanZoom re-fits to the wider content.
+  const contentWidth = model.compareMode === 'side-by-side' ? src.width * 2 : src.width
   return h.div(
     [
       // inset-0: the stage div fills the center column, so the transform div
       // below is anchored to the stage origin and pan/zoom offsets are plain
       // stage coordinates (no flex centering to compensate for).
       h.Class('absolute inset-0'),
-      h.OnMount(PanZoom({ imageWidth: src.width, imageHeight: src.height })),
+      h.OnMount(PanZoom({ imageWidth: contentWidth, imageHeight: src.height })),
     ],
     [
       h.div(
@@ -490,8 +519,10 @@ const loadedStage = (h: HtmlBuilder<EditorMessage>, model: Model) => {
               h.OnMount(RegisterCanvas()),
               // width/height attributes size both the CSS layout and (via
               // configure) the WebGPU swapchain; the GPU backend blits every
-              // rendered frame straight onto this canvas.
-              h.Attribute('width', String(src.width)),
+              // rendered frame straight onto this canvas. Side by side
+              // doubles the width, so the swapchain is 2× the image width
+              // and each half shows at native resolution.
+              h.Attribute('width', String(contentWidth)),
               h.Attribute('height', String(src.height)),
               h.Class('block'),
             ],

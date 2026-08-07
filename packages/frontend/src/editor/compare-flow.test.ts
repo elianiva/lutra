@@ -133,6 +133,43 @@ describe('compare control view', () => {
     )
   })
 
+  it('doubles the canvas width in Side by side mode so neither side is stretched', () => {
+    scene(
+      sceneConfig,
+      given({
+        ...initialModel(),
+        phase: Idle(),
+        source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
+        compareMode: 'side-by-side',
+      }),
+      ...loadedStageMounts,
+      // The canvas is 2× the image width: each half shows its image at
+      // native resolution (source left, graded right) instead of squeezing
+      // both into the image-sized canvas.
+      sceneExpect(selector('#lutra-canvas')).toHaveAttr('width', '400'),
+      sceneExpect(selector('#lutra-canvas')).toHaveAttr('height', '150'),
+      Command.expectNone(),
+    )
+  })
+
+  it('keeps the canvas at image size outside Side by side', () => {
+    scene(
+      sceneConfig,
+      given({
+        ...initialModel(),
+        phase: Idle(),
+        source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
+        compareMode: 'split',
+      }),
+      ...loadedStageMounts,
+      Mount.resolve(CompareDivider, ChangedSplitPosition({ position: 0.5 })),
+      Command.resolve(PresentFrame, FramePresented()),
+      sceneExpect(selector('#lutra-canvas')).toHaveAttr('width', '200'),
+      sceneExpect(selector('#lutra-canvas')).toHaveAttr('height', '150'),
+      Command.expectNone(),
+    )
+  })
+
   it('renders the divider in Split mode at the split position', () => {
     scene(
       sceneConfig,
