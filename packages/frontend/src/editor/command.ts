@@ -549,59 +549,15 @@ export const SaveLutRecents = Command.define('SaveLutRecents', {
 // ---- per-photo LUT thumbnails (filmstrip previews, docs/adr/0013) ----
 
 /**
- * The square size the per-photo filmstrip previews are rendered at. The
- * bar's thumbs are 96px CSS, so 200px keeps them sharp on 2× displays.
- */
-const LUT_THUMB_SIZE = 200
-
-/**
- * Downscale the source photo to the square preview: a center cover-crop
- * (scale to fill, crop the overflowing dimension from the center), matching
- * the bar's square `object-cover` presentation. One canvas-2D op per group
- * visit (~2ms); the 160KB ImageData is transferred to the thumb worker per
- * request.
- */
-const thumbImageData = (bitmap: ImageBitmap): Effect.Effect<ImageData, ThumbnailEncodeError> =>
-  Effect.tryPromise({
-    try: async () => {
-      const w = bitmap.width
-      const h = bitmap.height
-      const scale = Math.max(LUT_THUMB_SIZE / w, LUT_THUMB_SIZE / h)
-      const sw = LUT_THUMB_SIZE / scale
-      const sh = LUT_THUMB_SIZE / scale
-      const canvas = new OffscreenCanvas(LUT_THUMB_SIZE, LUT_THUMB_SIZE)
-      const ctx = canvas.getContext('2d')
-      if (!ctx) throw new ThumbnailEncodeError({ message: '2d context unavailable' })
-      ctx.drawImage(
-        bitmap,
-        (w - sw) / 2,
-        (h - sh) / 2,
-        sw,
-        sh,
-        0,
-        0,
-        LUT_THUMB_SIZE,
-        LUT_THUMB_SIZE,
-      )
-      return ctx.getImageData(0, 0, LUT_THUMB_SIZE, LUT_THUMB_SIZE)
-    },
-    catch: (cause) =>
-      cause instanceof ThumbnailEncodeError
-        ? cause
-        : new ThumbnailEncodeError({
-            message: 'Failed to downscale the photo for LUT previews',
-            cause,
-          }),
-  })
-
-/**
- * Render one per-photo LUT thumbnail: downscale the photo, resolve the
- * cube (memoized by the LUT store), and apply it in the thumb worker (CPU
- * sampler + JPEG encode). Every non-success path — downscale, cube fetch,
- * worker render, encode — becomes `LutThumbFailed`, so the bar silently
- * keeps the vendored generic jpg (docs/adr/0013). The message carries the
- * photo the preview belongs to, so a result that lands after a new image
- * loaded is dropped and revoked by update.
+ * Render one per-photo LUT thumbnail: resolve the cube (memoized by the
+ * LUT store) and apply it in the thumb worker pool (CPU sampler + JPEG
+ * encode). The photo's 200×200 downscale happens once per photo inside the
+ * thumbnailer layer (docs/adr/0013), so a group visit costs a single
+ * canvas-2D op. Every non-success path — cube fetch, downscale, worker
+ * render, encode — becomes `LutThumbFailed`, so the bar silently keeps the
+ * vendored generic jpg. The message carries the photo the preview belongs
+ * to, so a result that lands after a new image loaded is dropped and
+ * revoked by update.
  */
 export const GenerateLutThumb = Command.define('GenerateLutThumb', {
   args: {
@@ -613,11 +569,9 @@ export const GenerateLutThumb = Command.define('GenerateLutThumb', {
     Effect.gen(function* () {
       const store = yield* LutStore
       const thumbs = yield* LutThumbnailer
-      const image = yield* thumbImageData(bitmap).pipe(Effect.option)
-      if (Option.isNone(image)) return LutThumbFailed({ lutId })
       const cube = yield* store.getCube(lutId).pipe(Effect.option)
       if (Option.isNone(cube)) return LutThumbFailed({ lutId })
-      const bytes = yield* thumbs.render(lutId, image.value, cube.value, bitmap)
+      const bytes = yield* thumbs.render(lutId, bitmap, cube.value)
       if (Option.isNone(bytes)) return LutThumbFailed({ lutId })
       // The bytes' buffer came from the worker as a transferred ArrayBuffer;
       // TS can't know that, hence the BlobPart assertion (as in PrepareExport).
