@@ -25,6 +25,7 @@ describe('attached edit load (gallery → /edit/:id)', () => {
     expect(names).toContain('LoadEdit')
     expect(names).toContain('LoadCatalog')
     expect(names).toContain('LoadExportSettings')
+    expect(names).toContain('LoadLutRecents')
   })
 
   it('init does not fire LoadEdit when the boot route is the gallery', () => {

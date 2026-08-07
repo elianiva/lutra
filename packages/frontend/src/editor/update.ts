@@ -10,6 +10,7 @@ import {
   ExportDownload,
   RevokeExportUrl,
   SaveExportSettings,
+  SaveLutRecents,
   PickImageFile,
   RenderChain,
   PresentFrame,
@@ -18,7 +19,8 @@ import {
 } from './command'
 import { editorMachine } from './phase'
 import { LAYER_UI } from '../editor/layer-meta'
-import { fileExtension, type ExportSettings, type ImageEncoder, type LayerId } from '@lutra/engine'
+import { lutTarget } from './lut-bar'
+import { fileExtension, type ExportSettings, type ImageEncoder, type LayerId, type LutId } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import { EditStore } from '@lutra/store'
 import type { Model } from './model'
@@ -55,12 +57,32 @@ const presentState = (model: Model): PresentState => ({
  *  so stale render results can be dropped. When a render is already in
  *  flight, only the revision bump happens — the in-flight render re-triggers
  *  with the newest state when it completes (see the RenderedFrame handler),
- *  which keeps the GPU queue from backing up during slider drags. */
+ *  which keeps the GPU queue from backing up during slider drags.
+ *
+ *  A bar hover preview (docs/adr/0012) swaps the active LUT target's lutId
+ *  at render time — the draft or the focused chain LUT layer — without
+ *  touching the chain or the machine (the draft's lutId stays machine-owned).
+ *  Belt-and-suspenders: when no LUT target exists the preview is simply not
+ *  applied, so a leaked value can never corrupt a non-LUT render. */
 const renderNow = (model: Model): UpdateReturn => {
   if (!model.source.bitmap) return [model, [], Option.none()]
   // The draft lives in the phase machine (Drafting); the render pipeline
   // still receives it as a plain layer appended after the chain.
   const draft = model.phase._tag === 'Drafting' ? model.phase.layer : null
+  let layers = model.chain
+  let draftLayer = draft
+  const previewLut = model.previewLut
+  const phase = model.phase
+  if (previewLut) {
+    if (draft?.type === 'lut') {
+      draftLayer = { ...draft, lutId: previewLut }
+    } else if (phase._tag === 'Selected') {
+      const sel = layers.find((l) => l.id === phase.layerId)
+      if (sel?.type === 'lut') {
+        layers = layers.map((l) => (l.id === sel.id ? { ...l, lutId: previewLut } : l))
+      }
+    }
+  }
   const next: Model = { ...model, revision: model.revision + 1 }
   const stamp = next.revision
   if (model.renderPending) {
@@ -70,8 +92,8 @@ const renderNow = (model: Model): UpdateReturn => {
     { ...next, renderPending: true },
     [
       RenderChain({
-        layers: model.chain,
-        draft,
+        layers,
+        draft: draftLayer,
         bitmap: model.source.bitmap,
         stamp,
         present: presentState(model),
@@ -107,6 +129,28 @@ const startSave = (model: Model, fork: boolean): UpdateReturn => {
     ],
     Option.none(),
   ]
+}
+
+/** Most-recently-applied lutIds, newest first, deduped, capped at 12. The
+ *  bar is the only caller (its click commits); the `catalog[0]` auto-default
+ *  in SelectedTool never bumps (docs/adr/0012 D6). */
+const RECENTS_CAP = 12
+const bumpRecents = (model: Model, lutId: LutId): Model => ({
+  ...model,
+  lutRecents: [lutId, ...model.lutRecents.filter((id) => id !== lutId)].slice(0, RECENTS_CAP),
+})
+
+/**
+ * The persistence-during-preview rule (docs/adr/0012 D7): save and export
+ * snapshot from `model.lastRender` (thumbnail / export frame), which would
+ * otherwise capture the hovered look. While a bar preview is active, the
+ * click dismisses the preview instead of acting — the next click proceeds.
+ * One swallowed click in a rare case beats silently exporting a look the
+ * chain doesn't contain.
+ */
+const dismissPreviewOr = (model: Model, proceed: () => UpdateReturn): UpdateReturn => {
+  if (model.previewLut !== null) return renderNow({ ...model, previewLut: null })
+  return proceed()
 }
 
 /**
@@ -204,6 +248,9 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
           // A new image starts the split position over at 50% (the compare
           // mode itself persists across images).
           compareSplitAt: 0.5,
+          // A cleared image has no LUT target — a stale hover preview must
+          // not leak into a future render.
+          previewLut: null,
           attachedEdit: null,
           saveStatus: { _tag: 'idle' },
         },
@@ -225,7 +272,9 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
           chain,
           source: { bitmap, width, height, error: null },
           activeFieldIndex: {},
-          lutPickerOpen: false,
+          // A new attached edit closes the bar and its hover preview.
+          lutBarOpen: false,
+          previewLut: null,
           // A new image starts the split position over at 50% (the compare
           // mode itself persists across images).
           compareSplitAt: 0.5,
@@ -249,8 +298,12 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
       },
 
       // ---- save ----
-      SaveRequested: () => startSave(model, false),
-      SaveAsRequested: () => startSave(model, true),
+      // Save/export while a bar preview is active dismisses the preview
+      // instead of acting (docs/adr/0012 D7) — the thumbnail and the export
+      // frame snapshot `model.lastRender`, which would otherwise capture the
+      // hovered look. The next click proceeds.
+      SaveRequested: () => dismissPreviewOr({ ...model, phase }, () => startSave(model, false)),
+      SaveAsRequested: () => dismissPreviewOr({ ...model, phase }, () => startSave(model, true)),
       EditSaved: ({ id, savedAt }) => {
         // Attach the model to the persisted Edit: a fresh-pick Save created
         // the attachment, Save as re-points it. When the id is NEW (no
@@ -288,9 +341,11 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
       SelectedTool: ({ type }) => {
         // The machine built the draft (Drafting); the branch fills in what
         // needs model data: the LUT default selection and the field index.
+        // A new draft context also drops any bar hover preview — the old
+        // target is gone (D9).
         if (!transitioned || phase._tag !== 'Drafting') return [model, [], Option.none()]
         const layer = phase.layer
-        let next: Model = { ...model, phase }
+        let next: Model = { ...model, phase, previewLut: null }
         if (type === 'lut') {
           const catalog = model.catalog
           // Unreachable — the pre-guard above blocks LUT picks without a
@@ -302,7 +357,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
           next = {
             ...next,
             phase: { ...phase, layer: { ...layer, lutId: catalog[0]!.lut_file } },
-            lutPickerOpen: true,
+            lutBarOpen: true,
           }
         }
         return renderNow({
@@ -318,7 +373,8 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
           ...model,
           phase,
           chain: [...model.chain, from.layer],
-          lutPickerOpen: false,
+          lutBarOpen: false,
+          previewLut: null,
         })
       },
       CancelledDraft: () => {
@@ -328,7 +384,8 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
           ...model,
           phase,
           activeFieldIndex: restIndex,
-          lutPickerOpen: false,
+          lutBarOpen: false,
+          previewLut: null,
         })
       },
       UpdatedDraftParam: () => {
@@ -337,37 +394,74 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
         if (!transitioned || phase._tag !== 'Drafting') return [model, [], Option.none()]
         return renderNow({ ...model, phase })
       },
-      ChangedDraftLut: () => {
+      // The bar's click commits the real value: clear any hover preview (a
+      // stale one would otherwise double-apply) and bump recents — real
+      // picks only, the `catalog[0]` auto-default never bumps (D6).
+      ChangedDraftLut: ({ lutId }) => {
         if (!transitioned || phase._tag !== 'Drafting') return [model, [], Option.none()]
-        return renderNow({ ...model, phase })
+        const next = bumpRecents({ ...model, phase, previewLut: null }, lutId)
+        const [rendered, commands] = renderNow(next)
+        return [
+          rendered,
+          [...commands, SaveLutRecents({ recents: next.lutRecents })],
+          Option.none(),
+        ]
       },
       ToggledLutPicker: () => {
-        const lutDraft = phase._tag === 'Drafting' && phase.layer.type === 'lut'
-        const lutSelected =
-          phase._tag === 'Selected' &&
-          model.chain.some((l) => l.id === phase.layerId && l.type === 'lut')
-        if (!lutDraft && !lutSelected) return [model, [], Option.none()]
-        return [{ ...model, phase, lutPickerOpen: !model.lutPickerOpen }, [], Option.none()]
+        if (Option.isNone(lutTarget(model))) return [model, [], Option.none()]
+        const open = !model.lutBarOpen
+        // Closing also clears the hover preview; opening has nothing to
+        // clear (a closed bar cannot be hovered).
+        return [
+          { ...model, phase, lutBarOpen: open, previewLut: open ? model.previewLut : null },
+          [],
+          Option.none(),
+        ]
       },
+
+      // ---- LUT bar (bottom filmstrip picker, docs/adr/0012) ----
+      // Hover enter/leave on a bar thumb. Presentation-only: sets the
+      // previewed lutId and re-renders; the committed chain/draft is
+      // untouched. null restores the committed look. The same-value guard
+      // skips redundant renders while scrubbing across the strip.
+      PreviewedLut: ({ lutId }) => {
+        if (!model.source.bitmap) return [model, [], Option.none()]
+        if (Option.isNone(lutTarget(model))) return [model, [], Option.none()]
+        if (model.previewLut === lutId) return [model, [], Option.none()]
+        return renderNow({ ...model, phase, previewLut: lutId })
+      },
+      // Tab click: presentation-only, no render.
+      SelectedLutTab: ({ tab }) => [{ ...model, phase, lutTab: tab }, [], Option.none()],
+      // Recents restored from localStorage at boot.
+      LutRecentsLoaded: ({ recents }) => [
+        { ...model, phase, lutRecents: recents },
+        [],
+        Option.none(),
+      ],
+      LutRecentsSaved: () => [model, [], Option.none()],
+      LutStripWheelRegistered: () => [model, [], Option.none()],
 
       // ---- committed chain ----
       SelectedLayer: () => {
-        // The machine moved to Selected; the branch closes the picker. A
-        // selection without an image (or while a draft is active) has no
-        // edge and is ignored.
+        // The machine moved to Selected; the branch closes the bar (a
+        // selection is a new context — D9, and the bar's target may be
+        // gone). A selection without an image (or while a draft is active)
+        // has no edge and is ignored.
         if (!transitioned) return [model, [], Option.none()]
-        return [{ ...model, phase, lutPickerOpen: false }, [], Option.none()]
+        return [{ ...model, phase, lutBarOpen: false, previewLut: null }, [], Option.none()]
       },
       RemovedLayer: ({ id }) => {
         const { [id]: _r, ...restIndex } = model.activeFieldIndex
         // Removing the focused layer also deselects it — the machine's
         // Selected → Idle edge handles that; any other removal leaves the
-        // phase alone.
+        // phase alone. The removal always drops a hover preview (the target
+        // may be the removed layer).
         return renderNow({
           ...model,
           phase,
           chain: model.chain.filter((l) => l.id !== id),
           activeFieldIndex: restIndex,
+          previewLut: null,
         })
       },
       ReorderedLayer: ({ from: fromIndex, to }) => {
@@ -390,12 +484,25 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
           phase,
           chain: model.chain.map((l) => (l.id === id ? { ...l, [field]: value } : l)),
         }),
-      ChangedLayerLut: ({ id, lutId }) =>
-        renderNow({
-          ...model,
-          phase,
-          chain: model.chain.map((l) => (l.id === id ? { ...l, ...{ lutId } } : l)),
-        }),
+      ChangedLayerLut: ({ id, lutId }) => {
+        // The bar's click commits the real value: clear any hover preview
+        // (a stale one would otherwise double-apply) and bump recents (D6).
+        const next = bumpRecents(
+          {
+            ...model,
+            phase,
+            previewLut: null,
+            chain: model.chain.map((l) => (l.id === id ? { ...l, ...{ lutId } } : l)),
+          },
+          lutId,
+        )
+        const [rendered, commands] = renderNow(next)
+        return [
+          rendered,
+          [...commands, SaveLutRecents({ recents: next.lutRecents })],
+          Option.none(),
+        ]
+      },
       CycledToggledField: ({ id }) => {
         const layer = model.chain.find((l) => l.id === id)
         if (!layer) return [model, [], Option.none()]
@@ -490,6 +597,9 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
 
       // ---- export dialog ----
       ExportRequested: () => {
+        // D7: the export frame snapshots `model.lastRender` — a hover
+        // preview must never be exported, so the click dismisses it first.
+        if (model.previewLut !== null) return renderNow({ ...model, phase, previewLut: null })
         // The dialog opens only when there is a frame to export. The
         // snapshot readback happens once per open; the dialog encodes from
         // the cached ImageData when the user presses Export.

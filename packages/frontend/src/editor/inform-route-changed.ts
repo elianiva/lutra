@@ -8,7 +8,7 @@ import { EditStore } from '@lutra/store'
 import type { EditorMessage } from './message'
 import type { Model } from './model'
 import type { AppRoute } from '../route'
-import { LoadCatalog, LoadEdit, LoadExportSettings } from './command'
+import { LoadCatalog, LoadEdit, LoadExportSettings, LoadLutRecents } from './command'
 
 type Resource = GpuBackend | LutStore | CanvasRef | ImageEncoder | KeyValueStore | EditStore
 
@@ -19,18 +19,18 @@ type Resource = GpuBackend | LutStore | CanvasRef | ImageEncoder | KeyValueStore
  * instead of dispatching an Editor Message.
  *
  * Fire the one-time startup loads that are still missing (catalog, export
- * settings), and re-load the attached Edit when the route carries an
- * `editId` — arriving from the gallery after an open-photo flow (or from a
- * reload) hydrates the editor from the stored Edit. Arriving without an id
- * (gallery route) leaves the editor as-is; it is persistent cross-route
- * state per ADR 0009.
+ * settings, LUT recents), and re-load the attached Edit when the route
+ * carries an `editId` — arriving from the gallery after an open-photo flow
+ * (or from a reload) hydrates the editor from the stored Edit. Arriving
+ * without an id (gallery route) leaves the editor as-is; it is persistent
+ * cross-route state per ADR 0009.
  */
 export type RouteChangedReturn = readonly [
   Model,
   ReadonlyArray<Command.Command<EditorMessage, never, Resource>>,
 ]
 export const informRouteChanged = (model: Model, route: AppRoute): RouteChangedReturn => {
-  const boot = [LoadCatalog(), LoadExportSettings()]
+  const boot = [LoadCatalog(), LoadExportSettings(), LoadLutRecents()]
   const commands =
     route._tag === 'Editor' ? [LoadEdit({ id: route.editId }), ...boot] : boot
   return [model, commands]

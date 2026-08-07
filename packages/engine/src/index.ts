@@ -13,6 +13,7 @@ export {
   LAYER_TYPES,
   Layer,
   LayerPatch,
+  LutLayer,
   UnknownLayerTypeError,
 } from "./layers"
 export type {

@@ -2,7 +2,7 @@ import { Schema } from 'effect'
 import { Dialog } from '@foldkit/ui'
 import { RenderHandle } from '../gpu/backend'
 import { SourceImage, CompareMode, Catalog, SaveError, ExportError } from './message'
-import { ExportSettings, defaultExportSettings, LayerIdSchema, Layer } from '@lutra/engine'
+import { ExportSettings, defaultExportSettings, LayerIdSchema, LutIdSchema, Layer } from '@lutra/engine'
 import { EditIdSchema } from '@lutra/store'
 import { EditorPhase, editorMachine } from './phase'
 
@@ -62,8 +62,23 @@ export const Model = Schema.Struct({
   attachedEdit: AttachedEdit,
   // Save flow bookkeeping (see SaveStatus above).
   saveStatus: SaveStatus,
-  // Whether the inline LUT picker is expanded in the layer drawer.
-  lutPickerOpen: Schema.Boolean,
+  // Whether the bottom LUT bar is open (the filmstrip picker under the
+  // canvas — docs/adr/0012). The drawer's LUT rows keep summary + sliders
+  // and carry a chevron toggle for this bar; the bar owns browsing.
+  lutBarOpen: Schema.Boolean,
+  // Hover preview: the lutId hovered in the bar. Presentation-only, applied
+  // at render time to the active LUT target (the draft or the focused chain
+  // LUT layer) — never touches the chain or the machine (docs/adr/0011
+  // spirit). Cleared on every bar-closing transition.
+  previewLut: Schema.NullOr(LutIdSchema),
+  // Active tab in the bar: 'recents' or a catalog category name. A stale
+  // 'recents' (the list emptied since) falls back to the first catalog
+  // category at render.
+  lutTab: Schema.Union([Schema.Literal('recents'), Schema.String]),
+  // Most-recently-applied lutIds, newest first, capped at 12, persisted via
+  // the KeyValueStore (LoadLutRecents / SaveLutRecents) and shown as the
+  // bar's Recents tab (hidden while empty).
+  lutRecents: Schema.Array(LutIdSchema),
   // Compare (before/after viewing) state — CONTEXT.md "Compare": the active
   // mode, the split position in image space (0..1), and which side Toggle
   // shows (entering Toggle reveals the source first). The mode persists
@@ -126,7 +141,10 @@ export const initialModel = (): Model => ({
   catalog: null,
   attachedEdit: null,
   saveStatus: { _tag: 'idle' },
-  lutPickerOpen: false,
+  lutBarOpen: false,
+  previewLut: null,
+  lutTab: 'recents',
+  lutRecents: [],
   compareMode: 'off',
   compareSplitAt: 0.5,
   compareToggleBefore: false,

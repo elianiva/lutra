@@ -1,20 +1,18 @@
 import type { HtmlBuilder } from 'foldkit/html'
-import { ArrowDown, ArrowUp, Eye, EyeOff, Trash2, X, Check } from 'lucide'
+import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, Eye, EyeOff, Trash2, X, Check } from 'lucide'
 import { icon } from '../components/icon'
 import { LAYER_UI, fieldBounds, lutName } from './layer-meta'
-import { lutPicker } from './lut-picker'
 import {
   SelectedLayer,
   RemovedLayer,
   ToggledLayerVisibility,
   UpdatedLayerParam,
   UpdatedDraftParam,
-  ChangedDraftLut,
-  ChangedLayerLut,
   ConfirmedDraft,
   CancelledDraft,
   CycledToggledField,
   ReorderedLayer,
+  ToggledLutPicker,
 } from './message'
 import type { EditorMessage } from './message'
 import type { Model } from './model'
@@ -76,14 +74,17 @@ const draftRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer) => 
     [
       h.div(
         [h.Class('flex items-center gap-2 px-4 py-2')],
-        [icon(h, ui.icon, ui.label), h.span([h.Class('text-sm font-medium')], [ui.label])],
+        [
+          icon(h, ui.icon, ui.label),
+          h.span([h.Class('min-w-0 flex-1 truncate text-sm font-medium')], [ui.label]),
+          // LUT rows carry the bar toggle (the bar owns browsing; the
+          // drawer keeps the row's sliders).
+          ...(layer.type === 'lut' ? [lutBarToggle(h, model)] : []),
+        ],
       ),
       h.div(
         [h.Class('flex flex-col gap-3 px-4 pb-3')],
         [
-          ...(layer.type === 'lut'
-            ? [lutPicker(h, model, layer.lutId, (lutId) => ChangedDraftLut({ lutId }))]
-            : []),
           ...Object.keys(ui.fields).map((field) => draftSlider(h, layer, FieldKey(field), ui)),
         ],
       ),
@@ -159,6 +160,7 @@ const chainRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer, ind
               // targets a higher chain index and "Move down" a lower one. A row
               // at the top of the stack can't move up; a row at the bottom can't
               // move down.
+              ...(layer.type === 'lut' ? [lutBarToggle(h, model)] : []),
               reorderButton(h, 'Move up', ArrowUp, index === total - 1, () =>
                 ReorderedLayer({ from: index, to: index + 1 }),
               ),
@@ -181,13 +183,6 @@ const chainRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer, ind
         ? h.div(
             [h.Class('flex flex-col gap-3 px-4 pb-4')],
             [
-              ...(layer.type === 'lut'
-                ? [
-                    lutPicker(h, model, layer.lutId, (lutId) =>
-                      ChangedLayerLut({ id: layer.id, lutId }),
-                    ),
-                  ]
-                : []),
               ...Object.keys(ui.fields).map((field) =>
                 chainSlider(h, layer, FieldKey(field), ui, model),
               ),
@@ -246,6 +241,21 @@ const reorderButton = (
       h.Class('grid size-6 place-items-center text-muted hover:text-ink disabled:opacity-30'),
     ],
     [icon(h, node, label)],
+  )
+
+/** The chevron on a drawer LUT row: expands/collapses the bottom LUT bar
+ *  (the drawer keeps the row's summary + sliders; the bar owns browsing).
+ *  Sits inside the row's clickable div, following the nested-button pattern
+ *  of the visibility/reorder/delete buttons. */
+const lutBarToggle = (h: HtmlBuilder<EditorMessage>, model: Model) =>
+  h.button(
+    [
+      h.OnClick(ToggledLutPicker()),
+      h.AriaExpanded(model.lutBarOpen),
+      h.AriaLabel('Toggle LUT bar'),
+      h.Class('grid size-6 place-items-center text-muted hover:text-ink'),
+    ],
+    [icon(h, model.lutBarOpen ? ChevronUp : ChevronDown, 'Toggle LUT bar')],
   )
 
 export const sliderControl = (

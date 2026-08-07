@@ -174,6 +174,31 @@ export const ChangedLayerLut = Message.m('ChangedLayerLut', {
   lutId: LutIdSchema,
 })
 export const ToggledLutPicker = Message.m('ToggledLutPicker')
+
+// ---- LUT bar (bottom filmstrip picker, docs/adr/0012) ----
+
+// Hover enter/leave on a bar thumb. Presentation-only: sets `previewLut`
+// and re-renders; the committed chain/draft is untouched. null restores
+// the committed look. The bar is the only dispatcher of
+// ChangedDraftLut / ChangedLayerLut — the drawer accordion picker is gone.
+export const PreviewedLut = Message.m('PreviewedLut', {
+  lutId: S.NullOr(LutIdSchema),
+})
+// Click on a category tab (or Recents). Presentation-only, no render.
+export const SelectedLutTab = Message.m('SelectedLutTab', {
+  tab: S.Union([S.Literal('recents'), S.String]),
+})
+// Recents restored from localStorage (boot-time, mirrors ExportSettingsLoaded).
+export const LutRecentsLoaded = Message.m('LutRecentsLoaded', {
+  recents: S.Array(LutIdSchema),
+})
+// Ack for SaveLutRecents (observability, mirrors ExportSettingsSaved).
+export const LutRecentsSaved = Message.m('LutRecentsSaved')
+// One-shot acknowledgment from the filmstrip's wheel mount (the listener
+// registration already happened in the mount) — same ack pattern as
+// CanvasRegistered, for DevTools/Scene observability.
+export const LutStripWheelRegistered = Message.m('LutStripWheelRegistered')
+
 /** For toggled layers (White Balance, Vignette): cycle the active field shown in the drawer. */
 export const CycledToggledField = Message.m('CycledToggledField', { id: LayerIdSchema })
 
@@ -341,6 +366,11 @@ export const EditorMessage = S.Union([
   UpdatedLayerParam,
   ChangedLayerLut,
   ToggledLutPicker,
+  PreviewedLut,
+  SelectedLutTab,
+  LutRecentsLoaded,
+  LutRecentsSaved,
+  LutStripWheelRegistered,
   CycledToggledField,
   StartedLayerReorder,
   MovedLayerReorder,

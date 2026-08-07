@@ -12,6 +12,7 @@ import {
   GpuError,
   ImageEncoder,
   Layer,
+  LutIdSchema,
   LutParseError,
   type LayerType,
   type LutCube,
@@ -44,6 +45,8 @@ import {
   ExportSettingsLoaded,
   ExportUrlRevoked,
   ExportSettingsSaved,
+  LutRecentsLoaded,
+  LutRecentsSaved,
   SaveFailed,
   EditSaved,
   CatalogLoaded,
@@ -505,5 +508,38 @@ export const SaveExportSettings = Command.define('SaveExportSettings', {
         .set(EXPORT_SETTINGS_KEY, settings)
         .pipe(Effect.ignore)
       return ExportSettingsSaved()
+    }),
+})
+
+// ---- LUT recents (the bar's Recents tab, docs/adr/0012) ----
+
+const LUT_RECENTS_KEY = 'lutRecents'
+
+/** Restore persisted LUT recents (dispatched once at startup, like
+ *  LoadExportSettings). Missing or corrupt recents fall back to []. */
+export const LoadLutRecents = Command.define('LoadLutRecents', {
+  messages: [LutRecentsLoaded],
+  execute: Effect.gen(function* () {
+    const store = yield* Persistence.KeyValueStore
+    const schemaStore = Persistence.toSchemaStore(store, Schema.Array(LutIdSchema))
+    // `Effect.option` wraps the success (itself an Option) — flatten.
+    const saved = Option.flatten(yield* schemaStore.get(LUT_RECENTS_KEY).pipe(
+      Effect.option,
+    ))
+    return LutRecentsLoaded({ recents: Option.getOrElse(() => [])(saved) })
+  }),
+})
+
+/** Persist LUT recents (fired on every bump; localStorage is cheap). */
+export const SaveLutRecents = Command.define('SaveLutRecents', {
+  args: { recents: Schema.Array(LutIdSchema) },
+  messages: [LutRecentsSaved],
+  execute: ({ recents }) =>
+    Effect.gen(function* () {
+      const store = yield* Persistence.KeyValueStore
+      yield* Persistence.toSchemaStore(store, Schema.Array(LutIdSchema))
+        .set(LUT_RECENTS_KEY, recents)
+        .pipe(Effect.ignore)
+      return LutRecentsSaved()
     }),
 })

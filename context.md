@@ -74,7 +74,7 @@ A product-level design constraint, not a feature flag. The prototype intentional
 _Avoid_: "Presets" (these are built-in looks, distinct from the adjustment primitives the user composes), "filters" (see below).
 
 **LUT library**:
-The vendored collection of film-emulation `.cube` LUTs (296, mirrored from the G'MIC film color presets) that a **LUT layer** selects from via the **LUT picker**. Each LUT is referenced by its file path (`luts/<category>/<name>.cube`) as a stable id.
+The vendored collection of film-emulation `.cube` LUTs (296, mirrored from the G'MIC film color presets) that a **LUT layer** selects from via the **LUT bar**. Each LUT is referenced by its file path (`luts/<category>/<name>.cube`) as a stable id.
 _Avoid_: "presets" (see **Film simulation adjustment**), "LUT pack"
 
 **Edit chain**:
@@ -140,7 +140,7 @@ Tool selection and layer selection are edges only from the editable states, so a
 - **Editor phase** (`app/phase.ts`): the machine above. Owns the image lifecycle, the draft, and the selection. The `Drafting` state carries the draft layer; the model no longer has `draft`/`selectedLayerId`/`source.status` flags.
 - **Render loop** (`renderPending` / `revision` / `stamp`): deliberately plain — a latest-wins reconciliation whose stale-frame decision needs the model `revision`, and whose trigger is `renderNow` from data-op handlers, not a message.
 - **LUT catalog**: one-shot AsyncData (`null` until the startup fetch lands) — not a machine.
-- **Chain data ops, pan/zoom, export, LUT picker expansion**: pure data updates.
+- **Chain data ops, pan/zoom, export, LUT bar state** (open, hover preview, tab, recents): pure data updates.
 
 **Layer drawer**:
 The right sidebar of the **editor**, always visible, showing the current **edit chain** as a vertical list. Displays each layer with its icon, label, formatted value, visibility toggle, and delete button. When a layer is selected or a **draft layer** is active, the slider and confirm/cancel controls render inline below the layer entry. Supports drag-to-reorder.
@@ -158,9 +158,9 @@ _Avoid_: "before/after" (a descriptive phrase, not the feature name), "compare v
 The location of the divider in **Split** mode, in image space — it pans and zooms with the photo. The divider widget counter-scales its own size by the zoom, so its grab strip, line, and handle stay a constant screen size at any zoom (an image-space-sized strip would shrink to a few pixels on a zoomed-out photo and become undraggable). Persists while the image is loaded; a new image resets it to 50%.
 _Avoid_: "divider position" (the divider is the widget; the split position is the value)
 
-**LUT picker**:
-The inline control in the **layer drawer** for choosing the LUT on a **LUT layer** (draft or selected). Expands as per-category accordions showing a thumbnail grid; selecting updates the preview live and keeps the picker open for comparison. The current LUT is shown on a selector row above the grid, with the strength slider below.
-_Avoid_: "preset picker" (presets are built-in looks, distinct from LUTs)
+**LUT bar**:
+The bottom bar of the **editor** that owns LUT browsing (docs/adr/0012): category tabs on the left, a hover-to-preview / click-to-commit thumbnail filmstrip on the right, and a name line above the strip. Renders only while a LUT target exists — a drafting **LUT layer** or a selected chain **LUT layer** — and the **LUT library** catalog has loaded. Hover dispatches `PreviewedLut` (presentation-only model state applied at render time, never touching the chain or the machine); click commits via `ChangedDraftLut` / `ChangedLayerLut`. The drawer's LUT rows keep summary + strength slider and a chevron toggle for the bar; the bar auto-opens with a LUT draft and auto-closes on confirm/cancel/select. The **Recents** tab (most-recently-applied LUTs, capped at 12, persisted) is hidden while empty, falling back to the first catalog category. Save/export while a preview is active dismisses the preview instead of acting — the thumbnail/export frame must never capture the hovered look.
+_Avoid_: "preset picker" (presets are built-in looks, distinct from LUTs), "filmstrip" on its own (the strip is part of the bar)
 
 **Upload zone**:
 The empty-state placeholder in the canvas area before an image is loaded. Shows a dashed-border drop target with an icon and the prompt "Drop an image or click to browse." Accepts drag-and-drop and click-to-browse file input. Disappears once an image is loaded.
@@ -193,7 +193,7 @@ Most layers expose a single parameter with one ruler slider. Two layers — **Wh
 ### Screens
 
 **Editor**:
-The screen at `/editor` (current root behaviour). Three-column Lightroom-style layout: left sidebar (**tool panel**, ~240px), center (**canvas** with pannable/zoomable image), right sidebar (**layer drawer**, ~280px). Top bar: app wordmark (**LUTRA**) left-aligned; right-aligned are the **Save** / **Save as** controls, the export button, and the start-over button.
+The screen at `/editor` (current root behaviour). Three-column Lightroom-style layout: left sidebar (**tool panel**, ~240px), center (**canvas** with pannable/zoomable image), right sidebar (**layer drawer**, ~280px). Top bar: app wordmark (**LUTRA**) left-aligned; right-aligned are the **Save** / **Save as** controls, the export button, and the start-over button. The **LUT bar** sits below the three columns as a full-width bottom strip while open (the canvas shrinks; the stage re-fits only while untouched).
 _Avoid_: "color grading menu", "workspace"
 
 **Main menu**:

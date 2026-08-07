@@ -7,6 +7,7 @@ import { topBar } from './top-bar'
 import { toolPanel } from './tool-panel'
 import { layerDrawer } from './layer-drawer'
 import { canvasStage } from './canvas-stage'
+import { lutBar } from './lut-bar'
 import { exportDialogView } from './export-dialog'
 
 /**
@@ -28,6 +29,10 @@ const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
         [h.Class('flex min-h-0 flex-1')],
         [toolPanel(h, model), canvasStage(h, model), layerDrawer(h, model)],
       ),
+      // The bottom LUT bar (docs/adr/0012): a third flex-col child, so the
+      // canvas shrinks while it is open and the strip sits directly under
+      // the photo. Renders nothing without a LUT target.
+      lutBar(h, model),
       exportDialogView(h, model),
     ],
   )

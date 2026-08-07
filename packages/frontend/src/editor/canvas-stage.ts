@@ -22,8 +22,9 @@ const ZOOM_SPEED = 0.01
 
 /** Foldkit mounts on any Element; the stage needs HTMLElement APIs (the
  *  typed wheel/pointer event overloads). Narrow via instanceof instead of an
- *  assertion so the linter's assertion ban stays satisfied. */
-const asHtmlElement = (element: Element): HTMLElement => {
+ *  assertion so the linter's assertion ban stays satisfied. Shared with the
+ *  LUT bar's wheel mount (lut-bar.ts). */
+export const asHtmlElement = (element: Element): HTMLElement => {
   if (element instanceof HTMLElement) return element
   throw new MountElementError({ message: 'PanZoom stage must be an HTMLElement' })
 }
