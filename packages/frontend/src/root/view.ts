@@ -1,7 +1,9 @@
-import { Document, HtmlBuilder } from 'foldkit/html'
+import { Document, type Html, type HtmlBuilder } from 'foldkit/html'
+import { Match, Schema as S } from 'effect'
 import type { Model } from './model'
 import type { RootMessage } from './message'
 import { GotGalleryMessage, GotEditorMessage } from './message'
+import { GalleryRoute, EditorRoute } from '../route'
 import * as Gallery from '../gallery'
 import * as Editor from '../editor'
 
@@ -17,26 +19,27 @@ export const view = (model: Model, h: HtmlBuilder<RootMessage>): Document => ({
   body: h.div([h.Class('flex h-full flex-col bg-bg text-ink')], [activeRoute(model, h)]),
 })
 
-const activeRoute = (model: Model, h: HtmlBuilder<RootMessage>) => {
-  const route = model.route
-  if (route._tag === 'Gallery') {
-    return h.submodel({
-      slotId: 'gallery',
-      model: model.gallery,
-      view: Gallery.view,
-      toParentMessage: (message) => GotGalleryMessage({ message }),
-    })
-  }
-  if (route._tag === 'Editor') {
-    return h.submodel({
-      slotId: 'editor',
-      model: model.editor,
-      view: Editor.view,
-      toParentMessage: (message) => GotEditorMessage({ message }),
-    })
-  }
-  return notFound(h)
-}
+const activeRoute = (model: Model, h: HtmlBuilder<RootMessage>) =>
+  Match.value(model.route).pipe(
+    Match.withReturnType<Html>(),
+    Match.when(S.is(GalleryRoute), () =>
+      h.submodel({
+        slotId: 'gallery',
+        model: model.gallery,
+        view: Gallery.view,
+        toParentMessage: (message) => GotGalleryMessage({ message }),
+      }),
+    ),
+    Match.when(S.is(EditorRoute), () =>
+      h.submodel({
+        slotId: 'editor',
+        model: model.editor,
+        view: Editor.view,
+        toParentMessage: (message) => GotEditorMessage({ message }),
+      }),
+    ),
+    Match.orElse(() => notFound(h)),
+  )
 
 const notFound = (h: HtmlBuilder<RootMessage>) =>
   h.div(

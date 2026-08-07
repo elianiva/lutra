@@ -1,4 +1,5 @@
-import type { HtmlBuilder } from 'foldkit/html'
+import { Match } from 'effect'
+import type { Html, HtmlBuilder } from 'foldkit/html'
 import { Download } from 'lucide'
 import { icon } from '../components/icon'
 import { ExportRequested, ClearedImage, SaveRequested, SaveAsRequested } from './message'
@@ -80,17 +81,18 @@ export const topBar = (h: HtmlBuilder<EditorMessage>, model: Model, hasImage: bo
  * tile carries the same `savedAt`) or the last failure's reason. Nothing
  * while idle or saving — the Save button's "Saving…" label covers that.
  */
-const saveStatusText = (h: HtmlBuilder<EditorMessage>, model: Model) => {
-  const status = model.saveStatus
-  if (status._tag === 'saved') {
-    return h.span([h.Class('pr-1 text-[10px] text-muted')], [
-      `Saved ${new Date(status.at).toLocaleTimeString()}`,
-    ])
-  }
-  if (status._tag === 'failed') {
-    return h.span([h.Class('pr-1 text-[10px] text-accent'), h.Title(status.error.message)], [
-      'Save failed',
-    ])
-  }
-  return null
-}
+const saveStatusText = (h: HtmlBuilder<EditorMessage>, model: Model) =>
+  Match.value(model.saveStatus).pipe(
+    Match.withReturnType<Html>(),
+    Match.when({ _tag: 'saved' }, (status) =>
+      h.span([h.Class('pr-1 text-[10px] text-muted')], [
+        `Saved ${new Date(status.at).toLocaleTimeString()}`,
+      ]),
+    ),
+    Match.when({ _tag: 'failed' }, (status) =>
+      h.span([h.Class('pr-1 text-[10px] text-accent'), h.Title(status.error.message)], [
+        'Save failed',
+      ]),
+    ),
+    Match.orElse(() => null),
+  )

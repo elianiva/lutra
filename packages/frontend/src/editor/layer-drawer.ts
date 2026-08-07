@@ -18,14 +18,14 @@ import type { EditorMessage } from './message'
 import type { Model } from './model'
 import { FieldKey, type Layer, type LayerType } from '@lutra/engine'
 
-const num = (layer: Layer, key: FieldKey): number => {
+const num = (layer: Layer, key: FieldKey) => {
   const record: Record<string, unknown> = layer
   const value = record[key]
   return typeof value === 'number' ? value : NaN
 }
 
 /** One-line drawer summary: "Fuji Velvia 50 · 65%" for LUT layers. */
-const summary = (model: Model, layer: Layer, ui: (typeof LAYER_UI)[LayerType]): string =>
+const summary = (model: Model, layer: Layer, ui: (typeof LAYER_UI)[LayerType]) =>
   layer.type === 'lut'
     ? `${lutName(model.catalog, layer.lutId)} · ${ui.formatValue(layer)}`
     : ui.formatValue(layer)

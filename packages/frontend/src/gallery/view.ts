@@ -17,7 +17,7 @@ import type { EditSummary, EditId, StoreError } from '@lutra/store'
  * thumbnail contract (docs/adr/0007).
  */
 export const view = Submodel.defineView<Model, GalleryMessage>((model, h) => {
-  const grid: AsyncData.AsyncData<ReadonlyArray<EditSummary>, StoreError> = model.grid
+  const grid = model.grid
   return h.div(
     [h.Class('flex h-full flex-col bg-bg text-ink')],
     [

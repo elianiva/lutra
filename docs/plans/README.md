@@ -23,6 +23,7 @@ questions in each were resolved one by one and baked into the files as
 | 05 | A11y pass | **Decided — ready to implement** |
 | 06 | Gallery + tool panel freebies | **Decided — ready to implement** |
 | 07 | LUT bar (bottom filmstrip picker) | **Implemented** — docs/adr/0012 |
+| 08 | Component pattern (idiomatic Effect views) | **Implemented** — reference: `editor/lut-bar/` |
 
 Scope (agreed): **functional + a11y**. Visual polish (motion, histogram
 upgrade, LUT picker search) is deliberately out of this pass — see

@@ -25,7 +25,7 @@ import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import { EditStore } from '@lutra/store'
 import type { Model } from './model'
 import { GotExportDialogMessage, EditCreated } from './message'
-import type { EditorMessage, EditorOutMessage, PresentState } from './message'
+import type { EditorMessage, EditorOutMessage } from './message'
 
 export type UpdateReturn = readonly [
   Model,
@@ -39,15 +39,13 @@ export type UpdateReturn = readonly [
   Option.Option<EditorOutMessage>,
 ]
 
-const ensureFieldIndex = (
-  index: Record<LayerId, number>,
-  layerId: LayerId,
-): Record<LayerId, number> => (index[layerId] === undefined ? { ...index, [layerId]: 0 } : index)
+const ensureFieldIndex = (index: Record<LayerId, number>, layerId: LayerId) =>
+  index[layerId] === undefined ? { ...index, [layerId]: 0 } : index
 
 /** The compare presentation state (docs/adr/0011) the blit needs: the mode,
  *  the split position in image space, and the toggle side. Carried by every
  *  RenderChain (the render's final blit) and by PresentFrame (blit-only). */
-const presentState = (model: Model): PresentState => ({
+const presentState = (model: Model) => ({
   mode: model.compareMode,
   splitAt: model.compareSplitAt,
   showBefore: model.compareToggleBefore,

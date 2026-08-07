@@ -1,6 +1,6 @@
-import { Effect, Schema as S, Stream, Queue } from 'effect'
+import { Effect, Match, Schema as S, Stream, Queue } from 'effect'
 import { Mount } from 'foldkit'
-import type { HtmlBuilder } from 'foldkit/html'
+import type { Html, HtmlBuilder } from 'foldkit/html'
 import { Eye, EyeOff, SquareSplitHorizontal, Columns2, type IconNode } from 'lucide'
 import type { EditorMessage } from './message'
 import {
@@ -12,7 +12,7 @@ import {
   ChangedSplitPosition,
   type CompareMode,
 } from './message'
-import { hasImage } from './phase'
+import { Empty, ErrorState, hasImage, Loading } from './phase'
 import { canvasRef, registerCanvas } from '../gpu/canvas-ref'
 import { MountElementError } from '../errors'
 import type { Model } from './model'
@@ -550,11 +550,15 @@ export const canvasStage = (h: HtmlBuilder<EditorMessage>, model: Model) => {
   return h.main(
     [h.Class('relative flex min-w-0 flex-1 items-center justify-center overflow-hidden bg-bg')],
     [
-      imageLoaded
-        ? loadedStage(h, model)
-        : model.phase._tag === 'Error'
-          ? errorStage(h, model.source.error?.message ?? 'Unknown error')
-          : emptyStage(h),
+      Match.value(model.phase).pipe(
+        Match.withReturnType<Html>(),
+        Match.when(S.is(ErrorState), () =>
+          errorStage(h, model.source.error?.message ?? 'Unknown error'),
+        ),
+        Match.when(S.is(Empty), () => emptyStage(h)),
+        Match.when(S.is(Loading), () => emptyStage(h)),
+        Match.orElse(() => loadedStage(h, model)),
+      ),
       compareControl(h, model, imageLoaded),
     ],
   )

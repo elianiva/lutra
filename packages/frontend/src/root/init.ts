@@ -1,4 +1,5 @@
 import { Command, Url } from 'foldkit'
+import { Match, Schema as S } from 'effect'
 import { GpuBackend } from '../gpu/backend'
 import { CanvasRef } from '../gpu/canvas-ref'
 import { LutStore } from '../luts/store'
@@ -8,9 +9,9 @@ import { EditStore } from '@lutra/store'
 import type { RootMessage } from './message'
 import { GotGalleryMessage, GotEditorMessage } from './message'
 import type { Model } from './model'
+import { GalleryRoute, EditorRoute, parseRoute } from '../route'
 import * as Gallery from '../gallery'
 import * as Editor from '../editor'
-import { parseRoute } from '../route'
 
 type Resource =
   | GpuBackend
@@ -41,16 +42,16 @@ export const init = (url: Url.Url): InitReturn => {
   const [gallery, galleryCommands] = Gallery.init(route)
   const [editor, editorCommands] = Editor.init(route)
 
-  const commands = (() => {
-    switch (route._tag) {
-      case 'Gallery':
-        return Command.mapMessages(galleryCommands, (message) => GotGalleryMessage({ message }))
-      case 'Editor':
-        return Command.mapMessages(editorCommands, (message) => GotEditorMessage({ message }))
-      case 'NotFound':
-        return [] satisfies ReadonlyArray<Command.Command<RootMessage, never, Resource>>
-    }
-  })()
+  const commands = Match.value(route).pipe(
+    Match.withReturnType<ReadonlyArray<Command.Command<RootMessage, never, Resource>>>(),
+    Match.when(S.is(GalleryRoute), () =>
+      Command.mapMessages(galleryCommands, (message) => GotGalleryMessage({ message })),
+    ),
+    Match.when(S.is(EditorRoute), () =>
+      Command.mapMessages(editorCommands, (message) => GotEditorMessage({ message })),
+    ),
+    Match.orElse(() => []),
+  )
 
   return [
     {

@@ -34,7 +34,7 @@ export const toolPanel = (h: HtmlBuilder<EditorMessage>, model: Model) =>
 /** The machine owns the real gate (no SelectedTool edge from Empty/Loading/
  *  Error/Drafting — see ./phase.ts); this mirrors it so the buttons read
  *  as disabled instead of dead. */
-const canPickTool = (phase: EditorPhase): boolean =>
+const canPickTool = (phase: EditorPhase) =>
   phase._tag === 'Idle' || phase._tag === 'Selected'
 
 const toolRow = (

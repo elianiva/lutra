@@ -1,3 +1,4 @@
+import { Option, pipe } from 'effect'
 import type { HtmlBuilder } from 'foldkit/html'
 import { Dialog } from '@foldkit/ui'
 import type { Model } from './model'
@@ -9,9 +10,9 @@ import {
   ExportDownloadRequested,
   GotExportDialogMessage,
 } from './message'
-import { EXPORT_FORMATS, EXPORT_SCALES, fileExtension, isLossy, type ExportFormat, type ExportScale } from '@lutra/engine'
+import { EXPORT_FORMATS, EXPORT_SCALES, fileExtension, isLossy } from '@lutra/engine'
 
-const fmtBytes = (bytes: number): string => {
+const fmtBytes = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`
   const kb = bytes / 1024
   if (kb < 1024) return `${kb.toFixed(1)} KB`
@@ -19,11 +20,11 @@ const fmtBytes = (bytes: number): string => {
 }
 
 /** A 4-up segmented grid of hard-edged buttons; the selected one is filled. */
-const segmentedRow = (
+const segmentedRow = <T extends string | number>(
   h: HtmlBuilder<EditorMessage>,
-  options: readonly { label: string; value: string }[],
-  selected: string,
-  onSelect: (value: string) => EditorMessage,
+  options: readonly { label: string; value: T }[],
+  selected: T,
+  onSelect: (value: T) => EditorMessage,
 ) =>
   h.div(
     [h.Class('grid grid-cols-4 border border-border')],
@@ -133,37 +134,36 @@ const formatSection = (h: HtmlBuilder<EditorMessage>, model: Model) =>
         h,
         EXPORT_FORMATS.map((f) => ({ label: f.toUpperCase(), value: f })),
         model.exportSettings.format,
-        // The segmented row is string-typed; the settings schema narrows.
-        // oxlint-disable-next-line consistent-type-assertions
-        (value) => ChangedExportFormat({ format: value as ExportFormat }),
+        (value) => ChangedExportFormat({ format: value }),
       ),
     ],
   )
 
 const qualitySection = (h: HtmlBuilder<EditorMessage>, model: Model) => {
   const { format, quality } = model.exportSettings
-  if (!isLossy(format)) return h.div([], [])
-  return h.div(
-    [h.Class('flex flex-col gap-1.5')],
-    [
-      h.div(
-        [h.Class('flex items-baseline justify-between')],
+  return isLossy(format)
+    ? h.div(
+        [h.Class('flex flex-col gap-1.5')],
         [
-          h.span([h.Class('text-[10px] uppercase tracking-[0.14em] text-muted')], ['Quality']),
-          h.span([h.Class('tnum text-xs text-ink')], [String(quality ?? 75)]),
+          h.div(
+            [h.Class('flex items-baseline justify-between')],
+            [
+              h.span([h.Class('text-[10px] uppercase tracking-[0.14em] text-muted')], ['Quality']),
+              h.span([h.Class('tnum text-xs text-ink')], [String(quality ?? 75)]),
+            ],
+          ),
+          h.input([
+            h.Type('range'),
+            h.Class('lutra-range'),
+            h.Min('0'),
+            h.Max('100'),
+            h.Step('1'),
+            h.Value(String(quality ?? 75)),
+            h.OnInput((raw) => ChangedExportQuality({ quality: Number(raw) })),
+          ]),
         ],
-      ),
-      h.input([
-        h.Type('range'),
-        h.Class('lutra-range'),
-        h.Min('0'),
-        h.Max('100'),
-        h.Step('1'),
-        h.Value(String(quality ?? 75)),
-        h.OnInput((raw) => ChangedExportQuality({ quality: Number(raw) })),
-      ]),
-    ],
-  )
+      )
+    : null
 }
 
 const resolutionSection = (h: HtmlBuilder<EditorMessage>, model: Model) => {
@@ -180,11 +180,9 @@ const resolutionSection = (h: HtmlBuilder<EditorMessage>, model: Model) => {
       h.span([h.Class('text-[10px] uppercase tracking-[0.14em] text-muted')], ['Resolution']),
       segmentedRow(
         h,
-        EXPORT_SCALES.map((s) => ({ label: `${Math.round(s * 100)}%`, value: String(s) })),
-        String(exportSettings.scale),
-        // The segmented row is string-typed; the settings schema narrows.
-        // oxlint-disable-next-line consistent-type-assertions
-        (value) => ChangedExportScale({ scale: Number(value) as ExportScale }),
+        EXPORT_SCALES.map((s) => ({ label: `${Math.round(s * 100)}%`, value: s })),
+        exportSettings.scale,
+        (value) => ChangedExportScale({ scale: value }),
       ),
       h.span([h.Class('tnum text-xs text-muted')], [
         exportSettings.scale === 1 ? dims : `${dims} → ${scaled}`,
@@ -193,23 +191,27 @@ const resolutionSection = (h: HtmlBuilder<EditorMessage>, model: Model) => {
   )
 }
 
-const statusSection = (h: HtmlBuilder<EditorMessage>, model: Model) => {
-  let content: string
-  if (model.exportError) {
-    content = model.exportError.message
-  } else if (model.exportEncoding) {
-    content = 'Encoding…'
-  } else if (model.exportDownloaded && model.exportSize !== null) {
-    content = `${fmtBytes(model.exportSize)} · Downloaded`
-  } else {
-    // No size before the first export — encoding happens on Export press.
-    content = '—'
-  }
-  return h.div(
+const statusSection = (h: HtmlBuilder<EditorMessage>, model: Model) =>
+  h.div(
     [h.Class('flex items-baseline justify-between border-t border-border pt-3')],
     [
       h.span([h.Class('text-[10px] uppercase tracking-[0.14em] text-muted')], ['Size']),
-      h.span([h.Class('tnum text-xs text-ink')], [content]),
+      h.span([h.Class('tnum text-xs text-ink')], [exportStatusText(model)]),
     ],
   )
-}
+
+/** The size line: the encode error's reason, "Encoding…" while an encode
+ *  runs, the downloaded size after a download, else a placeholder — no size
+ *  exists before the first export (encoding happens on Export press). */
+const exportStatusText = (model: Model) =>
+  pipe(
+    Option.fromNullishOr(model.exportError),
+    Option.map((error) => error.message),
+    Option.orElse(() => (model.exportEncoding ? Option.some('Encoding…') : Option.none())),
+    Option.orElse(() =>
+      model.exportDownloaded && model.exportSize !== null
+        ? Option.some(`${fmtBytes(model.exportSize)} · Downloaded`)
+        : Option.none(),
+    ),
+    Option.getOrElse(() => '—'),
+  )

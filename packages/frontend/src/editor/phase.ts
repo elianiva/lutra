@@ -184,5 +184,5 @@ export const editorMachine = Machine.define({
 /** True while an image is loaded and the canvas is showing — the phases the
  *  editor can work in. Empty/Loading/Error render the upload zone (or the
  *  error stage) instead. */
-export const hasImage = (phase: EditorPhase): boolean =>
+export const hasImage = (phase: EditorPhase) =>
   phase._tag === 'Idle' || phase._tag === 'Drafting' || phase._tag === 'Selected'
