@@ -276,11 +276,13 @@ interface Session {
    * The canvas drawing-buffer size the swapchain was configured at. Equals
    * the image size except in Side by side, where the canvas is 2× the image
    * width (both halves at native resolution); the blit derives its uv from
-   * these via `u_canvas`. A change here (a compare-mode toggle) rebuilds the
-   * session.
+   * these via `u_canvas`. A change here (a compare-mode toggle) follows the
+   * resize in place — the swapchain re-configures and `u_canvas` is
+   * rewritten, but no image-sized resource is touched (the graded frame
+   * survives).
    */
-  readonly canvasWidth: number
-  readonly canvasHeight: number
+  canvasWidth: number
+  canvasHeight: number
   /**
    * The uploaded source bitmap, retained so `present` can rebuild the
    * session when the canvas size changes (a Side by side toggle) without
@@ -593,12 +595,31 @@ export const GpuBackendLive = Layer.effect(
     }
 
     /**
-     * Get the session for a canvas+image, rebuilding it when the canvas,
-     * the image dimensions, or the canvas drawing-buffer size change (the
-     * latter on a Side by side toggle, which doubles the canvas width;
-     * destroying the previous session's resources). The session lives in
-     * `sessionRef`; a failed rebuild leaves the ref empty rather than
-     * pointing at half-destroyed resources.
+     * Follow a canvas drawing-buffer resize in place: re-configure the
+     * swapchain (the drawing buffer size is captured at configure time) and
+     * rewrite the blit's `u_canvas` uniform. Nothing image-sized changes —
+     * `srcTex`, `dstTex`, and the intermediates keep their contents, so the
+     * last rendered frame re-presents instead of a blank texture.
+     */
+    const resizeCanvas = (s: Session): void => {
+      s.ctx.configure({ device, format: swapFormat, alphaMode: 'opaque' })
+      device.queue.writeBuffer(
+        s.canvasSizeBuffer,
+        0,
+        new Float32Array([s.canvas.width, s.canvas.height]),
+      )
+      s.canvasWidth = s.canvas.width
+      s.canvasHeight = s.canvas.height
+    }
+
+    /**
+     * Get the session for a canvas+image. Rebuilds only when the canvas
+     * element, the image dimensions, or the source bitmap change; a canvas
+     * drawing-buffer size change alone (a Side by side toggle doubles the
+     * canvas width) is followed in place by `resizeCanvas`, preserving the
+     * rendered frame. The session lives in `sessionRef`; a failed rebuild
+     * leaves the ref empty rather than pointing at half-destroyed
+     * resources.
      */
     const ensureSession = (
       canvas: HTMLCanvasElement,
@@ -613,9 +634,14 @@ export const GpuBackendLive = Layer.effect(
           current.value.canvas === canvas &&
           current.value.width === width &&
           current.value.height === height &&
-          current.value.canvasWidth === canvas.width &&
-          current.value.canvasHeight === canvas.height
+          current.value.srcBitmap === srcBitmap
         ) {
+          if (
+            current.value.canvasWidth !== canvas.width ||
+            current.value.canvasHeight !== canvas.height
+          ) {
+            resizeCanvas(current.value)
+          }
           return current.value
         }
         if (Option.isSome(current)) {
@@ -890,16 +916,17 @@ export const GpuBackendLive = Layer.effect(
           if (Option.isNone(current) || current.value.canvas !== canvas) {
             return
           }
-          const s = current.value
           // The canvas drawing-buffer size may have changed since the
-          // session was built — Side by side doubles the canvas width — and
-          // the swapchain size is fixed at build (ctx.configure). Rebuild
-          // with the stored source bitmap, then blit into the resized
-          // canvas.
-          const session =
-            s.canvasWidth === canvas.width && s.canvasHeight === canvas.height
-              ? s
-              : yield* ensureSession(canvas, s.width, s.height, s.srcBitmap)
+          // session was built — Side by side doubles the canvas width.
+          // ensureSession follows the resize in place (swapchain
+          // re-configured, u_canvas rewritten, nothing image-sized
+          // touched), so the graded frame survives and re-presents.
+          const session = yield* ensureSession(
+            canvas,
+            current.value.width,
+            current.value.height,
+            current.value.srcBitmap,
+          )
           const encoder = device.createCommandEncoder()
           blit(encoder, session, present)
           device.queue.submit([encoder.finish()])
