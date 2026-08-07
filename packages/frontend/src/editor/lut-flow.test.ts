@@ -30,6 +30,8 @@ import {
   SelectedLutTab,
   LutRecentsLoaded,
   LutRecentsSaved,
+  LutThumbGenerated,
+  LutThumbFailed,
   SaveRequested,
   SaveAsRequested,
   ExportRequested,
@@ -45,7 +47,7 @@ import {
 } from './message'
 import { PanZoom, RegisterCanvas } from './canvas-stage'
 import { LutStripWheel } from './lut-bar'
-import { RenderChain, ReadHistogram, SaveLutRecents } from './command'
+import { GenerateLutThumb, RenderChain, ReadHistogram, SaveLutRecents } from './command'
 import type { Catalog } from './message'
 import type { Model } from './model'
 
@@ -289,6 +291,95 @@ describe('LUT bar commit + recents', () => {
   })
 })
 
+describe('per-photo LUT thumbnails (lazy generation)', () => {
+  const genIds = (commands: ReadonlyArray<{ name: string; args?: Record<string, unknown> }>) =>
+    commands.filter((c) => c.name === 'GenerateLutThumb').map((c) => c.args?.lutId)
+
+  it('a LUT draft auto-open generates the visible group', () => {
+    // Effective tab: recents-empty falls back to the first category (Print).
+    const [, commands] = update(loaded(), SelectedTool({ type: 'lut' }))
+    expect(genIds(commands)).toEqual([lutPrint])
+  })
+
+  it('a non-LUT draft does not generate (the bar stays closed)', () => {
+    const [, commands] = update(loaded(), SelectedTool({ type: 'exposure' }))
+    expect(genIds(commands)).toEqual([])
+  })
+
+  it('SelectedLutTab generates only the newly visible group', () => {
+    const [, commands] = update(lutDraft(), SelectedLutTab({ tab: 'Bw' }))
+    expect(genIds(commands)).toEqual([lutBw])
+  })
+
+  it('does not regenerate thumbs that already exist', () => {
+    const model = { ...lutDraft(), lutThumbs: { [lutBw]: 'blob:done' } }
+    const [, commands] = update(model, SelectedLutTab({ tab: 'Bw' }))
+    expect(genIds(commands)).toEqual([])
+    // The other group is still missing and generates on its visit.
+    const [, back] = update(model, SelectedLutTab({ tab: 'Print' }))
+    expect(genIds(back)).toEqual([lutPrint])
+  })
+
+  it('opening the bar via the chevron generates the visible group; closing does not', () => {
+    const committed = selectedLut()
+    const [opened, commands] = update(committed, ToggledLutPicker())
+    expect(opened.lutBarOpen).toBe(true)
+    expect(genIds(commands)).toEqual([lutPrint])
+    const [, closed] = update(opened, ToggledLutPicker())
+    expect(genIds(closed)).toEqual([])
+  })
+
+  it('the recents tab generates its missing entries', () => {
+    const model = { ...lutDraft(), lutRecents: [lutBw] }
+    const [, commands] = update(model, SelectedLutTab({ tab: 'recents' }))
+    expect(genIds(commands)).toEqual([lutBw])
+  })
+
+  it('LutThumbGenerated stores the URL for the current photo', () => {
+    const model = lutDraft()
+    const [next] = update(
+      model,
+      LutThumbGenerated({ lutId: lutBw, url: 'blob:thumb', bitmap: model.source.bitmap! }),
+    )
+    expect(next.lutThumbs[lutBw]).toBe('blob:thumb')
+  })
+
+  it('a thumb from a previous photo is revoked and dropped', () => {
+    const model = lutDraft()
+    const [next, commands] = update(
+      model,
+      LutThumbGenerated({ lutId: lutBw, url: 'blob:stale', bitmap: new MockImageBitmap(1, 1) }),
+    )
+    expect(next.lutThumbs[lutBw]).toBeUndefined()
+    const revoke = commands.find((c) => c.name === 'RevokeLutThumbs')
+    expect(revoke?.args?.urls).toEqual(['blob:stale'])
+  })
+
+  it('a new image clears the thumbnails and revokes their URLs', () => {
+    const model = { ...lutDraft(), lutThumbs: { [lutBw]: 'blob:old' } }
+    const [next, commands] = update(
+      model,
+      EditLoaded({
+        id: editId(),
+        chain: [],
+        bitmap: new MockImageBitmap(200, 150),
+        width: 200,
+        height: 150,
+        source: new Uint8Array([9]),
+      }),
+    )
+    expect(next.lutThumbs).toEqual({})
+    const revoke = commands.find((c) => c.name === 'RevokeLutThumbs')
+    expect(revoke?.args?.urls).toEqual(['blob:old'])
+  })
+
+  it('LutThumbFailed keeps the generic fallback (no state change)', () => {
+    const [model, commands] = update(lutDraft(), LutThumbFailed({ lutId: lutBw }))
+    expect(model.lutThumbs[lutBw]).toBeUndefined()
+    expect(commands).toEqual([])
+  })
+})
+
 describe('preview cleanup on bar-closing transitions', () => {
   const closingTransitions: ReadonlyArray<{
     readonly name: string
@@ -325,14 +416,17 @@ describe('preview cleanup on bar-closing transitions', () => {
       name: 'EditLoaded',
       make: lutDraft,
       fire: (m) =>
-        update(m, EditLoaded({
-          id: editId(),
-          chain: [],
-          bitmap: new MockImageBitmap(200, 150),
-          width: 200,
-          height: 150,
-          source: new Uint8Array([9]),
-        }))[0],
+        update(
+          m,
+          EditLoaded({
+            id: editId(),
+            chain: [],
+            bitmap: new MockImageBitmap(200, 150),
+            width: 200,
+            height: 150,
+            source: new Uint8Array([9]),
+          }),
+        )[0],
     },
     {
       name: 'ToggledLutPicker (closing)',
@@ -412,6 +506,12 @@ const resolveRender = () => [
   Command.resolve(ReadHistogram, HistogramComputed({ bins: new Uint32Array(256), stamp: 999 })),
 ]
 
+/** Resolve a tab-triggered thumb generation with a failure — the scene's
+ *  concern is the bar, not the thumb worker; a failed thumb keeps the
+ *  generic jpg, which is exactly what these tests assume. */
+const resolveThumbFailure = (lutId: LutId) =>
+  Command.resolve(GenerateLutThumb, LutThumbFailed({ lutId }))
+
 describe('LUT bar view', () => {
   it('renders tabs + thumbs for a LUT draft; hover previews; click commits', () => {
     scene(
@@ -429,6 +529,7 @@ describe('LUT bar view', () => {
       sceneExpect(role('button', { name: 'Apply Agfa APX 100' })).toBeAbsent(),
       // Switch to the Bw tab.
       click(role('button', { name: 'Bw' })),
+      resolveThumbFailure(lutBw),
       sceneExpect(role('button', { name: 'Apply Agfa APX 100' })).toExist(),
       // Hover previews on the canvas (the render carries the previewed
       // draft lutId); the name line shows the hovered entry live.
@@ -456,6 +557,7 @@ describe('LUT bar view', () => {
         'border-accent',
       ),
       click(role('button', { name: 'Bw' })),
+      resolveThumbFailure(lutBw),
       hover(role('button', { name: 'Apply Agfa APX 100' })),
       ...resolveRender(),
       sceneExpect(text('Agfa APX 100 · Bw')).toExist(),
@@ -485,6 +587,31 @@ describe('LUT bar view', () => {
     )
   })
 
+  it('bar thumbs show the vendored generic jpg until the per-photo preview lands', () => {
+    const model = lutDraft()
+    const bitmap = model.source.bitmap
+    if (!bitmap) throw new Error('fixture: expected a bitmap')
+    scene(
+      sceneConfig,
+      given(model),
+      ...stageMounts,
+      // No per-photo thumb yet: the vendored generic jpg shows.
+      sceneExpect(role('img', { name: 'Kodak 2393 Cuspclip' })).toHaveAttr(
+        'src',
+        '/luts/thumbnails/print/kodak_2393_cuspclip.jpg',
+      ),
+      // Switch to Bw: generation fires, and the worker result swaps the
+      // thumb to the per-photo URL.
+      click(role('button', { name: 'Bw' })),
+      Command.resolve(
+        GenerateLutThumb,
+        LutThumbGenerated({ lutId: lutBw, url: 'blob:photo', bitmap }),
+      ),
+      sceneExpect(role('img', { name: 'Agfa APX 100' })).toHaveAttr('src', 'blob:photo'),
+      Command.expectNone(),
+    )
+  })
+
   it('the drawer chevron toggles the bar', () => {
     scene(
       sceneConfig,
@@ -498,6 +625,7 @@ describe('LUT bar view', () => {
       Mount.expectEnded(LutStripWheel),
       // …and reopens it.
       click(role('button', { name: 'Toggle LUT bar' })),
+      resolveThumbFailure(lutPrint),
       Mount.resolve(LutStripWheel, LutStripWheelRegistered()),
       sceneExpect(label('LUT thumbnails')).toExist(),
       Command.expectNone(),

@@ -14,6 +14,7 @@ import { GpuBackendLive } from './gpu/backend'
 import { CanvasRefLive } from './gpu/canvas-ref'
 import { LutStoreLive } from './luts/store'
 import { ImageEncoderWorkerLive } from './encode/worker-layer'
+import { LutThumbnailerLive } from './thumbs/worker-layer'
 
 /**
  * The root application (docs/adr/0009): a root Submodel orchestrating the
@@ -37,9 +38,12 @@ export const application = Runtime.makeApplication({
         Layer.merge(
           ImageEncoderWorkerLive,
           Layer.merge(
-            BrowserKeyValueStore.layerLocalStorage,
-            // The local IndexedDB EditStore backend (docs/adr/0007, 0008).
-            EditStoreIndexedDb,
+            LutThumbnailerLive,
+            Layer.merge(
+              BrowserKeyValueStore.layerLocalStorage,
+              // The local IndexedDB EditStore backend (docs/adr/0007, 0008).
+              EditStoreIndexedDb,
+            ),
           ),
         ),
       ),

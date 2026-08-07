@@ -25,7 +25,8 @@ describe("parseCube", () => {
     expect(cube.data[0]).toBe(0)
     expect(cube.data[1]).toBe(0)
     expect(cube.data[3]).toBe(0.5)
-    // Row-major: index (r*size+g)*size+b — last entry is (1,1,1)
+    // File point order: index (b*size+g)*size+r — red varies fastest, so
+    // the last entry (point index 7) is (1,1,1).
     expect(cube.data[21]).toBe(0.5)
   })
 

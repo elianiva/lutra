@@ -13,11 +13,16 @@
 
 import { Schema } from "effect"
 
-/** A parsed 3D color cube. `data` holds `size³ × 3` floats in row-major
- * order — index `(r * size + g) * size + b` — with channels RGB. */
+/** A parsed 3D color cube. `data` holds `size³ × 3` floats in the file's
+ * point order — for the vendored G'MIC cubes that is index
+ * `(b * size + g) * size + r`: the red channel varies fastest, blue slowest
+ * (verified against the upstream data, where point index 1 is the red-axis
+ * step). The GPU backend strides this same order into the 3D texture, so
+ * the texture's X/Y/Z axes are the file's red/green/blue channels and the
+ * shader can sample `color.rgb` as the texture coordinate directly. */
 export interface LutCube {
   readonly size: number
-  /** `size³ × 3` floats, row-major over (r, g, b). */
+  /** `size³ × 3` floats, file point order (red fastest for the vendored cubes). */
   readonly data: Float32Array
 }
 

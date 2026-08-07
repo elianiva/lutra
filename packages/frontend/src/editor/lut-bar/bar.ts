@@ -1,4 +1,4 @@
-import { Array, Option, pipe } from 'effect'
+import { Option, pipe } from 'effect'
 import type { HtmlBuilder } from 'foldkit/html'
 import type { LutId } from '@lutra/engine'
 import type { EditorMessage } from '../message'
@@ -6,7 +6,7 @@ import { ChangedDraftLut, ChangedLayerLut } from '../message'
 import { lutName } from '../layer-meta'
 import type { Model } from '../model'
 import { currentLutId, lutTarget } from './target'
-import { groupByCategory, lookup, recentsEntries } from './catalog'
+import { effectiveTab, groupByCategory, lookup, recentsEntries, visibleEntries } from './catalog'
 import { tab } from './tab'
 import { thumb } from './thumb'
 import { LutStripWheel } from './wheel'
@@ -26,31 +26,16 @@ export const lutBar = (h: HtmlBuilder<EditorMessage>, model: Model) =>
     Option.all([Option.fromNullishOr(model.catalog), lutTarget(model)]),
     Option.filter(() => model.lutBarOpen),
     Option.map(([catalog, target]) => {
+      // What the filmstrip shows, shared with the thumb-generation trigger
+      // (docs/adr/0013): a stale `lutTab: 'recents'` (the list emptied
+      // since) falls back to the first catalog category for content and
+      // highlight; an empty catalog degrades to the stale tab's empty
+      // filmstrip instead of crashing on a missing "first" category.
       const categories = groupByCategory(catalog)
       const recents = recentsEntries(catalog, model.lutRecents)
       const showRecents = recents.length > 0
-      // A stale `lutTab: 'recents'` (the list emptied since) falls back to
-      // the first catalog category for content and highlight; an empty
-      // catalog degrades to the stale tab's empty filmstrip instead of
-      // crashing on a missing "first" category.
-      const activeTab =
-        model.lutTab === 'recents' && !showRecents
-          ? pipe(
-              categories,
-              Array.head,
-              Option.map(({ category }) => category),
-              Option.getOrElse(() => model.lutTab),
-            )
-          : model.lutTab
-      const entries =
-        model.lutTab === 'recents' && showRecents
-          ? recents
-          : pipe(
-              categories,
-              Array.findFirst((group) => group.category === activeTab),
-              Option.map((group) => group.luts),
-              Option.getOrElse(() => []),
-            )
+      const activeTab = effectiveTab(catalog, model.lutTab, model.lutRecents)
+      const entries = visibleEntries(catalog, model.lutTab, model.lutRecents)
 
       const current = currentLutId(model, target)
       const hovered = pipe(
@@ -124,8 +109,15 @@ export const lutBar = (h: HtmlBuilder<EditorMessage>, model: Model) =>
                   h.OnMount(LutStripWheel()),
                 ],
                 entries.map((entry) =>
-                  thumb(h, entry, Option.contains(current, entry.lut_file), () =>
-                    commit(entry.lut_file),
+                  thumb(
+                    h,
+                    entry,
+                    // The per-photo preview (docs/adr/0013) once it has
+                    // rendered; the vendored generic jpg is the placeholder
+                    // and the failure fallback.
+                    model.lutThumbs[entry.lut_file] ?? `/luts/${entry.thumbnail}`,
+                    Option.contains(current, entry.lut_file),
+                    () => commit(entry.lut_file),
                   ),
                 ),
               ),

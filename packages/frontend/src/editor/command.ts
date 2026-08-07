@@ -21,6 +21,7 @@ import {
 import { GpuBackend, RenderHandle } from '../gpu/backend'
 import { CanvasRef } from '../gpu/canvas-ref'
 import { LutLoadError, LutStore } from '../luts/store'
+import { LutThumbnailer } from '../thumbs/worker-layer'
 import {
   CanvasUnavailableError,
   EditNotFoundError,
@@ -47,6 +48,9 @@ import {
   ExportSettingsSaved,
   LutRecentsLoaded,
   LutRecentsSaved,
+  LutThumbGenerated,
+  LutThumbFailed,
+  LutThumbsRevoked,
   SaveFailed,
   EditSaved,
   CatalogLoaded,
@@ -59,8 +63,7 @@ import { ENGINE_REGISTRY } from '../editor/layer-meta'
 
 // The frontend consumes the engine's registry directly — no duplicate layer
 // definitions.
-export const createLayerFor = (type: LayerType): Layer =>
-  createLayer(type, ENGINE_REGISTRY)
+export const createLayerFor = (type: LayerType): Layer => createLayer(type, ENGINE_REGISTRY)
 
 /**
  * Opens the native file picker restricted to image files. If the user selects
@@ -240,9 +243,7 @@ export const SaveEdit = Command.define('SaveEdit', {
       yield* store.save(Edit.make({ id: editId, chain, source, thumbnail, savedAt }))
       return EditSaved({ id: editId, savedAt })
     }).pipe(
-      Effect.catchTag('GpuError', (err: GpuError) =>
-        Effect.succeed(SaveFailed({ error: err })),
-      ),
+      Effect.catchTag('GpuError', (err: GpuError) => Effect.succeed(SaveFailed({ error: err }))),
       Effect.catchTag('StoreError', (err: StoreError) =>
         Effect.succeed(SaveFailed({ error: err })),
       ),
@@ -479,7 +480,8 @@ export const ExportDownload = Command.define('ExportDownload', {
 export const RevokeExportUrl = Command.define('RevokeExportUrl', {
   args: { url: Schema.String },
   messages: [ExportUrlRevoked],
-  execute: ({ url }) => Effect.sync(() => URL.revokeObjectURL(url)).pipe(Effect.as(ExportUrlRevoked())),
+  execute: ({ url }) =>
+    Effect.sync(() => URL.revokeObjectURL(url)).pipe(Effect.as(ExportUrlRevoked())),
 })
 
 /** Restore persisted export settings (dispatched once at startup). */
@@ -489,10 +491,12 @@ export const LoadExportSettings = Command.define('LoadExportSettings', {
     const store = yield* Persistence.KeyValueStore
     const schemaStore = Persistence.toSchemaStore(store, ExportSettings)
     // `Effect.option` wraps the success (itself an Option) — flatten.
-    const saved = Option.flatten(yield* schemaStore.get(EXPORT_SETTINGS_KEY).pipe(
-      // Missing or corrupt settings fall back to defaults.
-      Effect.option,
-    ))
+    const saved = Option.flatten(
+      yield* schemaStore.get(EXPORT_SETTINGS_KEY).pipe(
+        // Missing or corrupt settings fall back to defaults.
+        Effect.option,
+      ),
+    )
     return ExportSettingsLoaded({ settings: Option.getOrElse(defaultExportSettings)(saved) })
   }),
 })
@@ -523,9 +527,7 @@ export const LoadLutRecents = Command.define('LoadLutRecents', {
     const store = yield* Persistence.KeyValueStore
     const schemaStore = Persistence.toSchemaStore(store, Schema.Array(LutIdSchema))
     // `Effect.option` wraps the success (itself an Option) — flatten.
-    const saved = Option.flatten(yield* schemaStore.get(LUT_RECENTS_KEY).pipe(
-      Effect.option,
-    ))
+    const saved = Option.flatten(yield* schemaStore.get(LUT_RECENTS_KEY).pipe(Effect.option))
     return LutRecentsLoaded({ recents: Option.getOrElse(() => [])(saved) })
   }),
 })
@@ -541,5 +543,98 @@ export const SaveLutRecents = Command.define('SaveLutRecents', {
         .set(LUT_RECENTS_KEY, recents)
         .pipe(Effect.ignore)
       return LutRecentsSaved()
+    }),
+})
+
+// ---- per-photo LUT thumbnails (filmstrip previews, docs/adr/0013) ----
+
+/**
+ * The square size the per-photo filmstrip previews are rendered at. The
+ * bar's thumbs are 96px CSS, so 200px keeps them sharp on 2× displays.
+ */
+const LUT_THUMB_SIZE = 200
+
+/**
+ * Downscale the source photo to the square preview: a center cover-crop
+ * (scale to fill, crop the overflowing dimension from the center), matching
+ * the bar's square `object-cover` presentation. One canvas-2D op per group
+ * visit (~2ms); the 160KB ImageData is transferred to the thumb worker per
+ * request.
+ */
+const thumbImageData = (bitmap: ImageBitmap): Effect.Effect<ImageData, ThumbnailEncodeError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const w = bitmap.width
+      const h = bitmap.height
+      const scale = Math.max(LUT_THUMB_SIZE / w, LUT_THUMB_SIZE / h)
+      const sw = LUT_THUMB_SIZE / scale
+      const sh = LUT_THUMB_SIZE / scale
+      const canvas = new OffscreenCanvas(LUT_THUMB_SIZE, LUT_THUMB_SIZE)
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new ThumbnailEncodeError({ message: '2d context unavailable' })
+      ctx.drawImage(
+        bitmap,
+        (w - sw) / 2,
+        (h - sh) / 2,
+        sw,
+        sh,
+        0,
+        0,
+        LUT_THUMB_SIZE,
+        LUT_THUMB_SIZE,
+      )
+      return ctx.getImageData(0, 0, LUT_THUMB_SIZE, LUT_THUMB_SIZE)
+    },
+    catch: (cause) =>
+      cause instanceof ThumbnailEncodeError
+        ? cause
+        : new ThumbnailEncodeError({
+            message: 'Failed to downscale the photo for LUT previews',
+            cause,
+          }),
+  })
+
+/**
+ * Render one per-photo LUT thumbnail: downscale the photo, resolve the
+ * cube (memoized by the LUT store), and apply it in the thumb worker (CPU
+ * sampler + JPEG encode). Every non-success path — downscale, cube fetch,
+ * worker render, encode — becomes `LutThumbFailed`, so the bar silently
+ * keeps the vendored generic jpg (docs/adr/0013). The message carries the
+ * photo the preview belongs to, so a result that lands after a new image
+ * loaded is dropped and revoked by update.
+ */
+export const GenerateLutThumb = Command.define('GenerateLutThumb', {
+  args: {
+    lutId: LutIdSchema,
+    bitmap: Schema.instanceOf(ImageBitmap),
+  },
+  messages: [LutThumbGenerated, LutThumbFailed],
+  execute: ({ lutId, bitmap }) =>
+    Effect.gen(function* () {
+      const store = yield* LutStore
+      const thumbs = yield* LutThumbnailer
+      const image = yield* thumbImageData(bitmap).pipe(Effect.option)
+      if (Option.isNone(image)) return LutThumbFailed({ lutId })
+      const cube = yield* store.getCube(lutId).pipe(Effect.option)
+      if (Option.isNone(cube)) return LutThumbFailed({ lutId })
+      const bytes = yield* thumbs.render(lutId, image.value, cube.value, bitmap)
+      if (Option.isNone(bytes)) return LutThumbFailed({ lutId })
+      // The bytes' buffer came from the worker as a transferred ArrayBuffer;
+      // TS can't know that, hence the BlobPart assertion (as in PrepareExport).
+      // oxlint-disable-next-line consistent-type-assertions
+      const blob = new Blob([bytes.value as BlobPart], { type: 'image/jpeg' })
+      return LutThumbGenerated({ lutId, url: URL.createObjectURL(blob), bitmap })
+    }),
+})
+
+/** Revoke per-photo preview blob URLs (fired when a new image loads — the
+ *  old photo's thumbs are dead the moment the bitmap changes). */
+export const RevokeLutThumbs = Command.define('RevokeLutThumbs', {
+  args: { urls: Schema.Array(Schema.String) },
+  messages: [LutThumbsRevoked],
+  execute: ({ urls }) =>
+    Effect.sync(() => {
+      for (const url of urls) URL.revokeObjectURL(url)
+      return LutThumbsRevoked()
     }),
 })

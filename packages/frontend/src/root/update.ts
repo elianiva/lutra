@@ -6,6 +6,7 @@ import { EditStore, EditIdSchema } from '@lutra/store'
 import { GpuBackend } from '../gpu/backend'
 import { CanvasRef } from '../gpu/canvas-ref'
 import { LutStore } from '../luts/store'
+import { LutThumbnailer } from '../thumbs/worker-layer'
 import { ImageEncoder } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import type { RootMessage } from './message'
@@ -22,6 +23,7 @@ type Resource =
   | ImageEncoder
   | KeyValueStore
   | EditStore
+  | LutThumbnailer
 
 export type UpdateReturn = readonly [
   Model,
@@ -37,8 +39,7 @@ const NavigateToEdit = Command.define('NavigateToEdit', {
   execute: ({ id }) => pushUrl(`/edit/${id}`).pipe(Effect.as(NavigatedTo())),
 })
 
-const withRoute = (model: Model, route: Model['route']) =>
-  evo(model, { route: (_) => route })
+const withRoute = (model: Model, route: Model['route']) => evo(model, { route: (_) => route })
 
 /** The route changed (browser back/forward, a pushed URL): set the route and
  *  let the active Submodel derive its state — one arm per Submodel, calling

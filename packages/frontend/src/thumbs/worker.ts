@@ -1,0 +1,54 @@
+import { applyLutCpu, encodeImage, type LutCube } from '@lutra/engine'
+
+// The LUT-thumbnail worker. The main thread posts `{ id, image, cube }`; the
+// worker applies the cube to the (already downscaled) photo with the engine's
+// CPU sampler — the pure-JS mirror of the WGSL LUT pass, exact for a LUT-only
+// chain (docs/adr/0013) — encodes a small JPEG, and replies `{ id, bytes }`
+// (buffer transferred) or `{ id, error }`. Like the encode worker, the thumb
+// worker holds no state: the image is structured-cloned per request, which is
+// cheap at 200×200 (160KB).
+//
+// The JPEG step reuses the engine's `encodeImage` with export settings — the
+// jSquash codecs stay engine-owned (docs/adr/0006).
+
+export interface LutThumbRequest {
+  readonly id: number
+  readonly image: ImageData
+  readonly cube: LutCube
+}
+
+export interface LutThumbResponse {
+  readonly id: number
+  readonly bytes?: Uint8Array
+  readonly error?: string
+}
+
+// The DOM lib types `self.postMessage` for windows (targetOrigin arg); a
+// worker's postMessage takes a transfer list. Narrow the global here.
+// oxlint-disable-next-line consistent-type-assertions
+const ctx = self as unknown as {
+  postMessage(message: LutThumbResponse, transfer?: Transferable[]): void
+}
+
+self.onmessage = (event: MessageEvent<LutThumbRequest>) => {
+  const { id, image, cube } = event.data
+  // The sampler is synchronous; the encode is async (jSquash wasm).
+  let graded: ImageData
+  try {
+    graded = applyLutCpu(image, cube, 1)
+  } catch (cause) {
+    ctx.postMessage({
+      id,
+      error: cause instanceof Error ? cause.message : String(cause),
+    })
+    return
+  }
+  encodeImage(graded, { format: 'jpeg', quality: 85, scale: 1 })
+    .then((bytes) => ctx.postMessage({ id, bytes }, [bytes.buffer]))
+    .catch((cause) =>
+      ctx.postMessage({
+        id,
+        error: cause instanceof Error ? cause.message : String(cause),
+      }),
+    )
+}

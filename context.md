@@ -74,8 +74,12 @@ A product-level design constraint, not a feature flag. The prototype intentional
 _Avoid_: "Presets" (these are built-in looks, distinct from the adjustment primitives the user composes), "filters" (see below).
 
 **LUT library**:
-The vendored collection of film-emulation `.cube` LUTs (296, mirrored from the G'MIC film color presets) that a **LUT layer** selects from via the **LUT bar**. Each LUT is referenced by its file path (`luts/<category>/<name>.cube`) as a stable id.
+The vendored collection of film-emulation `.cube` LUTs (296, mirrored from the G'MIC film color presets) that a **LUT layer** selects from via the **LUT bar**. Each LUT is referenced by its file path (`luts/<category>/<name>.cube`) as a stable id. Each entry also carries a vendored generic preview jpg (`thumbnail`), the fallback for **LUT preview thumbnails**.
 _Avoid_: "presets" (see **Film simulation adjustment**), "LUT pack"
+
+**LUT preview thumbnail**:
+A 200×200 JPEG of the **user's** photo with one LUT applied at full strength, rendered lazily per visible catalog category by the thumb worker (docs/adr/0013): the engine's `applyLutCpu` — a pure-JS 1:1 mirror of the WGSL LUT body, exact because a LUT-only chain has no colorspace boundary — then the engine's JPEG encode. The **LUT bar**'s thumbs prefer it over the **LUT library**'s vendored generic preview, which stays as the placeholder and failure fallback. Blob URLs live in the model (`lutThumbs`), cleared and revoked when a new image loads; a result that lands after an image switch is dropped by a bitmap-identity guard. A failed thumb is silently retried on the group's next visit.
+_Avoid_: "per-LUT thumbnail" (the preview is per LUT _and_ per photo — the pairing is the point)
 
 **Edit chain**:
 The ordered list of **adjustment layers** applied to a single source image. The chain is the unit of non-destructive persistence: it can be saved, replayed, reordered, and pruned without touching the source image.
@@ -140,7 +144,7 @@ Tool selection and layer selection are edges only from the editable states, so a
 - **Editor phase** (`app/phase.ts`): the machine above. Owns the image lifecycle, the draft, and the selection. The `Drafting` state carries the draft layer; the model no longer has `draft`/`selectedLayerId`/`source.status` flags.
 - **Render loop** (`renderPending` / `revision` / `stamp`): deliberately plain — a latest-wins reconciliation whose stale-frame decision needs the model `revision`, and whose trigger is `renderNow` from data-op handlers, not a message.
 - **LUT catalog**: one-shot AsyncData (`null` until the startup fetch lands) — not a machine.
-- **Chain data ops, pan/zoom, export, LUT bar state** (open, hover preview, tab, recents): pure data updates.
+- **Chain data ops, pan/zoom, export, LUT bar state** (open, hover preview, tab, recents, per-photo **LUT preview thumbnails**): pure data updates.
 
 **Layer drawer**:
 The right sidebar of the **editor**, always visible, showing the current **edit chain** as a vertical list. Displays each layer with its icon, label, formatted value, visibility toggle, and delete button. When a layer is selected or a **draft layer** is active, the slider and confirm/cancel controls render inline below the layer entry. Supports drag-to-reorder.
@@ -151,7 +155,7 @@ The small histogram drawn in the bottom-right corner of the **canvas stage**, on
 _Avoid_: "chart", "waveform" (video terminology)
 
 **Compare**:
-The editor's before/after viewing feature, controlled from a segmented control floating on the **canvas stage**. Four modes: **Off** (normal view), **Toggle** (the whole canvas flips between the **source image** and the **graded output**), **Split** (both at once, separated by a draggable divider — see **split position**), and **Side by side** (both images shown next to each other in the canvas). The graded side always shows the *last rendered frame*: presentation changes — flipping, dragging the divider — re-present it without re-rendering the **edit chain** (docs/adr/0011).
+The editor's before/after viewing feature, controlled from a segmented control floating on the **canvas stage**. Four modes: **Off** (normal view), **Toggle** (the whole canvas flips between the **source image** and the **graded output**), **Split** (both at once, separated by a draggable divider — see **split position**), and **Side by side** (both images shown next to each other in the canvas). The graded side always shows the _last rendered frame_: presentation changes — flipping, dragging the divider — re-present it without re-rendering the **edit chain** (docs/adr/0011).
 _Avoid_: "before/after" (a descriptive phrase, not the feature name), "compare view"
 
 **Split position**:
@@ -159,7 +163,7 @@ The location of the divider in **Split** mode, in image space — it pans and zo
 _Avoid_: "divider position" (the divider is the widget; the split position is the value)
 
 **LUT bar**:
-The bottom bar of the **editor** that owns LUT browsing (docs/adr/0012): category tabs on the left, a hover-to-preview / click-to-commit thumbnail filmstrip on the right, and a name line above the strip. Renders only while a LUT target exists — a drafting **LUT layer** or a selected chain **LUT layer** — and the **LUT library** catalog has loaded. Hover dispatches `PreviewedLut` (presentation-only model state applied at render time, never touching the chain or the machine); click commits via `ChangedDraftLut` / `ChangedLayerLut`. The drawer's LUT rows keep summary + strength slider and a chevron toggle for the bar; the bar auto-opens with a LUT draft and auto-closes on confirm/cancel/select. The **Recents** tab (most-recently-applied LUTs, capped at 12, persisted) is hidden while empty, falling back to the first catalog category. Save/export while a preview is active dismisses the preview instead of acting — the thumbnail/export frame must never capture the hovered look.
+The bottom bar of the **editor** that owns LUT browsing (docs/adr/0012, 0013): category tabs on the left, a hover-to-preview / click-to-commit thumbnail filmstrip on the right, and a name line above the strip. Renders only while a LUT target exists — a drafting **LUT layer** or a selected chain **LUT layer** — and the **LUT library** catalog has loaded. Hover dispatches `PreviewedLut` (presentation-only model state applied at render time, never touching the chain or the machine); click commits via `ChangedDraftLut` / `ChangedLayerLut`. Thumbs show the **LUT preview thumbnail** for the current photo once it has rendered — generated lazily per visible group — else the vendored generic preview. The drawer's LUT rows keep summary + strength slider and a chevron toggle for the bar; the bar auto-opens with a LUT draft and auto-closes on confirm/cancel/select. The **Recents** tab (most-recently-applied LUTs, capped at 12, persisted) is hidden while empty, falling back to the first catalog category. Save/export while a preview is active dismisses the preview instead of acting — the thumbnail/export frame must never capture the hovered look.
 _Avoid_: "preset picker" (presets are built-in looks, distinct from LUTs), "filmstrip" on its own (the strip is part of the bar)
 
 **Upload zone**:

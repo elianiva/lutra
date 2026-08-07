@@ -12,6 +12,7 @@ import type { Model } from './model'
 import { GalleryRoute, EditorRoute, parseRoute } from '../route'
 import * as Gallery from '../gallery'
 import * as Editor from '../editor'
+import type { LutThumbnailer } from '../thumbs/worker-layer'
 
 type Resource =
   | GpuBackend
@@ -20,6 +21,7 @@ type Resource =
   | ImageEncoder
   | KeyValueStore
   | EditStore
+  | LutThumbnailer
 
 export type InitReturn = readonly [
   Model,

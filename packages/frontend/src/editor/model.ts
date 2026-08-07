@@ -2,7 +2,13 @@ import { Schema } from 'effect'
 import { Dialog } from '@foldkit/ui'
 import { RenderHandle } from '../gpu/backend'
 import { SourceImage, CompareMode, Catalog, SaveError, ExportError } from './message'
-import { ExportSettings, defaultExportSettings, LayerIdSchema, LutIdSchema, Layer } from '@lutra/engine'
+import {
+  ExportSettings,
+  defaultExportSettings,
+  LayerIdSchema,
+  LutIdSchema,
+  Layer,
+} from '@lutra/engine'
 import { EditIdSchema } from '@lutra/store'
 import { EditorPhase, editorMachine } from './phase'
 
@@ -79,6 +85,12 @@ export const Model = Schema.Struct({
   // the KeyValueStore (LoadLutRecents / SaveLutRecents) and shown as the
   // bar's Recents tab (hidden while empty).
   lutRecents: Schema.Array(LutIdSchema),
+  // Per-photo LUT preview thumbnails: lutId → blob URL of the 200×200 JPEG
+  // rendered by the thumb worker (docs/adr/0013). Presentation-only — the
+  // bar's thumbs prefer these over the vendored generic jpg. Generated
+  // lazily per visible group (tab select / bar open), cleared and revoked
+  // when a new image loads.
+  lutThumbs: Schema.Record(Schema.String, Schema.String),
   // Compare (before/after viewing) state — CONTEXT.md "Compare": the active
   // mode, the split position in image space (0..1), and which side Toggle
   // shows (entering Toggle reveals the source first). The mode persists
@@ -145,6 +157,7 @@ export const initialModel = (): Model => ({
   previewLut: null,
   lutTab: 'recents',
   lutRecents: [],
+  lutThumbs: {},
   compareMode: 'off',
   compareSplitAt: 0.5,
   compareToggleBefore: false,

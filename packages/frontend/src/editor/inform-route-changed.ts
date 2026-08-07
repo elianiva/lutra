@@ -2,6 +2,7 @@ import type { Command } from 'foldkit'
 import type { GpuBackend } from '../gpu/backend'
 import type { CanvasRef } from '../gpu/canvas-ref'
 import type { LutStore } from '../luts/store'
+import type { LutThumbnailer } from '../thumbs/worker-layer'
 import type { ImageEncoder } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import { EditStore } from '@lutra/store'
@@ -10,7 +11,14 @@ import type { Model } from './model'
 import type { AppRoute } from '../route'
 import { LoadCatalog, LoadEdit, LoadExportSettings, LoadLutRecents } from './command'
 
-type Resource = GpuBackend | LutStore | CanvasRef | ImageEncoder | KeyValueStore | EditStore
+type Resource =
+  | GpuBackend
+  | LutStore
+  | CanvasRef
+  | ImageEncoder
+  | KeyValueStore
+  | EditStore
+  | LutThumbnailer
 
 /**
  * The parent's hook for a route change that resolves to the Editor. Per the
@@ -31,7 +39,6 @@ export type RouteChangedReturn = readonly [
 ]
 export const informRouteChanged = (model: Model, route: AppRoute): RouteChangedReturn => {
   const boot = [LoadCatalog(), LoadExportSettings(), LoadLutRecents()]
-  const commands =
-    route._tag === 'Editor' ? [LoadEdit({ id: route.editId }), ...boot] : boot
+  const commands = route._tag === 'Editor' ? [LoadEdit({ id: route.editId }), ...boot] : boot
   return [model, commands]
 }

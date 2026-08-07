@@ -199,6 +199,26 @@ export const LutRecentsSaved = Message.m('LutRecentsSaved')
 // CanvasRegistered, for DevTools/Scene observability.
 export const LutStripWheelRegistered = Message.m('LutStripWheelRegistered')
 
+// ---- per-photo LUT thumbnails (filmstrip previews, docs/adr/0013) ----
+
+// A per-photo LUT thumbnail finished rendering in the thumb worker: lutId →
+// the blob URL of the 200×200 JPEG (the bar's thumb prefers it over the
+// vendored generic jpg). `bitmap` is the photo the preview belongs to — the
+// staleness guard, exactly like RenderedFrame's stamp: a thumb that lands
+// after a new image loaded is revoked and dropped (the model's map only
+// ever holds the current photo's thumbs).
+export const LutThumbGenerated = Message.m('LutThumbGenerated', {
+  lutId: LutIdSchema,
+  url: S.String,
+  bitmap: S.instanceOf(ImageBitmap),
+})
+// A per-photo LUT thumbnail failed (cube fetch, downscale, worker render, or
+// encode). The bar silently keeps the vendored generic jpg — previews are
+// presentation-only, so failures are not user-visible (docs/adr/0013).
+export const LutThumbFailed = Message.m('LutThumbFailed', { lutId: LutIdSchema })
+// Ack for RevokeLutThumbs (observability, like ExportUrlRevoked).
+export const LutThumbsRevoked = Message.m('LutThumbsRevoked')
+
 /** For toggled layers (White Balance, Vignette): cycle the active field shown in the drawer. */
 export const CycledToggledField = Message.m('CycledToggledField', { id: LayerIdSchema })
 
@@ -371,6 +391,9 @@ export const EditorMessage = S.Union([
   LutRecentsLoaded,
   LutRecentsSaved,
   LutStripWheelRegistered,
+  LutThumbGenerated,
+  LutThumbFailed,
+  LutThumbsRevoked,
   CycledToggledField,
   StartedLayerReorder,
   MovedLayerReorder,

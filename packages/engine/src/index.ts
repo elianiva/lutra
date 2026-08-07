@@ -46,6 +46,13 @@ export type { RenderRequest } from "./render"
 export { parseCube, LutParseError } from "./luts/cube"
 export type { LutCube } from "./luts/cube"
 
+// CPU LUT application
+// The pure-JS mirror of the WGSL LUT pass body (docs/adr/0013): per-photo
+// filmstrip previews render through this in the thumb worker, where the GPU
+// pipeline is not available. Exact match for a LUT-only chain (sRGB in,
+// sRGB out — no colorspace boundary).
+export { applyLutCpu } from "./luts/apply"
+
 // Shader generation
 export {
   generateChainSource,

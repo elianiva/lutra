@@ -1,9 +1,10 @@
-import { Match, Option } from 'effect'
+import { Array, Match, Option, pipe } from 'effect'
 import { Command } from 'foldkit'
 import { Dialog } from '@foldkit/ui'
 import { GpuBackend } from '../gpu/backend'
 import { CanvasRef } from '../gpu/canvas-ref'
 import { LutStore } from '../luts/store'
+import { LutThumbnailer } from '../thumbs/worker-layer'
 import {
   SnapshotForExport,
   PrepareExport,
@@ -11,6 +12,8 @@ import {
   RevokeExportUrl,
   SaveExportSettings,
   SaveLutRecents,
+  GenerateLutThumb,
+  RevokeLutThumbs,
   PickImageFile,
   RenderChain,
   PresentFrame,
@@ -20,7 +23,14 @@ import {
 import { editorMachine } from './phase'
 import { LAYER_UI } from '../editor/layer-meta'
 import { lutTarget } from './lut-bar'
-import { fileExtension, type ExportSettings, type ImageEncoder, type LayerId, type LutId } from '@lutra/engine'
+import { visibleEntries } from './lut-bar/catalog'
+import {
+  fileExtension,
+  type ExportSettings,
+  type ImageEncoder,
+  type LayerId,
+  type LutId,
+} from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import { EditStore } from '@lutra/store'
 import type { Model } from './model'
@@ -33,7 +43,7 @@ export type UpdateReturn = readonly [
     Command.Command<
       EditorMessage,
       never,
-      GpuBackend | LutStore | CanvasRef | ImageEncoder | KeyValueStore | EditStore
+      GpuBackend | LutStore | CanvasRef | ImageEncoder | KeyValueStore | EditStore | LutThumbnailer
     >
   >,
   Option.Option<EditorOutMessage>,
@@ -139,6 +149,27 @@ const bumpRecents = (model: Model, lutId: LutId): Model => ({
 })
 
 /**
+ * The per-photo LUT thumbnails (docs/adr/0013) generate lazily, per visible
+ * group: one `GenerateLutThumb` per filmstrip entry that has no preview
+ * yet. Fired on tab select and on bar-open (the LUT-draft auto-open and the
+ * chevron), so the visible strip fills in without ever prefetching groups
+ * the user does not browse. A lutId whose generation failed stays missing
+ * and is retried on the next visit of its group.
+ */
+const generateThumbCommands = (
+  model: Model,
+): ReadonlyArray<Command.Command<EditorMessage, never, LutStore | LutThumbnailer>> => {
+  // The strip is only visible (and only browsable) while the bar is open.
+  const bitmap = model.source.bitmap
+  if (!model.lutBarOpen || !bitmap || !model.catalog) return []
+  return pipe(
+    visibleEntries(model.catalog, model.lutTab, model.lutRecents),
+    Array.filter((entry) => model.lutThumbs[entry.lut_file] === undefined),
+    Array.map((entry) => GenerateLutThumb({ lutId: entry.lut_file, bitmap })),
+  )
+}
+
+/**
  * The persistence-during-preview rule (docs/adr/0012 D7): save and export
  * snapshot from `model.lastRender` (thumbnail / export frame), which would
  * otherwise capture the hovered look. While a bar preview is active, the
@@ -163,7 +194,8 @@ const dismissPreviewOr = (model: Model, proceed: () => UpdateReturn): UpdateRetu
  * created — navigate onto it" (`EditCreated`); the root owns navigation.
  * Most arms emit `Option.none()`.
  */
-export const update = (model: Model, message: EditorMessage): UpdateReturn => {  // Data-level gate the machine can't see: the LUT tool needs the catalog
+export const update = (model: Model, message: EditorMessage): UpdateReturn => {
+  // Data-level gate the machine can't see: the LUT tool needs the catalog
   // (a LUT draft must reference a real lutId, and the first catalog entry is
   // the default selection). Everything else the editor blocks — no image,
   // loading, error, draft active — is a missing edge in the machine.
@@ -217,13 +249,22 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
       // unattached source record (id null) that Save creates an Edit from.
       ImageDecoded: ({ bitmap, width, height, source }) => {
         if (!transitioned) return [model, [], Option.none()]
-        return renderNow({
+        // A new photo invalidates the previous one's per-photo LUT previews
+        // (docs/adr/0013): clear the map and revoke the old blob URLs.
+        const urls = Object.values(model.lutThumbs)
+        const [next, commands] = renderNow({
           ...model,
           phase,
           source: { bitmap, width, height, error: null },
           attachedEdit: { id: null, source },
           saveStatus: { _tag: 'idle' },
+          lutThumbs: {},
         })
+        return [
+          next,
+          urls.length > 0 ? [...commands, RevokeLutThumbs({ urls })] : commands,
+          Option.none(),
+        ]
       },
       ImageFailedToDecode: ({ error }) => {
         if (!transitioned) return [model, [], Option.none()]
@@ -232,29 +273,35 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
       // The machine moves the phase (draft/selection discarded); the branch
       // resets the model data that only makes sense with an image. In Empty
       // the machine ignores the clear and the resets are no-ops.
-      ClearedImage: () => [
-        {
-          ...model,
-          phase,
-          source: { bitmap: null, width: 0, height: 0, error: null },
-          chain: [],
-          activeFieldIndex: {},
-          renderPending: false,
-          renderedStamp: 0,
-          lastRender: null,
-          bins: null,
-          // A new image starts the split position over at 50% (the compare
-          // mode itself persists across images).
-          compareSplitAt: 0.5,
-          // A cleared image has no LUT target — a stale hover preview must
-          // not leak into a future render.
-          previewLut: null,
-          attachedEdit: null,
-          saveStatus: { _tag: 'idle' },
-        },
-        [],
-        Option.none(),
-      ],
+      ClearedImage: () => {
+        // The image is gone: its per-photo LUT previews are dead too —
+        // clear the map and revoke the blob URLs (docs/adr/0013).
+        const urls = Object.values(model.lutThumbs)
+        return [
+          {
+            ...model,
+            phase,
+            source: { bitmap: null, width: 0, height: 0, error: null },
+            chain: [],
+            activeFieldIndex: {},
+            renderPending: false,
+            renderedStamp: 0,
+            lastRender: null,
+            bins: null,
+            // A new image starts the split position over at 50% (the compare
+            // mode itself persists across images).
+            compareSplitAt: 0.5,
+            // A cleared image has no LUT target — a stale hover preview must
+            // not leak into a future render.
+            previewLut: null,
+            attachedEdit: null,
+            saveStatus: { _tag: 'idle' },
+            lutThumbs: {},
+          },
+          urls.length > 0 ? [RevokeLutThumbs({ urls })] : [],
+          Option.none(),
+        ]
+      },
 
       // ---- attached edit (gallery → /edit/:id) ----
       // The machine moved to Idle (or ignored the message); the branch seeds
@@ -264,7 +311,10 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
       // become the attached record that Save writes back through.
       EditLoaded: ({ id, chain, bitmap, width, height, source }) => {
         if (!transitioned) return [model, [], Option.none()]
-        return renderNow({
+        // A new photo invalidates the previous one's per-photo LUT previews
+        // (docs/adr/0013): clear the map and revoke the old blob URLs.
+        const urls = Object.values(model.lutThumbs)
+        const [next, commands] = renderNow({
           ...model,
           phase,
           chain,
@@ -278,7 +328,13 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
           compareSplitAt: 0.5,
           attachedEdit: { id, source },
           saveStatus: { _tag: 'idle' },
+          lutThumbs: {},
         })
+        return [
+          next,
+          urls.length > 0 ? [...commands, RevokeLutThumbs({ urls })] : commands,
+          Option.none(),
+        ]
       },
       EditLoadFailed: ({ error }) => {
         if (!transitioned) return [model, [], Option.none()]
@@ -358,10 +414,14 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
             lutBarOpen: true,
           }
         }
-        return renderNow({
+        // The bar just auto-opened: the visible group's per-photo thumbs
+        // start generating (docs/adr/0013) — one command per missing LUT.
+        const rendered = {
           ...next,
           activeFieldIndex: ensureFieldIndex(model.activeFieldIndex, layer.id),
-        })
+        }
+        const [after, commands] = renderNow(rendered)
+        return [after, [...commands, ...generateThumbCommands(rendered)], Option.none()]
       },
       ConfirmedDraft: () => {
         if (!transitioned || from._tag !== 'Drafting') return [model, [], Option.none()]
@@ -409,12 +469,15 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
         if (Option.isNone(lutTarget(model))) return [model, [], Option.none()]
         const open = !model.lutBarOpen
         // Closing also clears the hover preview; opening has nothing to
-        // clear (a closed bar cannot be hovered).
-        return [
-          { ...model, phase, lutBarOpen: open, previewLut: open ? model.previewLut : null },
-          [],
-          Option.none(),
-        ]
+        // clear (a closed bar cannot be hovered). Opening starts the
+        // visible group's per-photo thumbs (docs/adr/0013).
+        const next = {
+          ...model,
+          phase,
+          lutBarOpen: open,
+          previewLut: open ? model.previewLut : null,
+        }
+        return [next, open ? generateThumbCommands(next) : [], Option.none()]
       },
 
       // ---- LUT bar (bottom filmstrip picker, docs/adr/0012) ----
@@ -428,8 +491,13 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
         if (model.previewLut === lutId) return [model, [], Option.none()]
         return renderNow({ ...model, phase, previewLut: lutId })
       },
-      // Tab click: presentation-only, no render.
-      SelectedLutTab: ({ tab }) => [{ ...model, phase, lutTab: tab }, [], Option.none()],
+      // Tab click: presentation-only (no render), but the newly visible
+      // group's per-photo thumbs start generating (docs/adr/0013) — a
+      // revisit after a failure retries the missing LUTs.
+      SelectedLutTab: ({ tab }) => {
+        const next = { ...model, phase, lutTab: tab }
+        return [next, generateThumbCommands(next), Option.none()]
+      },
       // Recents restored from localStorage at boot.
       LutRecentsLoaded: ({ recents }) => [
         { ...model, phase, lutRecents: recents },
@@ -438,6 +506,26 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
       ],
       LutRecentsSaved: () => [model, [], Option.none()],
       LutStripWheelRegistered: () => [model, [], Option.none()],
+
+      // ---- per-photo LUT thumbnails (filmstrip previews, docs/adr/0013) ----
+      // A thumb landed. One that belongs to a previous photo (the bitmap
+      // changed while the worker was rendering) is revoked and dropped —
+      // the map only ever holds the current photo's previews.
+      LutThumbGenerated: ({ lutId, url, bitmap }) => {
+        if (model.source.bitmap !== bitmap) {
+          return [model, [RevokeLutThumbs({ urls: [url] })], Option.none()]
+        }
+        return [
+          { ...model, phase, lutThumbs: { ...model.lutThumbs, [lutId]: url } },
+          [],
+          Option.none(),
+        ]
+      },
+      // A thumb failed (cube fetch, downscale, worker, encode): the
+      // vendored generic jpg stays — previews are presentation-only, so
+      // failures are not user-visible.
+      LutThumbFailed: () => [model, [], Option.none()],
+      LutThumbsRevoked: () => [model, [], Option.none()],
 
       // ---- committed chain ----
       SelectedLayer: () => {
@@ -657,8 +745,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => { 
       },
       ChangedExportQuality: ({ quality }) =>
         settingsChanged(model, { ...model.exportSettings, quality }),
-      ChangedExportScale: ({ scale }) =>
-        settingsChanged(model, { ...model.exportSettings, scale }),
+      ChangedExportScale: ({ scale }) => settingsChanged(model, { ...model.exportSettings, scale }),
       ExportPrepared: ({ sizeBytes, url }) => {
         // An encode that completed after the dialog closed has no consumer.
         if (!model.exportDialog.isOpen) return [model, [RevokeExportUrl({ url })], Option.none()]

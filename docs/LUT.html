@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lutra's LUT pipeline — color cubes from file to film, explained</title>
+<style>
+  /* A compact, self-contained Tufte-style stylesheet.
+     Fonts: et-book is the Tufte face; we fall back to Palatino/Georgia
+     (the exact stack tufte-css uses when et-book is unavailable). */
+  html { font-size: 15px; }
+  body {
+    font-family: Palatino, "Palatino Linotype", "Book Antiqua", "Liberation Serif", Georgia, serif;
+    background-color: #fffff8;
+    color: #111;
+    max-width: 87.5rem;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    line-height: 1.5;
+  }
+  article { position: relative; max-width: 55rem; padding: 0 0 6rem 0; }
+  p, li { font-size: 1.05rem; line-height: 1.6; }
+  p { margin: 1.2rem 0 0 0; }
+  ul, ol { margin: 1rem 0 0 0; padding-left: 1.6rem; }
+  li { margin-top: 0.3rem; }
+  h1 { font-weight: 400; font-size: 2.3rem; line-height: 1.15; margin: 3.5rem 0 0.5rem 0; }
+  h2 { font-weight: 400; font-size: 1.45rem; margin: 3rem 0 0.2rem 0; letter-spacing: 0.01em; }
+  h3 { font-weight: 400; font-style: italic; font-size: 1.2rem; margin: 1.8rem 0 0.2rem 0; }
+  .subtitle { font-style: italic; font-size: 1.25rem; color: #555; margin-top: 0.2rem; }
+  .sans { font-family: "Gill Sans", "Gill Sans MT", "Trebuchet MS", sans-serif; }
+  a { color: #111; text-decoration: underline; }
+  a:hover { color: #7a2e1e; }
+  code {
+    font-family: "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 0.82em;
+    background: #f4f2e8;
+    padding: 0.08em 0.25em;
+    border-radius: 2px;
+  }
+  pre {
+    font-family: "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    background: #f4f2e8;
+    border: 1px solid #e3e0d2;
+    border-left: 3px solid #d0cdbd;
+    padding: 0.9rem 1.1rem;
+    margin: 1.1rem 0 0 0;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  pre code { background: none; padding: 0; font-size: 1em; }
+  blockquote {
+    border-left: 3px solid #d0cdbd;
+    padding-left: 1.2rem;
+    font-style: italic;
+    color: #444;
+    margin: 1.4rem 0 0 0;
+  }
+  blockquote footer { font-style: normal; font-size: 0.85rem; color: #666; }
+  .epigraph { border-left: none; padding-left: 0; margin: 4rem 0 0 0; font-size: 1.3rem; color: #333; }
+  .epigraph footer { margin-top: 0.3rem; }
+  .newthought { font-variant: small-caps; letter-spacing: 0.04em; }
+  figure { margin: 1.8rem 0 0 0; text-align: center; }
+  figure img, figure svg { max-width: 100%; }
+  figcaption {
+    font-size: 0.85rem;
+    font-style: italic;
+    color: #555;
+    margin-top: 0.4rem;
+  }
+  table { border-collapse: collapse; width: 100%; margin: 1.2rem 0 0 0; font-size: 0.95rem; }
+  th { border-bottom: 2px solid #111; text-align: left; padding: 0.4rem 0.8rem 0.3rem 0; font-weight: 400; font-variant: small-caps; letter-spacing: 0.03em; }
+  td { border-bottom: 1px solid #ddd; padding: 0.45rem 0.8rem 0.45rem 0; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 3rem 0; }
+  .marginnote, .sidenote {
+    font-size: 0.78rem;
+    line-height: 1.4;
+    color: #333;
+  }
+  /* sidenote mechanics (Tufte's checkbox hack) */
+  .sidenote-number { counter-increment: sidenote-counter; cursor: pointer; }
+  .sidenote-number::after {
+    content: counter(sidenote-counter);
+    vertical-align: super;
+    font-size: 0.65em;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .sidenote::before { content: counter(sidenote-counter) "  "; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .margin-toggle { display: none; }
+  @media (min-width: 1200px) {
+    .sidenote {
+      position: absolute;
+      right: -24rem;
+      width: 20rem;
+      margin-top: 0.2rem;
+    }
+    .marginnote { position: absolute; right: -24rem; width: 20rem; margin-top: 0.2rem; }
+    .sidenote-number::after { content: ""; }
+    .sidenote::before { content: ""; }
+  }
+  @media (max-width: 1199px) {
+    .sidenote { display: none; }
+    .margin-toggle:checked + .sidenote {
+      display: block;
+      float: left;
+      clear: both;
+      width: 95%;
+      margin: 1rem 0;
+      padding: 0.8rem 1rem;
+      background: #f4f2e8;
+      border-left: 3px solid #d0cdbd;
+    }
+  }
+  /* small pipeline diagram */
+  .flow { display: flex; align-items: stretch; flex-wrap: wrap; gap: 0.4rem; margin: 1.4rem 0 0 0; }
+  .flow .box {
+    border: 1px solid #111;
+    padding: 0.5rem 0.8rem;
+    text-align: center;
+    font-size: 0.85rem;
+    background: #fbfaf2;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .flow .box .t { font-weight: 600; }
+  .flow .box .s { font-size: 0.72rem; color: #555; }
+  .flow .arrow { align-self: center; font-size: 1.2rem; color: #555; }
+  .flow .loop { border-style: dashed; }
+  .callout {
+    border-left: 3px solid #a34a2f;
+    background: #fbf4ee;
+    padding: 0.7rem 1rem;
+    margin: 1.2rem 0 0 0;
+    font-size: 0.95rem;
+  }
+  .callout .h { font-variant: small-caps; letter-spacing: 0.04em; font-weight: 600; }
+  .tag {
+    display: inline-block;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.7rem;
+    border: 1px solid #999;
+    border-radius: 3px;
+    padding: 0.05em 0.45em;
+    margin-left: 0.4em;
+    vertical-align: middle;
+  }
+  .tag.good { border-color: #3f7d3f; color: #2c5e2c; }
+  .tag.warn { border-color: #a34a2f; color: #8a3a22; }
+  .tag.note { border-color: #6a6a8a; color: #4b4b6a; }
+  footer.fineprint {
+    margin-top: 4rem;
+    padding-top: 1rem;
+    border-top: 1px solid #ddd;
+    font-size: 0.85rem;
+    color: #666;
+  }
+</style>
+</head>
+<body>
+<article>
+
+<header>
+  <h1>Lutra's LUT pipeline</h1>
+  <p class="subtitle">Color cubes from file to film, explained from the ground up — what a LUT is, how the files are parsed, how the GPU and CPU apply them, and what a film emulation does to your pixels</p>
+</header>
+
+<blockquote class="epigraph">
+  <p>&ldquo;Graphical excellence is that which gives to the viewer the greatest number of ideas in the shortest time with the least ink in the smallest space.&rdquo;</p>
+  <footer>— Edward Tufte, <em>The Visual Display of Quantitative Information</em></footer>
+</blockquote>
+
+<p><span class="newthought">Every effect in Lutra is a formula.</span> Exposure multiplies, contrast applies an S-curve, grain adds noise. The <strong>LUT layer</strong> is the odd one out: it is not a formula at all, but a <em>table</em> — 2,197 sampled colors that, together, describe a whole film stock's response. This document follows that table from the text files on disk, through the parser, up onto the GPU as a 3D texture, into the CPU sampler that powers the thumbnail filmstrip, and finally to the perceptual changes you see on screen. It assumes you know what a pixel is and nothing else; the terms the rest of the document leans on are defined up front in &sect;0.</p>
+
+<h2>0 · A LUT is a function in table form</h2>
+
+<p>A pixel's color is three numbers: how much <em>red</em>, how much <em>green</em>, how much <em>blue</em> — each stored as a byte (0&ndash;255) in an image file, or as a fraction of 1 (0&ndash;1) in shader math. A <em>color transform</em> is any rule that takes those three numbers and produces three new ones. Most transforms are formulas. A <em>lookup table</em> (LUT) is a transform stored as a table of samples instead: for certain input colors it records the output color, and any input that falls between two samples is <em>interpolated</em> — blended between the nearest recorded ones.</p>
+
+<p>Because the input has three channels, the table is three-dimensional: imagine a cube with red along one axis, green along the second, blue along the third. Each axis is sampled at 13 evenly spaced values (0, 1/12, 2/12, &hellip;, 1), giving 13&sup3; = 2,197 <em>grid points</em>, and each grid point holds the output color for the input color at that spot. An arbitrary input color almost never lands exactly on a grid point — it lands inside one of the 12&sup3; = 1,728 little cells, and the output is a weighted blend of the eight grid points at the cell's corners: the closer a corner, the more it counts. Because the blending happens along all three axes, it is called <em>trilinear interpolation</em>. (The alternative — storing every possible 256&sup3; &asymp; 16.7 million colors — would make the files a thousand times bigger for no visible gain.)</p>
+
+<p>Why a table for film emulation? Because film's response is not a formula. Real film has per-channel tone curves with a <em>shoulder</em> (highlights roll off smoothly instead of clipping to white) and a <em>toe</em> (blacks lift off pure black) — an S-shaped response per color channel. And decisively, the three dye layers of film <em>contaminate each other</em>: a strong red exposure also shifts how the blue record develops. That cross-channel behavior is what makes a film look like film, and it cannot be expressed as three independent per-channel curves. A 1D LUT (one curve per channel, each channel transformed on its own) cannot do it; a 3D table can encode <em>any</em> function of (r, g, b), however gnarly, as long as it is smooth enough to sample at 13 points per axis. G'MIC's film presets are rendered into exactly this form, and the table is what Lutra ships.</p>
+
+<p>The terms used throughout, in one place:</p>
+
+<table>
+  <tr><th>Term</th><th>Meaning</th></tr>
+  <tr><td>Channel</td><td>one of the three color components of a pixel: red, green, or blue</td></tr>
+  <tr><td>Grid point</td><td>one of the 13&sup3; sampled colors inside the cube; the table's &ldquo;rows&rdquo;</td></tr>
+  <tr><td>Axis</td><td>one of the cube's three dimensions; moving along it changes one channel of the input color</td></tr>
+  <tr><td>Interpolation</td><td>blending between known samples to produce an in-between value; trilinear = along all three axes at once</td></tr>
+  <tr><td>Texel</td><td>one grid point viewed as an element of a GPU texture (&sect;3) — &ldquo;texture pixel&rdquo;</td></tr>
+  <tr><td>Pass</td><td>a small GPU program that runs once per pixel of the image: read a texture, compute, write a texture (&sect;3)</td></tr>
+  <tr><td>sRGB</td><td>the standard brightness encoding of image files and screens (&sect;4)</td></tr>
+  <tr><td>Linear light</td><td>physically proportional brightness — twice the number, twice the light; what effects compute in (&sect;4)</td></tr>
+  <tr><td>Amount / strength</td><td>the LUT layer's slider: 0 = no effect (identity), 1 = the full film look</td></tr>
+</table>
+
+<h2>1 · The film library</h2>
+
+<p>Lutra <em>vendors</em> 296 film-emulation cubes — ships copies of them inside the app, rather than downloading them from a third party at runtime — from the G'MIC film presets (<code>YahiaAngelo/Film-Luts</code>, mirrored at a pinned commit; docs/adr/0004). They are static assets in <code>packages/frontend/public/luts/</code>, split across nine categories:</p>
+
+<table>
+  <tr><th>Category</th><th>Cubes</th><th>Vibe</th></tr>
+  <tr><td>Instant Pro / Instant Consumer</td><td>68 / 54</td><td>Polaroid-style: lifted blacks, soft pastel casts</td></tr>
+  <tr><td>Negative Old / Negative New</td><td>44 / 39</td><td>Color-negative film: contrasty, saturated, warm highlights</td></tr>
+  <tr><td>Colorslide</td><td>26</td><td>Slide film: punchy, cool-balanced</td></tr>
+  <tr><td>Bw</td><td>25</td><td>Black-and-white stocks, including infrared</td></tr>
+  <tr><td>Fujixtransiii / Negative Color / Print</td><td>15 / 13 / 12</td><td>Digital camera simulation, generic negatives, print emulsions</td></tr>
+</table>
+
+<p>Three files describe the library. <code>film_luts.json</code> is the catalog — fetched once at startup — with one entry per LUT: a display <code>name</code>, a <code>category</code>, a preview <code>thumbnail</code> path, and <code>lut_file</code>, the path of the cube inside the library (<code>luts/print/kodak_2393_cuspclip.cube</code>). That path is also the layer's <code>lutId</code>: a stable string id that travels through the schema, the model, and the render request. The cubes themselves — 296 files, ~131KB each, 38MB in total — are fetched <em>on demand</em>: the first time a layer references a lutId (or a filmstrip group needs previews, &sect;8), its text is fetched, parsed once, and memoized for the session.</p>
+
+<h2>2 · From .cube text to a cube in memory</h2>
+
+<p>A cube file is deliberately plain text. The header names the LUT and declares the grid; the rest is 2,197 lines of three floats — one line per grid point:</p>
+
+<pre><code>TITLE "kodak_2393_cuspclip"
+LUT_3D_SIZE 13
+DOMAIN_MIN 0.0 0.0 0.0
+DOMAIN_MAX 1.0 1.0 1.0
+
+0.065090090036392212 0.065090090036392212 0.065090090036392212
+0.078139059245586395 0.078139059245586395 0.078139059245586395
+&hellip;</code></pre>
+
+<p>Three numbers per line: the output <em>red</em>, <em>green</em>, and <em>blue</em> for one grid point. The <code>DOMAIN</code> lines say the cube is meant for input colors between 0 and 1 — exactly the normalized pixel values the pipeline feeds it — so no scaling happens anywhere: the cube is used as-is.</p>
+
+<p><code>parseCube</code> (engine, <code>src/luts/cube.ts</code>) is tolerant of the format's noise and strict about its one invariant. Comments, blank lines, <code>TITLE</code>, and <code>DOMAIN_*</code> are skipped; CRLF line endings and stray extra columns are tolerated; but the data must contain exactly <code>size&sup3;</code> points, each with at least three floats, or the parse fails with a <code>LutParseError</code> — a corrupt cube is never half-loaded.</p>
+
+<h3>The one subtle part: which line belongs to which input?</h3>
+
+<p>Nothing on a line says what input color it answers for — the <em>order of the lines</em> is the only connection. The first data line is the output for the darkest input (0,0,0), the last for (1,1,1), and every line in between is assigned by walking the grid in a fixed pattern, changing one channel at a time. The channel that changes on every consecutive line varies <strong>fastest</strong>; the one that changes only after all the others have been cycled varies <strong>slowest</strong>. For a tiny 2&times;2&times;2 cube (two samples per axis), the two common conventions read:</p>
+
+<table>
+  <tr><th>Line</th><th>Red-fastest order<br>(what the G'MIC files use)</th><th>Red-slowest order<br>(the textbook convention)</th></tr>
+  <tr><td>0</td><td>input (0, 0, 0)</td><td>input (0, 0, 0)</td></tr>
+  <tr><td>1</td><td>input (1, 0, 0) &mdash; <em>red</em> stepped</td><td>input (0, 0, 1) &mdash; <em>blue</em> stepped</td></tr>
+  <tr><td>2</td><td>input (0, 1, 0)</td><td>input (0, 1, 0)</td></tr>
+  <tr><td>3</td><td>input (1, 1, 0)</td><td>input (0, 1, 1)</td></tr>
+  <tr><td>4</td><td>input (0, 0, 1) &mdash; blue first changes here</td><td>input (1, 0, 0) &mdash; red first changes here</td></tr>
+  <tr><td>&hellip;</td><td>red changes every line</td><td>blue changes every line</td></tr>
+</table>
+
+<p>As formulas: red-fastest indexes points as <code>(b&middot;size + g)&middot;size + r</code> (blue slowest), red-slowest as <code>(r&middot;size + g)&middot;size + b</code>. Same 2,197 outputs, different file — and mixing the two up swaps red and blue in every result.</p>
+
+<div class="callout">
+  <span class="h">The layout gotcha: the G'MIC files are red-fastest.</span> The commonly quoted .cube documentation describes the red-slowest convention. The vendored G'MIC files are generated the other way — <strong>red varies fastest</strong>, blue slowest. You can read it straight from the data: in <code>fuji_astia_100f.cube</code>, the line at index 12 (which red-fastest order assigns to the input one full step up the red axis: pure red, (1,0,0)) holds <code>(0.946, 0.086, 0.122)</code> — a saturated red result. The line at index 2028 (red-fastest's pure-blue input, (0,0,1)) holds <code>(0.066, 0.006, 0.439)</code> — a deep blue. Under the red-slowest reading those two lines swap meanings: pure red in would read the deep-blue output, and a slide film that turns red into blue is absurd. This cost us a real bug: the first version of the CPU sampler assumed the textbook order, every filmstrip preview came out with red and blue swapped (warm LUTs looked blue-ish), and a dedicated engine test — pure red input must come out red — now locks the order forever.
+</div>
+
+<p>The parsed cube is a <code>LutCube</code>: <code>size</code> plus a flat <code>Float32Array</code> of <code>size&sup3; &times; 3</code> floats in file order. This <em>is</em> the engine's contract — the GPU upload strides the same array into the texture (&sect;3) and the CPU sampler indexes the same file order (&sect;5), so there is exactly one layout and the two renderers can never disagree about which point is which.</p>
+
+<h2>3 · Applying a LUT on the GPU</h2>
+
+<p>A LUT layer renders as its own compute <em>pass</em> — a small GPU program that runs once per pixel of the image: it reads one texture (an image stored on the GPU), applies its logic, and writes another texture — like every other layer (architecture.html &sect;3). The pass differs from the others in one <em>binding</em> (a numbered slot through which the frontend hands the shader its data) and in its body. It declares <code>lutTex</code>, a 3D texture — a cube of values rather than a flat image — at binding 6, and it declares no sampler:</p>
+
+<pre><code>// color is sRGB-encoded here, by pass contract (&sect;4)
+let p = clamp(color, vec3&lt;f32&gt;(0.0), vec3&lt;f32&gt;(1.0)) * (LUT_SIZE - 1.0);
+let x0 = vec3&lt;i32&gt;(floor(p));
+let f = p - vec3&lt;f32&gt;(x0);
+let maxT = i32(LUT_SIZE) - 1;
+let x1 = min(x0 + vec3&lt;i32&gt;(1), vec3&lt;i32&gt;(maxT));
+let c000 = textureLoad(lutTex, vec3&lt;i32&gt;(x0.x, x0.y, x0.z), 0).rgb;
+// &hellip;seven more corners&hellip;
+let lutColor = mix(mix(mix(c000, c100, f.x), mix(c010, c110, f.x), f.y),
+                   mix(mix(c001, c101, f.x), mix(c011, c111, f.x), f.y), f.z);
+color = mix(color, lutColor, l0_amount);</code></pre>
+
+<p>The body is the whole algorithm, in four moves. <em>Map the color into texel space</em> — the cube's own coordinate system, where each grid point is one texel: multiplying by <code>SIZE&minus;1</code> puts input 0 and 1 on the cube's faces and input 0.5 exactly in the middle grid point. <em>Find the enclosing cell</em>: <code>x0</code> is the low corner's texel, <code>f</code> the fraction of the way to the high corner, <code>x1</code> the high corner clamped to the last plane (so the top face never reads past the cube). <em>Read the eight corners</em> with <code>textureLoad</code> and <em>lerp</em> — linear interpolation, a weighted average between two values — three times along x, two along y, one along z. Finally <code>amount</code> mixes the graded color with the original, so 0 is identity and 1 is the full look.</p>
+
+<p>The texture is <code>rgba32float</code>, and that choice is load-bearing. WebGPU cannot filter 32-bit float textures (filtering = the GPU's built-in interpolation, normally available for &ldquo;image&rdquo; textures), so the manual trilinear above is not an optimization but a necessity — and the format itself exists because the cheap alternative is broken: <code>rgba16float</code> would need an f32&rarr;f16 conversion on upload, and Chrome's <code>writeTexture</code> conversion path writes raw f32 bytes into f16 textures, corrupting rows. rgba32float matches the <code>Float32Array</code> byte-for-byte. The upload strides the file order 1:1 into the texture — flat texel index <code>(z&middot;size + y)&middot;size + x</code> — so the texture's X, Y, Z axes <em>are</em> the file's red, green, blue channels (the red-fastest order from &sect;2), and the shader can hand <code>color.rgb</code> straight to the texture coordinate. A cube is uploaded once per lutId and cached device-wide; textures are never re-uploaded per render.</p>
+
+<h2>4 · The sRGB contract (why the pass flips its boundaries)</h2>
+
+<p>Two ways of storing brightness matter here. <em>sRGB</em> is what image files and screens use: brightness is stored with a curve baked in, roughly matching how displays and human vision behave. <em>Linear light</em> is the physical version: twice the number means twice the actual light. The two are related by a curve (the formula lives in <code>colorspace.ts</code>; architecture.html &sect;4 explains it). Lutra's pipeline works in linear light — passes decode sRGB to linear, effects run, and the last pass encodes back to sRGB for the display — because adding, multiplying, and blending colors in sRGB space gives results that feel wrong (darkening by 50% would crush shadows differently than it should).</p>
+
+<p>The LUT layer is the deliberate exception, and the reason is upstream: <strong>G'MIC's film presets are authored against sRGB-encoded values</strong>, because sRGB is G'MIC's working space (docs/adr/0003). Apply a film cube to linear values and the film curves land in the wrong place — the toe and shoulder shift, the strength of every cast changes. So the LUT pass inverts the usual boundaries: it decodes its linear input <em>to</em> sRGB before the body and re-encodes <em>from</em> sRGB after, like the other passes do in reverse.</p>
+
+<p>Both ends of that round-trip are conditional. When the LUT pass reads the source texture directly (a LUT layer first in the chain), the input is already sRGB — no decode. When it is the last pass (writing the display texture), the output is already sRGB — no re-encode. A LUT-only chain — the exact configuration the filmstrip previews render (&sect;5) — is both, which means <strong>zero colorspace conversions</strong>: the pass becomes literally &ldquo;sample the cube, mix by amount.&rdquo; That is the fact that makes a byte-exact CPU implementation possible, and the strength mix happens in sRGB space either way, which is what &ldquo;50% film look&rdquo; perceptually means.</p>
+
+<h2>5 · Applying a LUT on the CPU</h2>
+
+<p>The filmstrip at the bottom of the editor shows the <em>user's</em> photo under every LUT they browse — 296 previews of the current image, one per cube (docs/adr/0013). Rendering those through the GPU pipeline would mean a new offscreen render path sharing the interactive device queue, or a second WebGPU device in a worker (a browser-support gamble). The LUT body's simplicity makes a third path obvious: <code>applyLutCpu</code> in the engine (<code>src/luts/apply.ts</code>) — the WGSL body above, translated line-for-line to JavaScript.</p>
+
+<p>Because a LUT-only chain has no colorspace boundary (&sect;4), the CPU function is <em>exactly</em> the shader body: the same texel-space mapping, the same eight corners, the same mixes, the same file-order indexing. The shader's <code>clamp</code> guards against out-of-range values (GPU textures can hold numbers beyond 0&ndash;1); the CPU input is 8-bit pixel bytes divided by 255, which are already inside the cube's domain, so the clamp is a no-op and is omitted. Alpha passes through untouched, and writing through a <code>Uint8ClampedArray</code> (a byte array that rounds and clamps on assignment) reproduces the <code>rgba8unorm</code> store's rounding. The translation is so direct that it was cross-checked against a JS reimplementation of the GPU lookup over 500 random colors — zero mismatches — and the axis-order test from &sect;2 guards the one place the two paths could drift.</p>
+
+<p>The sampler runs in a dedicated worker (<code>src/thumbs/worker.ts</code>), one request per LUT: the main thread downscales the photo to a 200&times;200 square (cropped from the center), transfers the 160KB <code>ImageData</code> (a plain array of pixel bytes), and the worker applies the cube and JPEG-encodes the result with the engine's <code>encodeImage</code> — the same codec path exports use, at quality 85. The work is cheap enough that the original &ldquo;is CPU fast enough?&rdquo; question answered itself: ~1.7ms per LUT at 200&times;200, so a whole 68-cube category renders in roughly a tenth of a second, progressively filling the strip as each thumb lands.</p>
+
+<h2>6 · GPU vs CPU, side by side</h2>
+
+<table>
+  <tr><th></th><th>GPU pass (<code>lut.ts</code> body)</th><th>CPU sampler (<code>applyLutCpu</code>)</th></tr>
+  <tr>
+    <td>Where it runs</td>
+    <td>WebGPU compute shader, in the interactive render pipeline</td>
+    <td>Plain JavaScript in a dedicated worker</td>
+  </tr>
+  <tr>
+    <td>Used for</td>
+    <td>The canvas — the committed chain, slider drags, hover previews. <em>Authoritative.</em></td>
+    <td>Static 200&times;200 filmstrip previews — the &ldquo;poster,&rdquo; presentation-only</td>
+  </tr>
+  <tr>
+    <td>Colorspace</td>
+    <td>sRGB by pass contract: decodes/re-encodes at the chain boundaries, skips both when the chain is LUT-only</td>
+    <td>None — always runs the LUT-only configuration, so the boundary is a no-op by construction</td>
+  </tr>
+  <tr>
+    <td>Interpolation</td>
+    <td>Manual trilinear via <code>textureLoad</code> (32-bit float textures aren't filterable)</td>
+    <td>The same manual trilinear, same texel-space math</td>
+  </tr>
+  <tr>
+    <td>Cube data</td>
+    <td>rgba32float 3D texture, uploaded once per lutId, cached device-wide</td>
+    <td>The parsed <code>Float32Array</code>, indexed in file order</td>
+  </tr>
+  <tr>
+    <td>Resolution</td>
+    <td>Full image, one invocation per pixel</td>
+    <td>200&times;200 preview, ~1.7ms per LUT</td>
+  </tr>
+  <tr>
+    <td>Strength</td>
+    <td>Uniform <code>amount</code>, mixed in sRGB space</td>
+    <td>Fixed at full strength — a preview shows the look, not a partial mix</td>
+  </tr>
+</table>
+
+<p>The division of authority is deliberate. The GPU path is the truth: it renders what you see, and the hover preview in the filmstrip grades the actual chain live. The CPU sampler exists to make browsing cheap and never pretends to be more — if the two ever disagreed, the canvas wins. In practice they cannot: same data, same math, same order, and the cross-checks in &sect;5.</p>
+
+<h2>7 · What a film LUT does to an image</h2>
+
+<p>Here is what three real cubes from the library do to three probe colors — pure red, mid-gray, and pure blue. Each cell shows the three output numbers (red, green, blue) the cube produces for that input, read straight from the grid (integer coordinates, so these are exact table values, not interpolations):</p>
+
+<table>
+  <tr><th>LUT</th><th>Input red (1,0,0)</th><th>Input mid-gray (0.5)</th><th>Input blue (0,0,1)</th></tr>
+  <tr>
+    <td>Kodak 2393 (Print)</td>
+    <td>(0.621, 0.130, 0.021) &mdash; reds pushed to amber</td>
+    <td>(0.552, 0.550, 0.554) &mdash; near-neutral, warm side</td>
+    <td>(0.000, 0.275, 0.529) &mdash; blues lean teal-green</td>
+  </tr>
+  <tr>
+    <td>Fuji Astia (Colorslide)</td>
+    <td>(0.946, 0.086, 0.122) &mdash; saturated red, slightly orange</td>
+    <td>(0.504, 0.489, 0.484) &mdash; neutral, slightly cool</td>
+    <td>(0.066, 0.006, 0.439) &mdash; deep, desaturated blue</td>
+  </tr>
+  <tr>
+    <td>Kodak Tri-X (Bw)</td>
+    <td>gray 0.467</td>
+    <td>gray 0.580</td>
+    <td>gray 0.783 &mdash; blue skies render light</td>
+  </tr>
+</table>
+
+<p>Read across the rows, the table <em>is</em> the look. Print emulation rolls reds toward amber and shadows toward teal — the warm-orange/teal balance you recognize from cinema. Slide film keeps reds saturated and pulls blue deep and cool. Black-and-white collapses every channel to a gray chosen by the stock's <em>spectral sensitivity</em> — how strongly the film responds to each wavelength of light — not by the standard HD-video formula for brightness (Rec. 709 luma). Note that Tri-X is <em>panchromatic</em> (sensitive to all colors, unlike early films that were blind to red) yet still renders pure blue <em>lighter</em> than pure red: the gray a color becomes is a property of the emulsion, baked into the table. The same transform applies to every pixel uniformly — LUTs have no spatial structure (no vignette falloff, no grain field) — so the whole image is regraded by the same function, and the perceptual result on a photo is the sum of these per-color behaviors: skin tones shift one way, skies another, shadows a third. That is why the filmstrip previews exist: a photo's worth of colors shows the look in one glance where a probe table never could.</p>
+
+<h2>8 · The filmstrip previews</h2>
+
+<p>The bar's thumbnails used to be one generic stock photo graded with each LUT — the same preview for every user, for every photo. The bar's whole job is &ldquo;see it on <em>your</em> photo&rdquo; (docs/adr/0012), so the previews are now generated per photo, per LUT (&sect;5, docs/adr/0013):</p>
+
+<div class="flow">
+  <div class="box"><span class="t">Bar opens / tab selected</span><span class="s">the visible group's missing thumbs are dispatched, one command per LUT</span></div>
+  <div class="arrow">&rarr;</div>
+  <div class="box"><span class="t">Downscale</span><span class="s">main thread: 200&times;200 center crop of the photo</span></div>
+  <div class="arrow">&rarr;</div>
+  <div class="box loop"><span class="t">Thumb worker</span><span class="s"><code>applyLutCpu</code> + JPEG q85, one request per LUT</span></div>
+  <div class="arrow">&rarr;</div>
+  <div class="box"><span class="t">Blob URL</span><span class="s">stored in <code>model.lutThumbs[lutId]</code></span></div>
+  <div class="arrow">&rarr;</div>
+  <div class="box"><span class="t">Swap</span><span class="s">the thumb's <code>img src</code> replaces the generic jpg</span></div>
+</div>
+
+<p>Generation is <em>lazy per group</em> — on tab select or bar-open, only the visible category's missing thumbs — so unvisited categories cost zero bandwidth: all 296 cubes would be 38MB of fetches at import; a single category is 4&ndash;8MB. The Recents tab reuses whatever its entries' categories have already produced. While a thumb renders (or if its cube fetch fails), the thumb keeps the vendored generic jpg — the placeholder and the failure fallback are the same thing, so the model only ever records <em>ready</em> previews and no status enum exists. A failure is retried on the group's next visit, never automatically.</p>
+
+<p>Two correctness details are worth naming. <em>Staleness:</em> each result message carries the photo it was rendered for; if the user switched images while the worker was busy, the result is revoked and dropped, so a preview can never show the wrong photo's grade. <em>Dedupe:</em> the worker layer tracks in-flight (lutId, photo) pairs, so a mid-batch tab switch-away-and-back does not render the same thumb twice. And when a new image loads, the old previews' <em>blob URLs</em> — temporary in-browser web addresses pointing at data that lives only in memory — are revoked explicitly, the same hygiene the export dialog applies to its blobs.</p>
+
+<h2>9 · Reference tables</h2>
+
+<table>
+  <tr><th>Constant</th><th>Value</th><th>Notes</th></tr>
+  <tr><td>Cube grid</td><td>13&sup3; = 2,197 points</td><td>13 samples per channel axis</td></tr>
+  <tr><td>Point order</td><td><code>(b&middot;size + g)&middot;size + r</code></td><td>red fastest — the G'MIC file order, not the textbook one (&sect;2)</td></tr>
+  <tr><td>Domain</td><td>0 &hellip; 1</td><td>matches normalized sRGB; no scaling anywhere</td></tr>
+  <tr><td>File size / library</td><td>~131KB each / 38MB total</td><td>high-precision floats, 17&ndash;18 significant digits</td></tr>
+  <tr><td>Texture</td><td>rgba32float 3D</td><td>byte-exact upload; unfilterable, hence manual trilinear (&sect;3)</td></tr>
+  <tr><td>Texel scale</td><td><code>c &middot; (SIZE&minus;1)</code></td><td>0.5 lands exactly on the middle grid point</td></tr>
+  <tr><td>Strength</td><td><code>amount</code> &isin; [0, 1], default 1</td><td>mixed in sRGB space; 0 = identity</td></tr>
+  <tr><td>Preview size</td><td>200&times;200 JPEG, quality 85</td><td>bar thumbs are 96px CSS; 200px stays sharp on 2&times; displays</td></tr>
+  <tr><td>CPU cost</td><td>~1.7ms per 200&times;200 LUT</td><td>a 68-cube category &asymp; 0.1s in the worker</td></tr>
+  <tr><td>Library</td><td>296 cubes, 9 categories</td><td>vendored from G'MIC film presets (docs/adr/0004)</td></tr>
+</table>
+
+<footer class="fineprint">
+  <p class="sans">Lutra &mdash; a color-grading app for film simulation. The LUT layer's design decisions: docs/adr/0003 (sRGB application), docs/adr/0004 (vendored library), docs/adr/0012 (the bar), docs/adr/0013 (per-photo previews). The surrounding render pipeline is documented in <code>docs/architecture.html</code>.</p>
+</footer>
+
+</article>
+</body>
+</html>
