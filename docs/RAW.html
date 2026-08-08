@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lutra's RAW pipeline — from sensor numbers to screen, explained</title>
+<style>
+  /* A compact, self-contained Tufte-style stylesheet.
+     Fonts: et-book is the Tufte face; we fall back to Palatino/Georgia
+     (the exact stack tufte-css uses when et-book is unavailable). */
+  html { font-size: 15px; }
+  body {
+    font-family: Palatino, "Palatino Linotype", "Book Antiqua", "Liberation Serif", Georgia, serif;
+    background-color: #fffff8;
+    color: #111;
+    max-width: 87.5rem;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    line-height: 1.5;
+  }
+  article { position: relative; max-width: 55rem; padding: 0 0 6rem 0; }
+  p, li { font-size: 1.05rem; line-height: 1.6; }
+  p { margin: 1.2rem 0 0 0; }
+  ul, ol { margin: 1rem 0 0 0; padding-left: 1.6rem; }
+  li { margin-top: 0.3rem; }
+  h1 { font-weight: 400; font-size: 2.3rem; line-height: 1.15; margin: 3.5rem 0 0.5rem 0; }
+  h2 { font-weight: 400; font-size: 1.45rem; margin: 3rem 0 0.2rem 0; letter-spacing: 0.01em; }
+  h3 { font-weight: 400; font-style: italic; font-size: 1.2rem; margin: 1.8rem 0 0.2rem 0; }
+  .subtitle { font-style: italic; font-size: 1.25rem; color: #555; margin-top: 0.2rem; }
+  .sans { font-family: "Gill Sans", "Gill Sans MT", "Trebuchet MS", sans-serif; }
+  a { color: #111; text-decoration: underline; }
+  a:hover { color: #7a2e1e; }
+  code {
+    font-family: "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 0.82em;
+    background: #f4f2e8;
+    padding: 0.08em 0.25em;
+    border-radius: 2px;
+  }
+  pre {
+    font-family: "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    background: #f4f2e8;
+    border: 1px solid #e3e0d2;
+    border-left: 3px solid #d0cdbd;
+    padding: 0.9rem 1.1rem;
+    margin: 1.1rem 0 0 0;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  pre code { background: none; padding: 0; font-size: 1em; }
+  blockquote {
+    border-left: 3px solid #d0cdbd;
+    padding-left: 1.2rem;
+    font-style: italic;
+    color: #444;
+    margin: 1.4rem 0 0 0;
+  }
+  blockquote footer { font-style: normal; font-size: 0.85rem; color: #666; }
+  .epigraph { border-left: none; padding-left: 0; margin: 4rem 0 0 0; font-size: 1.3rem; color: #333; }
+  .epigraph footer { margin-top: 0.3rem; }
+  .newthought { font-variant: small-caps; letter-spacing: 0.04em; }
+  figure { margin: 1.8rem 0 0 0; text-align: center; }
+  figure img, figure svg { max-width: 100%; }
+  figcaption {
+    font-size: 0.85rem;
+    font-style: italic;
+    color: #555;
+    margin-top: 0.4rem;
+  }
+  table { border-collapse: collapse; width: 100%; margin: 1.2rem 0 0 0; font-size: 0.95rem; }
+  th { border-bottom: 2px solid #111; text-align: left; padding: 0.4rem 0.8rem 0.3rem 0; font-weight: 400; font-variant: small-caps; letter-spacing: 0.03em; }
+  td { border-bottom: 1px solid #ddd; padding: 0.45rem 0.8rem 0.45rem 0; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 3rem 0; }
+  .marginnote, .sidenote {
+    font-size: 0.78rem;
+    line-height: 1.4;
+    color: #333;
+  }
+  /* sidenote mechanics (Tufte's checkbox hack) */
+  .sidenote-number { counter-increment: sidenote-counter; cursor: pointer; }
+  .sidenote-number::after {
+    content: counter(sidenote-counter);
+    vertical-align: super;
+    font-size: 0.65em;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .sidenote::before { content: counter(sidenote-counter) "  "; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .margin-toggle { display: none; }
+  @media (min-width: 1200px) {
+    .sidenote {
+      position: absolute;
+      right: -24rem;
+      width: 20rem;
+      margin-top: 0.2rem;
+    }
+    .marginnote { position: absolute; right: -24rem; width: 20rem; margin-top: 0.2rem; }
+    .sidenote-number::after { content: ""; }
+    .sidenote::before { content: ""; }
+  }
+  @media (max-width: 1199px) {
+    .sidenote { display: none; }
+    .margin-toggle:checked + .sidenote {
+      display: block;
+      float: left;
+      clear: both;
+      width: 95%;
+      margin: 1rem 0;
+      padding: 0.8rem 1rem;
+      background: #f4f2e8;
+      border-left: 3px solid #d0cdbd;
+    }
+  }
+  /* small pipeline diagram */
+  .flow { display: flex; align-items: stretch; flex-wrap: wrap; gap: 0.4rem; margin: 1.4rem 0 0 0; }
+  .flow .box {
+    border: 1px solid #111;
+    padding: 0.5rem 0.8rem;
+    text-align: center;
+    font-size: 0.85rem;
+    background: #fbfaf2;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .flow .box .t { font-weight: 600; }
+  .flow .box .s { font-size: 0.72rem; color: #555; }
+  .flow .arrow { align-self: center; font-size: 1.2rem; color: #555; }
+  .flow .loop { border-style: dashed; }
+  .callout {
+    border-left: 3px solid #a34a2f;
+    background: #fbf4ee;
+    padding: 0.7rem 1rem;
+    margin: 1.2rem 0 0 0;
+    font-size: 0.95rem;
+  }
+  .callout .h { font-variant: small-caps; letter-spacing: 0.04em; font-weight: 600; }
+  .tag {
+    display: inline-block;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.7rem;
+    border: 1px solid #999;
+    border-radius: 3px;
+    padding: 0.05em 0.45em;
+    margin-left: 0.4em;
+    vertical-align: middle;
+  }
+  .tag.good { border-color: #3f7d3f; color: #2c5e2c; }
+  .tag.warn { border-color: #a34a2f; color: #8a3a22; }
+  .tag.note { border-color: #6a6a8a; color: #4b4b6a; }
+  footer.fineprint {
+    margin-top: 4rem;
+    padding-top: 1rem;
+    border-top: 1px solid #ddd;
+    font-size: 0.85rem;
+    color: #666;
+  }
+</style>
+</head>
+<body>
+<article>
+
+<header>
+  <h1>Lutra's RAW pipeline</h1>
+  <p class="subtitle">From sensor numbers to screen, explained from the ground up — what a RAW file is, why cameras make them, how a mosaic of single-color readings becomes a photograph, and how Lutra decodes one entirely in your browser</p>
+</header>
+
+<blockquote class="epigraph">
+  <p>&ldquo;Clutter and confusion are failures of design, not attributes of information.&rdquo;</p>
+  <footer>— Edward Tufte, <em>Envisioning Information</em></footer>
+</blockquote>
+
+<p><span class="newthought">A camera RAW file is not a picture.</span> It is a <em>measurement</em> — millions of single numbers, one per light sensor on the camera's chip, plus a sheet of notes about how those numbers should be interpreted. Turning it into the photograph you see requires a pipeline of computations — some straightforward arithmetic, some educated guessing — and every program that does this (Lightroom, your phone, Lutra) makes choices along the way. This document explains what those numbers are, what the pipeline does to them, and exactly which choices Lutra makes and why. It assumes you know what a pixel is and nothing else; the terms the rest of the document leans on are defined up front in &sect;0.</p>
+
+<h2>0 · One number per pixel</h2>
+
+<p>A digital camera's image sensor is a grid of millions of tiny light meters called <em>photosites</em>. Each photosite records exactly one thing: <em>how much light fell on it</em>. Not what color. Not where the light came from. Just an intensity — and it records it as a plain number, proportional to the light (twice the photons, twice the number), typically with 12&ndash;14 bits of precision (4,096&ndash;16,384 possible levels per site, versus the 256 per channel a JPEG stores).</p>
+
+<p>Color is added later, and not by the sensor: the photosites are covered by a grid of tiny colored filters — the <em>color filter array</em>, or mosaic — so that each photosite sees light through exactly one red, green, or blue filter. The classic pattern is <strong>Bayer</strong>: 2&times;2 blocks with two greens, one red, one blue, named for Bryce Bayer who invented it at Kodak. The extra green is a nod to your eyes, which are most sensitive to green light; sampling it at double density gets the most detail out of the scene.</p>
+
+<table>
+  <tr><th>Term</th><th>Meaning</th></tr>
+  <tr><td>Photosite</td><td>one light meter on the sensor; records one number: light intensity</td></tr>
+  <tr><td>Mosaic / CFA</td><td>the grid of red/green/blue filters over the photosites; color filter array</td></tr>
+  <tr><td>Bayer</td><td>the classic mosaic: 2&times;2 blocks of red-green-green-blue</td></tr>
+  <tr><td>X-Trans</td><td>Fuji's alternative mosaic: a larger repeating pattern with more green, less moir&eacute;</td></tr>
+  <tr><td>Demosaic</td><td>reconstructing a full red+green+blue color for every pixel from one-color-per-site readings (&sect;2)</td></tr>
+  <tr><td>White balance</td><td>per-channel scaling so a neutral gray subject records as neutral gray under any light (&sect;4)</td></tr>
+  <tr><td>Black level</td><td>the number a photosite outputs for &ldquo;no light&rdquo; — not zero; subtracted before scaling (&sect;3)</td></tr>
+  <tr><td>Color matrix</td><td>the 3&times;3 conversion from the camera's color response to a standard color space (&sect;5)</td></tr>
+  <tr><td>Embedded JPEG preview</td><td>the small camera-rendered JPEG stored inside the RAW file (&sect;6)</td></tr>
+  <tr><td>RAW decode</td><td>the whole conversion: unpack &rarr; black/white levels &rarr; white balance &rarr; demosaic &rarr; color matrix &rarr; tone encode (&sect;3)</td></tr>
+  <tr><td>As-shot white balance</td><td>the white balance multipliers the camera recorded at the moment of shooting (&sect;4)</td></tr>
+  <tr><td>Linear light</td><td>numbers proportional to actual light; what photosites record and what the pipeline computes in</td></tr>
+  <tr><td>sRGB</td><td>the standard brightness encoding of image files and screens (architecture.html &sect;4)</td></tr>
+</table>
+
+<p>Because each photosite sees only one color, a RAW file's sensor data is a <em>mosaic</em>: 75% of the numbers are &ldquo;missing&rdquo; two color channels each. The file is also just <em>numbers plus notes</em> — the sensor readings, losslessly compressed, accompanied by a metadata section recording everything the decode needs: the mosaic pattern, the <em>black level</em> (what the sensor reports for darkness), the white-balance multipliers the camera chose, the camera's color calibration matrices, the orientation, and — usefully — a small JPEG the camera rendered as a preview.</p>
+
+<div class="callout">
+  <span class="h">The name is not an acronym.</span> &ldquo;RAW&rdquo; is the English word — the data is raw, unprocessed. It is not R.A.W., an acronym for anything. (Nobody seems to have told the marketers; the capitalization is permanent anyway.)
+</div>
+
+<h2>1 · Why the file is not a photo yet</h2>
+
+<p>When you shoot JPEG, the camera's firmware runs the exact pipeline this document describes <em>inside the camera</em>, in a few milliseconds, with the camera's own taste: a white balance it guessed, a contrast curve it likes, sharpening, noise reduction, and lossy compression. The result is a finished, viewable image — and everything else is gone. The mosaic, the extra precision, the choice of interpretation: deleted, permanently.</p>
+
+<p>RAW shooting keeps the measurement. The file is the negative: uninterpreted, unprocessed, and — because the sensor's numbers are linear and 12&ndash;14 bits deep — holding far more information than any 8-bit rendering of it. Expose for the highlights and the shadows still contain recoverable detail; pick a different white balance in post and the color is re-derived from data that was always there, rather than re-painted over a baked guess. Every serious photo workflow converges on the same shape: <em>keep the negative, interpret it later.</em></p>
+
+<p>This is also why decoding is a program, not a file conversion. A RAW file has no &ldquo;picture&rdquo; inside it (the embedded JPEG aside — see &sect;6); it has measurements and notes. The program's job is to interpret the notes and turn the measurements into pixels — and the interpretation is where the choices live.</p>
+
+<h2>2 · The mosaic becomes a picture: demosaicing</h2>
+
+<p>Every pixel of the final image needs a red, a green, and a blue value. The sensor only measured one of the three at each site. So the missing two must be <em>reconstructed from neighboring sites</em> — a step called <strong>demosaicing</strong> (or de-Bayering), and it is the one genuinely opinionated step in the pipeline. A trivial demosaicer looks at a red-filtered site, takes its red measurement, and copies the green and blue values from the nearest neighbors. That works but produces soft, jagged, color-speckled results at fine detail. A good demosaicer first looks at the <em>structure</em> of the neighborhood — where the edges are, which way they run — and only then interpolates <em>along</em> the edges rather than across them, which keeps edges crisp and kills most false color.</p>
+
+<p>The algorithm Lutra uses, <strong>AHD</strong> (adaptive homogeneity-directed demosaicing), is exactly that kind of edge-aware reconstruction: it produces two candidate guesses for each pixel (one from horizontal structure, one from vertical), and picks the better one by comparing which guess makes a smoother neighborhood. It comes from the dcraw lineage and is the standard mid-tier choice: dramatically better than naive interpolation, a bit slower, and — relevantly for &sect;7 — the best algorithm this build is <em>allowed</em> to ship.</p>
+
+<p>Two facts keep demosaicing from being as lossy as it sounds. First, real scenes are smooth at the pixel scale; neighboring photosites almost always recorded nearly the same light, so the guess is usually excellent. Second, the mosaic samples green at double density precisely because green carries most of the perceived detail — the colors being reconstructed from neighbors (red and blue) are the ones your eyes resolve coarsest anyway. The artifacts that remain — <em>zippering</em> on high-contrast diagonal edges, faint false color in fine repeating patterns like fabric — are the same artifacts every RAW developer lives with, and they are the reason demosaic quality is a thing at all.</p>
+
+<h2>3 · The decode pipeline, in seven steps</h2>
+
+<p>Here is the whole journey from file bytes to displayable image, in one picture — and, in miniature, what the camera's firmware does when you shoot JPEG:</p>
+
+<div class="flow">
+  <div class="box"><span class="t">1 · Unpack</span><span class="s">decompress the sensor data</span></div>
+  <div class="arrow">&rarr;</div>
+  <div class="box"><span class="t">2 · Black / white levels</span><span class="s">subtract black, scale to white</span></div>
+  <div class="arrow">&rarr;</div>
+  <div class="box"><span class="t">3 · White balance</span><span class="s">per-channel gains, as-shot</span></div>
+  <div class="arrow">&rarr;</div>
+  <div class="box"><span class="t">4 · Demosaic</span><span class="s">mosaic &rarr; full RGB (&sect;2)</span></div>
+  <div class="arrow">&rarr;</div>
+  <div class="box"><span class="t">5 · Color matrix</span><span class="s">camera space &rarr; standard space</span></div>
+  <div class="arrow">&rarr;</div>
+  <div class="box"><span class="t">6 · Defects &amp; orientation</span><span class="s">dead pixels, EXIF flip</span></div>
+  <div class="arrow">&rarr;</div>
+  <div class="box"><span class="t">7 · Tone encode</span><span class="s">linear &rarr; sRGB curve</span></div>
+</div>
+
+<p>In order of appearance:</p>
+
+<ol>
+  <li><strong>Unpack.</strong> Sensor data is compressed per-camera-format (losslessly, like a zip file for measurements — though Canon's C-RAW and Nikon's HE/HE* are lossy shortcuts, &sect;8). Unpacking is the mechanical step: get the numbers back out.</li>
+  <li><strong>Black / white levels.</strong> A photosite with no light does not report zero — electronics leak, so each channel has a <em>black level</em> (a stored offset, e.g. 64). The decode subtracts it, then scales the whole range so the sensor's <em>white level</em> maps to 1.0. Skip this and blacks come out tinted or lifted, and every channel is miscalibrated. The levels come from the file's metadata — never guessed.<label for="sn-black" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-black" class="margin-toggle"/><span class="sidenote">The black level is per-channel, which is why skipping this step shows up as a color cast in the shadows specifically — each channel's offset is different. It is the classic first thing to go wrong in a hand-rolled RAW decoder.</span></li>
+  <li><strong>White balance.</strong> Light has a color. Tungsten light is orange; a gray card under it records orange-gray until each channel is scaled to cancel the tint. The camera measures (or guesses) the right scaling at the moment of shooting and records it in the file as multipliers — the <em>as-shot</em> white balance. The decode applies those multipliers, so a white wall comes out white. (&sect;4 is devoted to this step, because it is the one with a real design decision in it.)</li>
+  <li><strong>Demosaic.</strong> The mosaic becomes full color (&sect;2). This is the step that actually invents information, and the only one where the algorithm choice is visible in the output.</li>
+  <li><strong>Color matrix.</strong> The sensor's red, green, and blue filters are not the same colors as your screen's red, green, and blue primaries — every camera's spectral response is its own. The decode converts camera color space to a standard one with a 3&times;3 matrix recorded in the file's calibration data (&sect;5).</li>
+  <li><strong>Defects &amp; orientation.</strong> Dead and hot pixels (photosites that always read dark or always read bright) are detected and repaired from their neighbors, automatically. The EXIF orientation is applied — some cameras store the image sideways and a flag says which way is up.</li>
+  <li><strong>Tone encode.</strong> The pipeline so far has been working in <em>linear light</em> — numbers proportional to photons. Screens and image files don't store that; they store <em>sRGB</em>, a curve that packs the brightness range our eyes actually care about into 8 bits (the same curve architecture.html &sect;4 discusses at length). The final step applies that curve, producing the sRGB-encoded image the rest of the app treats as a normal photo.</li>
+</ol>
+
+<p>Steps 3&ndash;7 have a musical-chairs quality: the camera firmware performs them too, at the moment of shooting, with its own taste, and then throws away the measurements. A RAW decoder performs them later, with <em>your</em> taste, on the measurements that were kept.</p>
+
+<h2>4 · White balance, and the &ldquo;as-shot&rdquo; decision</h2>
+
+<p>White balance is the step with a real design decision in it, so it deserves its own section. The physics: light has a color temperature. A gray card under warm tungsten light <em>reflects</em> warm light — it records as orange. To make it record as gray, the red channel must be scaled down and the blue up, by amounts the camera works out from its metering. Those multipliers are written into the RAW file: the <em>as-shot</em> white balance.</p>
+
+<p>The alternative is a <em>neutral</em> decode: apply no white balance at all, or estimate one (gray-world), and let the user's white-balance controls own the color entirely. Both are defensible — the decode is a moment of interpretation, after all. Lutra applies <strong>as-shot</strong>, and the reason is the White Balance adjustment layer's range. That layer scales the red and blue channels by at most &plusmn;30% at the slider extremes. As a <em>trim</em> on top of as-shot — the slider's zero meaning &ldquo;the camera's recorded white balance&rdquo; — &plusmn;30% is plenty. As a <em>correction</em> on top of a neutral decode it would be hopeless: under tungsten, the correct blue gain can be 2.5&times; — far beyond any slider. A neutral decode plus a bounded slider cannot even reach correct white balance; an as-shot decode plus the same slider lands the user exactly where the camera preview did, and lets them trim from there.</p>
+
+<div class="callout">
+  <span class="h">The consequence is a promise.</span> The White Balance layer's slider means &ldquo;relative to the camera's recorded white balance,&rdquo; not &ldquo;absolute color temperature.&rdquo; That is why an untouched RAW looks right the moment it decodes — the image matches what the camera previewed — and why the slider's zero point is meaningful rather than arbitrary. A Kelvin-based temperature model would change this contract; the current one is deliberate (docs/adr/0014).
+</div>
+
+<h2>5 · From camera color to screen color</h2>
+
+<p>Step 5 deserves one section of its own because its failure mode is the most confusing. Camera sensors do not see color the way screens display it: the filter dyes are different, the sensitivities overlap differently. The same red apple records as one triplet of numbers on a Canon sensor and a different triplet on a Sony sensor. To make every camera's files come out as the same colors, each camera's calibration records a 3&times;3 <em>color matrix</em> — usually two of them, for two reference light sources, interpolated by the light the file was shot under — and the decode multiplies every pixel by it.</p>
+
+<p>If the matrix is skipped, the image is not wildly wrong; it is <em>plausibly, insultingly wrong</em> — colors that are recognizable but desaturated and shifted, skin tones that look muddy, the classic &ldquo;washed-out RAW&rdquo; complaint. The fix is not a filter; it is the matrix that was in the file all along. Lutra applies it always (<code>useCameraMatrix: 3</code>, which means &ldquo;always,&rdquo; not &ldquo;only when a white balance is applied&rdquo;). There is no creative upside to skipping it — the artistic control lives in the layers, not in decode-level omission.</p>
+
+<h2>6 · What Lutra does when you open a RAW file</h2>
+
+<p>Everything above is the general science. Here is the specific machinery. When you pick a RAW file, Lutra routes it by <em>sniffing</em> the file's magic bytes and extension — a RAW file is, structurally, a TIFF-family container, so the sniff is cheap and reliable. The flow:</p>
+
+<div class="flow">
+  <div class="box"><span class="t">Pick / drop</span><span class="s">sniff: RAW magic + extension?</span></div>
+  <div class="arrow">&rarr;</div>
+  <div class="box"><span class="t">Preview first</span><span class="s">embedded JPEG shown instantly — gallery tile &amp; loading placeholder</span></div>
+  <div class="arrow">&rarr;</div>
+  <div class="box loop"><span class="t">Decode worker</span><span class="s">LibRaw in wasm, stage-based progress (&sect;7)</span></div>
+  <div class="arrow">&rarr;</div>
+  <div class="box"><span class="t">RGBA16 texture</span><span class="s">16-bit sRGB pixels, uploaded to the GPU</span></div>
+  <div class="arrow">&rarr;</div>
+  <div class="box"><span class="t">Engine</span><span class="s">the ordinary chain pipeline — unchanged (&sect;6.2)</span></div>
+</div>
+
+<p>Three things make this flow worth explaining:</p>
+
+<p><strong>The embedded JPEG preview is the instant half.</strong> Every RAW file contains a JPEG the camera rendered at the moment of shooting (&sect;1). Extracting it is nearly free (tens of milliseconds), so it fills the gallery tile and the editor's loading placeholder immediately — the editor never stares at a blank screen while decoding. The full decode replaces it in under a couple of seconds on a desktop. The embedded JPEG is <em>not</em> the same image as the decode: it carries the camera's tone curve and processing, so it is strictly a placeholder, never a substitute (&sect;6.3 shows the one place that distinction bites).</p>
+
+<p><strong>The decode runs in a worker.</strong> A 24-megapixel RAW takes on the order of a second to decode on desktop hardware — long enough that doing it on the UI thread would freeze the whole app. It runs in a Web Worker instead, with the decode split into coarse stages (unpack, white balance, demosaic, color conversion) and each stage reported back as progress. The main thread stays responsive; the progress bar is honest, and the embedded JPEG fills the wait.</p>
+
+<p><strong>The output is a 16-bit sRGB image.</strong> Here is the decision that makes the whole pipeline drop into place: the decode runs steps 2&ndash;7 of &sect;3 — including the tone encode — and emits <em>sRGB-encoded, 16-bit</em> pixels. That is the same encoding a JPEG file stores, just with more precision per channel (the engine's existing pass-0 <code>srgbToLinear</code> inverts the curve exactly — architecture.html &sect;4). The GPU upload pads the three color channels to four (WebGPU has no RGB16 format) and writes an <code>rgba16unorm</code> texture. The engine never knows the difference between this and a JPEG: same colorspace contract, same pipeline, just 16 bits of precision instead of 8. There is no linear-decoding path, no engine flag, no second chain — the complexity lives entirely in the decoder, where it belongs.</p>
+
+<div class="callout">
+  <span class="h">Why not decode to linear light directly?</span> The mathematically &ldquo;purer&rdquo; design feeds the engine linear values and flags the source as linear. It changes four engine sites (pass 0, LUT-at-position-0, the empty-chain passthrough, the compare blit) for a result that is visually identical in an sRGB-authored, 8-bit-export app — the sRGB curve is invertible, and 16-bit quantization is invisible in both directions. The linear working space remains a documented future step (it would matter for tone-mapped highlight rolloff), but v1 deliberately chooses zero engine risk (docs/adr/0014).</div>
+
+<h3>6.1 · The previews: tiles, placeholders, and the LUT bar</h3>
+
+<p>The one place the embedded JPEG's camera-rendering shows through is the <strong>LUT bar</strong> — the filmstrip of &ldquo;your photo under every LUT.&rdquo; Its thumbnails are generated from a small preview of the user's photo (LUT.html &sect;5, docs/adr/0013), and for RAW files that preview must come from the <em>decode</em>, not the embedded JPEG: the embedded JPEG carries the camera's tone curve (typically brighter), while the decode is deliberately un-brightened (<code>noAutoBright</code> — the camera's recorded levels, used as-is, so the Exposure layer owns brightness). A LUT thumb based on the embedded JPEG would show the film look on a visibly brighter image than the editor actually renders — the bar's whole promise is &ldquo;see it on your photo, as it will look.&rdquo; So the decode worker derives a small (~1024&times;1024) sRGB preview from the full decode itself, and the filmstrip consumes that. Gallery tiles and the loading placeholder, which are placeholders by nature, use the embedded JPEG directly.</p>
+
+<h3>6.2 · The engine contract, in one sentence</h3>
+
+<p>A RAW file decodes to the same thing a JPEG file is — an sRGB-encoded image — at higher precision. Everything downstream, from the chain assembler to compare mode (which binds the decoded source texture) to export, treats it as an ordinary source image. That is the entire integration story, and it is why this document fits in the series: the RAW pipeline is a <em>source</em> pipeline; the grading pipeline is documented in architecture.html.</p>
+
+<h3>6.3 · Memory, and the file's second life</h3>
+
+<p>A 24-megapixel decode occupies roughly 192&nbsp;MB as RGBA16 pixels in the worker's memory before upload, and the worker's wasm heap grows from 256&nbsp;MB to accommodate it — comfortably within the browser's ~2&nbsp;GB wasm ceiling up to very large sensors (~100&nbsp;MP is the practical cap). Closing the image disposes the worker and releases the heap. The original file bytes also live on, untouched, as the Edit's <code>source</code> — an Edit row is now commonly 25&ndash;100&nbsp;MB, which IndexedDB handles fine (a storage-persistence request at first save guards against eviction; per-edit size has always been part of the Edit summary, context.md).</p>
+
+<h2>7 · The decoder: LibRaw in your browser</h2>
+
+<p>The decode itself is performed by <strong>LibRaw</strong>, the open-source C++ library at the heart of most RAW software — it understands the sensor formats and compression schemes of essentially every camera that makes RAW files, including Fuji's X-Trans mosaics and the newest bodies (as long as the library version is recent enough). Browsers cannot run C++ directly, so LibRaw is compiled to <em>WebAssembly</em> — a low-level binary format browsers execute at near-native speed — and bundled with the app (~1.4&nbsp;MB, built with SIMD and multithreading enabled). The wasm build, the thin C++ wrapper around it, and the TypeScript client are <strong>ours</strong>: a fork of the LibRaw-Wasm project, rebuilt from source by <code>bun run build:raw</code> (docs/adr/0014).</p>
+
+<p>Owning the build is a deliberate choice, and it buys three concrete things:</p>
+
+<ul>
+  <li><strong>Progress.</strong> The stock wrapper reports nothing during a decode; ours wires LibRaw's progress callback so the editor can show the stage-based bar of &sect;6.</li>
+  <li><strong>Version freedom.</strong> Cameras ship new formats on their own schedule (Canon C-RAW, Nikon HE*, new bodies). The build pins LibRaw 0.22.1 and can be bumped and rebuilt whenever — a rebuild, not a rewrite.</li>
+  <li><strong>Trust.</strong> The shipped wasm binary is built from pinned, inspectable sources rather than consumed from a third party.</li>
+</ul>
+
+<p>One boundary is worth naming plainly. LibRaw's best demosaic algorithms (AMaZE, DCB, and friends) are licensed GPL, and including them would drag the whole app's licensing posture along. The build therefore stops at <strong>AHD</strong> (&sect;2) — the best algorithm in the permissively-licensed core. AHD is a perfectly respectable quality tier; it is simply not the absolute ceiling, and the ceiling is a licensing decision, not a technical one.</p>
+
+<div class="callout">
+  <span class="h">The future watch item: Rust.</span> A Rust-based decode stack (rawler + a pure-Rust demosaic crate, or — more promising — darktable's RawSpeed library, whose official Rust port is in progress) would be licensing-clean end to end. It is not today's choice: coverage and proven demosaic quality favor LibRaw, and the seam (a settings schema plus a service contract) does not block switching later. When RawSpeed-Rust ships with darktable-grade quality, it becomes a serious candidate.
+</div>
+
+<h2>8 · The formats</h2>
+
+<p>&ldquo;RAW&rdquo; is a family, not a format. Every maker has its own container and its own compression; the decode library's job is to know them all. The ones Lutra accepts:</p>
+
+<table>
+  <tr><th>Extension</th><th>Maker</th><th>Notes</th></tr>
+  <tr><td><code>.dng</code></td><td>Adobe / phones</td><td>The open <em>Digital Negative</em> standard — the one RAW format that isn't proprietary. Most camera phones (iPhone ProRAW included) shoot it.</td></tr>
+  <tr><td><code>.cr2</code> / <code>.cr3</code></td><td>Canon</td><td>CR3 is the modern container; C-RAW (the &ldquo;c&rdquo; is for compressed) is lossy and needs a recent LibRaw.</td></tr>
+  <tr><td><code>.nef</code> / <code>.nrw</code></td><td>Nikon</td><td>HE/HE* variants are lossy and the newest formats in the family.</td></tr>
+  <tr><td><code>.arw</code></td><td>Sony</td><td>&nbsp;</td></tr>
+  <tr><td><code>.rw2</code></td><td>Panasonic / Leica</td><td>&nbsp;</td></tr>
+  <tr><td><code>.orf</code></td><td>OM System / Olympus</td><td>&nbsp;</td></tr>
+  <tr><td><code>.raf</code></td><td>Fuji</td><td>X-Trans mosaic (&sect;0) — the reason a GPU demosaic of our own was never viable: X-Trans needs its own algorithm.</td></tr>
+  <tr><td><code>.pef</code> / <code>.srw</code> / <code>.3fr</code> / <code>.iiq</code></td><td>Pentax / Samsung / Hasselblad / Phase One</td><td>&nbsp;</td></tr>
+</table>
+
+<p>Two special cases are worth understanding, because they invert the &ldquo;RAW = mosaic&rdquo; picture. A <strong>linear DNG</strong> is a DNG that stores <em>already-demosaiced</em> RGB — three values per pixel, no mosaic — but still linear (un-tonemapped) and still carrying the calibration metadata. iPhone ProRAW (12&nbsp;MP) is exactly this: the file is already a &ldquo;photo,&rdquo; missing only the color matrix and tone curve. Lutra gives linear DNGs no special treatment: if LibRaw decodes them (it does, for dcraw-style pipelines), they work; if a file fails, the failure is an honest, readable error. The 48&nbsp;MP ProRAW variant, by contrast, is a normal Bayer DNG.</p>
+
+<p>And the embedded JPEG preview (&sect;6) is technically a second file inside the first — which is why RAW files are &ldquo;two things at once&rdquo;: a measurement waiting for interpretation, and a finished picture the camera already made. Lutra shows you the second instantly, then does the first properly.</p>
+
+<h2>9 · Reference tables</h2>
+
+<p>The decode configuration, once (these are the actual settings the decoder is opened with — docs/adr/0014):</p>
+
+<pre><code>useCameraWb: true        // as-shot white balance (&sect;4) — the untouched image
+                         // matches what the camera previewed
+useCameraMatrix: 3       // always apply the camera color matrix (&sect;5)
+outputColor: 1           // sRGB primaries
+outputBps: 16            // 16 bits per channel
+gamm: [1/2.4, 12.92]     // the sRGB curve — inverted exactly by the engine's
+                         // pass-0 srgbToLinear (architecture.html &sect;4)
+userQual: 3              // AHD demosaic (&sect;2) — the ceiling of this build
+highlight: 2             // blend: blown highlights reconstruct from neighbors
+                         // instead of clipping to a tinted white
+noAutoBright: true       // no histogram brightening — the camera's recorded
+                         // levels, as-is; the Exposure layer owns brightness
+userFlip: -1             // apply the EXIF orientation
+halfSize: false          // full resolution, always</code></pre>
+
+<table>
+  <tr><th>Constant</th><th>Value</th><th>Notes</th></tr>
+  <tr><td>Sensor data</td><td>12&ndash;14 bits per photosite</td><td>vs. 8 bits per channel in the final sRGB image</td></tr>
+  <tr><td>Decode time (24 MP)</td><td>~0.6&ndash;1.4 s desktop</td><td>measured with LibRaw 0.22 in wasm; phones slower — progress bar + embedded JPEG cover it</td></tr>
+  <tr><td>Memory</td><td>~192 MB RGBA16 per 24 MP</td><td>worker heap grows from 256 MB; released on dispose; ~100 MP is the practical ceiling</td></tr>
+  <tr><td>Wasm</td><td>~1.4 MB</td><td>built from pinned sources via <code>bun run build:raw</code>; pre-warmed in a hidden worker at startup</td></tr>
+  <tr><td>Preview latency</td><td>&lt; 50 ms</td><td>embedded JPEG extraction — gallery tile &amp; loading placeholder</td></tr>
+  <tr><td>Edit row size</td><td>25&ndash;100 MB</td><td>the original file bytes, stored untouched; IndexedDB handles it, persist() requested at first save</td></tr>
+  <tr><td>Demosaic</td><td>AHD</td><td>edge-aware, from the dcraw lineage; the licensing ceiling (&sect;7)</td></tr>
+  <tr><td>License</td><td>LGPL-2.1 / CDDL LibRaw</td><td>wrapper ISC, LCMS MIT; no GPL components in the build</td></tr>
+</table>
+
+<footer class="fineprint">
+  <p class="sans">Lutra &mdash; a color-grading app for film simulation. The RAW pipeline's design decisions: docs/adr/0014; the full research trail: <code>docs/research/raw-support.md</code>. The surrounding render pipeline is documented in <code>docs/architecture.html</code>; the LUT layer and its filmstrip previews in <code>docs/LUT.html</code>. The vocabulary (&ldquo;RAW decode,&rdquo; &ldquo;embedded JPEG preview,&rdquo; &ldquo;as-shot white balance,&rdquo; &hellip;) lives in <code>context.md</code>.</p>
+</footer>
+
+</article>
+</body>
+</html>
