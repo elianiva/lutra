@@ -9,12 +9,14 @@ import { Model } from './root/model'
 import { init } from './root/init'
 import { update } from './root/update'
 import { view } from './root/view'
+import { subscriptions } from './root/subscriptions'
 import { parseRoute } from './route'
 import { GpuBackendLive } from './gpu/backend'
 import { CanvasRefLive } from './gpu/canvas-ref'
 import { LutStoreLive } from './luts/store'
 import { ImageEncoderWorkerLive } from './encode/worker-layer'
 import { LutThumbnailerLive } from './thumbs/worker-layer'
+import { OfflineFillLive } from './offline/fill'
 
 /**
  * The root application (docs/adr/0009): a root Submodel orchestrating the
@@ -32,23 +34,27 @@ export const application = Runtime.makeApplication({
   resources: Layer.merge(
     GpuBackendLive,
     Layer.merge(
-      LutStoreLive,
+      OfflineFillLive,
       Layer.merge(
-        CanvasRefLive,
+        LutStoreLive,
         Layer.merge(
-          ImageEncoderWorkerLive,
+          CanvasRefLive,
           Layer.merge(
-            LutThumbnailerLive,
+            ImageEncoderWorkerLive,
             Layer.merge(
-              BrowserKeyValueStore.layerLocalStorage,
-              // The local IndexedDB EditStore backend (docs/adr/0007, 0008).
-              EditStoreIndexedDb,
+              LutThumbnailerLive,
+              Layer.merge(
+                BrowserKeyValueStore.layerLocalStorage,
+                // The local IndexedDB EditStore backend (docs/adr/0007, 0008).
+                EditStoreIndexedDb,
+              ),
             ),
           ),
         ),
       ),
     ),
   ),
+  subscriptions,
   routing: {
     onUrlRequest: (request: UrlRequest) => Navigated({ request }),
     onUrlChange: (url: Url.Url) => ChangedRoute({ route: parseRoute(url) }),

@@ -130,6 +130,32 @@ export type Catalog = typeof Catalog.Type
 export const CatalogLoaded = Message.m('CatalogLoaded', { catalog: Catalog })
 export const CatalogFailed = Message.m('CatalogFailed', { error: LutLoadError })
 
+// ---- offline library (the LUT bar's per-row download states) ----
+// Root-owned facts delegated into the editor (docs/adr/0015): the root's
+// offline slice owns the fill machine and counters; these carry the per-LUT
+// states the LUT bar renders — a row's spinner while its cube is being
+// fetched, the dimmed "not downloaded" badge while offline, and the notice
+// when the user tries to apply a cube that isn't cached yet.
+
+// A cube file's fetch began — the bar row shows its spinner.
+export const OfflineFileFetching = Message.m('OfflineFileFetching', {
+  lutId: LutIdSchema,
+})
+// A cube file landed in the offline library — the row is downloadable.
+export const OfflineFileDownloaded = Message.m('OfflineFileDownloaded', {
+  lutId: LutIdSchema,
+})
+// The browser's online state flipped — the bar dims undownloaded rows while
+// offline. Absence of a row in the download map means "not downloaded".
+export const OfflineConnectivityChanged = Message.m('OfflineConnectivityChanged', {
+  online: S.Boolean,
+})
+// The user clicked a bar row that isn't downloaded while offline: the bar
+// shows the distinct "connect once" notice instead of committing.
+export const OfflineLutUnavailable = Message.m('OfflineLutUnavailable', {
+  lutId: LutIdSchema,
+})
+
 // ---- canvas interaction ----
 
 export const ScaledCanvas = Message.m('ScaledCanvas', {
@@ -373,6 +399,10 @@ export const EditorMessage = S.Union([
   EditLoadFailed,
   CatalogLoaded,
   CatalogFailed,
+  OfflineFileFetching,
+  OfflineFileDownloaded,
+  OfflineConnectivityChanged,
+  OfflineLutUnavailable,
   ScaledCanvas,
   SelectedTool,
   ConfirmedDraft,

@@ -2,7 +2,7 @@ import { Option, pipe } from 'effect'
 import type { HtmlBuilder } from 'foldkit/html'
 import type { LutId } from '@lutra/engine'
 import type { EditorMessage } from '../message'
-import { ChangedDraftLut, ChangedLayerLut } from '../message'
+import { ChangedDraftLut, ChangedLayerLut, OfflineLutUnavailable } from '../message'
 import { lutName } from '../layer-meta'
 import type { Model } from '../model'
 import { currentLutId, lutTarget } from './target'
@@ -10,6 +10,7 @@ import { effectiveTab, groupByCategory, lookup, recentsEntries, visibleEntries }
 import { tab } from './tab'
 import { thumb } from './thumb'
 import { LutStripWheel } from './wheel'
+import { stateFor } from '../../offline/model'
 
 /**
  * The bottom LUT bar (docs/adr/0012): category tabs on the left, a
@@ -44,36 +45,47 @@ export const lutBar = (h: HtmlBuilder<EditorMessage>, model: Model) =>
         Option.flatMap((lutId) => lookup(catalog, lutId)),
       )
 
-      // The name line: the hovered entry while hovering, else the target's
-      // current LUT — one live label, no tooltip latency (`title` stays as
-      // backup on the thumbs).
+      // The name line: the transient offline notice while one is showing
+      // (an undownloaded row was clicked offline), else the hovered entry
+      // while hovering, else the target's current LUT — one live label, no
+      // tooltip latency (`title` stays as backup on the thumbs).
       const currentEntry = pipe(
         current,
         Option.flatMap((lutId) => lookup(catalog, lutId)),
       )
-      const nameLine = pipe(
-        hovered,
-        Option.orElse(() => currentEntry),
-        Option.match({
-          onSome: ({ name, category }) => `${name} · ${category}`,
-          // A stale current lutId (gone from the catalog) falls back to the
-          // bare file name.
-          onNone: () =>
-            pipe(
-              current,
-              Option.map((lutId) => lutName(catalog, lutId)),
-              Option.getOrElse(() => ''),
-            ),
-        }),
-      )
+      const nameLine = model.offlineLutNotice ??
+        pipe(
+          hovered,
+          Option.orElse(() => currentEntry),
+          Option.match({
+            onSome: ({ name, category }) => `${name} · ${category}`,
+            // A stale current lutId (gone from the catalog) falls back to the
+            // bare file name.
+            onNone: () =>
+              pipe(
+                current,
+                Option.map((lutId) => lutName(catalog, lutId)),
+                Option.getOrElse(() => ''),
+              ),
+          }),
+        )
 
       // The bar is the only dispatcher of the commit messages (the drawer
       // accordion is gone): a draft target commits ChangedDraftLut, a chain
-      // target ChangedLayerLut.
-      const commit = (lutId: LutId): EditorMessage =>
-        target.kind === 'draft'
+      // target ChangedLayerLut. The offline library gate (docs/adr/0015):
+      // while the device is offline, a cube that isn't cached yet can't be
+      // applied — the click becomes the distinct connect-once notice instead
+      // of a silent fetch failure. (While online the click commits as
+      // usual — the app fetches the cube on demand and cache-as-you-go
+      // mirrors it.)
+      const commit = (lutId: LutId): EditorMessage => {
+        if (!model.online && stateFor(model.lutDownloads, lutId) !== 'downloaded') {
+          return OfflineLutUnavailable({ lutId })
+        }
+        return target.kind === 'draft'
           ? ChangedDraftLut({ lutId })
           : ChangedLayerLut({ id: target.id, lutId })
+      }
 
       return h.div(
         [h.Class('flex shrink-0 border-t border-border bg-panel')],
@@ -101,7 +113,14 @@ export const lutBar = (h: HtmlBuilder<EditorMessage>, model: Model) =>
           h.div(
             [h.Class('flex min-w-0 flex-1 flex-col gap-1.5 px-3 py-2')],
             [
-              h.div([h.Class('truncate text-xs text-muted')], [nameLine]),
+              h.div(
+                [
+                  h.Class(
+                    `truncate text-xs ${model.offlineLutNotice === null ? 'text-muted' : 'text-accent'}`,
+                  ),
+                ],
+                [nameLine],
+              ),
               h.div(
                 [
                   h.Class('flex flex-wrap'),
@@ -117,6 +136,8 @@ export const lutBar = (h: HtmlBuilder<EditorMessage>, model: Model) =>
                     // and the failure fallback.
                     model.lutThumbs[entry.lut_file] ?? `/luts/${entry.thumbnail}`,
                     Option.contains(current, entry.lut_file),
+                    stateFor(model.lutDownloads, entry.lut_file),
+                    model.online,
                     () => commit(entry.lut_file),
                   ),
                 ),

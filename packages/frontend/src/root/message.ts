@@ -3,6 +3,10 @@ import { Message } from 'foldkit'
 import { AppRoute } from '../route'
 import * as Gallery from '../gallery/message'
 import * as Editor from '../editor/message'
+import * as Offline from '../offline/messages'
+// The offline UI's own requests/acks, re-exported so root-owned views
+// (the strip's start button, the toast) can dispatch them directly.
+export { OfflineFillRequested, OfflineReadyDismissed } from '../offline/messages'
 
 // The root orchestrated Submodel Messages (docs/adr/0009): routing facts the
 // root owns (`ChangedRoute`, `Navigated`) plus the `Got*Message` wrappers that
@@ -30,5 +34,20 @@ export const RootMessage = S.Union([
   GotGalleryMessage,
   GotEditorMessage,
   NavigatedTo,
+  // The offline slice's universe (../offline/messages): the fill's bridged
+  // events, the connectivity facts, and the UI's requests/acks. The root
+  // owns the fill machine and forwards per-file facts into the editor.
+  Offline.OfflineFillStarted,
+  Offline.OfflineFileStarted,
+  Offline.OfflineFileCompleted,
+  Offline.OfflineFileFailed,
+  Offline.OfflineFillPaused,
+  Offline.OfflineFillResumed,
+  Offline.OfflineFillComplete,
+  Offline.OfflineQuotaError,
+  Offline.ConnectivityChanged,
+  Offline.OfflineFillRequested,
+  Offline.StoragePersisted,
+  Offline.OfflineReadyDismissed,
 ])
 export type RootMessage = typeof RootMessage.Type

@@ -231,6 +231,53 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       CatalogLoaded: ({ catalog }) => [{ ...model, phase, catalog }, [], Option.none()],
       CatalogFailed: () => [model, [], Option.none()],
 
+      // ---- offline library (the LUT bar's per-row states, docs/adr/0015) ----
+      // Root-delegated facts; the editor machine has no edges for them, so
+      // the phase passes through untouched. A cube file's fetch began: the
+      // bar row shows its spinner.
+      OfflineFileFetching: ({ lutId }) => [
+        {
+          ...model,
+          phase,
+          lutDownloads: { ...model.lutDownloads, [lutId]: 'fetching' },
+        },
+        [],
+        Option.none(),
+      ],
+      // A cube landed in the offline library: the row is downloadable — and
+      // any "not downloaded yet" notice is moot.
+      OfflineFileDownloaded: ({ lutId }) => [
+        {
+          ...model,
+          phase,
+          lutDownloads: { ...model.lutDownloads, [lutId]: 'downloaded' },
+          offlineLutNotice: null,
+        },
+        [],
+        Option.none(),
+      ],
+      // The browser's online state flipped (dimming flag for the bar).
+      OfflineConnectivityChanged: ({ online }) => [
+        { ...model, phase, online },
+        [],
+        Option.none(),
+      ],
+      // An undownloaded row was clicked while offline: the bar's name line
+      // shows the distinct connect-once notice (the commit is blocked — the
+      // click never reaches the chain).
+      OfflineLutUnavailable: ({ lutId }) => {
+        const name = model.catalog?.find((entry) => entry.lut_file === lutId)?.name ?? lutId
+        return [
+          {
+            ...model,
+            phase,
+            offlineLutNotice: `${name} isn't downloaded yet — connect once and the offline library finishes preparing.`,
+          },
+          [],
+          Option.none(),
+        ]
+      },
+
       // The machine's edge already dispatched DecodeImage (its args come from
       // the message); the branch only carries the new phase forward. A file
       // selection anywhere but Empty/Error/Loading is ignored.
@@ -489,13 +536,13 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         if (!model.source.bitmap) return [model, [], Option.none()]
         if (Option.isNone(lutTarget(model))) return [model, [], Option.none()]
         if (model.previewLut === lutId) return [model, [], Option.none()]
-        return renderNow({ ...model, phase, previewLut: lutId })
+        return renderNow({ ...model, phase, previewLut: lutId, offlineLutNotice: null })
       },
       // Tab click: presentation-only (no render), but the newly visible
       // group's per-photo thumbs start generating (docs/adr/0013) — a
       // revisit after a failure retries the missing LUTs.
       SelectedLutTab: ({ tab }) => {
-        const next = { ...model, phase, lutTab: tab }
+        const next = { ...model, phase, lutTab: tab, offlineLutNotice: null }
         return [next, generateThumbCommands(next), Option.none()]
       },
       // Recents restored from localStorage at boot.

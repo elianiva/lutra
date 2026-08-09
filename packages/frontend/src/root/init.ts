@@ -13,6 +13,9 @@ import { GalleryRoute, EditorRoute, parseRoute } from '../route'
 import * as Gallery from '../gallery'
 import * as Editor from '../editor'
 import type { LutThumbnailer } from '../thumbs/worker-layer'
+import { initialOffline } from '../offline/model'
+import { StartOfflineFill } from './offline-command'
+import type { OfflineFill } from '../offline/fill'
 
 type Resource =
   | GpuBackend
@@ -22,6 +25,7 @@ type Resource =
   | KeyValueStore
   | EditStore
   | LutThumbnailer
+  | OfflineFill
 
 export type InitReturn = readonly [
   Model,
@@ -43,6 +47,7 @@ export const init = (url: Url.Url): InitReturn => {
 
   const [gallery, galleryCommands] = Gallery.init(route)
   const [editor, editorCommands] = Editor.init(route)
+  const offline = initialOffline()
 
   const commands = Match.value(route).pipe(
     Match.withReturnType<ReadonlyArray<Command.Command<RootMessage, never, Resource>>>(),
@@ -60,7 +65,12 @@ export const init = (url: Url.Url): InitReturn => {
       route,
       gallery,
       editor,
+      offline,
     },
-    commands,
+    // The offline fill's boot auto-start (docs/adr/0015): unless the device
+    // asked for reduced data usage — then the strip's manual start button
+    // is the only path in, and `start` stays idempotent for both. The
+    // persist() request rides along ungated (a bonus, not a precondition).
+    offline.saveData ? commands : [...commands, StartOfflineFill({ requirePersist: false })],
   ]
 }

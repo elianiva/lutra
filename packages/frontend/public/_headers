@@ -1,0 +1,23 @@
+# Cloudflare Workers static assets headers (alchemy reads this file from the
+# built assets dir and applies it via the asset config — keep it at the
+# public root so `vite build` copies it into dist/).
+#
+# The service worker script and the manifest must never be served stale: the
+# browser bypasses its HTTP cache for sw.js (updateViaCache: 'none' in
+# entry.ts), and these rules keep the edge from caching them either. The
+# platform default (max-age=0, must-revalidate) would work, but explicit
+# beats implicit for the one file a stale cache breaks offline updates on.
+/sw.js
+  Cache-Control: no-cache
+
+/manifest.webmanifest
+  Cache-Control: no-cache
+
+/index.html
+  Cache-Control: no-cache
+
+# Hashed, content-addressed build assets are immutable by name — a year-long
+# cache with revalidation. (The default max-age=0 forces a revalidation
+# round-trip on every load of every asset.)
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

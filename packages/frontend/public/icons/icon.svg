@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- The app tile: the editor's near-black background with a panel inset,
+       a geometric L monogram in the wordmark's ink, and the red accent. -->
+  <rect width="512" height="512" fill="#111111"/>
+  <rect x="28" y="28" width="456" height="456" rx="88" fill="#1f1f1f"/>
+  <path d="M150 130 h62 v186 h112 v62 h-174 z" fill="#fafafa"/>
+  <rect x="330" y="130" width="32" height="248" rx="5" fill="#cc0000"/>
+</svg>

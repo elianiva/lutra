@@ -1,0 +1,141 @@
+import { describe, it } from 'vitest'
+import {
+  Command,
+  Mount,
+  click,
+  given,
+  role,
+  scene,
+  text,
+  expect as sceneExpect,
+} from 'foldkit/scene'
+import { LutId } from '@lutra/engine'
+import { MockImageBitmap } from '../../vitest-setup'
+import { RenderHandle } from '../../gpu/backend'
+import { initialModel } from '../model'
+import { update } from '../update'
+import { view } from '../view'
+import { Idle } from '../phase'
+import {
+  SelectedTool,
+  RenderedFrame,
+  OfflineConnectivityChanged,
+  OfflineFileDownloaded,
+  LutRecentsSaved,
+  HistogramComputed,
+} from '../message'
+import { PanZoom, RegisterCanvas } from '../canvas-stage'
+import { LutStripWheel } from './index'
+import { SaveLutRecents, RenderChain, ReadHistogram } from '../command'
+import type { Catalog } from '../message'
+import type { Model } from '../model'
+
+// The LUT bar's offline library behavior (docs/adr/0015): while the device
+// is offline, an undownloaded cube's row is dimmed with a "not downloaded"
+// badge and its click becomes the connect-once notice instead of a commit;
+// a downloaded cube commits as usual — offline is exactly the point.
+
+const lutPrint = LutId('luts/print/kodak_2393_cuspclip.cube')
+
+const catalog: Catalog = [
+  {
+    name: 'Kodak 2393 Cuspclip',
+    lut_file: lutPrint,
+    category: 'Print',
+    thumbnail: 'thumbnails/print/kodak_2393_cuspclip.jpg',
+  },
+]
+
+const stubHandle = () =>
+  // oxlint-disable-next-line consistent-type-assertions
+  new RenderHandle({} as GPUTexture, 200, 150, { buffer: {} as GPUBuffer, map: null })
+
+const config = { update, view } as const
+
+// Mirrors lut-flow.test.ts's stageMounts: the canvas/pan-zoom/wheel mounts
+// resolve so the scene ends cleanly.
+const stageMounts = [
+  Mount.resolve(PanZoom, { _tag: 'ScaledCanvas', scale: 1, offsetX: 0, offsetY: 0 }),
+  Mount.resolve(RegisterCanvas, { _tag: 'CanvasRegistered' }),
+  Mount.resolve(LutStripWheel, { _tag: 'LutStripWheelRegistered' }),
+]
+
+const loaded = () => ({
+  ...initialModel(),
+  phase: Idle(),
+  catalog,
+  source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
+})
+
+const settled = (model: Model): Model =>
+  update(model, RenderedFrame({ stamp: model.revision, handle: stubHandle() }))[0]
+
+/** A LUT draft with the bar open (the draft selects the first catalog entry). */
+const lutDraft = () => settled(update(loaded(), SelectedTool({ type: 'lut' }))[0])
+
+/** The same draft, but the device is offline. */
+const offlineLutDraft = () =>
+  update(lutDraft(), OfflineConnectivityChanged({ online: false }))[0]
+
+/** The same draft, offline, with the cube already in the offline library. */
+const offlineLutDraftDownloaded = () =>
+  update(offlineLutDraft(), OfflineFileDownloaded({ lutId: lutPrint }))[0]
+
+describe('LUT bar offline library', () => {
+  it('an undownloaded cube while offline is dimmed with a badge', () => {
+    scene(
+      config,
+      given(offlineLutDraft()),
+      ...stageMounts,
+      sceneExpect(
+        role('button', {
+          name: 'Apply Kodak 2393 Cuspclip — not downloaded, needs a connection',
+        }),
+      ).toExist(),
+      sceneExpect(text('not downloaded', { exact: false })).toExist(),
+    )
+  })
+
+  it('clicking an undownloaded cube offline shows the connect-once notice instead of committing', () => {
+    scene(
+      config,
+      given(offlineLutDraft()),
+      ...stageMounts,
+      click(role('button', { name: /Apply Kodak 2393 Cuspclip/ })),
+      // No chain mutation, no commands — the bar's name line carries the
+      // distinct notice instead.
+      Command.expectNone(),
+      sceneExpect(
+        text("isn't downloaded yet — connect once and the offline library finishes preparing", {
+          exact: false,
+        }),
+      ).toExist(),
+    )
+  })
+
+  it('a downloaded cube commits offline exactly as online (no notice)', () => {
+    scene(
+      config,
+      given(offlineLutDraftDownloaded()),
+      ...stageMounts,
+      click(role('button', { name: /Apply Kodak 2393 Cuspclip/ })),
+      // The commit went through (the notice path fires nothing): the render
+      // + recents-save commands are dispatched — assert before resolving.
+      Command.expectHas(SaveLutRecents({ recents: [lutPrint] })),
+      Command.resolve(RenderChain, RenderedFrame({ stamp: 999, handle: stubHandle() })),
+      Command.resolve(ReadHistogram, HistogramComputed({ bins: new Uint32Array(256), stamp: 999 })),
+      Command.resolve(SaveLutRecents, LutRecentsSaved()),
+      sceneExpect(text("isn't downloaded yet", { exact: false })).toBeAbsent(),
+    )
+  })
+
+  it('while online the badge and notice never appear', () => {
+    scene(
+      config,
+      given(lutDraft()),
+      ...stageMounts,
+      sceneExpect(role('button', { name: 'Apply Kodak 2393 Cuspclip' })).toExist(),
+      sceneExpect(text('not downloaded', { exact: false })).toBeAbsent(),
+    )
+  })
+})
