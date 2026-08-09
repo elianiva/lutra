@@ -84,6 +84,16 @@ _Avoid_: "presets" (see **Film simulation adjustment**), "LUT pack"
 A 200×200 JPEG of the **user's** photo with one LUT applied at full strength, rendered lazily per visible catalog category by the thumb worker (docs/adr/0013): the engine's `applyLutCpu` — a pure-JS 1:1 mirror of the WGSL LUT body, exact because a LUT-only chain has no colorspace boundary — then the engine's JPEG encode. The **LUT bar**'s thumbs prefer it over the **LUT library**'s vendored generic preview, which stays as the placeholder and failure fallback. Blob URLs live in the model (`lutThumbs`), cleared and revoked when a new image loads; a result that lands after an image switch is dropped by a bitmap-identity guard. A failed thumb is silently retried on the group's next visit.
 _Avoid_: "per-LUT thumbnail" (the preview is per LUT _and_ per photo — the pairing is the point)
 
+### Offline
+
+**Offline library**:
+The complete vendored **LUT library** — the catalog, every `.cube` file, and every generic preview thumbnail — mirrored into the browser's Cache Storage so the app works without a connection. The mirror is diff-based: each **offline fill** run compares the catalog's entries against what is already cached and fetches only what is missing, so a catalog update on a later deploy is picked up automatically. Once the mirror is complete, the app is fully offline-capable: editing, saving, exporting, and every LUT apply and preview work with no network.
+_Avoid_: "cache" on its own (the browser cache is the mechanism, not the feature), "offline cache"
+
+**Offline fill**:
+The background process that builds the **offline library**. Page-driven — the model owns its state — and automatic: it starts after the app settles, runs in small throttled batches so it never competes with real browsing, pauses while the device is offline, and resumes on reconnect. Applying a LUT before the fill reaches it caches that LUT immediately (cache-as-you-go). Completion is announced by an "offline ready" toast; a storage-quota failure surfaces a distinct, actionable message instead.
+_Avoid_: "background download" (the download is the mechanism, not the feature), "preloading"
+
 **Edit chain**:
 The ordered list of **adjustment layers** applied to a single source image. The chain is the unit of non-destructive persistence: it can be saved, replayed, reordered, and pruned without touching the source image.
 _Avoid_: "Stack" (Snapseed uses this word but it suggests LIFO; the chain is order-sensitive in both directions), "history" (history is a side effect, not the model).

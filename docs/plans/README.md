@@ -24,7 +24,10 @@ questions in each were resolved one by one and baked into the files as
 | 06 | Gallery + tool panel freebies | **Decided — ready to implement** |
 | 07 | LUT bar (bottom filmstrip picker) | **Implemented** — docs/adr/0012 |
 | 08 | Component pattern (idiomatic Effect views) | **Implemented** — reference: `editor/lut-bar/` |
+| 09 | RAW support (owned LibRaw wasm build → sRGB-16 source) | **Decided — ready to implement** (docs/adr/0014 + `09-raw-support.md`) |
 
 Scope (agreed): **functional + a11y**. Visual polish (motion, histogram
 upgrade, LUT picker search) is deliberately out of this pass — see
-`01-undo-redo.md` for the exact boundary.
+`01-undo-redo.md` for the exact boundary. Plan 09 is outside the UI pass
+(feature work); it sits in this index because it is the same plan/ADR
+convention.
