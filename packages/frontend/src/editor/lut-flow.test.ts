@@ -5,9 +5,11 @@ import {
   click,
   given,
   hover,
+  inside,
   role,
   scene,
   label,
+  testId,
   text,
   expect as sceneExpect,
 } from 'foldkit/scene'
@@ -43,10 +45,8 @@ import {
   HistogramComputed,
   ScaledCanvas,
   CanvasRegistered,
-  LutStripWheelRegistered,
 } from './message'
 import { PanZoom, RegisterCanvas } from './canvas-stage'
-import { LutStripWheel } from './lut-bar'
 import { GenerateLutThumb, RenderChain, ReadHistogram, SaveLutRecents } from './command'
 import type { Catalog } from './message'
 import type { Model } from './model'
@@ -498,7 +498,6 @@ const sceneConfig = { update, view } as const
 const stageMounts = [
   Mount.resolve(PanZoom, ScaledCanvas({ scale: 1, offsetX: 0, offsetY: 0 })),
   Mount.resolve(RegisterCanvas, CanvasRegistered()),
-  Mount.resolve(LutStripWheel, LutStripWheelRegistered()),
 ]
 
 const resolveRender = () => [
@@ -536,10 +535,15 @@ describe('LUT bar view', () => {
       hover(role('button', { name: 'Apply Agfa APX 100' })),
       ...resolveRender(),
       sceneExpect(text('Agfa APX 100 · Bw')).toExist(),
-      // Click commits: the accent border moves to the clicked thumb and the
-      // name line keeps it (now the committed LUT).
+      // Click commits: the accent border moves to the clicked thumb, its
+      // centered check badge appears (the active LUT must read at a
+      // glance), and the name line keeps it (now the committed LUT).
       click(role('button', { name: 'Apply Agfa APX 100' })),
       sceneExpect(role('button', { name: 'Apply Agfa APX 100' })).toHaveClass('border-accent'),
+      inside(
+        role('button', { name: 'Apply Agfa APX 100' }),
+        sceneExpect(testId('current-lut-check')).toExist(),
+      ),
       sceneExpect(text('Agfa APX 100 · Bw')).toExist(),
       ...resolveRender(),
       Command.resolve(SaveLutRecents, LutRecentsSaved()),
@@ -552,9 +556,14 @@ describe('LUT bar view', () => {
       sceneConfig,
       given({ ...selectedLut(), lutBarOpen: true }),
       ...stageMounts,
-      // The committed LUT (Kodak) carries the accent border.
+      // The committed LUT (Kodak) carries the accent border and the check
+      // badge; the uncommitted Bw thumb has neither.
       sceneExpect(role('button', { name: 'Apply Kodak 2393 Cuspclip' })).toHaveClass(
         'border-accent',
+      ),
+      inside(
+        role('button', { name: 'Apply Kodak 2393 Cuspclip' }),
+        sceneExpect(testId('current-lut-check')).toExist(),
       ),
       click(role('button', { name: 'Bw' })),
       resolveThumbFailure(lutBw),
@@ -565,6 +574,16 @@ describe('LUT bar view', () => {
       sceneExpect(role('button', { name: 'Apply Agfa APX 100' })).toHaveClass('border-accent'),
       sceneExpect(role('button', { name: 'Apply Kodak 2393 Cuspclip' })).not.toHaveClass(
         'border-accent',
+      ),
+      // The check badge moved with the border: only the clicked thumb
+      // carries it now.
+      inside(
+        role('button', { name: 'Apply Agfa APX 100' }),
+        sceneExpect(testId('current-lut-check')).toExist(),
+      ),
+      inside(
+        role('button', { name: 'Apply Kodak 2393 Cuspclip' }),
+        sceneExpect(testId('current-lut-check')).toBeAbsent(),
       ),
       ...resolveRender(),
       Command.resolve(SaveLutRecents, LutRecentsSaved()),
@@ -622,11 +641,9 @@ describe('LUT bar view', () => {
       sceneExpect(label('LUT thumbnails')).toExist(),
       click(role('button', { name: 'Toggle LUT bar' })),
       sceneExpect(label('LUT thumbnails')).toBeAbsent(),
-      Mount.expectEnded(LutStripWheel),
       // …and reopens it.
       click(role('button', { name: 'Toggle LUT bar' })),
       resolveThumbFailure(lutPrint),
-      Mount.resolve(LutStripWheel, LutStripWheelRegistered()),
       sceneExpect(label('LUT thumbnails')).toExist(),
       Command.expectNone(),
     )

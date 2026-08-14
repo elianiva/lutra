@@ -67,6 +67,19 @@ describe('EditStoreIndexedDb (IndexedDB local backend)', () => {
     expect(loaded).toEqual(Option.none())
   })
 
+  it('load finds an Edit by id even when it is not the first row', async () => {
+    // Rows come back in key order, so the second id is not the scan's
+    // first row — a load-by-id must still find it (the old
+    // first-row-then-check-id implementation returned None here).
+    const first = edit('11111111-1111-4111-8111-111111111111', 10)
+    const second = edit('22222222-2222-4222-8222-222222222222', 20)
+    await run(save(first))
+    await run(save(second))
+
+    const loaded = await run(load(second.id))
+    expect(loaded).toEqual(Option.some(second))
+  })
+
   it('list returns summaries, newest-first by savedAt, without source bytes', async () => {
     const older = edit('11111111-1111-4111-8111-111111111111', 10)
     const newer = edit('22222222-2222-4222-8222-222222222222', 20)

@@ -25,7 +25,6 @@ import {
   HistogramComputed,
 } from '../message'
 import { PanZoom, RegisterCanvas } from '../canvas-stage'
-import { LutStripWheel } from './index'
 import { SaveLutRecents, RenderChain, ReadHistogram } from '../command'
 import type { Catalog } from '../message'
 import type { Model } from '../model'
@@ -57,7 +56,6 @@ const config = { update, view } as const
 const stageMounts = [
   Mount.resolve(PanZoom, { _tag: 'ScaledCanvas', scale: 1, offsetX: 0, offsetY: 0 }),
   Mount.resolve(RegisterCanvas, { _tag: 'CanvasRegistered' }),
-  Mount.resolve(LutStripWheel, { _tag: 'LutStripWheelRegistered' }),
 ]
 
 const loaded = () => ({

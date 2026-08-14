@@ -552,7 +552,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         Option.none(),
       ],
       LutRecentsSaved: () => [model, [], Option.none()],
-      LutStripWheelRegistered: () => [model, [], Option.none()],
 
       // ---- per-photo LUT thumbnails (filmstrip previews, docs/adr/0013) ----
       // A thumb landed. One that belongs to a previous photo (the bitmap

@@ -9,7 +9,6 @@ import { currentLutId, lutTarget } from './target'
 import { effectiveTab, groupByCategory, lookup, recentsEntries, visibleEntries } from './catalog'
 import { tab } from './tab'
 import { thumb } from './thumb'
-import { LutStripWheel } from './wheel'
 import { stateFor } from '../../offline/model'
 
 /**
@@ -87,13 +86,19 @@ export const lutBar = (h: HtmlBuilder<EditorMessage>, model: Model) =>
           : ChangedLayerLut({ id: target.id, lutId })
       }
 
+      // Fixed-height bar: exactly two rows of 96px thumbs + the name line
+      // (231 = 1px border + 16px name + 6px gap + 16px padding + 192px
+      // strip). The tab list and the filmstrip scroll independently inside
+      // it, so the bar's height never follows the row count (Instant Pro
+      // alone is 7 rows at 1280px).
       return h.div(
-        [h.Class('flex shrink-0 border-t border-border bg-panel')],
+        [h.Class('flex h-[231px] shrink-0 border-t border-border bg-panel')],
         [
           // Left column: category tabs (Recents only when non-empty), with
-          // counts for the catalog categories.
+          // counts for the catalog categories. The list scrolls when it
+          // outgrows the fixed bar height.
           h.div(
-            [h.Class('flex w-48 shrink-0 flex-col border-r border-border')],
+            [h.Class('flex w-48 shrink-0 flex-col overflow-y-auto border-r border-border')],
             [
               ...(showRecents
                 ? [tab(h, 'recents', 'Recents', recents.length, activeTab === 'recents')]
@@ -121,11 +126,14 @@ export const lutBar = (h: HtmlBuilder<EditorMessage>, model: Model) =>
                 ],
                 [nameLine],
               ),
+              // The filmstrip: rows wrap as before, but the container is
+              // capped at two visible rows — the overflow scrolls
+              // vertically, natively (no wheel mount; a JS horizontal
+              // handler would only block the vertical gesture).
               h.div(
                 [
-                  h.Class('flex flex-wrap'),
+                  h.Class('flex min-h-0 flex-1 flex-wrap content-start overflow-y-auto'),
                   h.AriaLabel('LUT thumbnails'),
-                  h.OnMount(LutStripWheel()),
                 ],
                 entries.map((entry) =>
                   thumb(

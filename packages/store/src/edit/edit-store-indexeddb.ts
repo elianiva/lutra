@@ -63,10 +63,8 @@ export const EditStoreLive: Layer.Layer<
       )
 
     const load = (id: EditId): Effect.Effect<Option.Option<EditType>, StoreError> =>
-      table.select().pipe(
-        Effect.map((rows) => Option.fromIterable(rows).pipe(
-          Option.flatMap((first) => first.id === id ? Option.some(first) : Option.none()),
-        )),
+      table.select().equals(id).pipe(
+        Effect.map((rows) => Option.fromIterable(rows)),
         Effect.mapError(mapQueryError),
       )
 

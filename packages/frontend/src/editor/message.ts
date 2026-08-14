@@ -220,10 +220,6 @@ export const LutRecentsLoaded = Message.m('LutRecentsLoaded', {
 })
 // Ack for SaveLutRecents (observability, mirrors ExportSettingsSaved).
 export const LutRecentsSaved = Message.m('LutRecentsSaved')
-// One-shot acknowledgment from the filmstrip's wheel mount (the listener
-// registration already happened in the mount) — same ack pattern as
-// CanvasRegistered, for DevTools/Scene observability.
-export const LutStripWheelRegistered = Message.m('LutStripWheelRegistered')
 
 // ---- per-photo LUT thumbnails (filmstrip previews, docs/adr/0013) ----
 
@@ -420,7 +416,6 @@ export const EditorMessage = S.Union([
   SelectedLutTab,
   LutRecentsLoaded,
   LutRecentsSaved,
-  LutStripWheelRegistered,
   LutThumbGenerated,
   LutThumbFailed,
   LutThumbsRevoked,
