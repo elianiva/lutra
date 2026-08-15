@@ -1,6 +1,6 @@
 export { createLayer, UnknownLayerTypeError } from "./defaults"
 export { nextLayerId } from "./id"
 export { makeRegistry } from "./registry"
-export { LAYER_TYPES, Layer, LayerPatch, LutLayer } from "./schemas"
+export { LAYER_TYPES, Layer, LayerPatch, LutLayer, ColorMixerLayer } from "./schemas"
 export type { LayerType } from "./schemas"
 export type { FieldMeta, LayerEntry, LayerRegistry, RegistryInput } from "./registry"

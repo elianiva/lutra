@@ -1,7 +1,7 @@
 import type { HtmlBuilder } from 'foldkit/html'
 import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, Eye, EyeOff, Trash2, X, Check } from 'lucide'
 import { icon } from '../components/icon'
-import { LAYER_UI, fieldBounds, lutName } from './layer-meta'
+import { LAYER_UI, MIXER_COLORS, MIXER_CHANNELS, fieldBounds, formatHue, formatPercentSigned, lutName } from './layer-meta'
 import {
   SelectedLayer,
   RemovedLayer,
@@ -11,12 +11,13 @@ import {
   ConfirmedDraft,
   CancelledDraft,
   CycledToggledField,
+  SelectedMixerColor,
   ReorderedLayer,
   ToggledLutPicker,
 } from './message'
 import type { EditorMessage } from './message'
 import type { Model } from './model'
-import { FieldKey, type Layer, type LayerType } from '@lutra/engine'
+import { FieldKey, type Layer, type LayerId, type LayerType } from '@lutra/engine'
 
 const num = (layer: Layer, key: FieldKey) => {
   const record: Record<string, unknown> = layer
@@ -26,9 +27,117 @@ const num = (layer: Layer, key: FieldKey) => {
 
 /** One-line drawer summary: "Fuji Velvia 50 · 65%" for LUT layers. */
 const summary = (model: Model, layer: Layer, ui: (typeof LAYER_UI)[LayerType]) =>
-  layer.type === 'lut'
-    ? `${lutName(model.catalog, layer.lutId)} · ${ui.formatValue(layer)}`
-    : ui.formatValue(layer)
+  layer.type === 'colorMixer'
+    ? mixerSummary(model, layer)
+    : layer.type === 'lut'
+      ? `${lutName(model.catalog, layer.lutId)} · ${ui.formatValue(layer)}`
+      : ui.formatValue(layer)
+
+/** The active hue range of a Color Mixer layer's drawer (0..7). */
+const activeMixerColor = (model: Model, layerId: LayerId) =>
+  Math.min(7, Math.max(0, Math.round(model.activeMixerColor[layerId] ?? 0)))
+
+/**
+ * One-line drawer summary for a Color Mixer layer: the active range's name
+ * plus its non-default slider values (the same numbers the open sliders
+ * show). A pristine layer reads just "Red".
+ */
+const mixerSummary = (model: Model, layer: Layer) => {
+  const color = MIXER_COLORS[activeMixerColor(model, layer.id)]!
+  const record: Record<string, unknown> = layer
+  const value = (suffix: string) => {
+    const v = record[`${color.key}${suffix}`]
+    return typeof v === 'number' ? v : 0
+  }
+  const parts: string[] = [color.name]
+  if (value('Hue') !== 0) parts.push(formatHue(value('Hue')))
+  if (value('Saturation') !== 0) parts.push(formatPercentSigned(value('Saturation')))
+  if (value('Luminance') !== 0) parts.push(formatPercentSigned(value('Luminance')))
+  return parts.join(' ')
+}
+
+/**
+ * The 8 hue-range swatches (docs/adr/0027 D3): pure-hue dots at the same
+ * centers the shader classifies with; the active range gets the ring.
+ * Tapping dispatches SelectedMixerColor — presentation-only, no render.
+ */
+const mixerSwatches = (h: HtmlBuilder<EditorMessage>, active: number, onSelect: (index: number) => EditorMessage) =>
+  h.div([h.Class('flex items-center gap-1.5'), h.AriaLabel('Color ranges')], [
+    ...MIXER_COLORS.map((color, index) =>
+      h.button(
+        [
+          h.OnClick(onSelect(index)),
+          h.AriaLabel(`Select ${color.name}`),
+          h.AriaPressed(String(index === active)),
+          h.Class(
+            `size-5 shrink-0 rounded-full border ${
+              index === active ? 'border-ink ring-1 ring-ink' : 'border-border hover:border-muted'
+            }`,
+          ),
+          h.Style({ background: `hsl(${color.hue} 100% 50%)` }),
+        ],
+        [],
+      ),
+    ),
+  ])
+
+/**
+ * The active range's three sliders — HUE / SATURATION / LUMINANCE — bound
+ * to the `${color}${channel}` fields on the layer.
+ */
+const mixerSliders = (
+  h: HtmlBuilder<EditorMessage>,
+  layer: Layer,
+  ui: (typeof LAYER_UI)[LayerType],
+  colorIndex: number,
+  onChange: (field: FieldKey, value: number) => EditorMessage,
+) => {
+  const color = MIXER_COLORS[colorIndex]!
+  return MIXER_CHANNELS.map((channel) => {
+    const field = FieldKey(`${color.key}${channel}`)
+    const fieldUi = ui.fields[field]!
+    const { min, max } = fieldBounds(layer.type, field)
+    const value = num(layer, field)
+    return sliderControl(
+      h,
+      fieldUi.label,
+      fieldUi.format(value),
+      min,
+      max,
+      value,
+      (v) => onChange(field, v),
+    )
+  })
+}
+
+/**
+ * The sliders a row shows: the generic per-field list, or — for Color
+ * Mixer layers — the swatch row plus the active range's three sliders.
+ */
+const layerSliders = (
+  h: HtmlBuilder<EditorMessage>,
+  model: Model,
+  layer: Layer,
+  ui: (typeof LAYER_UI)[LayerType],
+  kind: 'draft' | 'chain',
+) => {
+  if (layer.type === 'colorMixer') {
+    const color = activeMixerColor(model, layer.id)
+    return [
+      mixerSwatches(h, color, (index) => SelectedMixerColor({ id: layer.id, color: index })),
+      ...mixerSliders(h, layer, ui, color, (field, value) =>
+        kind === 'draft'
+          ? UpdatedDraftParam({ field, value })
+          : UpdatedLayerParam({ id: layer.id, field, value }),
+      ),
+    ]
+  }
+  return Object.keys(ui.fields).map((field) =>
+    kind === 'draft'
+      ? draftSlider(h, layer, FieldKey(field), ui)
+      : chainSlider(h, layer, FieldKey(field), ui, model),
+  )
+}
 
 /**
  * The right "Layers" sidebar (docs/adr/0024-mobile-ui): always visible as a side
@@ -95,7 +204,7 @@ const draftRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer) => 
       h.div(
         [h.Class('flex flex-col gap-3 px-4 pb-3')],
         [
-          ...Object.keys(ui.fields).map((field) => draftSlider(h, layer, FieldKey(field), ui)),
+          ...layerSliders(h, model, layer, ui, 'draft'),
         ],
       ),
       h.div(
@@ -162,7 +271,7 @@ const chainRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer, ind
           ),
           icon(h, ui.icon, ui.label),
           h.span([h.Class('min-w-0 flex-1 truncate text-sm')], [ui.label]),
-          h.span([h.Class('tnum text-xs text-muted')], [summary(model, layer, ui)]),
+          h.span([h.Class('tnum min-w-0 truncate text-xs text-muted')], [summary(model, layer, ui)]),
           h.div(
             [h.Class('flex items-center gap-0.5')],
             [
@@ -193,9 +302,7 @@ const chainRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer, ind
         ? h.div(
             [h.Class('flex flex-col gap-3 px-4 pb-4')],
             [
-              ...Object.keys(ui.fields).map((field) =>
-                chainSlider(h, layer, FieldKey(field), ui, model),
-              ),
+              ...layerSliders(h, model, layer, ui, 'chain'),
             ],
           )
         : null,

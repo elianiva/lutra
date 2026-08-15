@@ -355,6 +355,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             source: { bitmap: null, width: 0, height: 0, error: null },
             chain: [],
             activeFieldIndex: {},
+            activeMixerColor: {},
             renderPending: false,
             renderedStamp: 0,
             lastRender: null,
@@ -393,6 +394,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           chain,
           source: { bitmap, width, height, error: null },
           activeFieldIndex: {},
+          activeMixerColor: {},
           // A new attached edit closes the bar and its hover preview.
           lutBarOpen: false,
           previewLut: null,
@@ -421,6 +423,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             source: { ...model.source, error },
             chain: [],
             activeFieldIndex: {},
+            activeMixerColor: {},
           },
           [],
           Option.none(),
@@ -516,10 +519,12 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       CancelledDraft: () => {
         if (!transitioned || from._tag !== 'Drafting') return [model, [], Option.none()]
         const { [from.layer.id]: _removed, ...restIndex } = model.activeFieldIndex
+        const { [from.layer.id]: _removedColor, ...restMixer } = model.activeMixerColor
         return renderNow({
           ...model,
           phase,
           activeFieldIndex: restIndex,
+          activeMixerColor: restMixer,
           lutBarOpen: false,
           previewLut: null,
         })
@@ -621,6 +626,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       },
       RemovedLayer: ({ id }) => {
         const { [id]: _r, ...restIndex } = model.activeFieldIndex
+        const { [id]: _rc, ...restMixer } = model.activeMixerColor
         // Removing the focused layer also deselects it — the machine's
         // Selected → Idle edge handles that; any other removal leaves the
         // phase alone. The removal always drops a hover preview (the target
@@ -630,6 +636,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           phase,
           chain: model.chain.filter((l) => l.id !== id),
           activeFieldIndex: restIndex,
+          activeMixerColor: restMixer,
           previewLut: null,
         })
       },
@@ -692,6 +699,21 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           Option.none(),
         ]
       },
+      // The mixer swatch row's selection: which of the 8 hue ranges the
+      // drawer shows. Presentation-only (like CycledToggledField) — the
+      // sliders are already bound to their fields; no render needed.
+      SelectedMixerColor: ({ id, color }) => [
+        {
+          ...model,
+          phase,
+          activeMixerColor: {
+            ...model.activeMixerColor,
+            [id]: Math.min(7, Math.max(0, Math.round(color))),
+          },
+        },
+        [],
+        Option.none(),
+      ],
 
       // ---- reorder drag (drag operations reshuffle via ReorderedLayer) ----
       StartedLayerReorder: () => [model, [], Option.none()],

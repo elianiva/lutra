@@ -4,6 +4,7 @@ import {
   Boxes,
   CircleDot,
   Contrast,
+  Droplet,
   Eclipse,
   Eye,
   Flame,
@@ -21,6 +22,7 @@ import {
   renderHighlights,
   renderWhiteBalance,
   renderSaturation,
+  renderColorMixer,
   renderGrain,
   renderVignette,
   renderChromaticAberration,
@@ -43,6 +45,7 @@ export const ENGINE_REGISTRY = makeRegistry({
   highlights: renderHighlights,
   whiteBalance: renderWhiteBalance,
   saturation: renderSaturation,
+  colorMixer: renderColorMixer,
   grain: renderGrain,
   vignette: renderVignette,
   chromaticAberration: renderChromaticAberration,
@@ -68,6 +71,11 @@ export type Formatter = (v: number) => string
 const formatSigned = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`
 const formatEV = (v: number) => `${formatSigned(v)} EV`
 const formatPercent = (v: number) => `${Math.round(v * 100)}%`
+
+// Color Mixer formatters: hue maps the [-1, 1] slider to ±90° of rotation
+// (GIMP's full-deflection mapping) and saturation/luminance to ±100 points.
+export const formatHue = (v: number) => `${v >= 0 ? '+' : ''}${Math.round(v * 90)}°`
+export const formatPercentSigned = (v: number) => `${v >= 0 ? '+' : ''}${Math.round(v * 100)}%`
 
 // white-balance temperature maps the [-1, 1] slider to Kelvin, matching the
 // mobile mapping so values line up across platforms.
@@ -102,6 +110,26 @@ export interface LayerUi {
   /** "When to use it" line for the tool panel card (docs/adr/0016-tool-panel-cards). */
   readonly when: string
 }
+
+// The Color Mixer's 8 hue ranges (docs/adr/0027): UI order, the field-key
+// prefix on the layer, the display name, and the pure-hue CSS color of the
+// range's center on the hue wheel — the same centers the shader classifies
+// with, so a swatch's color is exactly the color its range governs.
+export const MIXER_COLORS = [
+  { key: 'red', name: 'Red', hue: 0 },
+  { key: 'orange', name: 'Orange', hue: 30 },
+  { key: 'yellow', name: 'Yellow', hue: 60 },
+  { key: 'green', name: 'Green', hue: 120 },
+  { key: 'aqua', name: 'Aqua', hue: 180 },
+  { key: 'blue', name: 'Blue', hue: 240 },
+  { key: 'purple', name: 'Purple', hue: 270 },
+  { key: 'magenta', name: 'Magenta', hue: 300 },
+] as const
+
+export type MixerColor = (typeof MIXER_COLORS)[number]
+
+/** The channel field suffixes on a Color Mixer layer, in slider order. */
+export const MIXER_CHANNELS = ['Hue', 'Saturation', 'Luminance'] as const
 
 // Read a numeric field off a heterogeneous Layer without paying for a
 // discriminated-union collapse at every call site.
@@ -177,6 +205,36 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
     formatValue: (l) => formatSigned(num(l, FieldKey('amount'))),
     description: 'Controls how vivid the colors are.',
     when: 'Make colors pop, or pull back for a faded look.',
+  },
+  colorMixer: {
+    label: 'Color Mixer',
+    icon: Droplet,
+    toggled: false,
+    // 24 sliders, one per range × channel. The drawer never renders them
+    // generically (it shows the active range's three — layer-drawer.ts);
+    // the entries still carry the labels/formats the mixer sliders read.
+    fields: Object.fromEntries(
+      MIXER_COLORS.flatMap((color) =>
+        MIXER_CHANNELS.map((channel) => [
+          `${color.key}${channel}`,
+          { label: channel.toUpperCase(), format: channel === 'Hue' ? formatHue : formatPercentSigned },
+        ]),
+      ),
+    ),
+    // Fallback used nowhere today (the drawer special-cases the summary
+    // with the active range's values — model context the pure function
+    // can't see); kept honest: how many of the 24 sliders moved.
+    formatValue: (l) => {
+      let moved = 0
+      for (const color of MIXER_COLORS) {
+        for (const channel of MIXER_CHANNELS) {
+          if (num(l, FieldKey(`${color.key}${channel}`)) !== 0) moved++
+        }
+      }
+      return moved === 0 ? 'No adjustments' : `${moved} slider${moved === 1 ? '' : 's'} moved`
+    },
+    description: 'Adjusts hue, saturation, and brightness of one color range at a time.',
+    when: 'Recolor a single tone — sky, skin, grass — and leave the rest.',
   },
   grain: {
     label: 'Grain',
@@ -260,6 +318,9 @@ export const LAYER_TYPES_ORDER: ReadonlyArray<LayerType> = [
   'highlights',
   'whiteBalance',
   'saturation',
+  // The per-color sibling of Saturation: choosing a tone and adjusting it
+  // is the natural next step after a global saturation pull.
+  'colorMixer',
   'grain',
   'vignette',
   'chromaticAberration',

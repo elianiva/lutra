@@ -25,6 +25,11 @@ import { LutLoadError } from '../luts/store'
 // drawer. Keyed by layer id so each toggled layer remembers its own selection.
 const ActiveFieldIndex = Schema.Record(LayerIdSchema, Schema.Number)
 
+// Which of the 8 hue ranges (0..7 into MIXER_COLORS) a Color Mixer layer's
+// drawer currently shows — the range whose three sliders are open. Keyed by
+// layer id, exactly like activeFieldIndex.
+const ActiveMixerColor = Schema.Record(LayerIdSchema, Schema.Number)
+
 // The persisted record identity of the current image (CONTEXT.md "Attached
 // edit"): the Edit id it is attached to — null when the image was picked
 // fresh in-editor — and the source image in its stored byte encoding (the
@@ -58,6 +63,8 @@ export const Model = Schema.Struct({
   phase: EditorPhase,
   // Per-layer index into the toggled layer's two fields.
   activeFieldIndex: ActiveFieldIndex,
+  // Per-layer index of the Color Mixer's active hue range (0..7).
+  activeMixerColor: ActiveMixerColor,
   // Canvas pan/zoom driven by wheel + drag on the center stage.
   scale: Schema.Number,
   offsetX: Schema.Number,
@@ -173,6 +180,7 @@ export const initialModel = (): Model => ({
   chain: [],
   phase: editorMachine.initial,
   activeFieldIndex: {},
+  activeMixerColor: {},
   scale: 1,
   offsetX: 0,
   offsetY: 0,

@@ -4,6 +4,7 @@ import type { LayerType } from "./schemas"
 import {
   ChromaticAberrationLayer,
   ClarityLayer,
+  ColorMixerLayer,
   ContrastLayer,
   ExposureLayer,
   GrainLayer,
@@ -57,6 +58,36 @@ const FIELD_META = {
     tint: { default: 0, min: -1, max: 1 },
   },
   saturation: { amount: { default: 0, min: -1, max: 1 } },
+  // The Color Mixer: 24 fields (8 hue ranges × hue/saturation/luminance),
+  // all normalized [-1, 1]. The shader maps hue to ±180° of rotation and
+  // saturation/luminance to multiplicative/asymmetric lightness deltas
+  // (docs/adr/0027 D2).
+  colorMixer: {
+    redHue: { default: 0, min: -1, max: 1 },
+    redSaturation: { default: 0, min: -1, max: 1 },
+    redLuminance: { default: 0, min: -1, max: 1 },
+    orangeHue: { default: 0, min: -1, max: 1 },
+    orangeSaturation: { default: 0, min: -1, max: 1 },
+    orangeLuminance: { default: 0, min: -1, max: 1 },
+    yellowHue: { default: 0, min: -1, max: 1 },
+    yellowSaturation: { default: 0, min: -1, max: 1 },
+    yellowLuminance: { default: 0, min: -1, max: 1 },
+    greenHue: { default: 0, min: -1, max: 1 },
+    greenSaturation: { default: 0, min: -1, max: 1 },
+    greenLuminance: { default: 0, min: -1, max: 1 },
+    aquaHue: { default: 0, min: -1, max: 1 },
+    aquaSaturation: { default: 0, min: -1, max: 1 },
+    aquaLuminance: { default: 0, min: -1, max: 1 },
+    blueHue: { default: 0, min: -1, max: 1 },
+    blueSaturation: { default: 0, min: -1, max: 1 },
+    blueLuminance: { default: 0, min: -1, max: 1 },
+    purpleHue: { default: 0, min: -1, max: 1 },
+    purpleSaturation: { default: 0, min: -1, max: 1 },
+    purpleLuminance: { default: 0, min: -1, max: 1 },
+    magentaHue: { default: 0, min: -1, max: 1 },
+    magentaSaturation: { default: 0, min: -1, max: 1 },
+    magentaLuminance: { default: 0, min: -1, max: 1 },
+  },
   grain: {
     texture: { default: 0, min: 0, max: 1 },
     size: { default: 0, min: 0, max: 1 },
@@ -81,6 +112,7 @@ export interface RegistryInput {
   highlights: BodyRenderer
   whiteBalance: BodyRenderer
   saturation: BodyRenderer
+  colorMixer: BodyRenderer
   grain: BodyRenderer
   vignette: BodyRenderer
   chromaticAberration: BodyRenderer
@@ -132,6 +164,13 @@ export function makeRegistry(bodies: RegistryInput): Record<LayerType, LayerEntr
       label: "Saturation",
       pinned: true,
       fields: FIELD_META.saturation,
+    },
+    colorMixer: {
+      schema: ColorMixerLayer,
+      body: bodies.colorMixer,
+      label: "Color Mixer",
+      pinned: false,
+      fields: FIELD_META.colorMixer,
     },
     grain: {
       schema: GrainLayer,

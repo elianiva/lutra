@@ -5,6 +5,7 @@ import { FieldKey, LutId } from "../brands"
 import { renderExposure } from "../shaders/bodies/exposure"
 import { renderContrast } from "../shaders/bodies/contrast"
 import { renderSaturation } from "../shaders/bodies/saturation"
+import { renderColorMixer } from "../shaders/bodies/color-mixer"
 import { renderVignette } from "../shaders/bodies/vignette"
 import { renderChromaticAberration } from "../shaders/bodies/chromatic-aberration"
 import { renderWhiteBalance } from "../shaders/bodies/white-balance"
@@ -161,6 +162,77 @@ describe("generateChainSource", () => {
     expect(result.passes[1]!.usesSampler).toBe(true)
     // Sampler-free passes never declare binding 5
     expect(result.passes[0]!.source).not.toContain("@group(0) @binding(5)")
+  })
+
+  it("emits the Color Mixer as one pass with 24 uniform slots and its helpers", () => {
+    const mixerKeys: FieldKey[] = [
+      "redHue",
+      "redSaturation",
+      "redLuminance",
+      "orangeHue",
+      "orangeSaturation",
+      "orangeLuminance",
+      "yellowHue",
+      "yellowSaturation",
+      "yellowLuminance",
+      "greenHue",
+      "greenSaturation",
+      "greenLuminance",
+      "aquaHue",
+      "aquaSaturation",
+      "aquaLuminance",
+      "blueHue",
+      "blueSaturation",
+      "blueLuminance",
+      "purpleHue",
+      "purpleSaturation",
+      "purpleLuminance",
+      "magentaHue",
+      "magentaSaturation",
+      "magentaLuminance",
+    ].map(FieldKey)
+    const layers: ChainLayerInfo[] = [
+      { type: "colorMixer", body: renderColorMixer, fieldKeys: mixerKeys },
+    ]
+    const result = generateChainSource(layers)
+    expect(result.passes).toHaveLength(1)
+    const pass = result.passes[0]!
+    // 24 uniform slots, in registry field order.
+    expect(pass.uniforms).toEqual(
+      mixerKeys.map((key, offset) => ({ layerIndex: 0, field: key, offset })),
+    )
+    const source = pass.source
+    // The self-contained sRGB + HSL helpers are emitted at module scope
+    // (prefixed so they never collide with the pass template's own
+    // srgbToLinear/linearToSrgb at chain ends).
+    for (const helper of [
+      "fn mixerSrgbToLinear",
+      "fn mixerLinearToSrgb",
+      "fn mixerRgbToHsl",
+      "fn mixerHslToRgb",
+      "fn mixerWeight",
+    ]) {
+      const idx = source.indexOf(helper)
+      expect(idx).toBeGreaterThanOrEqual(0)
+      expect(idx).toBeLessThan(source.indexOf("@compute"))
+    }
+    // The body classifies with the 8 midpoint ranges and applies per-range
+    // deltas: hue additive (×90°), saturation multiplicative, luminance
+    // asymmetric.
+    expect(source).toContain("mixerWeight(h, 330.0, 15.0)")
+    expect(source).toContain("mixerWeight(h, 285.0, 330.0)")
+    expect(source).toContain("l0_magentaLuminance")
+    expect(source).toContain(" * 90.0")
+    expect(source).toContain("hsl.y * (1.0 + dSaturation)")
+    expect(source).toContain("dLuminance * (1.0 - hsl.z)")
+    // Achromatic pixels are left untouched (hue is undefined for them).
+    expect(source).toContain("if (hsl.y > 0.001)")
+    // The mixer's own helpers, not the pass template's: a middle-of-chain
+    // mixer has no SRGB_TO_LINEAR helpers in scope, so it must not rely on
+    // them.
+    expect(source).not.toContain("let c = srgbToLinear")
+    expect(source).toContain("let srgb = mixerLinearToSrgb(c)")
+    expect(source).toContain("color = mixerSrgbToLinear(mixerHslToRgb")
   })
 
   it("emits module-scope helpers ahead of the entry point", () => {

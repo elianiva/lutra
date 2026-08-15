@@ -96,6 +96,7 @@ describe('tool panel cards', () => {
       sceneExpect(role('button', { name: 'Add Highlights adjustment' })).toExist(),
       sceneExpect(role('button', { name: 'Add White Balance adjustment' })).toExist(),
       sceneExpect(role('button', { name: 'Add Saturation adjustment' })).toExist(),
+      sceneExpect(role('button', { name: 'Add Color Mixer adjustment' })).toExist(),
       sceneExpect(role('button', { name: 'Add Grain adjustment' })).toExist(),
       sceneExpect(role('button', { name: 'Add Vignette adjustment' })).toExist(),
       sceneExpect(role('button', { name: 'Add Chromatic Aberration adjustment' })).toExist(),
@@ -113,6 +114,10 @@ describe('tool panel cards', () => {
       sceneExpect(text('Use it to fix an odd cast or set a mood.')).toExist(),
       sceneExpect(text('Controls how vivid the colors are.')).toExist(),
       sceneExpect(text('Make colors pop, or pull back for a faded look.')).toExist(),
+      sceneExpect(
+        text('Adjusts hue, saturation, and brightness of one color range at a time.'),
+      ).toExist(),
+      sceneExpect(text('Recolor a single tone — sky, skin, grass — and leave the rest.')).toExist(),
       sceneExpect(text('Adds animated film grain for an analog feel.')).toExist(),
       sceneExpect(text('Give the photo texture, like classic film.')).toExist(),
       sceneExpect(text("Darkens or brightens the photo's edges.")).toExist(),

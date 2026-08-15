@@ -14,6 +14,7 @@ export {
   Layer,
   LayerPatch,
   LutLayer,
+  ColorMixerLayer,
   UnknownLayerTypeError,
 } from "./layers"
 export type {
@@ -71,6 +72,7 @@ export {
   renderHighlights,
   renderWhiteBalance,
   renderSaturation,
+  renderColorMixer,
   renderGrain,
   renderVignette,
   renderChromaticAberration,

@@ -10,6 +10,7 @@ export const LAYER_TYPES = [
   "highlights",
   "whiteBalance",
   "saturation",
+  "colorMixer",
   "grain",
   "vignette",
   "chromaticAberration",
@@ -71,6 +72,46 @@ export const SaturationLayer = Schema.Struct({
 })
 export type SaturationLayer = typeof SaturationLayer.Type
 
+// The Color Mixer (Lightroom-style HSL panel, docs/adr/0027): eight hue
+// ranges (red, orange, yellow, green, aqua, blue, purple, magenta), each
+// with hue / saturation / luminance adjustments — 24 numeric fields, one
+// uniform slot each. Field naming is `{color}{Channel}`: redHue,
+// redSaturation, redLuminance, ...
+
+const MixerChannelFields = {
+  redHue: Schema.Number,
+  redSaturation: Schema.Number,
+  redLuminance: Schema.Number,
+  orangeHue: Schema.Number,
+  orangeSaturation: Schema.Number,
+  orangeLuminance: Schema.Number,
+  yellowHue: Schema.Number,
+  yellowSaturation: Schema.Number,
+  yellowLuminance: Schema.Number,
+  greenHue: Schema.Number,
+  greenSaturation: Schema.Number,
+  greenLuminance: Schema.Number,
+  aquaHue: Schema.Number,
+  aquaSaturation: Schema.Number,
+  aquaLuminance: Schema.Number,
+  blueHue: Schema.Number,
+  blueSaturation: Schema.Number,
+  blueLuminance: Schema.Number,
+  purpleHue: Schema.Number,
+  purpleSaturation: Schema.Number,
+  purpleLuminance: Schema.Number,
+  magentaHue: Schema.Number,
+  magentaSaturation: Schema.Number,
+  magentaLuminance: Schema.Number,
+} as const
+
+export const ColorMixerLayer = Schema.Struct({
+  ...LayerCommon.fields,
+  type: Schema.Literal("colorMixer"),
+  ...MixerChannelFields,
+})
+export type ColorMixerLayer = typeof ColorMixerLayer.Type
+
 export const GrainLayer = Schema.Struct({
   ...LayerCommon.fields,
   type: Schema.Literal("grain"),
@@ -125,6 +166,7 @@ export const Layer = Schema.Union([
   HighlightsLayer,
   WhiteBalanceLayer,
   SaturationLayer,
+  ColorMixerLayer,
   GrainLayer,
   VignetteLayer,
   ChromaticAberrationLayer,
@@ -152,6 +194,9 @@ export type WhiteBalanceParams = typeof WhiteBalanceParams.Type
 
 export const SaturationParams = Schema.Struct({ amount: Schema.Number })
 export type SaturationParams = typeof SaturationParams.Type
+
+export const ColorMixerParams = Schema.Struct(MixerChannelFields)
+export type ColorMixerParams = typeof ColorMixerParams.Type
 
 export const GrainParams = Schema.Struct({
   texture: Schema.Number,
@@ -184,6 +229,7 @@ export const LayerPatch = Schema.Union([
   Schema.Struct({ type: Schema.Literal("highlights"), patch: HighlightsParams }),
   Schema.Struct({ type: Schema.Literal("whiteBalance"), patch: WhiteBalanceParams }),
   Schema.Struct({ type: Schema.Literal("saturation"), patch: SaturationParams }),
+  Schema.Struct({ type: Schema.Literal("colorMixer"), patch: ColorMixerParams }),
   Schema.Struct({ type: Schema.Literal("grain"), patch: GrainParams }),
   Schema.Struct({ type: Schema.Literal("vignette"), patch: VignetteParams }),
   Schema.Struct({ type: Schema.Literal("chromaticAberration"), patch: ChromaticAberrationParams }),

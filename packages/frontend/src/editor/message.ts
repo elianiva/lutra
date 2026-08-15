@@ -255,6 +255,15 @@ export const LutThumbsRevoked = Message.m('LutThumbsRevoked')
 /** For toggled layers (White Balance, Vignette): cycle the active field shown in the drawer. */
 export const CycledToggledField = Message.m('CycledToggledField', { id: LayerIdSchema })
 
+/** For Color Mixer layers: select which hue range the drawer shows — the
+ *  range's three sliders replace the previous range's. Presentation-only
+ *  (no render), exactly like CycledToggledField. */
+export const SelectedMixerColor = Message.m('SelectedMixerColor', {
+  id: LayerIdSchema,
+  // 0..7 into MIXER_COLORS; clamped in update.
+  color: S.Number,
+})
+
 // ---- layer drawer reorder (drag) ----
 
 export const StartedLayerReorder = Message.m('StartedLayerReorder', { id: LayerIdSchema })
@@ -432,6 +441,7 @@ export const EditorMessage = S.Union([
   LutThumbFailed,
   LutThumbsRevoked,
   CycledToggledField,
+  SelectedMixerColor,
   StartedLayerReorder,
   MovedLayerReorder,
   ChangedCompareMode,
