@@ -74,8 +74,12 @@ export const exportDialogView = (h: HtmlBuilder<EditorMessage>, model: Model) =>
                 h.div(
                   [
                     ...panel,
+                    // Full-width on phones (docs/plans/12): the fixed 420px
+                    // panel would overflow a ~360px viewport. Capped in
+                    // height with an internal scroll so a landscape phone
+                    // can still reach the Export button.
                     h.Class(
-                      'fixed left-1/2 top-1/2 z-[60] w-[420px] -translate-x-1/2 -translate-y-1/2 border border-border bg-panel shadow-lg',
+                      'fixed left-1/2 top-1/2 z-[60] w-[min(420px,calc(100vw-2rem))] max-h-[85dvh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto border border-border bg-panel shadow-lg',
                     ),
                   ],
                   [

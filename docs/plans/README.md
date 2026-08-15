@@ -27,6 +27,7 @@ questions in each were resolved one by one and baked into the files as
 | 09 | RAW support (owned LibRaw wasm build → sRGB-16 source) | **Decided — ready to implement** (docs/adr/0014 + `09-raw-support.md`) |
 | 10 | PWA + offline support (offline library) | **Implemented** — docs/adr/0015 |
 | 11 | Informative tool panel cards | **Implemented** — docs/adr/0016 |
+| 12 | Mobile support UI | **Implemented** — `12-mobile-ui.md` |
 
 Scope (agreed): **functional + a11y**. Visual polish (motion, histogram
 upgrade, LUT picker search) is deliberately out of this pass — see

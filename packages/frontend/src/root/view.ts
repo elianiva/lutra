@@ -45,8 +45,11 @@ const readyToast = (model: Model, h: HtmlBuilder<RootMessage>) =>
     ? h.div(
         [
           h.OnClick(OfflineReadyDismissed()),
+          // inset-x-4 on phones (docs/plans/12): the card spans the viewport
+          // width instead of floating in the corner; `md:` restores the
+          // fixed-width corner float.
           h.Class(
-            'fixed bottom-4 right-4 z-50 cursor-pointer border border-border bg-panel px-4 py-3 text-sm text-ink shadow-lg',
+            'fixed inset-x-4 bottom-4 z-50 cursor-pointer border border-border bg-panel px-4 py-3 text-sm text-ink shadow-lg md:inset-x-auto md:right-4 md:w-64',
           ),
         ],
         ['Offline ready — Lutra works without a connection'],
@@ -63,7 +66,14 @@ const offlineCard = (model: Model, h: HtmlBuilder<RootMessage>) => {
   const pct = offline.total > 0 ? Math.round((offline.downloaded / offline.total) * 100) : 0
   const frame = (content: ReadonlyArray<Html>) =>
     h.div(
-      [h.Class('fixed bottom-4 right-4 z-50 w-64 border border-border bg-panel px-4 py-3 shadow-lg')],
+      [
+        // inset-x-4 on phones (docs/plans/12): the card spans the viewport
+        // width instead of floating in the corner; `md:` restores the
+        // fixed-width corner float.
+        h.Class(
+          'fixed inset-x-4 bottom-4 z-50 border border-border bg-panel px-4 py-3 shadow-lg md:inset-x-auto md:right-4 md:w-64',
+        ),
+      ],
       content,
     )
   const progress = h.div([h.Class('h-1 w-full bg-border-strong')], [

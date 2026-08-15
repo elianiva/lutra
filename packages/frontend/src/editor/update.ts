@@ -218,6 +218,16 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
   return Match.value(message).pipe(
     Match.withReturnType<UpdateReturn>(),
     Match.tagsExhaustive({
+      // ---- mobile bottom sheets (docs/plans/12) ----
+      // Toggle the tapped sheet: tapping the active tab closes it, tapping
+      // the other switches. Desktop never reads this — the panels render
+      // side-by-side there regardless (the sheet classes are `lg:`-scoped).
+      ToggledMobileSheet: ({ sheet }) => [
+        { ...model, phase, mobileSheet: model.mobileSheet === sheet ? null : sheet },
+        [],
+        Option.none(),
+      ],
+
       // ---- canvas registration ----
       // The mount already wrote the element into the CanvasRef service; the
       // acknowledgment exists for observability (DevTools, Scene, replay).
@@ -317,6 +327,9 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           attachedEdit: { id: null, source },
           saveStatus: { _tag: 'idle' },
           lutThumbs: {},
+          // A new photo is a new context: close the mobile sheets so the
+          // canvas is the first thing on screen (docs/plans/12).
+          mobileSheet: null,
         })
         return [
           next,
@@ -352,6 +365,8 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             // A cleared image has no LUT target — a stale hover preview must
             // not leak into a future render.
             previewLut: null,
+            // The mobile sheets close with the image (docs/plans/12).
+            mobileSheet: null,
             attachedEdit: null,
             saveStatus: { _tag: 'idle' },
             lutThumbs: {},
@@ -384,6 +399,9 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           // A new image starts the split position over at 50% (the compare
           // mode itself persists across images).
           compareSplitAt: 0.5,
+          // And closes the mobile sheets — the canvas is the first thing
+          // on screen (docs/plans/12).
+          mobileSheet: null,
           attachedEdit: { id, source },
           saveStatus: { _tag: 'idle' },
           lutThumbs: {},
@@ -457,7 +475,9 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         // target is gone (D9).
         if (!transitioned || phase._tag !== 'Drafting') return [model, [], Option.none()]
         const layer = phase.layer
-        let next: Model = { ...model, phase, previewLut: null }
+        // A pick is an edit action: on mobile the sheet follows the draft
+        // to the layer drawer, where the sliders live (docs/plans/12).
+        let next: Model = { ...model, phase, previewLut: null, mobileSheet: 'layers' }
         if (type === 'lut') {
           const catalog = model.catalog
           // Unreachable — the pre-guard above blocks LUT picks without a
@@ -591,7 +611,13 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         // gone). A selection without an image (or while a draft is active)
         // has no edge and is ignored.
         if (!transitioned) return [model, [], Option.none()]
-        return [{ ...model, phase, lutBarOpen: false, previewLut: null }, [], Option.none()]
+        // Selecting a layer opens its sliders: on mobile the sheet follows
+        // to the layer drawer (docs/plans/12).
+        return [
+          { ...model, phase, lutBarOpen: false, previewLut: null, mobileSheet: 'layers' },
+          [],
+          Option.none(),
+        ]
       },
       RemovedLayer: ({ id }) => {
         const { [id]: _r, ...restIndex } = model.activeFieldIndex

@@ -115,6 +115,15 @@ export const Model = Schema.Struct({
   compareMode: CompareMode,
   compareSplitAt: Schema.Number,
   compareToggleBefore: Schema.Boolean,
+  // Which bottom sheet is open on mobile (docs/plans/12): under the `lg`
+  // breakpoint the tool panel and the layer drawer collapse into full-width
+  // bottom sheets toggled by the mobile tab bar — this field tracks which
+  // one is open (null = neither, the canvas gets the full screen). Inert on
+  // desktop: both panels are always visible there and the sheets render
+  // hidden.
+  mobileSheet: Schema.NullOr(
+    Schema.Union([Schema.Literal('tools'), Schema.Literal('layers')]),
+  ),
   // True while a RenderChain command is in flight; renderNow skips dispatch
   // while pending so the GPU queue never backs up (the in-flight render
   // re-triggers with the newest state when it completes).
@@ -182,6 +191,7 @@ export const initialModel = (): Model => ({
   compareMode: 'off',
   compareSplitAt: 0.5,
   compareToggleBefore: false,
+  mobileSheet: null,
   renderPending: false,
   renderedStamp: 0,
   lastRender: null,

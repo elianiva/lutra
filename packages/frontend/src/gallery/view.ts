@@ -150,7 +150,9 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) =>
                 [
                   h.OnClick(DeleteRequested({ id: summary.id })),
                   h.AriaLabel('Delete saved edit'),
-                  h.Class('text-[10px] text-white/80 hover:text-white'),
+                  // size-7: a finger-sized hit target on touch screens
+                  // (docs/plans/12) — the glyph stays small.
+                  h.Class('grid size-7 place-items-center text-[10px] text-white/80 hover:text-white'),
                   h.DataAttribute('delete-edit-id', summary.id),
                 ],
                 ['✕'],

@@ -30,9 +30,19 @@ const summary = (model: Model, layer: Layer, ui: (typeof LAYER_UI)[LayerType]) =
     ? `${lutName(model.catalog, layer.lutId)} · ${ui.formatValue(layer)}`
     : ui.formatValue(layer)
 
-export const layerDrawer = (h: HtmlBuilder<EditorMessage>, model: Model) =>
+/**
+ * The right "Layers" sidebar (docs/plans/12): always visible as a side
+ * column at `lg`+, and a full-width bottom sheet below `lg` — `open` is the
+ * mobile sheet state (visible only while its tab is active).
+ */
+export const layerDrawer = (h: HtmlBuilder<EditorMessage>, model: Model, open: boolean) =>
   h.aside(
-    [h.Class('flex w-72 shrink-0 flex-col border-l border-border bg-panel'), h.AriaLabel('Layers')],
+    [
+      h.Class(
+        `${open ? 'flex' : 'hidden'} order-2 max-h-[45dvh] shrink-0 flex-col overflow-y-auto border-t border-border bg-panel lg:order-none lg:flex lg:max-h-none lg:w-72 lg:overflow-y-visible lg:border-l lg:border-t-0`,
+      ),
+      h.AriaLabel('Layers'),
+    ],
     [
       h.div(
         [

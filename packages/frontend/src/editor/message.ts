@@ -165,6 +165,17 @@ export const ScaledCanvas = Message.m('ScaledCanvas', {
   offsetY: S.Number,
 })
 
+// ---- mobile (bottom sheets + tab bar, docs/plans/12) ----
+
+// The two mobile bottom sheets: the tool panel ('tools') and the layer
+// drawer ('layers'). Under the `lg` breakpoint both panels collapse into
+// full-width bottom sheets toggled by the mobile tab bar; this message
+// toggles one open (tapping the active tab closes it). Inert on desktop.
+export const MobileSheet = S.Union([S.Literal('tools'), S.Literal('layers')])
+export type MobileSheet = typeof MobileSheet.Type
+
+export const ToggledMobileSheet = Message.m('ToggledMobileSheet', { sheet: MobileSheet })
+
 // ---- tool panel / draft lifecycle ----
 
 export const SelectedTool = Message.m('SelectedTool', {
@@ -387,6 +398,7 @@ export const SaveFailed = Message.m('SaveFailed', { error: SaveError })
 export const EditorMessage = S.Union([
   FilePickRequested,
   FilePickCancelled,
+  ToggledMobileSheet,
   SelectedImageFile,
   ImageDecoded,
   ImageFailedToDecode,

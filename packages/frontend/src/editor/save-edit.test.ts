@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { Option } from 'effect'
 import { Command } from 'foldkit'
-import { Command as SceneCommand, Mount, click, expect as sceneExpect, expectOutMessage, given, scene, text } from 'foldkit/scene'
+import { Command as SceneCommand, Mount, click, expect as sceneExpect, expectOutMessage, given, role, scene, text } from 'foldkit/scene'
 import { MockImageBitmap } from '../vitest-setup'
 import { RenderHandle } from '../gpu/backend'
 import { EditId, StoreError } from '@lutra/store'
@@ -187,7 +187,9 @@ describe('editor: top bar save controls', () => {
       given(loaded({ id: id(), source: source() })),
       ...settleCanvasMounts,
       sceneExpect(text('Save')).toExist(),
-      sceneExpect(text('Save as')).toExist(),
+      // The button's accessible name comes from its aria-label (the visible
+      // label is a CSS-hidable span — docs/plans/12).
+      sceneExpect(role('button', { name: 'Save as a new edit' })).toExist(),
       click(text('Save')),
       // The button flips to Saving… while the command is in flight.
       sceneExpect(text('Saving…')).toExist(),
@@ -205,7 +207,7 @@ describe('editor: top bar save controls', () => {
       config,
       given(loaded({ id: null, source: source() })),
       ...settleCanvasMounts,
-      sceneExpect(text('Save as')).toBeDisabled(),
+      sceneExpect(role('button', { name: 'Save as a new edit' })).toBeDisabled(),
       sceneExpect(text('Save')).toBeEnabled(),
       SceneCommand.expectNone(),
     )
@@ -218,7 +220,7 @@ describe('editor: top bar save controls', () => {
       ...settleCanvasMounts,
       // The Save button shows the in-flight label; both are disabled.
       sceneExpect(text('Saving…')).toBeDisabled(),
-      sceneExpect(text('Save as')).toBeDisabled(),
+      sceneExpect(role('button', { name: 'Save as a new edit' })).toBeDisabled(),
       SceneCommand.expectNone(),
     )
   })
@@ -228,7 +230,7 @@ describe('editor: top bar save controls', () => {
       config,
       given(loaded({ id: id(), source: source() })),
       ...settleCanvasMounts,
-      click(text('Save as')),
+      click(role('button', { name: 'Save as a new edit' })),
       SceneCommand.expectHas(SaveEdit),
       SceneCommand.resolve(SaveEdit, EditSaved({ id: otherId(), savedAt: 1234 })),
       sceneExpect(text('Saved', { exact: false })).toExist(),

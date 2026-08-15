@@ -14,11 +14,17 @@ import type { LayerType } from '@lutra/engine'
  * tool is already in the chain. The LUT card's description slot doubles as
  * the catalog status slot (loading / failed) while the library isn't
  * available — plan 06's caption absorbed into the card.
+ *
+ * `open` is the mobile sheet state (docs/plans/12): under `lg` the panel
+ * renders as a full-width bottom sheet, visible only while its tab is
+ * active; the classes flip back to the in-flow side column at `lg`.
  */
-export const toolPanel = (h: HtmlBuilder<EditorMessage>, model: Model) =>
+export const toolPanel = (h: HtmlBuilder<EditorMessage>, model: Model, open: boolean) =>
   h.aside(
     [
-      h.Class('flex w-72 shrink-0 flex-col border-r border-border bg-panel'),
+      h.Class(
+        `${open ? 'flex' : 'hidden'} order-3 max-h-[45dvh] shrink-0 flex-col overflow-y-auto border-t border-border bg-panel lg:order-none lg:flex lg:max-h-none lg:w-72 lg:overflow-y-visible lg:border-r lg:border-t-0`,
+      ),
       h.AriaLabel('Adjustment tools'),
     ],
     [

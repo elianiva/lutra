@@ -90,15 +90,28 @@ export const lutBar = (h: HtmlBuilder<EditorMessage>, model: Model) =>
       // (231 = 1px border + 16px name + 6px gap + 16px padding + 192px
       // strip). The tab list and the filmstrip scroll independently inside
       // it, so the bar's height never follows the row count (Instant Pro
-      // alone is 7 rows at 1280px).
+      // alone is 7 rows at 1280px). On phones the bar stacks instead
+      // (docs/plans/12): tabs become a horizontal row on top, the filmstrip
+      // below — the two-column layout would leave a ~150px strip on a
+      // 360px screen. Taller, capped to 40dvh so a landscape phone keeps
+      // some canvas.
       return h.div(
-        [h.Class('flex h-[231px] shrink-0 border-t border-border bg-panel')],
         [
-          // Left column: category tabs (Recents only when non-empty), with
-          // counts for the catalog categories. The list scrolls when it
-          // outgrows the fixed bar height.
+          h.Class(
+            'flex h-[min(340px,40dvh)] shrink-0 flex-col border-t border-border bg-panel lg:h-[231px] lg:flex-row',
+          ),
+        ],
+        [
+          // Left column (desktop) / top row (mobile): category tabs
+          // (Recents only when non-empty), with counts for the catalog
+          // categories. The list scrolls when it outgrows the bar height;
+          // the row scrolls horizontally on phones.
           h.div(
-            [h.Class('flex w-48 shrink-0 flex-col overflow-y-auto border-r border-border')],
+            [
+              h.Class(
+                'flex shrink-0 flex-row overflow-x-auto border-b border-border lg:w-48 lg:flex-col lg:overflow-y-auto lg:border-r lg:border-b-0',
+              ),
+            ],
             [
               ...(showRecents
                 ? [tab(h, 'recents', 'Recents', recents.length, activeTab === 'recents')]
@@ -116,7 +129,7 @@ export const lutBar = (h: HtmlBuilder<EditorMessage>, model: Model) =>
           ),
           // Right column: name line + filmstrip.
           h.div(
-            [h.Class('flex min-w-0 flex-1 flex-col gap-1.5 px-3 py-2')],
+            [h.Class('flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 px-3 py-2')],
             [
               h.div(
                 [

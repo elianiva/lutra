@@ -20,7 +20,7 @@ export const tab = (
       // different tab).
       h.Key(tab),
       h.Class(
-        `flex items-center justify-between gap-2 px-3 py-1.5 text-left text-[10px] uppercase tracking-[0.14em] ${
+        `flex shrink-0 items-center justify-between gap-2 px-3 py-1.5 text-left text-[10px] uppercase tracking-[0.14em] ${
           active ? 'bg-panel-alt text-ink' : 'text-muted hover:bg-panel-alt hover:text-ink'
         }`,
       ),

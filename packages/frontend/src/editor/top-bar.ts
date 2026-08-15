@@ -1,6 +1,6 @@
 import { Match } from 'effect'
 import type { Html, HtmlBuilder } from 'foldkit/html'
-import { Download } from 'lucide'
+import { CopyPlus, Download, Plus } from 'lucide'
 import { icon } from '../components/icon'
 import { ExportRequested, ClearedImage, SaveRequested, SaveAsRequested } from './message'
 import type { EditorMessage } from './message'
@@ -9,6 +9,10 @@ import type { Model } from './model'
 /**
  * Top bar: LUTRA wordmark left; right side: the save flow (Save, Save as,
  * and the last save's status), export, and clear.
+ *
+ * On phones (docs/plans/12) the wordmark and Save stay, while Save as and
+ * New collapse to icon-only buttons (`sm` restores the text) — the whole
+ * action row must fit a ~360px viewport next to the wordmark.
  *
  * Save persists the committed chain through the Edit store — in place when
  * the editor has an attached Edit, creating a new Edit for a fresh in-editor
@@ -49,7 +53,12 @@ export const topBar = (h: HtmlBuilder<EditorMessage>, model: Model, hasImage: bo
               'px-2 py-1 text-xs text-muted hover:text-ink disabled:opacity-30',
             ),
           ],
-          ['Save as'],
+          [
+            h.span([h.Class('hidden sm:inline')], ['Save as']),
+            h.span([h.Class('grid size-8 place-items-center sm:hidden')], [
+              icon(h, CopyPlus, 'Save as a new edit'),
+            ]),
+          ],
         ),
         h.button(
           [
@@ -67,9 +76,16 @@ export const topBar = (h: HtmlBuilder<EditorMessage>, model: Model, hasImage: bo
             h.OnClick(ClearedImage()),
             h.Disabled(!hasImage),
             h.AriaLabel('Start over'),
-            h.Class('px-2 text-xs text-muted hover:text-ink disabled:opacity-30'),
+            h.Class(
+              'px-2 py-1 text-xs text-muted hover:text-ink disabled:opacity-30',
+            ),
           ],
-          ['New'],
+          [
+            h.span([h.Class('hidden sm:inline')], ['New']),
+            h.span([h.Class('grid size-8 place-items-center sm:hidden')], [
+              icon(h, Plus, 'Start over'),
+            ]),
+          ],
         ),
       ]),
     ],
@@ -85,12 +101,12 @@ const saveStatusText = (h: HtmlBuilder<EditorMessage>, model: Model) =>
   Match.value(model.saveStatus).pipe(
     Match.withReturnType<Html>(),
     Match.when({ _tag: 'saved' }, (status) =>
-      h.span([h.Class('pr-1 text-[10px] text-muted')], [
+      h.span([h.Class('hidden pr-1 text-[10px] text-muted sm:inline')], [
         `Saved ${new Date(status.at).toLocaleTimeString()}`,
       ]),
     ),
     Match.when({ _tag: 'failed' }, (status) =>
-      h.span([h.Class('pr-1 text-[10px] text-accent'), h.Title(status.error.message)], [
+      h.span([h.Class('hidden pr-1 text-[10px] text-accent sm:inline'), h.Title(status.error.message)], [
         'Save failed',
       ]),
     ),
