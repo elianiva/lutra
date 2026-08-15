@@ -37,8 +37,15 @@ export class LutCacheError extends Schema.TaggedErrorClass<LutCacheError>()('Lut
  *  Exported for the normalization test (the real Cache API is not
  *  available under happy-dom). The fallback base makes the function total
  *  for both absolute and (hypothetically) relative keys. */
-export const toLibraryPath = (key: string): string =>
-  new URL(key, 'https://lutra.invalid').pathname
+export const toLibraryPath = (key: string): string => {
+  // Pathological keys (a protocol-relative `//…` has no host to resolve
+  // against) fall back to the key itself — the function is total.
+  try {
+    return new URL(key, 'https://lutra.invalid').pathname
+  } catch {
+    return key
+  }
+}
 
 export interface LutCacheShape {
   /** True when a path is already mirrored into the offline library. */
@@ -64,7 +71,9 @@ const withCache = <A>(f: (cache: Cache) => Promise<A>): Effect.Effect<A, LutCach
     catch: (cause) =>
       new LutCacheError({
         kind:
-          cause instanceof DOMException && cause.name === 'QuotaExceededError' ? 'quota' : 'unavailable',
+          cause instanceof DOMException && cause.name === 'QuotaExceededError'
+            ? 'quota'
+            : 'unavailable',
         message: `Offline library storage: ${cause instanceof Error ? cause.message : String(cause)}`,
         cause,
       }),

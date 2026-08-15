@@ -1,126 +1,185 @@
-import { describe, it, expect } from "vitest"
-import { applyLutCpu } from "./apply"
-import { parseCube } from "./cube"
+import { describe, it, expect } from 'vitest'
+import fc from 'fast-check'
+import { applyLutCpu } from './apply'
+import type { LutCube } from './cube'
 
-// A size-2 cube with texel (0,0,0) = black, texel (1,1,1) = white, and every
-// other texel mid-gray — hand-computable trilinear results. Row-major layout
-// ((r*size + g)*size + b) * 3, exactly what parseCube emits.
-const midGrayCube = () => {
-  const data = new Float32Array(8 * 3).fill(0.5)
-  // texel (0,0,0) -> black
-  data[0] = 0
-  data[1] = 0
-  data[2] = 0
-  // texel (1,1,1) -> white
-  data[21] = 1
-  data[22] = 1
-  data[23] = 1
-  return { size: 2, data }
+// ---- generators ----
+
+const channel = fc.integer({ min: 0, max: 255 })
+const amountArb = fc.float({ min: 0, max: 1, noDefaultInfinity: true, noNaN: true })
+
+const imageArb = fc
+  .tuple(fc.integer({ min: 1, max: 8 }), fc.integer({ min: 1, max: 8 }))
+  .chain(([width, height]) =>
+    fc
+      .array(channel, { minLength: width * height * 4, maxLength: width * height * 4 })
+      .map((px) => new ImageData(new Uint8ClampedArray(px), width, height)),
+  )
+
+/** A cube of a fixed size with arbitrary texel values. */
+const cubeOfSize = (size: number) =>
+  fc
+    .array(fc.float({ min: 0, max: 1, noDefaultInfinity: true, noNaN: true }), {
+      minLength: size * size * size * 3,
+      maxLength: size * size * size * 3,
+    })
+    .map(
+      (values): LutCube => ({
+        size,
+        data: new Float32Array(values.map((v) => (v === 0 ? 0 : v))),
+      }),
+    )
+
+const cubeArb = fc.integer({ min: 2, max: 8 }).chain(cubeOfSize)
+
+const sceneArb = fc.record({ image: imageArb, cube: cubeArb, amount: amountArb })
+
+// ---- reference ----
+
+/**
+ * A textbook trilinear sampler, deliberately structured differently from
+ * the implementation (sum of corner texels weighted by the product of the
+ * per-axis weights, instead of nested `mix` calls): an axis-order or
+ * mix-order bug in `applyLutCpu` shows up as a byte-level mismatch.
+ */
+const referenceApply = (image: ImageData, cube: LutCube, amount: number): Uint8ClampedArray => {
+  const { size, data } = cube
+  const scale = size - 1
+  const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+  const out = new Uint8ClampedArray(image.data.length)
+
+  for (let i = 0; i < image.data.length; i += 4) {
+    const c = [image.data[i]! / 255, image.data[i + 1]! / 255, image.data[i + 2]! / 255]
+    const p = c.map((v) => v * scale)
+    const x0 = p.map(Math.floor)
+    const f = p.map((v, k) => v - x0[k]!)
+    const x1 = x0.map((v) => Math.min(v + 1, size - 1))
+
+    const lut = [0, 0, 0]
+    for (let corner = 0; corner < 8; corner++) {
+      const rr = corner & 1 ? x1[0]! : x0[0]!
+      const gg = corner & 2 ? x1[1]! : x0[1]!
+      const bb = corner & 4 ? x1[2]! : x0[2]!
+      const wr = corner & 1 ? f[0]! : 1 - f[0]!
+      const wg = corner & 2 ? f[1]! : 1 - f[1]!
+      const wb = corner & 4 ? f[2]! : 1 - f[2]!
+      const idx = ((bb * size + gg) * size + rr) * 3
+      for (let ch = 0; ch < 3; ch++) {
+        lut[ch]! += data[idx + ch]! * wr * wg * wb
+      }
+    }
+    for (let ch = 0; ch < 3; ch++) {
+      out[i + ch] = lerp(image.data[i + ch]! / 255, lut[ch]!, amount) * 255
+    }
+    out[i + 3] = image.data[i + 3]!
+  }
+  return out
 }
 
-const image = (px: ReadonlyArray<number>) => new ImageData(new Uint8ClampedArray(px), 1, 1)
-
-describe("applyLutCpu", () => {
-  it("matches the shader's trilinear sampling on hand-computed values", () => {
-    // Input (0.25, 0.25, 0.25): p = 0.25 * 1, f = 0.25 on every axis.
-    // x-lerps: 0 -> 0.5 at 0.25 = 0.125, 0.5 -> 0.5 = 0.5, 0.5 -> 0.5 = 0.5,
-    // 0.5 -> 1 at 0.25 = 0.625; y-lerps: 0.125 -> 0.5 at 0.25 = 0.21875,
-    // 0.5 -> 0.625 at 0.25 = 0.53125; z-lerp: 0.21875 -> 0.53125 at 0.25 =
-    // 0.296875 -> byte 75.703 -> 76.
-    const out = applyLutCpu(image([64, 64, 64, 255]), midGrayCube(), 1)
-    expect(out.data[0]).toBe(76)
-    expect(out.data[1]).toBe(76)
-    expect(out.data[2]).toBe(76)
-    expect(out.data[3]).toBe(255)
-  })
-
-  it("collapses to the corner texel at full-scale coordinates", () => {
-    // Input (1, 0, 0): p = (1, 0, 0), f = 0 everywhere -> the lerps collapse
-    // to texel (1,0,0) = mid-gray (0.5) -> byte 127.5 -> 128.
-    const out = applyLutCpu(image([255, 0, 0, 128]), midGrayCube(), 1)
-    expect(out.data[0]).toBe(128)
-    expect(out.data[1]).toBe(128)
-    expect(out.data[2]).toBe(128)
-    // Alpha passes through untouched (the shader stores it unmodified).
-    expect(out.data[3]).toBe(128)
-  })
-
-  it("amount 0 leaves the image unchanged", () => {
-    const out = applyLutCpu(image([10, 200, 90, 255]), midGrayCube(), 0)
-    expect(out.data[0]).toBe(10)
-    expect(out.data[1]).toBe(200)
-    expect(out.data[2]).toBe(90)
-  })
-
-  it("applies a half-strength mix between source and LUT", () => {
-    // (1,0,0) with amount 0.5: 0.5*(1,0,0) + 0.5*(0.5,0.5,0.5) = (0.75, 0.25, 0.25)
-    const out = applyLutCpu(image([255, 0, 0, 255]), midGrayCube(), 0.5)
-    expect(out.data[0]).toBe(191) // 0.75 * 255 = 191.25
-    expect(out.data[1]).toBe(64) // 0.25 * 255 = 63.75
-    expect(out.data[2]).toBe(64)
-  })
-
-  it("works on a cube produced by parseCube", () => {
-    // File point order: red varies fastest — point i is texel
-    // (r = i % 2, g = (i / 2) % 2, b = i / 4) where the output is the
-    // texel's own coordinates: an identity cube.
-    const cube = parseCube(
-      [
-        "LUT_3D_SIZE 2",
-        "0 0 0",
-        "1 0 0",
-        "0 1 0",
-        "1 1 0",
-        "0 0 1",
-        "1 0 1",
-        "0 1 1",
-        "1 1 1",
-      ].join("\n"),
-    )
-    // A linear cube: applying it is the identity on every channel.
-    const out = applyLutCpu(image([13, 27, 240, 255]), cube, 1)
-    expect(out.data[0]).toBe(13)
-    expect(out.data[1]).toBe(27)
-    expect(out.data[2]).toBe(240)
-  })
-
-  it("reads the red axis from the file's fastest-varying points", () => {
-    // A cube whose red-axis step (file point 1) is red and whose blue-axis
-    // step (file point size² = 4) is blue, everything else mid-gray. Under
-    // the file's red-fastest order, pure red input must come out red — a
-    // red/blue swap in the sampler would answer blue here.
-    const cube = {
-      size: 2,
-      data: new Float32Array(8 * 3).fill(0.5),
+/** The identity cube: texel (r, g, b) stores its own coordinates. */
+const identityCube = (size: number): LutCube => {
+  const data = new Float32Array(size * size * size * 3)
+  const scale = size - 1
+  for (let b = 0; b < size; b++) {
+    for (let g = 0; g < size; g++) {
+      for (let r = 0; r < size; r++) {
+        const idx = ((b * size + g) * size + r) * 3
+        data[idx] = r / scale
+        data[idx + 1] = g / scale
+        data[idx + 2] = b / scale
+      }
     }
-    const d = cube.data
-    d[0] = 0
-    d[1] = 0
-    d[2] = 0 // point 0 = (0,0,0): black
-    d[3] = 1
-    d[4] = 0
-    d[5] = 0 // point 1 = (1,0,0): red
-    d[12] = 0
-    d[13] = 0
-    d[14] = 1 // point 4 = (0,0,1): blue
-    d[21] = 1
-    d[22] = 1
-    d[23] = 1 // point 7 = (1,1,1): white
-    const red = applyLutCpu(image([255, 0, 0, 255]), cube, 1)
-    expect(red.data[0]).toBe(255)
-    expect(red.data[1]).toBe(0)
-    expect(red.data[2]).toBe(0)
-    const blue = applyLutCpu(image([0, 0, 255, 255]), cube, 1)
-    expect(blue.data[0]).toBe(0)
-    expect(blue.data[1]).toBe(0)
-    expect(blue.data[2]).toBe(255)
+  }
+  return { size, data }
+}
+
+describe('applyLutCpu', () => {
+  it('matches a reference trilinear sampler on any image, cube, and amount', () => {
+    fc.assert(
+      fc.property(sceneArb, ({ image, cube, amount }) => {
+        const out = applyLutCpu(image, cube, amount)
+        const ref = referenceApply(image, cube, amount)
+        for (let i = 0; i < out.data.length; i++) {
+          // The two formulations round differently only at byte boundaries.
+          expect(Math.abs(out.data[i]! - ref[i]!)).toBeLessThanOrEqual(1)
+        }
+      }),
+    )
   })
 
-  it("does not mutate the input image", () => {
-    const input = image([200, 100, 50, 255])
-    applyLutCpu(input, midGrayCube(), 1)
-    expect(input.data[0]).toBe(200)
-    expect(input.data[1]).toBe(100)
-    expect(input.data[2]).toBe(50)
+  it('amount 0 leaves every pixel byte-identical', () => {
+    fc.assert(
+      fc.property(sceneArb, ({ image, cube }) => {
+        const out = applyLutCpu(image, cube, 0)
+        for (let i = 0; i < image.data.length; i++) {
+          expect(out.data[i]).toBe(image.data[i])
+        }
+      }),
+    )
+  })
+
+  it('passes the alpha channel through untouched', () => {
+    fc.assert(
+      fc.property(sceneArb, ({ image, cube, amount }) => {
+        const out = applyLutCpu(image, cube, amount)
+        for (let i = 3; i < image.data.length; i += 4) {
+          expect(out.data[i]).toBe(image.data[i])
+        }
+      }),
+    )
+  })
+
+  it('applying the identity cube is the identity on every channel', () => {
+    fc.assert(
+      fc.property(
+        fc.tuple(imageArb, fc.integer({ min: 2, max: 8 }), amountArb),
+        ([image, size, amount]) => {
+          const out = applyLutCpu(image, identityCube(size), amount)
+          for (let i = 0; i < image.data.length; i++) {
+            // Trilinear interpolation of the identity mapping is exact in
+            // theory; float rounding can land one byte off the original.
+            expect(Math.abs(out.data[i]! - image.data[i]!)).toBeLessThanOrEqual(1)
+          }
+        },
+      ),
+    )
+  })
+
+  it('collapses to the corner texel at texel-center coordinates', () => {
+    // Sizes where 255 is divisible by size-1 (2 and 16): the byte
+    // k * 255/(size-1) maps to the exact texel k/(size-1), so the lerps
+    // collapse and the output is that texel's own value.
+    fc.assert(
+      fc.property(
+        fc
+          .constantFrom(2, 16)
+          .chain((size) =>
+            fc.tuple(fc.constant(size), fc.integer({ min: 0, max: size - 1 }), cubeOfSize(size)),
+          ),
+        ([size, k, cube]) => {
+          const byte = (k * 255) / (size - 1)
+          const input = new ImageData(new Uint8ClampedArray([byte, byte, byte, 255]), 1, 1)
+          const out = applyLutCpu(input, cube, 1)
+          const texelIndex = ((k * size + k) * size + k) * 3
+          for (const ch of [0, 1, 2]) {
+            const expected = Math.round(cube.data[texelIndex + ch]! * 255)
+            expect(Math.abs(out.data[ch]! - expected)).toBeLessThanOrEqual(1)
+          }
+          expect(out.data[3]).toBe(255)
+        },
+      ),
+    )
+  })
+
+  it('does not mutate the input image', () => {
+    fc.assert(
+      fc.property(sceneArb, ({ image, cube, amount }) => {
+        const before = new Uint8ClampedArray(image.data)
+        applyLutCpu(image, cube, amount)
+        for (let i = 0; i < before.length; i++) {
+          expect(image.data[i]).toBe(before[i])
+        }
+      }),
+    )
   })
 })

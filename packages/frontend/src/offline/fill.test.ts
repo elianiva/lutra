@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
+import fc from 'fast-check'
 import { Duration, Effect } from 'effect'
 import { fillFiles, libraryFiles, type FillOptions } from './fill'
 import type { FillEvent } from './messages'
@@ -69,11 +70,15 @@ const opts = (overrides: Partial<FillOptions> = {}): FillOptions => {
   }
 }
 
-/** Run one fill and collect its events through the emit channel. */
-const collectEvents = (options: FillOptions): Promise<ReadonlyArray<FillEvent>> => {
+/** Run one fill and collect its events through the emit channel. Defaults to
+ *  the module catalog; property tests pass a random one. */
+const collectEvents = (
+  options: FillOptions,
+  catalogEntries: ReadonlyArray<LutCatalogEntry> = catalog,
+): Promise<ReadonlyArray<FillEvent>> => {
   const events: Array<FillEvent> = []
   return Effect.runPromise(
-    fillFiles(catalog, options, (event) =>
+    fillFiles(catalogEntries, options, (event) =>
       Effect.sync(() => {
         events.push(event)
       }),
@@ -220,8 +225,7 @@ describe('fillFiles', () => {
   it('a quota failure stops the run with FillQuotaError — no completion', async () => {
     const quotaCache = {
       ...fakeCache(),
-      put: () =>
-        Effect.fail(new LutCacheError({ kind: 'quota', message: 'origin storage full' })),
+      put: () => Effect.fail(new LutCacheError({ kind: 'quota', message: 'origin storage full' })),
     }
     const events = await collectEvents(opts({ cache: quotaCache, maxAttempts: 3 }))
     expect(events.at(-1)).toMatchObject({
@@ -252,5 +256,147 @@ describe('fillFiles', () => {
     // 5 batches × 5ms minimum — the loop actually slept between batches.
     expect(Date.now() - started).toBeGreaterThanOrEqual(20)
     expect(okFetch).toHaveBeenCalledTimes(TOTAL)
+  })
+})
+
+// ---- property-based convergence ----
+
+/** A random fill scenario: a catalog, an arbitrary cache snapshot (library
+ *  files already mirrored, plus orphans a shrink left behind), and a
+ *  per-file fetch verdict. The catalog pairs unique LUT references with
+ *  unique thumbnails, so the library file list never contains duplicates. */
+const scenarioArb = fc
+  .tuple(
+    fc.uniqueArray(fc.stringMatching(/^luts\/[a-z0-9/._-]{1,40}$/), { maxLength: 6 }),
+    fc.uniqueArray(fc.stringMatching(/^thumbnails\/[a-z0-9/._-]{1,40}$/), { maxLength: 6 }),
+    fc.array(
+      fc.record({ name: fc.string({ maxLength: 12 }), category: fc.string({ maxLength: 12 }) }),
+      { minLength: 6, maxLength: 6 },
+    ),
+  )
+  .chain(([lutFiles, thumbnails, meta]) => {
+    const entries: Array<LutCatalogEntry> = meta
+      .slice(0, Math.min(lutFiles.length, thumbnails.length))
+      .map((m, i) => ({ ...m, lut_file: LutId(lutFiles[i]!), thumbnail: thumbnails[i]! }))
+    const files = libraryFiles(entries)
+    return fc.record({
+      entries: fc.constant(entries),
+      files: fc.constant(files),
+      cached: fc.subarray(files.map((f) => f.path)),
+      orphans: fc.array(fc.stringMatching(/^\/luts\/[a-z0-9/._-]{1,40}$/), { maxLength: 3 }),
+      // A verdict per library file; only the missing ones are ever fetched.
+      failures: fc.array(fc.boolean(), {
+        minLength: files.length,
+        maxLength: files.length,
+      }),
+    })
+  })
+
+describe('fillFiles (property-based)', () => {
+  it('any catalog and cache converge to exactly the library files', async () => {
+    await fc.assert(
+      fc.asyncProperty(scenarioArb, async ({ entries, files, cached, orphans }) => {
+        const cache = fakeCache([...cached, ...orphans])
+        const fetchImpl = vi.fn(() => Promise.resolve(new Response('bytes', { status: 200 })))
+        const events = await collectEvents(opts({ cache, fetchImpl }), entries)
+
+        // Every library file is mirrored; orphans are swept; nothing else
+        // remains.
+        const remaining = await Effect.runPromise(cache.keys())
+        expect([...remaining].sort()).toEqual([...files.map((f) => f.path)].sort())
+
+        // Only the missing files are fetched, exactly once each, in order.
+        const missing = files.filter((f) => !cached.includes(f.path))
+        if (missing.length === 0) {
+          // A fully cached library boots silently: no events at all.
+          expect(events).toEqual([])
+          return
+        }
+        expect(fetchImpl).toHaveBeenCalledTimes(missing.length)
+        for (const f of missing) {
+          expect(fetchImpl).toHaveBeenCalledWith(f.path)
+        }
+
+        // The event stream mirrors the diff: a Started header, per-file
+        // started→completed pairs in library order, a Complete footer.
+        expect(events[0]).toEqual({
+          _tag: 'FillStarted',
+          total: files.length,
+          done: files.length - missing.length,
+        })
+        expect(events.at(-1)).toEqual({ _tag: 'FillComplete' })
+        const fileEvents = events.filter(
+          (e) => e._tag === 'FillFileStarted' || e._tag === 'FillFileCompleted',
+        )
+        expect(fileEvents).toHaveLength(missing.length * 2)
+        for (let i = 0; i < missing.length; i++) {
+          expect(fileEvents[i * 2]).toMatchObject({ _tag: 'FillFileStarted' })
+          expect(fileEvents[i * 2 + 1]).toEqual({
+            _tag: 'FillFileCompleted',
+            file: missing[i],
+          })
+        }
+        expect(events.some((e) => e._tag === 'FillFileFailed')).toBe(false)
+        expect(events.some((e) => e._tag === 'FillQuotaError')).toBe(false)
+      }),
+      { numRuns: 25 },
+    )
+  })
+
+  it('per-file failures are reported, never cached, and the run still completes', async () => {
+    await fc.assert(
+      fc.asyncProperty(scenarioArb, async ({ entries, files, cached, orphans, failures }) => {
+        const failSet = new Set(files.filter((_, i) => failures[i]).map((f) => f.path))
+        const missing = files.filter((f) => !cached.includes(f.path))
+        const failed = missing.filter((f) => failSet.has(f.path))
+        const succeeded = missing.filter((f) => !failSet.has(f.path))
+
+        if (missing.length === 0) {
+          // Fully cached: silent boot, nothing fetched.
+          const silentCache = fakeCache([...cached, ...orphans])
+          const silentFetch = vi.fn(() => Promise.resolve(new Response('bytes', { status: 200 })))
+          expect(
+            await collectEvents(opts({ cache: silentCache, fetchImpl: silentFetch }), entries),
+          ).toEqual([])
+          expect(silentFetch).not.toHaveBeenCalled()
+          return
+        }
+
+        const cache = fakeCache([...cached, ...orphans])
+        const fetchImpl = vi.fn((path: string) =>
+          failSet.has(path)
+            ? Promise.reject(new TypeError('network down'))
+            : Promise.resolve(new Response('bytes', { status: 200 })),
+        )
+        // One attempt per file: every fetch happens exactly once and the
+        // verdict is final.
+        const events = await collectEvents(opts({ cache, fetchImpl, maxAttempts: 1 }), entries)
+
+        // The cache holds the library minus the failed files (orphans are
+        // swept regardless).
+        const remaining = await Effect.runPromise(cache.keys())
+        expect([...remaining].sort()).toEqual([...cached, ...succeeded.map((f) => f.path)].sort())
+
+        // Every missing file was attempted exactly once.
+        expect(fetchImpl).toHaveBeenCalledTimes(missing.length)
+        for (const f of missing) {
+          expect(fetchImpl).toHaveBeenCalledWith(f.path)
+        }
+
+        // Failed files announce FillFileFailed, successful ones complete,
+        // and the run still finishes with FillComplete.
+        const completed = events.filter((e) => e._tag === 'FillFileCompleted')
+        expect(completed.map((e) => (e._tag === 'FillFileCompleted' ? e.file.path : ''))).toEqual(
+          succeeded.map((f) => f.path),
+        )
+        const reported = events.filter((e) => e._tag === 'FillFileFailed')
+        expect(reported.map((e) => (e._tag === 'FillFileFailed' ? e.file.path : ''))).toEqual(
+          failed.map((f) => f.path),
+        )
+        expect(events.at(-1)).toEqual({ _tag: 'FillComplete' })
+        expect(events.some((e) => e._tag === 'FillQuotaError')).toBe(false)
+      }),
+      { numRuns: 15 },
+    )
   })
 })

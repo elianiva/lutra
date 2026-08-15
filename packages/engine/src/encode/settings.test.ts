@@ -1,73 +1,139 @@
-import { describe, expect, it } from "vitest"
-import { Schema } from "effect"
+import { describe, expect, it } from 'vitest'
+import fc from 'fast-check'
+import { Schema } from 'effect'
 import {
+  EXPORT_FORMATS,
+  EXPORT_SCALES,
   ExportSettings,
   defaultExportSettings,
   isLossy,
   fileExtension,
   mimeFor,
-} from "./settings"
+} from './settings'
 
-describe("ExportSettings", () => {
-  it("decodes a full settings object", () => {
-    expect(
-      Schema.decodeSync(ExportSettings)({ format: "webp", quality: 80, scale: 0.5 }),
-    ).toEqual({ format: "webp", quality: 80, scale: 0.5 })
+// ---- generators ----
+
+const formatArb = fc.constantFrom(...EXPORT_FORMATS)
+const scaleArb = fc.constantFrom(...EXPORT_SCALES)
+const qualityArb = fc.oneof(fc.constant(null), fc.integer({ min: 0, max: 100 }))
+
+/** Any payload the schema accepts. */
+const validSettingsArb = fc.record({
+  format: formatArb,
+  quality: qualityArb,
+  scale: scaleArb,
+})
+
+// ---- tests ----
+
+describe('ExportSettings', () => {
+  it('round-trips any valid settings object', () => {
+    fc.assert(
+      fc.property(validSettingsArb, (settings) => {
+        expect(Schema.decodeSync(ExportSettings)(settings)).toEqual(settings)
+      }),
+    )
   })
 
-  it("accepts null quality for lossless PNG", () => {
-    expect(
-      Schema.decodeSync(ExportSettings)({ format: "png", quality: null, scale: 1 }),
-    ).toEqual({ format: "png", quality: null, scale: 1 })
+  it('decodes the defaults and they are a valid settings object', () => {
+    fc.assert(
+      fc.property(fc.constant(defaultExportSettings()), (defaults) => {
+        expect(Schema.decodeSync(ExportSettings)(defaults)).toEqual(defaults)
+      }),
+    )
   })
 
-  it("rejects out-of-range quality", () => {
-    expect(() =>
-      Schema.decodeSync(ExportSettings)({ format: "jpeg", quality: 101, scale: 1 }),
-    ).toThrow()
-    expect(() =>
-      Schema.decodeSync(ExportSettings)({ format: "jpeg", quality: -1, scale: 1 }),
-    ).toThrow()
+  it('rejects any out-of-range quality', () => {
+    fc.assert(
+      fc.property(
+        fc.record({
+          format: formatArb,
+          // Just outside the [0, 100] window, and a non-number quality.
+          quality: fc.oneof(
+            fc.integer({ min: -1000, max: -1 }),
+            fc.integer({ min: 101, max: 1000 }),
+            fc.string(),
+          ),
+          scale: scaleArb,
+        }),
+        (settings) => {
+          expect(() => Schema.decodeUnknownSync(ExportSettings)(settings)).toThrow()
+        },
+      ),
+    )
   })
 
-  it("rejects unknown formats", () => {
-    // The payload is deliberately outside the schema's type — decodeUnknown
-    // accepts it at the type level and the runtime rejects it.
-    expect(() =>
-      Schema.decodeUnknownSync(ExportSettings)({ format: "gif", quality: null, scale: 1 }),
-    ).toThrow()
+  it('rejects any unknown format', () => {
+    const formatNames: readonly string[] = EXPORT_FORMATS
+    fc.assert(
+      fc.property(
+        fc.string({ minLength: 1, maxLength: 12 }).filter((s) => !formatNames.includes(s)),
+        (format) => {
+          expect(() =>
+            Schema.decodeUnknownSync(ExportSettings)({ format, quality: null, scale: 1 }),
+          ).toThrow()
+        },
+      ),
+    )
   })
 
-  it("rejects scales outside the presets", () => {
-    expect(() =>
-      Schema.decodeUnknownSync(ExportSettings)({ format: "png", quality: null, scale: 0.3 }),
-    ).toThrow()
+  it('rejects any scale outside the presets', () => {
+    const scaleNames: readonly number[] = EXPORT_SCALES
+    fc.assert(
+      fc.property(
+        fc.double().filter((n) => !scaleNames.includes(n)),
+        (scale) => {
+          expect(() =>
+            Schema.decodeUnknownSync(ExportSettings)({ format: 'png', quality: null, scale }),
+          ).toThrow()
+        },
+      ),
+    )
   })
 
-  it("defaults are valid settings", () => {
-    expect(Schema.decodeSync(ExportSettings)(defaultExportSettings())).toEqual(
-      defaultExportSettings(),
+  it('rejects payloads missing required fields', () => {
+    fc.assert(
+      fc.property(
+        fc
+          .record({ format: formatArb, quality: qualityArb, scale: scaleArb })
+          // Drop one required field at a time.
+          .chain((settings) =>
+            fc.constantFrom(
+              { format: settings.format, quality: settings.quality },
+              { format: settings.format, scale: settings.scale },
+              { quality: settings.quality, scale: settings.scale },
+            ),
+          ),
+        (settings) => {
+          expect(() => Schema.decodeUnknownSync(ExportSettings)(settings)).toThrow()
+        },
+      ),
     )
   })
 })
 
-describe("format helpers", () => {
-  it("isLossy flags everything but PNG", () => {
-    expect(isLossy("png")).toBe(false)
-    expect(isLossy("jpeg")).toBe(true)
-    expect(isLossy("webp")).toBe(true)
-    expect(isLossy("avif")).toBe(true)
+describe('format helpers', () => {
+  it('isLossy flags everything but PNG', () => {
+    fc.assert(
+      fc.property(formatArb, (format) => {
+        expect(isLossy(format)).toBe(format !== 'png')
+      }),
+    )
   })
 
-  it("fileExtension matches the format name", () => {
-    expect(fileExtension("png")).toBe("png")
-    expect(fileExtension("avif")).toBe("avif")
+  it('fileExtension matches the format name', () => {
+    fc.assert(
+      fc.property(formatArb, (format) => {
+        expect(fileExtension(format)).toBe(format)
+      }),
+    )
   })
 
-  it("mimeFor maps each format to its MIME type", () => {
-    expect(mimeFor("png")).toBe("image/png")
-    expect(mimeFor("jpeg")).toBe("image/jpeg")
-    expect(mimeFor("webp")).toBe("image/webp")
-    expect(mimeFor("avif")).toBe("image/avif")
+  it('mimeFor maps each format to its MIME type', () => {
+    fc.assert(
+      fc.property(formatArb, (format) => {
+        expect(mimeFor(format)).toBe(`image/${format}`)
+      }),
+    )
   })
 })

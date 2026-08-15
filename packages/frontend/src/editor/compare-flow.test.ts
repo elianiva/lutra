@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import fc from 'fast-check'
 import { Command, Mount, given, scene, selector, label, expect as sceneExpect } from 'foldkit/scene'
 import { MockImageBitmap } from '../vitest-setup'
 import { initialModel } from './model'
@@ -27,8 +28,9 @@ const loadedModel = () => ({
 })
 
 /** The compare presentation state on a dispatched PresentFrame, if any. */
-const presented = (commands: ReadonlyArray<{ readonly name: string; readonly args?: Record<string, unknown> }>) =>
-  commands.find((c) => c.name === 'PresentFrame')?.args?.present
+const presented = (
+  commands: ReadonlyArray<{ readonly name: string; readonly args?: Record<string, unknown> }>,
+) => commands.find((c) => c.name === 'PresentFrame')?.args?.present
 
 // ---- update flow ----
 
@@ -58,11 +60,22 @@ describe('compare flow', () => {
     expect(model.compareSplitAt).toBe(0.3)
   })
 
-  it('clamps the split position to [0, 1]', () => {
-    const [model] = update(loadedModel(), ChangedSplitPosition({ position: 1.5 }))
-    expect(model.compareSplitAt).toBe(1)
-    const [model2] = update(model, ChangedSplitPosition({ position: -0.2 }))
-    expect(model2.compareSplitAt).toBe(0)
+  it('clamps any split position into [0, 1]', () => {
+    fc.assert(
+      fc.property(
+        fc.double({ min: -1_000_000, max: 1_000_000, noNaN: true, noDefaultInfinity: true }),
+        (position) => {
+          const [model] = update(loadedModel(), ChangedSplitPosition({ position }))
+          expect(model.compareSplitAt).toBeGreaterThanOrEqual(0)
+          expect(model.compareSplitAt).toBeLessThanOrEqual(1)
+          // Positions already in range pass through untouched (-0 clamps to +0,
+          // which is the same value).
+          if (position >= 0 && position <= 1) {
+            expect(model.compareSplitAt).toBe(position || 0)
+          }
+        },
+      ),
+    )
   })
 
   it('does not present without an image', () => {

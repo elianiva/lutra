@@ -28,6 +28,7 @@
     "@foldkit/oxlint-plugin": "^0.4.0",
     "@foldkit/vite-plugin": "^0.11.3",
     "@webgpu/types": "^0.1.60",
+    "fast-check": "^4.9.0",
     "happy-dom": "^20.11.1",
     "typescript": "^7.0.2",
     "vite": "^8.1.5",

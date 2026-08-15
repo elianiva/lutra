@@ -1,4 +1,5 @@
 import { describe, expect, it, afterEach } from 'vitest'
+import fc from 'fast-check'
 import { Effect, Option } from 'effect'
 import { EditId } from './edit-id'
 import { EditStore, EditStoreIndexedDb, Edit } from '../index'
@@ -40,9 +41,14 @@ const list = () =>
     return yield* store.list()
   })
 
+const del = (id: EditId) =>
+  Effect.gen(function* () {
+    const store = yield* EditStore
+    yield* store.delete(id)
+  })
+
 // IndexedDB is async and fake-indexeddb caches open connections per DB name;
-// clear the store between tests via the seam itself so cases never leak into
-// each other.
+// clear the store between tests so cases never leak into each other.
 afterEach(async () => {
   await run(
     Effect.gen(function* () {
@@ -52,21 +58,86 @@ afterEach(async () => {
   )
 })
 
+// ---- model-based property ----
+
+/** The reference model: exactly the rows the store should hold. */
+class Model {
+  readonly rows = new Map<EditId, EditRecord>()
+}
+
+/** The gallery summary the store's list() must produce for one row. */
+const summaryOf = (e: EditRecord) => ({
+  id: e.id,
+  chain: e.chain,
+  thumbnail: e.thumbnail,
+  byteLength: e.thumbnail.byteLength,
+  savedAt: e.savedAt,
+})
+
+/** A random Edit whose id is a format-valid UUID (the EditIdSchema check). */
+const editArb = fc
+  .record({
+    id: fc.uuid(),
+    savedAt: fc.integer({ min: 0, max: 10_000 }),
+    source: fc.uint8Array({ minLength: 0, maxLength: 24 }),
+    thumbnail: fc.uint8Array({ minLength: 0, maxLength: 24 }),
+  })
+  .map((r) =>
+    Edit.make({
+      id: EditId(r.id),
+      chain: [],
+      source: r.source,
+      thumbnail: r.thumbnail,
+      savedAt: r.savedAt,
+    }),
+  )
+
+class SaveCommand implements fc.AsyncCommand<Model, void> {
+  constructor(readonly record: EditRecord) {}
+  check = () => true
+  async run(model: Model): Promise<void> {
+    model.rows.set(this.record.id, this.record)
+    await run(save(this.record))
+  }
+}
+
+class LoadCommand implements fc.AsyncCommand<Model, void> {
+  constructor(readonly id: EditId) {}
+  check = () => true
+  async run(model: Model): Promise<void> {
+    const expected = model.rows.get(this.id)
+    const loaded = await run(load(this.id))
+    expect(loaded).toEqual(expected === undefined ? Option.none() : Option.some(expected))
+  }
+}
+
+class DeleteCommand implements fc.AsyncCommand<Model, void> {
+  constructor(readonly id: EditId) {}
+  check = () => true
+  async run(model: Model): Promise<void> {
+    model.rows.delete(this.id)
+    await run(del(this.id))
+  }
+}
+
+class ListCommand implements fc.AsyncCommand<Model, void> {
+  check = () => true
+  async run(model: Model): Promise<void> {
+    const summaries = await run(list())
+    // Newest-first by savedAt; ties fall back to key (id) order — the rows
+    // come back from IndexedDB in key order and the sort is stable.
+    const expected = [...model.rows.values()]
+      .map(summaryOf)
+      .sort((a, b) => b.savedAt - a.savedAt || (a.id < b.id ? -1 : 1))
+    expect(summaries).toEqual(expected)
+    // Summaries exclude source bytes and carry byteLength instead.
+    for (const s of summaries) {
+      expect('source' in s).toBe(false)
+    }
+  }
+}
+
 describe('EditStoreIndexedDb (IndexedDB local backend)', () => {
-  it('round-trips save → load with the whole self-contained Edit', async () => {
-    const e = edit('11111111-1111-4111-8111-111111111111', 1000)
-    await run(save(e))
-
-    const loaded = await run(load(e.id))
-    expect(Option.isSome(loaded)).toBe(true)
-    expect(loaded).toEqual(Option.some(e))
-  })
-
-  it('load returns Option.None for an unknown id', async () => {
-    const loaded = await run(load(EditId('00000000-0000-4000-8000-000000000000')))
-    expect(loaded).toEqual(Option.none())
-  })
-
   it('load finds an Edit by id even when it is not the first row', async () => {
     // Rows come back in key order, so the second id is not the scan's
     // first row — a load-by-id must still find it (the old
@@ -80,54 +151,34 @@ describe('EditStoreIndexedDb (IndexedDB local backend)', () => {
     expect(loaded).toEqual(Option.some(second))
   })
 
-  it('list returns summaries, newest-first by savedAt, without source bytes', async () => {
-    const older = edit('11111111-1111-4111-8111-111111111111', 10)
-    const newer = edit('22222222-2222-4222-8222-222222222222', 20)
-    await run(save(older))
-    await run(save(newer))
-
-    const summaries = await run(list())
-    expect(summaries.map((s) => s.savedAt)).toEqual([20, 10])
-
-    for (const s of summaries) {
-      // Summaries exclude source bytes and carry byteLength instead.
-      expect('source' in s).toBe(false)
-      expect(s.byteLength).toBe(2)
-    }
-  })
-
-  it('save upserts by id (Save in place updates, id unchanged)', async () => {
-    const id = EditId('11111111-1111-4111-8111-111111111111')
-    await run(save(edit(id, 1)))
-    await run(save(edit(id, 2)))
-
-    const summaries = await run(list())
-    expect(summaries).toHaveLength(1)
-    expect(summaries[0]!.savedAt).toBe(2)
-  })
-
-  it('delete removes one Edit by id; unknown id is a no-op', async () => {
-    const keep = edit('11111111-1111-4111-8111-111111111111', 1)
-    const gone = edit('22222222-2222-4222-8222-222222222222', 2)
-    await run(save(keep))
-    await run(save(gone))
-
-    await run(
-      Effect.gen(function* () {
-        const store = yield* EditStore
-        yield* store.delete(gone.id)
-      }),
+  it('matches a reference model under any sequence of save/load/delete/list', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.commands(
+          [
+            editArb.map((record) => new SaveCommand(record)),
+            fc.uuid().map((id) => new LoadCommand(EditId(id))),
+            fc.uuid().map((id) => new DeleteCommand(EditId(id))),
+            fc.constant(new ListCommand()),
+          ],
+          { maxCommands: 40 },
+        ),
+        async (commands) => {
+          const model = new Model()
+          // Each run starts from an empty database, mirroring the empty model.
+          await run(
+            Effect.gen(function* () {
+              const store = yield* EditStore
+              yield* store.clearAll()
+            }),
+          )
+          for (const command of commands) {
+            if (command.check(model)) await command.run(model, undefined)
+          }
+        },
+      ),
+      { numRuns: 40 },
     )
-    expect((await run(list())).map((s) => s.id)).toEqual([keep.id])
-
-    // Deleting a known-absent id doesn't fail.
-    await run(
-      Effect.gen(function* () {
-        const store = yield* EditStore
-        yield* store.delete(EditId('00000000-0000-4000-8000-000000000000'))
-      }),
-    )
-    expect((await run(list())).map((s) => s.id)).toEqual([keep.id])
   })
 
   it('clearAll removes every Edit', async () => {
