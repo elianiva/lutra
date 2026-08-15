@@ -1,4 +1,4 @@
-import type { BodyRenderer } from "../types"
+import type { BodyRenderer } from '../types'
 
 // Highlight lift. Mask rises from 0 at mid-grey to 1 at white
 // (softened with pow 2.2). 0.2 multiplier tuned for -1..+1 range.

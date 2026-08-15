@@ -1,4 +1,4 @@
-import type { BodyRenderer } from "../types"
+import type { BodyRenderer } from '../types'
 
 // Radial vignette. amount = 0 is identity; positive darkens edges,
 // negative brightens them. uv maps [0,1] → [-1,1] and the x axis is

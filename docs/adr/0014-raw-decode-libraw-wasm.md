@@ -82,7 +82,7 @@ Gallery tiles and the editor's Loading placeholder use the embedded JPEG
 ~1024 px sRGB8 preview derived from the full decode inside the decode worker
 (convert + downscale via OffscreenCanvas, transferred once per photo):
 embedded JPEGs carry the camera tone curve and would mismatch the
-`noAutoBright` decode, and the bar's whole point is "see the LUT on *your*
+`noAutoBright` decode, and the bar's whole point is "see the LUT on _your_
 photo" as the editor renders it. Compare binds the decoded source texture —
 unchanged.
 

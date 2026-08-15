@@ -1,4 +1,4 @@
-import type { BodyRenderer } from "../types"
+import type { BodyRenderer } from '../types'
 
 // Shadow lift. Mask is 1 at black, falls to 0 by mid-grey.
 // 0.15 multiplier tuned for -1..+1 slider range.

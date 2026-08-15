@@ -1,4 +1,4 @@
-import type { BodyRenderer } from "../types"
+import type { BodyRenderer } from '../types'
 
 // Multiplicative exposure in linear light. gain = 2^stops.
 export const renderExposure: BodyRenderer = (i) => `

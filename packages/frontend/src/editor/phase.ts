@@ -3,6 +3,7 @@ import { Machine } from 'foldkit/experimental'
 import { to, when } from 'foldkit/experimental/machine'
 import { ts } from 'foldkit/schema'
 import { Layer, LayerIdSchema } from '@lutra/engine'
+import { moveCurvePoint, resetCurve } from '@lutra/engine'
 import { createLayerFor, DecodeImage } from './command'
 import { EditorMessage } from './message'
 
@@ -131,6 +132,17 @@ export const editorMachine = Machine.define({
         UpdatedDraftParam: to('Drafting', ({ state, message }) =>
           Drafting({ layer: { ...state.layer, [message.field]: message.value } }),
         ),
+        // The curve widget's drag: the engine clamps the move into the
+        // curve's invariants (x stays between neighbors, y in [0, 1]) and
+        // no-ops for non-toneCurve drafts — the widget only renders for a
+        // toneCurve draft, so the edge is a formality for stray messages.
+        CurvePointDragged: to('Drafting', ({ state, message }) =>
+          Drafting({
+            layer: moveCurvePoint(state.layer, message.index, message.x, message.y),
+          }),
+        ),
+        // The curve widget's reset button: every point back to identity.
+        CurveReset: to('Drafting', ({ state }) => Drafting({ layer: resetCurve(state.layer) })),
         // Only a LUT draft can swap its LUT; anything else is ignored. The
         // guard extracts the LUT layer so the build sees a narrowed variant.
         ChangedDraftLut: [

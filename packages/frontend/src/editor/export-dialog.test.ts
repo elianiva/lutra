@@ -82,10 +82,7 @@ describe('Export dialog', () => {
       Command.expectHas(SnapshotForExport),
 
       // The snapshot lands and is cached — no encode yet.
-      Command.resolve(
-        SnapshotForExport,
-        ExportSnapshotted({ image: exportImage }),
-      ),
+      Command.resolve(SnapshotForExport, ExportSnapshotted({ image: exportImage })),
       Command.expectNone(),
 
       // Pressing Export starts the encode and shows the loading state.
@@ -94,10 +91,7 @@ describe('Export dialog', () => {
       Command.expectHas(PrepareExport),
 
       // The encode completes; the download fires and the size appears.
-      Command.resolve(
-        PrepareExport,
-        ExportPrepared({ sizeBytes: 4096, url: 'blob:export-1' }),
-      ),
+      Command.resolve(PrepareExport, ExportPrepared({ sizeBytes: 4096, url: 'blob:export-1' })),
       Command.expectHas(ExportDownload),
       Command.resolve(ExportDownload, ExportDownloaded({ url: 'blob:export-1' })),
       expect(text('Downloaded', { exact: false })).toExist(),
@@ -147,10 +141,7 @@ describe('Export dialog', () => {
       ...mountLoadedStage,
       click(selector('[aria-label^="Export"]')),
       ...openDialog,
-      Command.resolve(
-        SnapshotForExport,
-        ExportSnapshotted({ image: exportImage }),
-      ),
+      Command.resolve(SnapshotForExport, ExportSnapshotted({ image: exportImage })),
       // PNG: no quality knob.
       expect(text('Quality')).not.toExist(),
 
@@ -171,10 +162,7 @@ describe('Export dialog', () => {
 
       // The pressed settings (JPEG, 50%) are what the export encodes.
       click(text('Export')),
-      Command.resolve(
-        PrepareExport,
-        ExportPrepared({ sizeBytes: 1024, url: 'blob:export-1' }),
-      ),
+      Command.resolve(PrepareExport, ExportPrepared({ sizeBytes: 1024, url: 'blob:export-1' })),
       Command.resolve(ExportDownload, ExportDownloaded({ url: 'blob:export-1' })),
       expect(text('1.0 KB', { exact: false })).toExist(),
       Command.expectNone(),
@@ -188,10 +176,7 @@ describe('Export dialog', () => {
       ...mountLoadedStage,
       click(selector('[aria-label^="Export"]')),
       ...openDialog,
-      Command.resolve(
-        SnapshotForExport,
-        ExportSnapshotted({ image: exportImage }),
-      ),
+      Command.resolve(SnapshotForExport, ExportSnapshotted({ image: exportImage })),
       click(text('Export')),
       Command.resolve(
         PrepareExport,
@@ -201,10 +186,7 @@ describe('Export dialog', () => {
 
       // The button is back to Export and can retry.
       click(text('Export')),
-      Command.resolve(
-        PrepareExport,
-        ExportPrepared({ sizeBytes: 2048, url: 'blob:export-2' }),
-      ),
+      Command.resolve(PrepareExport, ExportPrepared({ sizeBytes: 2048, url: 'blob:export-2' })),
       Command.resolve(ExportDownload, ExportDownloaded({ url: 'blob:export-2' })),
       expect(text('2.0 KB', { exact: false })).toExist(),
       Command.expectNone(),
@@ -218,15 +200,9 @@ describe('Export dialog', () => {
       ...mountLoadedStage,
       click(selector('[aria-label^="Export"]')),
       ...openDialog,
-      Command.resolve(
-        SnapshotForExport,
-        ExportSnapshotted({ image: exportImage }),
-      ),
+      Command.resolve(SnapshotForExport, ExportSnapshotted({ image: exportImage })),
       click(text('Export')),
-      Command.resolve(
-        PrepareExport,
-        ExportPrepared({ sizeBytes: 4096, url: 'blob:export-1' }),
-      ),
+      Command.resolve(PrepareExport, ExportPrepared({ sizeBytes: 4096, url: 'blob:export-1' })),
       Command.resolve(ExportDownload, ExportDownloaded({ url: 'blob:export-1' })),
 
       click(text('Cancel')),
@@ -258,14 +234,8 @@ describe('Export dialog', () => {
     // Open, close (bypassing the dialog's own commands), then deliver the
     // snapshot — nothing may encode or retain a blob URL.
     let [model] = update(loadedModel(), ExportRequestedMessage())
-    ;[model] = update(
-      model,
-      GotExportDialogMessage({ message: Dialog.RequestedClose() }),
-    )
-    ;[model] = update(
-      model,
-      GotExportDialogMessage({ message: Dialog.CompletedCloseDialog() }),
-    )
+    ;[model] = update(model, GotExportDialogMessage({ message: Dialog.RequestedClose() }))
+    ;[model] = update(model, GotExportDialogMessage({ message: Dialog.CompletedCloseDialog() }))
     vitestExpect(model.exportDialog.isOpen).toBe(false)
 
     const [after, commands] = update(model, ExportSnapshotted({ image: exportImage }))
@@ -282,14 +252,8 @@ describe('Export dialog', () => {
     vitestExpect(model.exportEncoding).toBe(true)
 
     // Close while the encode is in flight.
-    ;[model] = update(
-      model,
-      GotExportDialogMessage({ message: Dialog.RequestedClose() }),
-    )
-    ;[model] = update(
-      model,
-      GotExportDialogMessage({ message: Dialog.CompletedCloseDialog() }),
-    )
+    ;[model] = update(model, GotExportDialogMessage({ message: Dialog.RequestedClose() }))
+    ;[model] = update(model, GotExportDialogMessage({ message: Dialog.CompletedCloseDialog() }))
 
     const [after, commands] = update(model, ExportPrepared({ sizeBytes: 100, url: 'blob:late' }))
     vitestExpect(after.exportEncoding).toBe(false)

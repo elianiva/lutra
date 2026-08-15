@@ -188,7 +188,10 @@ describe('File picker command resolution', () => {
       Command.resolve(PickImageFile, SelectedImageFile({ file: mockPngFile })),
       Command.expectHas(DecodeImage),
       // Resolve DecodeImage to end cleanly
-      Command.resolve(DecodeImage, ImageFailedToDecode({ error: new ImageDecodeError({ message: 'Cancelled in test' }) })),
+      Command.resolve(
+        DecodeImage,
+        ImageFailedToDecode({ error: new ImageDecodeError({ message: 'Cancelled in test' }) }),
+      ),
       Command.expectNone(),
     )
   })
@@ -205,7 +208,10 @@ describe('Image decode flow', () => {
       click(text('browse')),
       Command.resolve(PickImageFile, SelectedImageFile({ file: mockPngFile })),
 
-      Command.resolve(DecodeImage, ImageDecoded({ bitmap, width: 200, height: 150, source: new Uint8Array([1]) })),
+      Command.resolve(
+        DecodeImage,
+        ImageDecoded({ bitmap, width: 200, height: 150, source: new Uint8Array([1]) }),
+      ),
 
       // Empty chain → the passthrough render presents the source on the
       // canvas. The update dispatches RenderChain (stamp = revision 1); the
@@ -218,7 +224,11 @@ describe('Image decode flow', () => {
         RenderedFrame({
           stamp: 1,
           // oxlint-disable-next-line consistent-type-assertions
-          handle: new RenderHandle({} as GPUTexture, 200, 150, { buffer: {} as GPUBuffer, map: null }),
+          handle: new RenderHandle({} as GPUTexture, 200, 150, {
+            // oxlint-disable-next-line consistent-type-assertions
+            buffer: {} as GPUBuffer,
+            map: null,
+          }),
         }),
       ),
       Mount.resolve(PanZoom, ScaledCanvas({ scale: 1, offsetX: 0, offsetY: 0 })),
@@ -241,7 +251,10 @@ describe('Image decode flow', () => {
       Command.resolve(PickImageFile, SelectedImageFile({ file: mockPngFile })),
 
       // Resolve decode with failure
-      Command.resolve(DecodeImage, ImageFailedToDecode({ error: new ImageDecodeError({ message: 'Corrupt image file' }) })),
+      Command.resolve(
+        DecodeImage,
+        ImageFailedToDecode({ error: new ImageDecodeError({ message: 'Corrupt image file' }) }),
+      ),
 
       expect(text('Failed to load image: Corrupt image file')).toExist(),
       expect(text('Try another')).toExist(),

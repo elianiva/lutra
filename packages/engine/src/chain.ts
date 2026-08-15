@@ -1,7 +1,7 @@
-import type { Layer, LayerPatch, LayerType } from "./layers/schemas"
-import type { LayerId } from "./brands"
-import type { LayerRegistry } from "./layers/registry"
-import { createLayer } from "./layers/defaults"
+import type { Layer, LayerPatch, LayerType } from './layers/schemas'
+import type { LayerId } from './brands'
+import type { LayerRegistry } from './layers/registry'
+import { createLayer } from './layers/defaults'
 
 // ---- operations ----
 
@@ -17,20 +17,13 @@ export function addLayer(
   return [...chain, createLayer(type, registry)]
 }
 
-export function removeLayer(
-  chain: ReadonlyArray<Layer>,
-  id: LayerId,
-): Layer[] {
+export function removeLayer(chain: ReadonlyArray<Layer>, id: LayerId): Layer[] {
   const idx = findIndex(chain, id)
   if (idx === -1) return [...chain]
   return [...chain.slice(0, idx), ...chain.slice(idx + 1)]
 }
 
-export function reorderLayer(
-  chain: ReadonlyArray<Layer>,
-  id: LayerId,
-  newIndex: number,
-): Layer[] {
+export function reorderLayer(chain: ReadonlyArray<Layer>, id: LayerId, newIndex: number): Layer[] {
   const idx = findIndex(chain, id)
   if (idx === -1) return [...chain]
   if (newIndex < 0 || newIndex >= chain.length) return [...chain]
@@ -41,10 +34,7 @@ export function reorderLayer(
   return result
 }
 
-export function updateLayerParam(
-  chain: ReadonlyArray<Layer>,
-  patch: LayerPatch,
-): Layer[] {
+export function updateLayerParam(chain: ReadonlyArray<Layer>, patch: LayerPatch): Layer[] {
   const idx = chain.findIndex((l) => l.type === patch.type)
   if (idx === -1) return [...chain]
 
@@ -55,10 +45,7 @@ export function updateLayerParam(
   return result
 }
 
-export function toggleLayerVisibility(
-  chain: ReadonlyArray<Layer>,
-  id: LayerId,
-): Layer[] {
+export function toggleLayerVisibility(chain: ReadonlyArray<Layer>, id: LayerId): Layer[] {
   const idx = findIndex(chain, id)
   if (idx === -1) return [...chain]
 

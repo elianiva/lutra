@@ -1,4 +1,4 @@
-import type { BodyRenderer } from "../types"
+import type { BodyRenderer } from '../types'
 
 // Rec.709 luma mix in linear light. amount=0 is identity; +1 doubles
 // chroma, -1 zeroes it.

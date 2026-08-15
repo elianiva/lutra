@@ -1,5 +1,11 @@
 import { Context, Effect, Layer, Option, Ref } from 'effect'
-import { GpuError, WORKGROUP_SIZE, type ChainPass, type LutCube, type RenderRequest } from '@lutra/engine'
+import {
+  GpuError,
+  WORKGROUP_SIZE,
+  type ChainPass,
+  type LutCube,
+  type RenderRequest,
+} from '@lutra/engine'
 
 // ---- service ----
 
@@ -89,9 +95,7 @@ export interface GpuBackendShape {
   ) => Effect.Effect<Uint32Array<ArrayBuffer>, GpuError>
 }
 
-export class GpuBackend extends Context.Service<GpuBackend, GpuBackendShape>()(
-  'GpuBackend',
-) {}
+export class GpuBackend extends Context.Service<GpuBackend, GpuBackendShape>()('GpuBackend') {}
 
 // Uncaptured WebGPU errors fire synchronously from the device event bus, at a
 // moment where dispatching a new Effect fiber is the right escape hatch: the
@@ -509,11 +513,7 @@ export const GpuBackendLive = Layer.effect(
         size: 16,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       })
-      device.queue.writeBuffer(
-        canvasSizeBuffer,
-        0,
-        new Float32Array([canvas.width, canvas.height]),
-      )
+      device.queue.writeBuffer(canvasSizeBuffer, 0, new Float32Array([canvas.width, canvas.height]))
       const frameBuffer = device.createBuffer({
         size: 16,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -675,7 +675,8 @@ export const GpuBackendLive = Layer.effect(
       luts: ReadonlyMap<string, LutCube>,
     ): Effect.Effect<ComputeEntry, GpuError> =>
       Effect.gen(function* () {
-        const cacheKey = pass.lutId !== undefined ? `${pass.source}::lut:${pass.lutId}` : pass.source
+        const cacheKey =
+          pass.lutId !== undefined ? `${pass.source}::lut:${pass.lutId}` : pass.source
         const cached = s.compute[cacheKey]
         if (cached) return cached
 
@@ -727,7 +728,9 @@ export const GpuBackendLive = Layer.effect(
         if (pass.lutId !== undefined) {
           const cube = luts.get(pass.lutId)
           if (!cube) {
-            return yield* Effect.fail(new GpuError({ message: `LUT cube missing for ${pass.lutId}` }))
+            return yield* Effect.fail(
+              new GpuError({ message: `LUT cube missing for ${pass.lutId}` }),
+            )
           }
           // The view dimension must be explicit: createView() on a 3D
           // texture defaults to e2DArray in Chrome, which fails bind-group
@@ -995,7 +998,8 @@ export const GpuBackendLive = Layer.effect(
           // completed, so it resolves without waiting on any later render.
           yield* Effect.tryPromise({
             try: () => map,
-            catch: (cause) => new GpuError({ message: 'Failed to map histogram bins buffer', cause }),
+            catch: (cause) =>
+              new GpuError({ message: 'Failed to map histogram bins buffer', cause }),
           })
           const bins = new Uint32Array(slot.buffer.getMappedRange())
           const copy = new Uint32Array(bins)

@@ -31,8 +31,7 @@ const galleryUrl = () => Option.getOrThrow(Url.fromString('https://lutra.test/')
 
 const galleryModel = (): Model => init(galleryUrl())[0]
 
-const fillStarted = () =>
-  update(galleryModel(), OfflineFillStarted({ total: 593, done: 7 }))
+const fillStarted = () => update(galleryModel(), OfflineFillStarted({ total: 593, done: 7 }))
 
 describe('root: offline library', () => {
   afterEach(() => {

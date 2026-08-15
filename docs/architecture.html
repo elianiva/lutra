@@ -1,322 +1,694 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lutra under the hood — architecture &amp; effects, explained</title>
-<style>
-  /* A compact, self-contained Tufte-style stylesheet.
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lutra under the hood — architecture &amp; effects, explained</title>
+    <style>
+      /* A compact, self-contained Tufte-style stylesheet.
      Fonts: et-book is the Tufte face; we fall back to Palatino/Georgia
      (the exact stack tufte-css uses when et-book is unavailable). */
-  html { font-size: 15px; }
-  body {
-    font-family: Palatino, "Palatino Linotype", "Book Antiqua", "Liberation Serif", Georgia, serif;
-    background-color: #fffff8;
-    color: #111;
-    max-width: 87.5rem;
-    margin: 0 auto;
-    padding: 0 1.5rem;
-    line-height: 1.5;
-  }
-  article { position: relative; max-width: 55rem; padding: 0 0 6rem 0; }
-  p, li { font-size: 1.05rem; line-height: 1.6; }
-  p { margin: 1.2rem 0 0 0; }
-  ul, ol { margin: 1rem 0 0 0; padding-left: 1.6rem; }
-  li { margin-top: 0.3rem; }
-  h1 { font-weight: 400; font-size: 2.3rem; line-height: 1.15; margin: 3.5rem 0 0.5rem 0; }
-  h2 { font-weight: 400; font-size: 1.45rem; margin: 3rem 0 0.2rem 0; letter-spacing: 0.01em; }
-  h3 { font-weight: 400; font-style: italic; font-size: 1.2rem; margin: 1.8rem 0 0.2rem 0; }
-  .subtitle { font-style: italic; font-size: 1.25rem; color: #555; margin-top: 0.2rem; }
-  .sans { font-family: "Gill Sans", "Gill Sans MT", "Trebuchet MS", sans-serif; }
-  a { color: #111; text-decoration: underline; }
-  a:hover { color: #7a2e1e; }
-  code {
-    font-family: "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-    font-size: 0.82em;
-    background: #f4f2e8;
-    padding: 0.08em 0.25em;
-    border-radius: 2px;
-  }
-  pre {
-    font-family: "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-    font-size: 0.78rem;
-    line-height: 1.45;
-    background: #f4f2e8;
-    border: 1px solid #e3e0d2;
-    border-left: 3px solid #d0cdbd;
-    padding: 0.9rem 1.1rem;
-    margin: 1.1rem 0 0 0;
-    overflow-x: auto;
-    white-space: pre;
-  }
-  pre code { background: none; padding: 0; font-size: 1em; }
-  blockquote {
-    border-left: 3px solid #d0cdbd;
-    padding-left: 1.2rem;
-    font-style: italic;
-    color: #444;
-    margin: 1.4rem 0 0 0;
-  }
-  blockquote footer { font-style: normal; font-size: 0.85rem; color: #666; }
-  .epigraph { border-left: none; padding-left: 0; margin: 4rem 0 0 0; font-size: 1.3rem; color: #333; }
-  .epigraph footer { margin-top: 0.3rem; }
-  .newthought { font-variant: small-caps; letter-spacing: 0.04em; }
-  figure { margin: 1.8rem 0 0 0; text-align: center; }
-  figure img, figure svg { max-width: 100%; }
-  figcaption {
-    font-size: 0.85rem;
-    font-style: italic;
-    color: #555;
-    margin-top: 0.4rem;
-  }
-  table { border-collapse: collapse; width: 100%; margin: 1.2rem 0 0 0; font-size: 0.95rem; }
-  th { border-bottom: 2px solid #111; text-align: left; padding: 0.4rem 0.8rem 0.3rem 0; font-weight: 400; font-variant: small-caps; letter-spacing: 0.03em; }
-  td { border-bottom: 1px solid #ddd; padding: 0.45rem 0.8rem 0.45rem 0; vertical-align: top; }
-  tr:last-child td { border-bottom: none; }
-  hr { border: none; border-top: 1px solid #ddd; margin: 3rem 0; }
-  .marginnote, .sidenote {
-    font-size: 0.78rem;
-    line-height: 1.4;
-    color: #333;
-  }
-  /* sidenote mechanics (Tufte's checkbox hack) */
-  .sidenote-number { counter-increment: sidenote-counter; cursor: pointer; }
-  .sidenote-number::after {
-    content: counter(sidenote-counter);
-    vertical-align: super;
-    font-size: 0.65em;
-    font-family: "SF Mono", Menlo, Consolas, monospace;
-  }
-  .sidenote::before { content: counter(sidenote-counter) "  "; font-family: "SF Mono", Menlo, Consolas, monospace; }
-  .margin-toggle { display: none; }
-  @media (min-width: 1200px) {
-    .sidenote {
-      position: absolute;
-      right: -24rem;
-      width: 20rem;
-      margin-top: 0.2rem;
-    }
-    .marginnote { position: absolute; right: -24rem; width: 20rem; margin-top: 0.2rem; }
-    .sidenote-number::after { content: ""; }
-    .sidenote::before { content: ""; }
-  }
-  @media (max-width: 1199px) {
-    .sidenote { display: none; }
-    .margin-toggle:checked + .sidenote {
-      display: block;
-      float: left;
-      clear: both;
-      width: 95%;
-      margin: 1rem 0;
-      padding: 0.8rem 1rem;
-      background: #f4f2e8;
-      border-left: 3px solid #d0cdbd;
-    }
-  }
-  /* small pipeline diagram */
-  .flow { display: flex; align-items: stretch; flex-wrap: wrap; gap: 0.4rem; margin: 1.4rem 0 0 0; }
-  .flow .box {
-    border: 1px solid #111;
-    padding: 0.5rem 0.8rem;
-    text-align: center;
-    font-size: 0.85rem;
-    background: #fbfaf2;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-  }
-  .flow .box .t { font-weight: 600; }
-  .flow .box .s { font-size: 0.72rem; color: #555; }
-  .flow .arrow { align-self: center; font-size: 1.2rem; color: #555; }
-  .flow .loop { border-style: dashed; }
-  .callout {
-    border-left: 3px solid #a34a2f;
-    background: #fbf4ee;
-    padding: 0.7rem 1rem;
-    margin: 1.2rem 0 0 0;
-    font-size: 0.95rem;
-  }
-  .callout .h { font-variant: small-caps; letter-spacing: 0.04em; font-weight: 600; }
-  .tag {
-    display: inline-block;
-    font-family: "SF Mono", Menlo, Consolas, monospace;
-    font-size: 0.7rem;
-    border: 1px solid #999;
-    border-radius: 3px;
-    padding: 0.05em 0.45em;
-    margin-left: 0.4em;
-    vertical-align: middle;
-  }
-  .tag.good { border-color: #3f7d3f; color: #2c5e2c; }
-  .tag.warn { border-color: #a34a2f; color: #8a3a22; }
-  .tag.note { border-color: #6a6a8a; color: #4b4b6a; }
-  footer.fineprint {
-    margin-top: 4rem;
-    padding-top: 1rem;
-    border-top: 1px solid #ddd;
-    font-size: 0.85rem;
-    color: #666;
-  }
-</style>
-</head>
-<body>
-<article>
+      html {
+        font-size: 15px;
+      }
+      body {
+        font-family:
+          Palatino, 'Palatino Linotype', 'Book Antiqua', 'Liberation Serif', Georgia, serif;
+        background-color: #fffff8;
+        color: #111;
+        max-width: 87.5rem;
+        margin: 0 auto;
+        padding: 0 1.5rem;
+        line-height: 1.5;
+      }
+      article {
+        position: relative;
+        max-width: 55rem;
+        padding: 0 0 6rem 0;
+      }
+      p,
+      li {
+        font-size: 1.05rem;
+        line-height: 1.6;
+      }
+      p {
+        margin: 1.2rem 0 0 0;
+      }
+      ul,
+      ol {
+        margin: 1rem 0 0 0;
+        padding-left: 1.6rem;
+      }
+      li {
+        margin-top: 0.3rem;
+      }
+      h1 {
+        font-weight: 400;
+        font-size: 2.3rem;
+        line-height: 1.15;
+        margin: 3.5rem 0 0.5rem 0;
+      }
+      h2 {
+        font-weight: 400;
+        font-size: 1.45rem;
+        margin: 3rem 0 0.2rem 0;
+        letter-spacing: 0.01em;
+      }
+      h3 {
+        font-weight: 400;
+        font-style: italic;
+        font-size: 1.2rem;
+        margin: 1.8rem 0 0.2rem 0;
+      }
+      .subtitle {
+        font-style: italic;
+        font-size: 1.25rem;
+        color: #555;
+        margin-top: 0.2rem;
+      }
+      .sans {
+        font-family: 'Gill Sans', 'Gill Sans MT', 'Trebuchet MS', sans-serif;
+      }
+      a {
+        color: #111;
+        text-decoration: underline;
+      }
+      a:hover {
+        color: #7a2e1e;
+      }
+      code {
+        font-family: 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+        font-size: 0.82em;
+        background: #f4f2e8;
+        padding: 0.08em 0.25em;
+        border-radius: 2px;
+      }
+      pre {
+        font-family: 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+        font-size: 0.78rem;
+        line-height: 1.45;
+        background: #f4f2e8;
+        border: 1px solid #e3e0d2;
+        border-left: 3px solid #d0cdbd;
+        padding: 0.9rem 1.1rem;
+        margin: 1.1rem 0 0 0;
+        overflow-x: auto;
+        white-space: pre;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      blockquote {
+        border-left: 3px solid #d0cdbd;
+        padding-left: 1.2rem;
+        font-style: italic;
+        color: #444;
+        margin: 1.4rem 0 0 0;
+      }
+      blockquote footer {
+        font-style: normal;
+        font-size: 0.85rem;
+        color: #666;
+      }
+      .epigraph {
+        border-left: none;
+        padding-left: 0;
+        margin: 4rem 0 0 0;
+        font-size: 1.3rem;
+        color: #333;
+      }
+      .epigraph footer {
+        margin-top: 0.3rem;
+      }
+      .newthought {
+        font-variant: small-caps;
+        letter-spacing: 0.04em;
+      }
+      figure {
+        margin: 1.8rem 0 0 0;
+        text-align: center;
+      }
+      figure img,
+      figure svg {
+        max-width: 100%;
+      }
+      figcaption {
+        font-size: 0.85rem;
+        font-style: italic;
+        color: #555;
+        margin-top: 0.4rem;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 1.2rem 0 0 0;
+        font-size: 0.95rem;
+      }
+      th {
+        border-bottom: 2px solid #111;
+        text-align: left;
+        padding: 0.4rem 0.8rem 0.3rem 0;
+        font-weight: 400;
+        font-variant: small-caps;
+        letter-spacing: 0.03em;
+      }
+      td {
+        border-bottom: 1px solid #ddd;
+        padding: 0.45rem 0.8rem 0.45rem 0;
+        vertical-align: top;
+      }
+      tr:last-child td {
+        border-bottom: none;
+      }
+      hr {
+        border: none;
+        border-top: 1px solid #ddd;
+        margin: 3rem 0;
+      }
+      .marginnote,
+      .sidenote {
+        font-size: 0.78rem;
+        line-height: 1.4;
+        color: #333;
+      }
+      /* sidenote mechanics (Tufte's checkbox hack) */
+      .sidenote-number {
+        counter-increment: sidenote-counter;
+        cursor: pointer;
+      }
+      .sidenote-number::after {
+        content: counter(sidenote-counter);
+        vertical-align: super;
+        font-size: 0.65em;
+        font-family: 'SF Mono', Menlo, Consolas, monospace;
+      }
+      .sidenote::before {
+        content: counter(sidenote-counter) '  ';
+        font-family: 'SF Mono', Menlo, Consolas, monospace;
+      }
+      .margin-toggle {
+        display: none;
+      }
+      @media (min-width: 1200px) {
+        .sidenote {
+          position: absolute;
+          right: -24rem;
+          width: 20rem;
+          margin-top: 0.2rem;
+        }
+        .marginnote {
+          position: absolute;
+          right: -24rem;
+          width: 20rem;
+          margin-top: 0.2rem;
+        }
+        .sidenote-number::after {
+          content: '';
+        }
+        .sidenote::before {
+          content: '';
+        }
+      }
+      @media (max-width: 1199px) {
+        .sidenote {
+          display: none;
+        }
+        .margin-toggle:checked + .sidenote {
+          display: block;
+          float: left;
+          clear: both;
+          width: 95%;
+          margin: 1rem 0;
+          padding: 0.8rem 1rem;
+          background: #f4f2e8;
+          border-left: 3px solid #d0cdbd;
+        }
+      }
+      /* small pipeline diagram */
+      .flow {
+        display: flex;
+        align-items: stretch;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin: 1.4rem 0 0 0;
+      }
+      .flow .box {
+        border: 1px solid #111;
+        padding: 0.5rem 0.8rem;
+        text-align: center;
+        font-size: 0.85rem;
+        background: #fbfaf2;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .flow .box .t {
+        font-weight: 600;
+      }
+      .flow .box .s {
+        font-size: 0.72rem;
+        color: #555;
+      }
+      .flow .arrow {
+        align-self: center;
+        font-size: 1.2rem;
+        color: #555;
+      }
+      .flow .loop {
+        border-style: dashed;
+      }
+      .callout {
+        border-left: 3px solid #a34a2f;
+        background: #fbf4ee;
+        padding: 0.7rem 1rem;
+        margin: 1.2rem 0 0 0;
+        font-size: 0.95rem;
+      }
+      .callout .h {
+        font-variant: small-caps;
+        letter-spacing: 0.04em;
+        font-weight: 600;
+      }
+      .tag {
+        display: inline-block;
+        font-family: 'SF Mono', Menlo, Consolas, monospace;
+        font-size: 0.7rem;
+        border: 1px solid #999;
+        border-radius: 3px;
+        padding: 0.05em 0.45em;
+        margin-left: 0.4em;
+        vertical-align: middle;
+      }
+      .tag.good {
+        border-color: #3f7d3f;
+        color: #2c5e2c;
+      }
+      .tag.warn {
+        border-color: #a34a2f;
+        color: #8a3a22;
+      }
+      .tag.note {
+        border-color: #6a6a8a;
+        color: #4b4b6a;
+      }
+      footer.fineprint {
+        margin-top: 4rem;
+        padding-top: 1rem;
+        border-top: 1px solid #ddd;
+        font-size: 0.85rem;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <article>
+      <header>
+        <h1>Lutra under the hood</h1>
+        <p class="subtitle">
+          Architecture &amp; every effect, explained for someone who knows a little GLSL
+        </p>
+      </header>
 
-<header>
-  <h1>Lutra under the hood</h1>
-  <p class="subtitle">Architecture &amp; every effect, explained for someone who knows a little GLSL</p>
-</header>
+      <blockquote class="epigraph">
+        <p>&ldquo;Above all else, show the data.&rdquo;</p>
+        <footer>— Edward Tufte</footer>
+      </blockquote>
 
-<blockquote class="epigraph">
-  <p>&ldquo;Above all else, show the data.&rdquo;</p>
-  <footer>— Edward Tufte</footer>
-</blockquote>
+      <p>
+        <span class="newthought">Lutra is a color-grading app.</span> You load a photo, add
+        <em>adjustment layers</em> (exposure, contrast, grain, vignette, &hellip;), drag sliders,
+        and the image updates live. All image processing happens on the GPU via
+        <strong>WebGPU compute shaders</strong> written in <strong>WGSL</strong>. This document
+        walks through how the whole thing is built — from the pixel-level math of each effect up to
+        the pass pipeline that renders them — assuming you&rsquo;ve written a little GLSL but never
+        touched WebGPU.
+      </p>
 
-<p><span class="newthought">Lutra is a color-grading app.</span> You load a photo, add <em>adjustment layers</em> (exposure, contrast, grain, vignette, &hellip;), drag sliders, and the image updates live. All image processing happens on the GPU via <strong>WebGPU compute shaders</strong> written in <strong>WGSL</strong>. This document walks through how the whole thing is built — from the pixel-level math of each effect up to the pass pipeline that renders them — assuming you&rsquo;ve written a little GLSL but never touched WebGPU.</p>
+      <h2>0 · Map of the code</h2>
 
-<h2>0 · Map of the code</h2>
+      <p>The project is split into two packages, and the boundary is deliberate:</p>
 
-<p>The project is split into two packages, and the boundary is deliberate:</p>
+      <table>
+        <tr>
+          <th>Package</th>
+          <th>Owns</th>
+          <th>Knows about</th>
+        </tr>
+        <tr>
+          <td><code>@lutra/engine</code></td>
+          <td>
+            The <em>pure</em> computational core: layer schemas, the registry of effects, and — the
+            subject of this doc — every WGSL shader body and the assembler that stitches passes
+            together. Also packs parameter values into uniform buffers.
+          </td>
+          <td>No WebGPU API, no DOM, no browser. It just produces strings and numbers.</td>
+        </tr>
+        <tr>
+          <td><code>@lutra/frontend</code></td>
+          <td>
+            The browser app: the UI, and the <code>GpuBackend</code> — device acquisition, texture
+            upload, dispatching compute passes, blitting to the canvas, and export readback.
+          </td>
+          <td>
+            The WebGPU API and the canvas. It calls the engine to build shaders, then runs them.
+          </td>
+        </tr>
+      </table>
 
-<table>
-  <tr><th>Package</th><th>Owns</th><th>Knows about</th></tr>
-  <tr>
-    <td><code>@lutra/engine</code></td>
-    <td>The <em>pure</em> computational core: layer schemas, the registry of effects, and — the subject of this doc — every WGSL shader body and the assembler that stitches passes together. Also packs parameter values into uniform buffers.</td>
-    <td>No WebGPU API, no DOM, no browser. It just produces strings and numbers.</td>
-  </tr>
-  <tr>
-    <td><code>@lutra/frontend</code></td>
-    <td>The browser app: the UI, and the <code>GpuBackend</code> — device acquisition, texture upload, dispatching compute passes, blitting to the canvas, and export readback.</td>
-    <td>The WebGPU API and the canvas. It calls the engine to build shaders, then runs them.</td>
-  </tr>
-</table>
+      <p>The files that matter for this document:</p>
 
-<p>The files that matter for this document:</p>
+      <ul>
+        <li>
+          <code>packages/engine/src/shaders/chain-source.ts</code> — the <strong>assembler</strong>:
+          turns an ordered list of layers into an ordered list of WGSL compute passes.
+        </li>
+        <li>
+          <code>packages/engine/src/shaders/bodies/*.ts</code> — one file per effect; each exports a
+          function that emits the WGSL statements for that effect.
+        </li>
+        <li>
+          <code>packages/engine/src/shaders/colorspace.ts</code> — the sRGB&harr;linear conversion
+          functions embedded into shaders.
+        </li>
+        <li>
+          <code>packages/engine/src/render.ts</code> — builds a <em>render request</em>: passes +
+          packed uniforms + source image + frame counter.
+        </li>
+        <li>
+          <code>packages/frontend/src/gpu/backend.ts</code> — the WebGPU runtime: textures, buffers,
+          pipelines, dispatch loop, blit, snapshot.
+        </li>
+      </ul>
 
-<ul>
-  <li><code>packages/engine/src/shaders/chain-source.ts</code> — the <strong>assembler</strong>: turns an ordered list of layers into an ordered list of WGSL compute passes.</li>
-  <li><code>packages/engine/src/shaders/bodies/*.ts</code> — one file per effect; each exports a function that emits the WGSL statements for that effect.</li>
-  <li><code>packages/engine/src/shaders/colorspace.ts</code> — the sRGB&harr;linear conversion functions embedded into shaders.</li>
-  <li><code>packages/engine/src/render.ts</code> — builds a <em>render request</em>: passes + packed uniforms + source image + frame counter.</li>
-  <li><code>packages/frontend/src/gpu/backend.ts</code> — the WebGPU runtime: textures, buffers, pipelines, dispatch loop, blit, snapshot.</li>
-</ul>
+      <h2>1 · Compute shaders vs. the GLSL you know</h2>
 
-<h2>1 · Compute shaders vs. the GLSL you know</h2>
+      <p>
+        If your GLSL background is fragment shaders, the mental model is:
+        <em>write a function that runs once per pixel; read a texture; write a color.</em> WebGPU
+        compute shaders are the same idea with a different framing. Instead of the GPU calling your
+        function once per pixel implicitly, it calls it once per <em>invocation</em>, and
+        <strong>you</strong> decide which pixel each invocation handles — usually just
+        <code>id.xy</code>. You also get explicit control over how invocations are grouped into
+        <em>workgroups</em>, which is what unlocks shared-memory tricks later (real film grain,
+        local contrast).
+      </p>
 
-<p>If your GLSL background is fragment shaders, the mental model is: <em>write a function that runs once per pixel; read a texture; write a color.</em> WebGPU compute shaders are the same idea with a different framing. Instead of the GPU calling your function once per pixel implicitly, it calls it once per <em>invocation</em>, and <strong>you</strong> decide which pixel each invocation handles — usually just <code>id.xy</code>. You also get explicit control over how invocations are grouped into <em>workgroups</em>, which is what unlocks shared-memory tricks later (real film grain, local contrast).</p>
+      <table>
+        <tr>
+          <th>Concept</th>
+          <th>GLSL fragment shader</th>
+          <th>WGSL compute shader (as Lutra uses it)</th>
+        </tr>
+        <tr>
+          <td>Entry point</td>
+          <td><code>main()</code>, once per pixel; position via <code>gl_FragCoord</code></td>
+          <td>
+            <code>fn main(@builtin(global_invocation_id) id: vec3&lt;u32&gt;)</code> —
+            <code>id.xy</code> is the pixel
+          </td>
+        </tr>
+        <tr>
+          <td>Read a texel</td>
+          <td><code>texture(sampler2D, uv)</code> — filtered, float coords</td>
+          <td>
+            <code>textureLoad(tex, coord, 0)</code> — <strong>raw texel</strong>, integer coords, no
+            filtering
+          </td>
+        </tr>
+        <tr>
+          <td>Write a pixel</td>
+          <td><code>gl_FragColor = ...</code> / <code>out vec4</code></td>
+          <td>
+            <code>textureStore(storageTex, coord, vec4)</code> into a <em>storage texture</em>
+          </td>
+        </tr>
+        <tr>
+          <td>Uniforms</td>
+          <td><code>uniform float x;</code></td>
+          <td>
+            <code>var&lt;uniform&gt; u_params: LayerParams;</code> — grouped in buffers, bound via
+            <em>bind groups</em>
+          </td>
+        </tr>
+        <tr>
+          <td>Thread grouping</td>
+          <td>implicit</td>
+          <td>workgroups of 16&times;16 = 256 invocations; you dispatch a grid of them</td>
+        </tr>
+      </table>
 
-<table>
-  <tr><th>Concept</th><th>GLSL fragment shader</th><th>WGSL compute shader (as Lutra uses it)</th></tr>
-  <tr>
-    <td>Entry point</td>
-    <td><code>main()</code>, once per pixel; position via <code>gl_FragCoord</code></td>
-    <td><code>fn main(@builtin(global_invocation_id) id: vec3&lt;u32&gt;)</code> — <code>id.xy</code> is the pixel</td>
-  </tr>
-  <tr>
-    <td>Read a texel</td>
-    <td><code>texture(sampler2D, uv)</code> — filtered, float coords</td>
-    <td><code>textureLoad(tex, coord, 0)</code> — <strong>raw texel</strong>, integer coords, no filtering</td>
-  </tr>
-  <tr>
-    <td>Write a pixel</td>
-    <td><code>gl_FragColor = ...</code> / <code>out vec4</code></td>
-    <td><code>textureStore(storageTex, coord, vec4)</code> into a <em>storage texture</em></td>
-  </tr>
-  <tr>
-    <td>Uniforms</td>
-    <td><code>uniform float x;</code></td>
-    <td><code>var&lt;uniform&gt; u_params: LayerParams;</code> — grouped in buffers, bound via <em>bind groups</em></td>
-  </tr>
-  <tr>
-    <td>Thread grouping</td>
-    <td>implicit</td>
-    <td>workgroups of 16&times;16 = 256 invocations; you dispatch a grid of them</td>
-  </tr>
-</table>
+      <p>
+        Two consequences of <code>textureLoad</code> matter throughout this codebase. First, there
+        is <strong>no bilinear filtering</strong> in compute — if you want smooth sampling you must
+        write it yourself or use a separate pass with a sampler (Lutra does the former in the LUT
+        body, see §7.11, and the latter for display, see §3). Second, you can write to a texture
+        only if it was created with the <em>storage</em> usage flag, and only into formats WebGPU
+        allows for storage.
+      </p>
 
-<p>Two consequences of <code>textureLoad</code> matter throughout this codebase. First, there is <strong>no bilinear filtering</strong> in compute — if you want smooth sampling you must write it yourself or use a separate pass with a sampler (Lutra does the former in the LUT body, see §7.11, and the latter for display, see §3). Second, you can write to a texture only if it was created with the <em>storage</em> usage flag, and only into formats WebGPU allows for storage.</p>
+      <p>
+        Everything a shader touches — textures, buffers — is declared at the top of the shader with
+        <code>@group(0) @binding(n)</code> attributes, and then <em>bound</em> at runtime by the
+        frontend. Lutra uses <code>layout: 'auto'</code>, which means WebGPU computes the binding
+        layout from what the shader actually references: declare a binding the shader never uses,
+        and it simply doesn&rsquo;t exist in the layout. The frontend mirrors this — it only
+        attaches bindings the shader statically uses.<label
+          for="sn-auto"
+          class="margin-toggle sidenote-number"
+        ></label
+        ><input type="checkbox" id="sn-auto" class="margin-toggle" /><span class="sidenote"
+          >This is why the assembler reports <code>usesFrame</code> per pass: the frame-counter
+          binding (binding 3) exists only in passes whose body mentions <code>u_frame</code> —
+          currently only grain. If the frontend attached it anyway,
+          <code>createBindGroup</code> would throw a validation error.</span
+        >
+      </p>
 
-<p>Everything a shader touches — textures, buffers — is declared at the top of the shader with <code>@group(0) @binding(n)</code> attributes, and then <em>bound</em> at runtime by the frontend. Lutra uses <code>layout: 'auto'</code>, which means WebGPU computes the binding layout from what the shader actually references: declare a binding the shader never uses, and it simply doesn&rsquo;t exist in the layout. The frontend mirrors this — it only attaches bindings the shader statically uses.<label for="sn-auto" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-auto" class="margin-toggle"/><span class="sidenote">This is why the assembler reports <code>usesFrame</code> per pass: the frame-counter binding (binding 3) exists only in passes whose body mentions <code>u_frame</code> — currently only grain. If the frontend attached it anyway, <code>createBindGroup</code> would throw a validation error.</span></p>
+      <h2>2 · One frame, from slider to screen</h2>
 
-<h2>2 · One frame, from slider to screen</h2>
+      <p>
+        Here is the whole journey of a pixel, in one picture. The <em>session</em> (textures +
+        buffers) is created once per image; the per-tick work is just writing uniforms and
+        dispatching passes.
+      </p>
 
-<p>Here is the whole journey of a pixel, in one picture. The <em>session</em> (textures + buffers) is created once per image; the per-tick work is just writing uniforms and dispatching passes.</p>
+      <div class="flow">
+        <div class="box">
+          <span class="t">Upload</span
+          ><span class="s"
+            >once per image — ImageBitmap &rarr; <code>srcTex</code> (rgba8unorm, sRGB)</span
+          >
+        </div>
+        <div class="arrow">&rarr;</div>
+        <div class="box loop">
+          <span class="t">Pass 0</span><span class="s">decode sRGB &rarr; linear</span>
+        </div>
+        <div class="arrow">&rarr;</div>
+        <div class="box loop">
+          <span class="t">Pass 1 &hellip; N&minus;2</span
+          ><span class="s">layer effects, linear in/out (rgba16float)</span>
+        </div>
+        <div class="arrow">&rarr;</div>
+        <div class="box">
+          <span class="t">Pass N&minus;1</span
+          ><span class="s">last effect + encode back to sRGB &rarr; <code>dstTex</code></span>
+        </div>
+        <div class="arrow">&rarr;</div>
+        <div class="box">
+          <span class="t">Histogram</span
+          ><span class="s"
+            >scatter-write luma bins &rarr; 1KB readback &mdash; the display path&rsquo;s only one
+            (&sect;8)</span
+          >
+        </div>
+        <div class="arrow">&rarr;</div>
+        <div class="box">
+          <span class="t">Blit</span
+          ><span class="s">fullscreen-triangle fragment pass, bilinear, &rarr; canvas</span>
+        </div>
+      </div>
 
-<div class="flow">
-  <div class="box"><span class="t">Upload</span><span class="s">once per image — ImageBitmap &rarr; <code>srcTex</code> (rgba8unorm, sRGB)</span></div>
-  <div class="arrow">&rarr;</div>
-  <div class="box loop"><span class="t">Pass 0</span><span class="s">decode sRGB &rarr; linear</span></div>
-  <div class="arrow">&rarr;</div>
-  <div class="box loop"><span class="t">Pass 1 &hellip; N&minus;2</span><span class="s">layer effects, linear in/out (rgba16float)</span></div>
-  <div class="arrow">&rarr;</div>
-  <div class="box"><span class="t">Pass N&minus;1</span><span class="s">last effect + encode back to sRGB &rarr; <code>dstTex</code></span></div>
-  <div class="arrow">&rarr;</div>
-  <div class="box"><span class="t">Histogram</span><span class="s">scatter-write luma bins &rarr; 1KB readback &mdash; the display path&rsquo;s only one (&sect;8)</span></div>
-  <div class="arrow">&rarr;</div>
-  <div class="box"><span class="t">Blit</span><span class="s">fullscreen-triangle fragment pass, bilinear, &rarr; canvas</span></div>
-</div>
+      <p>In order of appearance:</p>
 
-<p>In order of appearance:</p>
+      <ol>
+        <li>
+          <strong>Upload.</strong> The source image is copied to the GPU once into
+          <code>srcTex</code>, an <code>rgba8unorm</code> texture. &ldquo;unorm&rdquo; means
+          unsigned normalized: 8 bits per channel, and the shader sees values as floats in [0,1].
+          Crucially, the bytes are the file&rsquo;s raw values — which are
+          <em>sRGB-encoded</em> (see §4 for why that matters).
+        </li>
+        <li>
+          <strong>Compute passes.</strong> Each adjustment layer runs as its own compute pass. Pass
+          0 (or the first layer pass) decodes sRGB to linear light. Intermediate passes shuttle
+          linear values through <code>rgba16float</code> textures (half-precision floats). The final
+          pass encodes back to sRGB and writes the display texture <code>dstTex</code>. The one
+          exception is the LUT layer, whose pass decodes to sRGB, applies the film cube, and
+          re-encodes (§7.11).
+        </li>
+        <li>
+          <strong>Blit.</strong> A tiny fragment shader draws a fullscreen triangle, sampling
+          <code>dstTex</code> with a bilinear sampler and writing to the canvas swapchain. This is
+          the one place Lutra gets free texture filtering — and it doubles as the upscale/downscale
+          step, since the canvas is sized to the image. No flip is needed: compute and canvas both
+          have their origin at the top-left.
+        </li>
+        <li>
+          <strong>Export (not shown).</strong> Only on export does a frame leave the GPU:
+          <code>dstTex</code> is copied to a CPU buffer (rows padded to 256-byte alignment — a
+          WebGPU requirement), un-padded, and turned into an <code>ImageBitmap</code> for PNG
+          encoding.
+        </li>
+      </ol>
 
-<ol>
-  <li><strong>Upload.</strong> The source image is copied to the GPU once into <code>srcTex</code>, an <code>rgba8unorm</code> texture. &ldquo;unorm&rdquo; means unsigned normalized: 8 bits per channel, and the shader sees values as floats in [0,1]. Crucially, the bytes are the file&rsquo;s raw values — which are <em>sRGB-encoded</em> (see §4 for why that matters).</li>
-  <li><strong>Compute passes.</strong> Each adjustment layer runs as its own compute pass. Pass 0 (or the first layer pass) decodes sRGB to linear light. Intermediate passes shuttle linear values through <code>rgba16float</code> textures (half-precision floats). The final pass encodes back to sRGB and writes the display texture <code>dstTex</code>. The one exception is the LUT layer, whose pass decodes to sRGB, applies the film cube, and re-encodes (§7.11).</li>
-  <li><strong>Blit.</strong> A tiny fragment shader draws a fullscreen triangle, sampling <code>dstTex</code> with a bilinear sampler and writing to the canvas swapchain. This is the one place Lutra gets free texture filtering — and it doubles as the upscale/downscale step, since the canvas is sized to the image. No flip is needed: compute and canvas both have their origin at the top-left.</li>
-  <li><strong>Export (not shown).</strong> Only on export does a frame leave the GPU: <code>dstTex</code> is copied to a CPU buffer (rows padded to 256-byte alignment — a WebGPU requirement), un-padded, and turned into an <code>ImageBitmap</code> for PNG encoding.</li>
-</ol>
+      <p>
+        The per-tick cost of dragging a slider is therefore: write the changed uniform values into
+        buffers, dispatch one compute pass per layer, submit, and wait for the GPU to catch up. The
+        frontend keeps at most one render in flight (<code>queue.onSubmittedWorkDone</code>) so a
+        fast slider drag can&rsquo;t backlog the GPU queue — the next render simply waits. Between
+        the last pass and the blit, one more dispatch runs: the histogram pass bins the
+        frame&rsquo;s luma into 256 counters, and a 1KB copy of the bins crosses back to the UI —
+        the display path&rsquo;s single, scoped readback (&sect;8).
+      </p>
 
-<p>The per-tick cost of dragging a slider is therefore: write the changed uniform values into buffers, dispatch one compute pass per layer, submit, and wait for the GPU to catch up. The frontend keeps at most one render in flight (<code>queue.onSubmittedWorkDone</code>) so a fast slider drag can&rsquo;t backlog the GPU queue — the next render simply waits. Between the last pass and the blit, one more dispatch runs: the histogram pass bins the frame&rsquo;s luma into 256 counters, and a 1KB copy of the bins crosses back to the UI — the display path&rsquo;s single, scoped readback (&sect;8).</p>
+      <h2>3 · The chain model and why one pass per layer</h2>
 
-<h2>3 · The chain model and why one pass per layer</h2>
+      <p>
+        The product model is an <em>edit chain</em>: an ordered list of adjustment layers. Each
+        layer consumes the output of the previous one — there is no parallel compositing, no blend
+        modes. Order matters: saturation before or after a white-balance shift produces different
+        colors, and that&rsquo;s a feature (it&rsquo;s how looks get built).
+      </p>
 
-<p>The product model is an <em>edit chain</em>: an ordered list of adjustment layers. Each layer consumes the output of the previous one — there is no parallel compositing, no blend modes. Order matters: saturation before or after a white-balance shift produces different colors, and that&rsquo;s a feature (it&rsquo;s how looks get built).</p>
+      <p>
+        This sequential-consumption model is exactly why the engine emits
+        <strong>one compute pass per layer</strong>. A pass is the natural unit of &ldquo;consume
+        the previous output&rdquo;: it reads one texture and writes another, so the chain maps onto
+        a sequence of passes one-to-one — layer 0 reads the source, layer 1 reads layer 0&rsquo;s
+        output, and so on. Two properties of the effects make this mapping not just natural but
+        necessary:
+      </p>
 
-<p>This sequential-consumption model is exactly why the engine emits <strong>one compute pass per layer</strong>. A pass is the natural unit of &ldquo;consume the previous output&rdquo;: it reads one texture and writes another, so the chain maps onto a sequence of passes one-to-one — layer 0 reads the source, layer 1 reads layer 0&rsquo;s output, and so on. Two properties of the effects make this mapping not just natural but necessary:</p>
+      <ul>
+        <li>
+          <em
+            >Effects that sample other coordinates must read the accumulated result, not the raw
+            source.</em
+          >
+          Chromatic aberration reads pixels a few positions away to split color channels. If it
+          shared a pass with the layers before it, the only texture available to sample would be the
+          original source image — so a CA layer placed after an exposure layer would split channels
+          that never saw the exposure. Chain semantics would be broken.
+        </li>
+        <li>
+          <em>Sampled texels must be linear light.</em> The source texture is sRGB-encoded, but the
+          pipeline works in linear light (§4) — mixing the two transfer functions in one color value
+          is a subtle gamma bug.
+        </li>
+      </ul>
 
-<ul>
-  <li><em>Effects that sample other coordinates must read the accumulated result, not the raw source.</em> Chromatic aberration reads pixels a few positions away to split color channels. If it shared a pass with the layers before it, the only texture available to sample would be the original source image — so a CA layer placed after an exposure layer would split channels that never saw the exposure. Chain semantics would be broken.</li>
-  <li><em>Sampled texels must be linear light.</em> The source texture is sRGB-encoded, but the pipeline works in linear light (§4) — mixing the two transfer functions in one color value is a subtle gamma bug.</li>
-</ul>
+      <p>
+        Giving each layer its own pass solves both by construction: pass <em>i</em> reads the output
+        of pass <em>i&minus;1</em>, so anything a body samples is the
+        <em>accumulated result of all earlier layers</em>, already in linear light.<label
+          for="sn-multipass"
+          class="margin-toggle sidenote-number"
+        ></label
+        ><input type="checkbox" id="sn-multipass" class="margin-toggle" /><span class="sidenote"
+          >The cost is one dispatch per layer; on modern GPUs each pass is memory-bound and cheap.
+          The structure also leaves room for the deferred features: real local-contrast clarity
+          needs neighbor access, and FBM grain needs workgroup shared memory — both slot directly
+          into this pass-per-layer shape.</span
+        >
+      </p>
 
-<p>Giving each layer its own pass solves both by construction: pass <em>i</em> reads the output of pass <em>i&minus;1</em>, so anything a body samples is the <em>accumulated result of all earlier layers</em>, already in linear light.<label for="sn-multipass" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-multipass" class="margin-toggle"/><span class="sidenote">The cost is one dispatch per layer; on modern GPUs each pass is memory-bound and cheap. The structure also leaves room for the deferred features: real local-contrast clarity needs neighbor access, and FBM grain needs workgroup shared memory — both slot directly into this pass-per-layer shape.</span></p>
+      <h2>4 · Color management: why every effect lives in linear light</h2>
 
-<h2>4 · Color management: why every effect lives in linear light</h2>
+      <p>
+        Here is the single most important decision in the pipeline. Photographs store
+        <em>sRGB-encoded</em> values: the byte values are not proportional to light intensity —
+        they&rsquo;ve been through a gamma-like curve so that 8 bits cover the range our eyes care
+        about. The standard curve (IEC 61966-2-1) is piecewise:
+      </p>
 
-<p>Here is the single most important decision in the pipeline. Photographs store <em>sRGB-encoded</em> values: the byte values are not proportional to light intensity — they&rsquo;ve been through a gamma-like curve so that 8 bits cover the range our eyes care about. The standard curve (IEC 61966-2-1) is piecewise:</p>
-
-<pre><code>fn srgbToLinear(c: vec3&lt;f32&gt;) -&gt; vec3&lt;f32&gt; {
+      <pre><code>fn srgbToLinear(c: vec3&lt;f32&gt;) -&gt; vec3&lt;f32&gt; {
   let lo = c / 12.92;                                   // dark toe: linear
   let hi = pow((c + 0.055) / 1.055, vec3&lt;f32&gt;(2.4));    // main curve
   return select(lo, hi, c &gt; vec3&lt;f32&gt;(0.04045));
 }</code></pre>
 
-<p>If you do <em>arithmetic</em> on sRGB values — multiply, add, mix — the numbers don&rsquo;t correspond to light, so the results are physically wrong and usually look muddy. Doubling an sRGB byte value does <em>not</em> double the light it represents. So the pipeline does what every serious color tool does:</p>
+      <p>
+        If you do <em>arithmetic</em> on sRGB values — multiply, add, mix — the numbers don&rsquo;t
+        correspond to light, so the results are physically wrong and usually look muddy. Doubling an
+        sRGB byte value does <em>not</em> double the light it represents. So the pipeline does what
+        every serious color tool does:
+      </p>
 
-<div class="flow">
-  <div class="box"><span class="t">decode</span><span class="s">sRGB &rarr; linear</span></div>
-  <div class="arrow">&rarr;</div>
-  <div class="box"><span class="t">all effects</span><span class="s">linear light arithmetic</span></div>
-  <div class="arrow">&rarr;</div>
-  <div class="box"><span class="t">encode</span><span class="s">linear &rarr; sRGB</span></div>
-</div>
+      <div class="flow">
+        <div class="box">
+          <span class="t">decode</span><span class="s">sRGB &rarr; linear</span>
+        </div>
+        <div class="arrow">&rarr;</div>
+        <div class="box">
+          <span class="t">all effects</span><span class="s">linear light arithmetic</span>
+        </div>
+        <div class="arrow">&rarr;</div>
+        <div class="box">
+          <span class="t">encode</span><span class="s">linear &rarr; sRGB</span>
+        </div>
+      </div>
 
-<p>In linear light, exposure is a true multiplicative gain (double the light = one stop brighter), contrast pivots on the correct perceptual mid-grey, and mixing colors behaves. The final clamp to [0,1] happens only at encode time, so intermediate passes can carry values above 1 — blown highlights stay &ldquo;hot&rdquo; instead of silently clipping mid-chain.</p>
+      <p>
+        In linear light, exposure is a true multiplicative gain (double the light = one stop
+        brighter), contrast pivots on the correct perceptual mid-grey, and mixing colors behaves.
+        The final clamp to [0,1] happens only at encode time, so intermediate passes can carry
+        values above 1 — blown highlights stay &ldquo;hot&rdquo; instead of silently clipping
+        mid-chain.
+      </p>
 
-<p>Two numbers are worth memorizing because they appear everywhere:</p>
+      <p>Two numbers are worth memorizing because they appear everywhere:</p>
 
-<ul>
-  <li><strong>0.2140</strong> — the linear value of sRGB <em>mid-grey</em> (the sRGB value 0.5, un-gamma&rsquo;d). It&rsquo;s the pivot for contrast. <label for="sn-pivot" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-pivot" class="margin-toggle"/><span class="sidenote">Photographers often quote 18% grey (0.18 linear) as &ldquo;middle grey&rdquo;; that&rsquo;s a metering standard, not a display midpoint. Lutra pivots on the value that <em>looks</em> halfway between black and white on screen — sRGB 0.5, i.e. 0.2140 linear — which is what a contrast pivot should do.</span></li>
-  <li><strong>(0.2126, 0.7152, 0.0722)</strong> — the Rec. 709 <em>luma</em> coefficients: how much each channel contributes to perceived brightness. Green dominates, as your eyes would expect. Every &ldquo;luma&rdquo; in this codebase is this dot product.</li>
-</ul>
+      <ul>
+        <li>
+          <strong>0.2140</strong> — the linear value of sRGB <em>mid-grey</em> (the sRGB value 0.5,
+          un-gamma&rsquo;d). It&rsquo;s the pivot for contrast.
+          <label for="sn-pivot" class="margin-toggle sidenote-number"></label
+          ><input type="checkbox" id="sn-pivot" class="margin-toggle" /><span class="sidenote"
+            >Photographers often quote 18% grey (0.18 linear) as &ldquo;middle grey&rdquo;;
+            that&rsquo;s a metering standard, not a display midpoint. Lutra pivots on the value that
+            <em>looks</em> halfway between black and white on screen — sRGB 0.5, i.e. 0.2140 linear
+            — which is what a contrast pivot should do.</span
+          >
+        </li>
+        <li>
+          <strong>(0.2126, 0.7152, 0.0722)</strong> — the Rec. 709 <em>luma</em> coefficients: how
+          much each channel contributes to perceived brightness. Green dominates, as your eyes would
+          expect. Every &ldquo;luma&rdquo; in this codebase is this dot product.
+        </li>
+      </ul>
 
-<p><strong>The one exception: LUT.</strong> The film-emulation LUT layer deliberately steps out of linear light. Its cube — a 13&sup3; color lookup table from the vendored G&rsquo;MIC film presets (§7.11) — is authored against sRGB-encoded values, because G&rsquo;MIC&rsquo;s working space is sRGB. Apply it to linear values and the film curves land in the wrong place: lifted blacks wash out further, the S-curves shift. So the LUT pass decodes its linear input to sRGB, applies the cube, mixes by strength, and re-encodes to linear — skipping the round-trip at the chain ends, where the source and display textures are already sRGB (see docs/adr/0003). The strength mix happens in sRGB space, which is what &ldquo;50% film look&rdquo; perceptually means.</p>
+      <p>
+        <strong>The one exception: LUT.</strong> The film-emulation LUT layer deliberately steps out
+        of linear light. Its cube — a 13&sup3; color lookup table from the vendored G&rsquo;MIC film
+        presets (§7.11) — is authored against sRGB-encoded values, because G&rsquo;MIC&rsquo;s
+        working space is sRGB. Apply it to linear values and the film curves land in the wrong
+        place: lifted blacks wash out further, the S-curves shift. So the LUT pass decodes its
+        linear input to sRGB, applies the cube, mixes by strength, and re-encodes to linear —
+        skipping the round-trip at the chain ends, where the source and display textures are already
+        sRGB (see docs/adr/0003). The strength mix happens in sRGB space, which is what &ldquo;50%
+        film look&rdquo; perceptually means.
+      </p>
 
-<h2>5 · Anatomy of a pass</h2>
+      <h2>5 · Anatomy of a pass</h2>
 
-<p>Here is the full WGSL skeleton the assembler generates for one layer (this one happens to be a non-final, non-first pass, so no sRGB conversion at its boundaries):</p>
+      <p>
+        Here is the full WGSL skeleton the assembler generates for one layer (this one happens to be
+        a non-final, non-first pass, so no sRGB conversion at its boundaries):
+      </p>
 
-<pre><code>struct LayerParams {
+      <pre><code>struct LayerParams {
   l0_stops: f32,          // one member per field of this layer
 }
 
@@ -342,116 +714,274 @@ fn main(@builtin(global_invocation_id) id: vec3&lt;u32&gt;) {
   textureStore(dstTex, coord, vec4&lt;f32&gt;(outColor, alpha));
 }</code></pre>
 
-<p>Four details worth understanding:</p>
+      <p>Four details worth understanding:</p>
 
-<ul>
-  <li><strong>The alias trick.</strong> In WGSL, struct members are only reachable through the struct variable (<code>u_params.l0_stops</code>), but each effect body is written to reference its parameters <em>bare</em> (<code>l0_stops</code>) — because bodies are written as self-contained snippets that read like math. The assembler injects one <code>let l0_stops = u_params.l0_stops;</code> per field before the body, so the body&rsquo;s bare names resolve. This is what keeps a body renderer as simple as <code>color *= exp2(l0_stops)</code>.</li>
-  <li><strong>The bounds check.</strong> Workgroups are dispatched in a grid that covers the image (16&times;16 invocations each), but the grid is rounded up, so edge invocations fall outside the image. The <code>if &hellip; return</code> guard keeps those from writing out of bounds.</li>
-  <li><strong>16&times;16.</strong> 256 invocations per workgroup — a sweet spot for occupancy on most desktop GPUs, and the frontend dispatches with the same constant.</li>
-  <li><strong>Boundary conversions.</strong> A pass either decodes its input (first layer), encodes its output (last layer), both (single layer), or neither (middle). The assembler computes these three booleans from the layer&rsquo;s position and writes the corresponding expressions into the template. The colorspace functions are embedded in a shader only if one of its boundaries needs them.</li>
-</ul>
+      <ul>
+        <li>
+          <strong>The alias trick.</strong> In WGSL, struct members are only reachable through the
+          struct variable (<code>u_params.l0_stops</code>), but each effect body is written to
+          reference its parameters <em>bare</em> (<code>l0_stops</code>) — because bodies are
+          written as self-contained snippets that read like math. The assembler injects one
+          <code>let l0_stops = u_params.l0_stops;</code> per field before the body, so the
+          body&rsquo;s bare names resolve. This is what keeps a body renderer as simple as
+          <code>color *= exp2(l0_stops)</code>.
+        </li>
+        <li>
+          <strong>The bounds check.</strong> Workgroups are dispatched in a grid that covers the
+          image (16&times;16 invocations each), but the grid is rounded up, so edge invocations fall
+          outside the image. The <code>if &hellip; return</code> guard keeps those from writing out
+          of bounds.
+        </li>
+        <li>
+          <strong>16&times;16.</strong> 256 invocations per workgroup — a sweet spot for occupancy
+          on most desktop GPUs, and the frontend dispatches with the same constant.
+        </li>
+        <li>
+          <strong>Boundary conversions.</strong> A pass either decodes its input (first layer),
+          encodes its output (last layer), both (single layer), or neither (middle). The assembler
+          computes these three booleans from the layer&rsquo;s position and writes the corresponding
+          expressions into the template. The colorspace functions are embedded in a shader only if
+          one of its boundaries needs them.
+        </li>
+      </ul>
 
-<h3>The linearize pass</h3>
+      <h3>The linearize pass</h3>
 
-<p>There is one more pass shape. If the <em>first</em> layer samples its input texture (currently: chromatic aberration), the assembler inserts a dedicated pass before it that does nothing but decode sRGB to linear and write an rgba16float intermediate. Why not let the first layer pass do the decoding as usual? Because when a body samples <em>other coordinates</em>, it samples them raw — if the texture were still sRGB, the sampled neighbors would be in the wrong transfer function. The standalone linearize pass guarantees every texture a body ever samples is already linear. The moment CA is not first, this pass disappears: the first layer&rsquo;s pass decodes its own center texel and writes linear, which is all the later passes need.</p>
+      <p>
+        There is one more pass shape. If the <em>first</em> layer samples its input texture
+        (currently: chromatic aberration), the assembler inserts a dedicated pass before it that
+        does nothing but decode sRGB to linear and write an rgba16float intermediate. Why not let
+        the first layer pass do the decoding as usual? Because when a body samples
+        <em>other coordinates</em>, it samples them raw — if the texture were still sRGB, the
+        sampled neighbors would be in the wrong transfer function. The standalone linearize pass
+        guarantees every texture a body ever samples is already linear. The moment CA is not first,
+        this pass disappears: the first layer&rsquo;s pass decodes its own center texel and writes
+        linear, which is all the later passes need.
+      </p>
 
-<h3>Ping-pong intermediates</h3>
+      <h3>Ping-pong intermediates</h3>
 
-<p>Between the layers live exactly two rgba16float textures, used alternately:</p>
+      <p>Between the layers live exactly two rgba16float textures, used alternately:</p>
 
-<div class="flow">
-  <div class="box"><span class="t">pass 0</span><span class="s">reads <code>srcTex</code> &rarr; writes <code>inter[0]</code></span></div>
-  <div class="arrow">&rarr;</div>
-  <div class="box"><span class="t">pass 1</span><span class="s">reads <code>inter[0]</code> &rarr; writes <code>inter[1]</code></span></div>
-  <div class="arrow">&rarr;</div>
-  <div class="box"><span class="t">pass 2</span><span class="s">reads <code>inter[1]</code> &rarr; writes <code>inter[0]</code></span></div>
-  <div class="arrow">&rarr;</div>
-  <div class="box"><span class="t">&hellip;</span><span class="s">and so on</span></div>
-  <div class="arrow">&rarr;</div>
-  <div class="box"><span class="t">last</span><span class="s">reads one inter &rarr; writes <code>dstTex</code></span></div>
-</div>
+      <div class="flow">
+        <div class="box">
+          <span class="t">pass 0</span
+          ><span class="s">reads <code>srcTex</code> &rarr; writes <code>inter[0]</code></span>
+        </div>
+        <div class="arrow">&rarr;</div>
+        <div class="box">
+          <span class="t">pass 1</span
+          ><span class="s">reads <code>inter[0]</code> &rarr; writes <code>inter[1]</code></span>
+        </div>
+        <div class="arrow">&rarr;</div>
+        <div class="box">
+          <span class="t">pass 2</span
+          ><span class="s">reads <code>inter[1]</code> &rarr; writes <code>inter[0]</code></span>
+        </div>
+        <div class="arrow">&rarr;</div>
+        <div class="box"><span class="t">&hellip;</span><span class="s">and so on</span></div>
+        <div class="arrow">&rarr;</div>
+        <div class="box">
+          <span class="t">last</span
+          ><span class="s">reads one inter &rarr; writes <code>dstTex</code></span>
+        </div>
+      </div>
 
-<p>Two textures suffice because passes run strictly in sequence — pass <em>i</em> only needs the output of <em>i&minus;1</em>, which is always on the &ldquo;other&rdquo; texture. Why <code>rgba16float</code> (half precision, 2 bytes per channel) instead of 8-bit like the display texture? Every 8-bit intermediate would re-quantize the image to 256 levels per channel per pass — after ten layers you&rsquo;d see banding in smooth gradients, especially in the dark toe where 8 bits are coarsest. Half floats carry the linear values losslessly enough that the only quantization the viewer ever sees is the final one.</p>
+      <p>
+        Two textures suffice because passes run strictly in sequence — pass <em>i</em> only needs
+        the output of <em>i&minus;1</em>, which is always on the &ldquo;other&rdquo; texture. Why
+        <code>rgba16float</code> (half precision, 2 bytes per channel) instead of 8-bit like the
+        display texture? Every 8-bit intermediate would re-quantize the image to 256 levels per
+        channel per pass — after ten layers you&rsquo;d see banding in smooth gradients, especially
+        in the dark toe where 8 bits are coarsest. Half floats carry the linear values losslessly
+        enough that the only quantization the viewer ever sees is the final one.
+      </p>
 
-<p><strong>The LUT pass inverts the boundaries.</strong> A LUT layer&rsquo;s pass is the same skeleton with three differences. It declares an extra binding — <code>lutTex</code>, a 13&sup3; <code>texture_3d&lt;f32&gt;</code> (rgba32float) at binding 6 — and it omits the sampler: 32-bit float textures are not filterable in WebGPU, so the body does its own trilinear interpolation with <code>textureLoad</code> over the baked <code>LUT_SIZE</code> (the body maps each color to texel space <code>c·(SIZE−1)</code>, lerps the eight surrounding texels, and never touches edge-adjacent memory, so no bleed outside the cube). And its color-space boundaries are inverted: the input is decoded <em>to</em> sRGB (unless the pass reads the sRGB source directly) and the output is re-encoded <em>from</em> sRGB (unless the pass is last and writes the display texture). The body itself only reads and mixes — and it is the one body that is guaranteed sRGB-encoded input, by contract.</p>
+      <p>
+        <strong>The LUT pass inverts the boundaries.</strong> A LUT layer&rsquo;s pass is the same
+        skeleton with three differences. It declares an extra binding — <code>lutTex</code>, a
+        13&sup3; <code>texture_3d&lt;f32&gt;</code> (rgba32float) at binding 6 — and it omits the
+        sampler: 32-bit float textures are not filterable in WebGPU, so the body does its own
+        trilinear interpolation with <code>textureLoad</code> over the baked
+        <code>LUT_SIZE</code> (the body maps each color to texel space <code>c·(SIZE−1)</code>,
+        lerps the eight surrounding texels, and never touches edge-adjacent memory, so no bleed
+        outside the cube). And its color-space boundaries are inverted: the input is decoded
+        <em>to</em> sRGB (unless the pass reads the sRGB source directly) and the output is
+        re-encoded <em>from</em> sRGB (unless the pass is last and writes the display texture). The
+        body itself only reads and mixes — and it is the one body that is guaranteed sRGB-encoded
+        input, by contract.
+      </p>
 
-<h2>6 · How a slider value reaches a shader</h2>
+      <h2>6 · How a slider value reaches a shader</h2>
 
-<p>When you drag a slider, the flow is:</p>
+      <p>When you drag a slider, the flow is:</p>
 
-<ol>
-  <li>The UI updates the layer&rsquo;s parameter in the model (e.g. <code>exposure.stops = 1.5</code>).</li>
-  <li>The engine&rsquo;s <code>createRenderRequest</code> walks the visible layers, asks the assembler for the pass list, and <em>packs uniforms</em>: for each pass, a flat <code>Float32Array</code> laid out exactly like that pass&rsquo;s <code>LayerParams</code> struct, with one slot per field. The assembler reports the slot order (layer index, field name, offset) and the packer fills it from the model — so the engine and the shader can never disagree about layout.</li>
-  <li>The frontend writes each pass&rsquo;s array into that pass&rsquo;s GPU uniform buffer (a plain <code>memcpy</code>-style write) and dispatches the passes.</li>
-  <li>Inside the shader, <code>u_params.l0_stops</code> is the float you just wrote.</li>
-</ol>
+      <ol>
+        <li>
+          The UI updates the layer&rsquo;s parameter in the model (e.g.
+          <code>exposure.stops = 1.5</code>).
+        </li>
+        <li>
+          The engine&rsquo;s <code>createRenderRequest</code> walks the visible layers, asks the
+          assembler for the pass list, and <em>packs uniforms</em>: for each pass, a flat
+          <code>Float32Array</code> laid out exactly like that pass&rsquo;s
+          <code>LayerParams</code> struct, with one slot per field. The assembler reports the slot
+          order (layer index, field name, offset) and the packer fills it from the model — so the
+          engine and the shader can never disagree about layout.
+        </li>
+        <li>
+          The frontend writes each pass&rsquo;s array into that pass&rsquo;s GPU uniform buffer (a
+          plain <code>memcpy</code>-style write) and dispatches the passes.
+        </li>
+        <li>Inside the shader, <code>u_params.l0_stops</code> is the float you just wrote.</li>
+      </ol>
 
-<p>The frame counter works the same way: <code>u_frame</code> is a tiny uniform written once per render (not per pass), and only passes that mention it get the binding. Grain uses it to animate the noise across frames.</p>
+      <p>
+        The frame counter works the same way: <code>u_frame</code> is a tiny uniform written once
+        per render (not per pass), and only passes that mention it get the binding. Grain uses it to
+        animate the noise across frames.
+      </p>
 
-<h2>7 · The eleven effects</h2>
+      <h2>7 · The eleven effects</h2>
 
-<p>Every effect is a pure function of the pixel&rsquo;s <code>color</code> — linear light for ten of them, sRGB-encoded for the LUT layer (§7.11) — and, for two of them, of the pass&rsquo;s input texture at other coordinates. The slider ranges come from the registry (<code>registry.ts</code>); the math below is the whole story. <code>l{i}_field</code> means &ldquo;this layer&rsquo;s slider value.&rdquo;</p>
+      <p>
+        Every effect is a pure function of the pixel&rsquo;s <code>color</code> — linear light for
+        ten of them, sRGB-encoded for the LUT layer (§7.11) — and, for two of them, of the
+        pass&rsquo;s input texture at other coordinates. The slider ranges come from the registry
+        (<code>registry.ts</code>); the math below is the whole story. <code>l{i}_field</code> means
+        &ldquo;this layer&rsquo;s slider value.&rdquo;
+      </p>
 
-<h3>7.1 Exposure — <code>stops</code> &isin; [&minus;3, 3] <span class="tag good">correct</span></h3>
+      <h3>
+        7.1 Exposure — <code>stops</code> &isin; [&minus;3, 3] <span class="tag good">correct</span>
+      </h3>
 
-<pre><code>let gain = exp2(l0_stops);
+      <pre><code>let gain = exp2(l0_stops);
 color *= gain;</code></pre>
 
-<p>A stop is a doubling of light. <code>exp2(stops)</code> converts stops to a multiplicative factor: +1 stop &rarr; 2&times;, &minus;1 &rarr; &frac12;&times;, +3 &rarr; 8&times;. This is the textbook exposure formula, and it only works because we&rsquo;re in linear light — the same formula on sRGB values would be off by a gamma. Clipping of blown highlights is handled by the clamp at final encode.</p>
+      <p>
+        A stop is a doubling of light. <code>exp2(stops)</code> converts stops to a multiplicative
+        factor: +1 stop &rarr; 2&times;, &minus;1 &rarr; &frac12;&times;, +3 &rarr; 8&times;. This
+        is the textbook exposure formula, and it only works because we&rsquo;re in linear light —
+        the same formula on sRGB values would be off by a gamma. Clipping of blown highlights is
+        handled by the clamp at final encode.
+      </p>
 
-<h3>7.2 Contrast — <code>amount</code> &isin; [&minus;1, 1] <span class="tag good">correct</span></h3>
+      <h3>
+        7.2 Contrast — <code>amount</code> &isin; [&minus;1, 1]
+        <span class="tag good">correct</span>
+      </h3>
 
-<pre><code>let gain = exp2(-l0_amount * 0.5);
+      <pre><code>let gain = exp2(-l0_amount * 0.5);
 let t = max(color, vec3&lt;f32&gt;(0.0)) / 0.2140;   // guard: no NaN from negatives
 color = pow(t, vec3&lt;f32&gt;(gain)) * 0.2140;</code></pre>
 
-<p>This is a <em>power-curve S-curve</em> pivoted on mid-grey. The pivot: 0.2140, the linear value of sRGB 0.5 (§4). The curve is <code>c&prime; = 0.214 &middot; (c / 0.214)<sup>&gamma;</sup></code> with <code>&gamma; = 2<sup>&minus;amount/2</sup></code> — one &ldquo;stop of curve&rdquo; at each slider extreme. Positive amount gives <code>&gamma; &lt; 1</code>: every value below the pivot is <em>lifted</em>, every value above it is <em>compressed</em>. That&rsquo;s the classic film look — shadows open up, highlights roll off gently — and it&rsquo;s a true S shape when you plot output vs. input. Negative amount (<code>&gamma; &gt; 1</code>) does the reverse: tones get pushed away from the pivot, flattening the midtones and letting highlights run hot. The <code>max(color, 0)</code> guard exists because a previous layer (e.g. shadows at &minus;1) can drive channels slightly negative, and <code>pow</code> of a negative base is NaN.</p>
+      <p>
+        This is a <em>power-curve S-curve</em> pivoted on mid-grey. The pivot: 0.2140, the linear
+        value of sRGB 0.5 (§4). The curve is
+        <code>c&prime; = 0.214 &middot; (c / 0.214)<sup>&gamma;</sup></code> with
+        <code>&gamma; = 2<sup>&minus;amount/2</sup></code> — one &ldquo;stop of curve&rdquo; at each
+        slider extreme. Positive amount gives <code>&gamma; &lt; 1</code>: every value below the
+        pivot is <em>lifted</em>, every value above it is <em>compressed</em>. That&rsquo;s the
+        classic film look — shadows open up, highlights roll off gently — and it&rsquo;s a true S
+        shape when you plot output vs. input. Negative amount (<code>&gamma; &gt; 1</code>) does the
+        reverse: tones get pushed away from the pivot, flattening the midtones and letting
+        highlights run hot. The <code>max(color, 0)</code> guard exists because a previous layer
+        (e.g. shadows at &minus;1) can drive channels slightly negative, and <code>pow</code> of a
+        negative base is NaN.
+      </p>
 
-<figure>
-  <svg viewBox="0 0 210 200" width="380" role="img" aria-label="Contrast curves">
-    <!-- axes -->
-    <line x1="20" y1="165" x2="185" y2="165" stroke="#999" stroke-width="1"/>
-    <line x1="20" y1="5" x2="20" y2="165" stroke="#999" stroke-width="1"/>
-    <text x="14" y="179" font-size="11" fill="#666">0</text>
-    <text x="95" y="179" font-size="11" fill="#666">0.5</text>
-    <text x="148" y="179" font-size="11" fill="#666">1 &nbsp;(linear input)</text>
-    <text x="8" y="14" font-size="11" fill="#666">1</text>
-    <!-- identity -->
-    <line x1="20" y1="165" x2="180" y2="5" stroke="#aaa" stroke-width="1.2" stroke-dasharray="4 3"/>
-    <!-- gamma = 1.414 (negative amount): y = 0.214*(x/0.214)^1.414, clamped at 1 -->
-    <polyline points="20,165 23,164 28,161 36,153 54,131 68,110 100,51 132,5 164,5 180,5"
-      fill="none" stroke="#8a6d3b" stroke-width="1.8"/>
-    <!-- gamma = 0.707 (positive amount): y = 0.214*(x/0.214)^0.707 -->
-    <polyline points="20,165 23,159 28,153 36,145 54,131 68,122 100,103 132,86 164,71 180,63"
-      fill="none" stroke="#7a2e1e" stroke-width="1.8"/>
-    <!-- pivot -->
-    <circle cx="54" cy="131" r="3" fill="#111"/>
-    <text x="58" y="148" font-size="11" fill="#444">pivot 0.214</text>
-    <text x="105" y="26" font-size="11" fill="#7a2e1e">amount &gt; 0 (S-curve)</text>
-    <text x="105" y="192" font-size="11" fill="#8a6d3b">amount &lt; 0 (flatten)</text>
-  </svg>
-  <figcaption>The contrast curve family in linear light (input on the x axis, output on the y axis). Red: positive amount &mdash; shadows lift, highlights roll off. Brown: negative amount &mdash; tones pushed outward from the pivot, blown highlights clamp at 1. Dashed: identity.</figcaption>
-</figure>
+      <figure>
+        <svg viewBox="0 0 210 200" width="380" role="img" aria-label="Contrast curves">
+          <!-- axes -->
+          <line x1="20" y1="165" x2="185" y2="165" stroke="#999" stroke-width="1" />
+          <line x1="20" y1="5" x2="20" y2="165" stroke="#999" stroke-width="1" />
+          <text x="14" y="179" font-size="11" fill="#666">0</text>
+          <text x="95" y="179" font-size="11" fill="#666">0.5</text>
+          <text x="148" y="179" font-size="11" fill="#666">1 &nbsp;(linear input)</text>
+          <text x="8" y="14" font-size="11" fill="#666">1</text>
+          <!-- identity -->
+          <line
+            x1="20"
+            y1="165"
+            x2="180"
+            y2="5"
+            stroke="#aaa"
+            stroke-width="1.2"
+            stroke-dasharray="4 3"
+          />
+          <!-- gamma = 1.414 (negative amount): y = 0.214*(x/0.214)^1.414, clamped at 1 -->
+          <polyline
+            points="20,165 23,164 28,161 36,153 54,131 68,110 100,51 132,5 164,5 180,5"
+            fill="none"
+            stroke="#8a6d3b"
+            stroke-width="1.8"
+          />
+          <!-- gamma = 0.707 (positive amount): y = 0.214*(x/0.214)^0.707 -->
+          <polyline
+            points="20,165 23,159 28,153 36,145 54,131 68,122 100,103 132,86 164,71 180,63"
+            fill="none"
+            stroke="#7a2e1e"
+            stroke-width="1.8"
+          />
+          <!-- pivot -->
+          <circle cx="54" cy="131" r="3" fill="#111" />
+          <text x="58" y="148" font-size="11" fill="#444">pivot 0.214</text>
+          <text x="105" y="26" font-size="11" fill="#7a2e1e">amount &gt; 0 (S-curve)</text>
+          <text x="105" y="192" font-size="11" fill="#8a6d3b">amount &lt; 0 (flatten)</text>
+        </svg>
+        <figcaption>
+          The contrast curve family in linear light (input on the x axis, output on the y axis).
+          Red: positive amount &mdash; shadows lift, highlights roll off. Brown: negative amount
+          &mdash; tones pushed outward from the pivot, blown highlights clamp at 1. Dashed:
+          identity.
+        </figcaption>
+      </figure>
 
-<h3>7.3 Shadows — <code>amount</code> &isin; [&minus;1, 1] <span class="tag note">approximation</span></h3>
+      <h3>
+        7.3 Shadows — <code>amount</code> &isin; [&minus;1, 1]
+        <span class="tag note">approximation</span>
+      </h3>
 
-<pre><code>let luma = clamp(dot(color, vec3&lt;f32&gt;(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
+      <pre><code>let luma = clamp(dot(color, vec3&lt;f32&gt;(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
 let mask = 1.0 - smoothstep(0.0, 0.5, luma);   // 1 at black, 0 by mid-grey
 color += l0_amount * 0.15 * mask;</code></pre>
 
-<p>This is an <em>additive lift with a tonal mask</em>. The mask is 1 for pure black, falls off smoothly, and reaches 0 at luma 0.5 — so the effect touches only tones darker than mid-grey, strongest at the bottom. Positive amount brightens shadows (a &ldquo;lift&rdquo;), negative darkens them. The 0.15 multiplier is a tuning constant chosen so the &minus;1&hellip;1 slider stays tasteful. This is a simplified shadows tool — a production tool would shape the tone curve more carefully (lift/gamma/gain separation) — but for v1 it&rsquo;s honest, cheap, and does what it says.</p>
+      <p>
+        This is an <em>additive lift with a tonal mask</em>. The mask is 1 for pure black, falls off
+        smoothly, and reaches 0 at luma 0.5 — so the effect touches only tones darker than mid-grey,
+        strongest at the bottom. Positive amount brightens shadows (a &ldquo;lift&rdquo;), negative
+        darkens them. The 0.15 multiplier is a tuning constant chosen so the &minus;1&hellip;1
+        slider stays tasteful. This is a simplified shadows tool — a production tool would shape the
+        tone curve more carefully (lift/gamma/gain separation) — but for v1 it&rsquo;s honest,
+        cheap, and does what it says.
+      </p>
 
-<h3>7.4 Highlights — <code>amount</code> &isin; [&minus;1, 1] <span class="tag note">approximation</span></h3>
+      <h3>
+        7.4 Highlights — <code>amount</code> &isin; [&minus;1, 1]
+        <span class="tag note">approximation</span>
+      </h3>
 
-<pre><code>let luma = clamp(dot(color, vec3&lt;f32&gt;(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
+      <pre><code>let luma = clamp(dot(color, vec3&lt;f32&gt;(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
 let mask = pow(luma, 2.2);                     // 0 at black, 1 at white
 color += l0_amount * 0.2 * mask;</code></pre>
 
-<p>The mirror image of shadows: the mask rises from 0 at mid-grey-ish to 1 at white (the <code>pow(luma, 2.2)</code> shapes the ramp), so only bright tones are affected, most at the top. Positive amount <em>lifts</em> highlights (brightens them further); negative darkens them. Note that this is a <em>lift</em>, not a compression: positive amount does not &ldquo;recover&rdquo; blown detail — it pushes bright tones brighter. Real highlight recovery (rolling the tone curve over so highlights compress toward white) is a different operation and a future refinement.</p>
+      <p>
+        The mirror image of shadows: the mask rises from 0 at mid-grey-ish to 1 at white (the
+        <code>pow(luma, 2.2)</code> shapes the ramp), so only bright tones are affected, most at the
+        top. Positive amount <em>lifts</em> highlights (brightens them further); negative darkens
+        them. Note that this is a <em>lift</em>, not a compression: positive amount does not
+        &ldquo;recover&rdquo; blown detail — it pushes bright tones brighter. Real highlight
+        recovery (rolling the tone curve over so highlights compress toward white) is a different
+        operation and a future refinement.
+      </p>
 
-<h3>7.5 White balance — <code>temp</code>, <code>tint</code> &isin; [&minus;1, 1] <span class="tag note">approximation</span></h3>
+      <h3>
+        7.5 White balance — <code>temp</code>, <code>tint</code> &isin; [&minus;1, 1]
+        <span class="tag note">approximation</span>
+      </h3>
 
-<pre><code>// temp: -1 cool (blue) / +1 warm (amber)
+      <pre><code>// temp: -1 cool (blue) / +1 warm (amber)
 color.r *= 1.0 - temp * 0.3;
 color.b *= 1.0 + temp * 0.3;
 // tint: -1 magenta / +1 green
@@ -459,18 +989,49 @@ color.g *= 1.0 + tint * 0.2;
 color.r *= 1.0 - tint * 0.1;
 color.b *= 1.0 - tint * 0.1;</code></pre>
 
-<p>Temperature is modeled as a red&harr;blue seesaw: warming scales red up and blue down by up to &plusmn;30% at the slider extremes; cooling does the opposite. Tint is green vs. magenta: scaling green against a smaller opposing pull on red and blue. This is the classic cheap approximation of white balance — multiplicative channel scaling in linear light.<label for="sn-wb" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-wb" class="margin-toggle"/><span class="sidenote">Physically rigorous tools convert a color temperature in Kelvin to a reference white and derive per-channel gains in a cone-response (LMS) space — Unity&rsquo;s White Balance node is the canonical reference. Lutra&rsquo;s direct channel scaling captures the look with a fraction of the math. Documented as an approximation; the Kelvin-based upgrade is on the roadmap.</span> It does not shift green with temperature or red/blue with tint beyond the intended cross-coupling — good. The slider is normalized &minus;1&hellip;1 (0 = neutral).</p>
+      <p>
+        Temperature is modeled as a red&harr;blue seesaw: warming scales red up and blue down by up
+        to &plusmn;30% at the slider extremes; cooling does the opposite. Tint is green vs. magenta:
+        scaling green against a smaller opposing pull on red and blue. This is the classic cheap
+        approximation of white balance — multiplicative channel scaling in linear light.<label
+          for="sn-wb"
+          class="margin-toggle sidenote-number"
+        ></label
+        ><input type="checkbox" id="sn-wb" class="margin-toggle" /><span class="sidenote"
+          >Physically rigorous tools convert a color temperature in Kelvin to a reference white and
+          derive per-channel gains in a cone-response (LMS) space — Unity&rsquo;s White Balance node
+          is the canonical reference. Lutra&rsquo;s direct channel scaling captures the look with a
+          fraction of the math. Documented as an approximation; the Kelvin-based upgrade is on the
+          roadmap.</span
+        >
+        It does not shift green with temperature or red/blue with tint beyond the intended
+        cross-coupling — good. The slider is normalized &minus;1&hellip;1 (0 = neutral).
+      </p>
 
-<h3>7.6 Saturation — <code>amount</code> &isin; [&minus;1, 1] <span class="tag good">correct</span></h3>
+      <h3>
+        7.6 Saturation — <code>amount</code> &isin; [&minus;1, 1]
+        <span class="tag good">correct</span>
+      </h3>
 
-<pre><code>let luma = dot(color, vec3&lt;f32&gt;(0.2126, 0.7152, 0.0722));
+      <pre><code>let luma = dot(color, vec3&lt;f32&gt;(0.2126, 0.7152, 0.0722));
 color = mix(vec3&lt;f32&gt;(luma), color, 1.0 + l0_amount);</code></pre>
 
-<p>The textbook saturation formula: blend each pixel between its <em>gray equivalent</em> (luma everywhere) and itself. <code>mix(a, b, t)</code> is <code>a&middot;(1&minus;t) + b&middot;t</code>, so with <code>t = 1 + amount</code>: amount 0 is identity, &minus;1 makes <code>t = 0</code> and the image goes fully grayscale, +1 makes <code>t = 2</code> — the color is pushed <em>past</em> its gray value, doubling chroma. Linear-light luma mixing keeps hues stable while desaturating, which naive per-channel averaging does not.</p>
+      <p>
+        The textbook saturation formula: blend each pixel between its <em>gray equivalent</em> (luma
+        everywhere) and itself. <code>mix(a, b, t)</code> is
+        <code>a&middot;(1&minus;t) + b&middot;t</code>, so with <code>t = 1 + amount</code>: amount
+        0 is identity, &minus;1 makes <code>t = 0</code> and the image goes fully grayscale, +1
+        makes <code>t = 2</code> — the color is pushed <em>past</em> its gray value, doubling
+        chroma. Linear-light luma mixing keeps hues stable while desaturating, which naive
+        per-channel averaging does not.
+      </p>
 
-<h3>7.7 Grain — <code>texture</code>, <code>size</code>, <code>blur</code> &isin; [0, 1] <span class="tag good">correct</span></h3>
+      <h3>
+        7.7 Grain — <code>texture</code>, <code>size</code>, <code>blur</code> &isin; [0, 1]
+        <span class="tag good">correct</span>
+      </h3>
 
-<pre><code>// 3-octave FBM over smooth value noise (integer lattice hash, quintic easing)
+      <pre><code>// 3-octave FBM over smooth value noise (integer lattice hash, quintic easing)
 let f = 0.6667 * pow(0.15, l0_size);         // cell: 1.5 px (0) &rarr; 10 px (1), log scale
 let p = 0.6 - 0.45 * l0_blur;                 // octave persistence 0.6 &rarr; 0.15
 let n = grainNoise(coord * f, u_frame) * inv
@@ -480,28 +1041,74 @@ let noise = (n - 0.5) * 2.0;                  // &plusmn;1
 let w = max(1.0 - abs(L - 0.5) * 1.4, 0.35);  // midtone weighting
 color += noise * l0_texture * 0.15 * w;</code></pre>
 
-<p>Grain is three-octave FBM over <em>smooth value noise</em>: the lattice is hashed with an integer hash (a few multiply/xor/shift operations on the pixel coordinate plus the frame counter — no transcendentals), and the hash values are interpolated with quintic easing. Because neighboring pixels share lattice points, the noise is spatially coherent — it clumps and swirls like real film grain, instead of the per-pixel static the mobile version shipped. The frame seed animates the whole field between frames, and octaves 2 and 3 use derived seeds so they decorrelate over time. Three knobs shape it:</p>
+      <p>
+        Grain is three-octave FBM over <em>smooth value noise</em>: the lattice is hashed with an
+        integer hash (a few multiply/xor/shift operations on the pixel coordinate plus the frame
+        counter — no transcendentals), and the hash values are interpolated with quintic easing.
+        Because neighboring pixels share lattice points, the noise is spatially coherent — it clumps
+        and swirls like real film grain, instead of the per-pixel static the mobile version shipped.
+        The frame seed animates the whole field between frames, and octaves 2 and 3 use derived
+        seeds so they decorrelate over time. Three knobs shape it:
+      </p>
 
-<ul>
-  <li><strong><code>texture</code> — strength.</strong> Amplitude &plusmn;0.15 linear at full slider (&asymp; &plusmn;14 sRGB levels at midtone), masked to midtones: the triangle <code>w</code> peaks at luma 0.5 and falls to a floor of 0.35 at the extremes, so blacks and whites stay relatively clean.<label for="sn-grain" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-grain" class="margin-toggle"/><span class="sidenote">Grain is added in linear light, but the display curve stretches dark values — so the same linear amplitude looks larger in the shadows on screen. AMD&rsquo;s &ldquo;Fine Art of Film Grain&rdquo; (GPUOpen) discusses exactly this effect and how real pipelines scale grain with the signal. The midtone floor keeps blacks from lifting outright, but per-signal scaling is a future refinement.</span></li>
-  <li><strong><code>size</code> — noise cell.</strong> Log scale from 1.5 px fine speckle to 10 px chunky grain.</li>
-  <li><strong><code>blur</code> — octave persistence.</strong> 0.6 &rarr; 0.15; the octave weights are normalized by construction (1, p, p&sup2; &divide; their sum), so blur changes the character of the grain, not its loudness.</li>
-</ul>
+      <ul>
+        <li>
+          <strong><code>texture</code> — strength.</strong> Amplitude &plusmn;0.15 linear at full
+          slider (&asymp; &plusmn;14 sRGB levels at midtone), masked to midtones: the triangle
+          <code>w</code> peaks at luma 0.5 and falls to a floor of 0.35 at the extremes, so blacks
+          and whites stay relatively clean.<label
+            for="sn-grain"
+            class="margin-toggle sidenote-number"
+          ></label
+          ><input type="checkbox" id="sn-grain" class="margin-toggle" /><span class="sidenote"
+            >Grain is added in linear light, but the display curve stretches dark values — so the
+            same linear amplitude looks larger in the shadows on screen. AMD&rsquo;s &ldquo;Fine Art
+            of Film Grain&rdquo; (GPUOpen) discusses exactly this effect and how real pipelines
+            scale grain with the signal. The midtone floor keeps blacks from lifting outright, but
+            per-signal scaling is a future refinement.</span
+          >
+        </li>
+        <li>
+          <strong><code>size</code> — noise cell.</strong> Log scale from 1.5 px fine speckle to 10
+          px chunky grain.
+        </li>
+        <li>
+          <strong><code>blur</code> — octave persistence.</strong> 0.6 &rarr; 0.15; the octave
+          weights are normalized by construction (1, p, p&sup2; &divide; their sum), so blur changes
+          the character of the grain, not its loudness.
+        </li>
+      </ul>
 
-<h3>7.8 Vignette — <code>amount</code>, <code>size</code> <span class="tag good">correct</span></h3>
+      <h3>
+        7.8 Vignette — <code>amount</code>, <code>size</code> <span class="tag good">correct</span>
+      </h3>
 
-<pre><code>var uv = vec2&lt;f32&gt;(f32(coord.x), f32(coord.y)) / u_resolution * 2.0 - 1.0;
+      <pre><code>var uv = vec2&lt;f32&gt;(f32(coord.x), f32(coord.y)) / u_resolution * 2.0 - 1.0;
 uv.x *= u_resolution.x / u_resolution.y;      // aspect correction
 let dist = length(uv);
 let v = smoothstep(l0_size * 0.6, l0_size, dist);
 let k = 1.0 - v * l0_amount;
 color *= k;</code></pre>
 
-<p>A radial darkening toward the frame edges. Pixel coordinates are mapped to [&minus;1, 1] around the center, then <code>dist</code> is the distance from center. The <code>uv.x *= aspect</code> line is the subtle-but-critical one: without it, a &ldquo;circle&rdquo; in uv space is an <em>ellipse</em> on a non-square photo (stretched along the long axis). Scaling x by width/height makes the falloff genuinely circular on any frame. <code>smoothstep(size&middot;0.6, size, dist)</code> is a smooth ramp that stays 0 inside 60% of <code>size</code> and reaches 1 at <code>size</code>; <code>k = 1 &minus; v&middot;amount</code> then darkens (&gt;0) or brightens (&lt;0) the edges by multiplying the color. Note it&rsquo;s a <em>multiplicative</em> vignette — it scales light, which is what a lens does.</p>
+      <p>
+        A radial darkening toward the frame edges. Pixel coordinates are mapped to [&minus;1, 1]
+        around the center, then <code>dist</code> is the distance from center. The
+        <code>uv.x *= aspect</code> line is the subtle-but-critical one: without it, a
+        &ldquo;circle&rdquo; in uv space is an <em>ellipse</em> on a non-square photo (stretched
+        along the long axis). Scaling x by width/height makes the falloff genuinely circular on any
+        frame. <code>smoothstep(size&middot;0.6, size, dist)</code> is a smooth ramp that stays 0
+        inside 60% of <code>size</code> and reaches 1 at <code>size</code>;
+        <code>k = 1 &minus; v&middot;amount</code> then darkens (&gt;0) or brightens (&lt;0) the
+        edges by multiplying the color. Note it&rsquo;s a <em>multiplicative</em> vignette — it
+        scales light, which is what a lens does.
+      </p>
 
-<h3>7.9 Chromatic aberration — <code>amount</code> &isin; [&minus;1, 1] <span class="tag good">correct</span></h3>
+      <h3>
+        7.9 Chromatic aberration — <code>amount</code> &isin; [&minus;1, 1]
+        <span class="tag good">correct</span>
+      </h3>
 
-<pre><code>let d = vec2&lt;f32&gt;(coord) - u_resolution * 0.5;          // pixels from center
+      <pre><code>let d = vec2&lt;f32&gt;(coord) - u_resolution * 0.5;          // pixels from center
 let dist = length(d);
 let dir = d / max(dist, 1.0);                            // radial direction
 let radius = dist / min(u_resolution.x, u_resolution.y);
@@ -515,13 +1122,33 @@ let strength = abs(l0_amount);
 color.r = mix(color.r, rVal, strength);
 color.b = mix(color.b, bVal, strength);</code></pre>
 
-<p>Lenses fail to focus all wavelengths on the same plane, so fringes of red and blue appear toward the frame edges — <em>radial</em> chromatic aberration. This body reproduces it: red is pulled <em>outward</em> from the center, blue <em>inward</em>, along the radial direction, with the offset growing <em>quadratically</em> with distance from center (zero at the center — which is why the effect naturally vanishes mid-frame and peaks at the corners, like the real artifact). The radius is normalized by the shorter image dimension so the effect&rsquo;s strength is resolution-independent; the 4.0 constant caps it at a few pixels at the corners. The <code>mix</code> with <code>|amount|</code> blends the shifted channel in — it smooths the effect as the slider passes through small values, where a pure integer pixel offset would otherwise snap from nothing to one pixel.</p>
+      <p>
+        Lenses fail to focus all wavelengths on the same plane, so fringes of red and blue appear
+        toward the frame edges — <em>radial</em> chromatic aberration. This body reproduces it: red
+        is pulled <em>outward</em> from the center, blue <em>inward</em>, along the radial
+        direction, with the offset growing <em>quadratically</em> with distance from center (zero at
+        the center — which is why the effect naturally vanishes mid-frame and peaks at the corners,
+        like the real artifact). The radius is normalized by the shorter image dimension so the
+        effect&rsquo;s strength is resolution-independent; the 4.0 constant caps it at a few pixels
+        at the corners. The <code>mix</code> with <code>|amount|</code> blends the shifted channel
+        in — it smooths the effect as the slider passes through small values, where a pure integer
+        pixel offset would otherwise snap from nothing to one pixel.
+      </p>
 
-<p>Two properties come from the pass architecture rather than from this snippet: <code>srcTex</code> here is the <em>previous pass&rsquo;s output</em> — so the split is applied to the fully graded image, not the raw source — and it is guaranteed linear light, so the sampled channels share the pipeline&rsquo;s transfer function. The assembler inserts the standalone linearize pass when CA is the first layer (§5).</p>
+      <p>
+        Two properties come from the pass architecture rather than from this snippet:
+        <code>srcTex</code> here is the <em>previous pass&rsquo;s output</em> — so the split is
+        applied to the fully graded image, not the raw source — and it is guaranteed linear light,
+        so the sampled channels share the pipeline&rsquo;s transfer function. The assembler inserts
+        the standalone linearize pass when CA is the first layer (§5).
+      </p>
 
-<h3>7.10 Clarity — <code>amount</code> &isin; [&minus;1, 1] <span class="tag good">correct</span></h3>
+      <h3>
+        7.10 Clarity — <code>amount</code> &isin; [&minus;1, 1]
+        <span class="tag good">correct</span>
+      </h3>
 
-<pre><code>let uv = (vec2&lt;f32&gt;(coord) + vec2&lt;f32&gt;(0.5)) / u_resolution;
+      <pre><code>let uv = (vec2&lt;f32&gt;(coord) + vec2&lt;f32&gt;(0.5)) / u_resolution;
 let s = vec2&lt;f32&gt;(4.0) / u_resolution;             // 4 px radius
 let avg = (color                                  // 9-tap box blur, bilinear-sampled
   + textureSampleLevel(srcTex, samp, uv + vec2&lt;f32&gt;(-s.x, 0.0), 0.0).rgb
@@ -531,11 +1158,20 @@ let luma = dot(avg, vec3&lt;f32&gt;(0.2126, 0.7152, 0.0722));
 let mask = clamp(1.0 - 4.0 * (luma - 0.5) * (luma - 0.5), 0.0, 1.0);  // midtone tent
 color += l0_amount * mask * (color - avg) * 0.5;  // unsharp-mask push away from the mean</code></pre>
 
-<p>Clarity is <em>local</em> contrast: a 9-tap box blur of the pass input (radius 4 px, sampled bilinearly so the sparse kernel stays smooth), then an unsharp-mask push away from the local mean — positive <code>amount</code> enhances structure, negative flattens it. The midtone mask keeps the effect off deep blacks and blown highlights where halos read as artifacts. This is the neighbor-sampling body the pass architecture exists for: <code>srcTex</code> is the previous pass&rsquo;s output in linear light, so the neighborhood reflects all earlier adjustments. The radius is fixed at 4 px — a true wide-radius clarity would need a separable blur or mip pyramid.</p>
+      <p>
+        Clarity is <em>local</em> contrast: a 9-tap box blur of the pass input (radius 4 px, sampled
+        bilinearly so the sparse kernel stays smooth), then an unsharp-mask push away from the local
+        mean — positive <code>amount</code> enhances structure, negative flattens it. The midtone
+        mask keeps the effect off deep blacks and blown highlights where halos read as artifacts.
+        This is the neighbor-sampling body the pass architecture exists for: <code>srcTex</code> is
+        the previous pass&rsquo;s output in linear light, so the neighborhood reflects all earlier
+        adjustments. The radius is fixed at 4 px — a true wide-radius clarity would need a separable
+        blur or mip pyramid.
+      </p>
 
-<h3>7.11 LUT — <code>amount</code> &isin; [0, 1] <span class="tag good">correct</span></h3>
+      <h3>7.11 LUT — <code>amount</code> &isin; [0, 1] <span class="tag good">correct</span></h3>
 
-<pre><code>// color is sRGB-encoded here, by pass contract (§5)
+      <pre><code>// color is sRGB-encoded here, by pass contract (§5)
 let p = clamp(color, vec3&lt;f32&gt;(0.0), vec3&lt;f32&gt;(1.0)) * (LUT_SIZE - 1.0);
 let x0 = vec3&lt;i32&gt;(floor(p));
 let f = p - vec3&lt;f32&gt;(x0);
@@ -544,17 +1180,50 @@ let c000 = textureLoad(lutTex, vec3&lt;i32&gt;(x0.x, x0.y, x0.z), 0).rgb;
 let lutColor = mix(/* ... */);
 color = mix(color, lutColor, l0_amount);</code></pre>
 
-<p>The LUT layer applies a film-emulation color cube — a 13&sup3; lookup table from the vendored G&rsquo;MIC film presets (296 cubes, mirrored from <code>YahiaAngelo/Film-Luts</code>, shipped as static assets and loaded on demand). The cube lives on the GPU as a 13&sup3; rgba32float 3D texture. The format is deliberate: rgba16float would need an f32&rarr;f16 conversion on upload, and Chrome&rsquo;s <code>writeTexture</code> conversion path is broken (raw f32 bytes land verbatim, corrupting rows) — rgba32float matches the Float32Array upload byte-for-byte, and 32-bit float textures are not filterable anyway, so the body reads the cube with <code>textureLoad</code> and performs manual trilinear interpolation over texel coordinates (the same texel-space mapping hardware filtering would use). The body operates on sRGB-encoded values (§4) — the pass boundary handles the round-trip — and <code>amount</code> mixes the graded color with the original in sRGB space, so 0 is identity and 1 is the full look. The LUT id is a layer field, not a uniform: the render request carries an id&rarr;cube map, and an unresolvable id fails the render rather than silently skipping the grade.</p>
+      <p>
+        The LUT layer applies a film-emulation color cube — a 13&sup3; lookup table from the
+        vendored G&rsquo;MIC film presets (296 cubes, mirrored from
+        <code>YahiaAngelo/Film-Luts</code>, shipped as static assets and loaded on demand). The cube
+        lives on the GPU as a 13&sup3; rgba32float 3D texture. The format is deliberate: rgba16float
+        would need an f32&rarr;f16 conversion on upload, and Chrome&rsquo;s
+        <code>writeTexture</code> conversion path is broken (raw f32 bytes land verbatim, corrupting
+        rows) — rgba32float matches the Float32Array upload byte-for-byte, and 32-bit float textures
+        are not filterable anyway, so the body reads the cube with <code>textureLoad</code> and
+        performs manual trilinear interpolation over texel coordinates (the same texel-space mapping
+        hardware filtering would use). The body operates on sRGB-encoded values (§4) — the pass
+        boundary handles the round-trip — and <code>amount</code> mixes the graded color with the
+        original in sRGB space, so 0 is identity and 1 is the full look. The LUT id is a layer
+        field, not a uniform: the render request carries an id&rarr;cube map, and an unresolvable id
+        fails the render rather than silently skipping the grade.
+      </p>
 
-<h2>8 · The histogram overlay</h2>
+      <h2>8 · The histogram overlay</h2>
 
-<p><span class="newthought">&ldquo;Above all else, show the data.&rdquo;</span> The one piece of UI that reads the image itself is the small histogram pinned to the stage&rsquo;s bottom-right corner: a filled-area luminance curve of the frame currently on screen. It is a pure display widget — always on, no toggle, <code>pointer-events-none</code> so wheel and drag pass straight through — and it is <em>screen-space</em>: a sibling of the panned/zoomed image, so panning and zooming never move it. It is drawn as SVG in the foldkit view, a pure function of the model, and because it is UI rather than part of the blit, it never appears in exports.</p>
+      <p>
+        <span class="newthought">&ldquo;Above all else, show the data.&rdquo;</span> The one piece
+        of UI that reads the image itself is the small histogram pinned to the stage&rsquo;s
+        bottom-right corner: a filled-area luminance curve of the frame currently on screen. It is a
+        pure display widget — always on, no toggle, <code>pointer-events-none</code> so wheel and
+        drag pass straight through — and it is <em>screen-space</em>: a sibling of the panned/zoomed
+        image, so panning and zooming never move it. It is drawn as SVG in the foldkit view, a pure
+        function of the model, and because it is UI rather than part of the blit, it never appears
+        in exports.
+      </p>
 
-<p>What it measures is exactly what the eye is judging: <code>dstTex</code>, the sRGB-encoded display texture, after the whole chain has run — the <em>graded output</em>, not the source. Each texel contributes its <em>luma</em>, the Rec. 709 dot product <code>(0.2126, 0.7152, 0.0722)</code> you met in &sect;4 — the same coefficients every body in &sect;7 uses for its masks — into one of 256 bins. Luminance only: no per-channel traces.</p>
+      <p>
+        What it measures is exactly what the eye is judging: <code>dstTex</code>, the sRGB-encoded
+        display texture, after the whole chain has run — the <em>graded output</em>, not the source.
+        Each texel contributes its <em>luma</em>, the Rec. 709 dot product
+        <code>(0.2126, 0.7152, 0.0722)</code> you met in &sect;4 — the same coefficients every body
+        in &sect;7 uses for its masks — into one of 256 bins. Luminance only: no per-channel traces.
+      </p>
 
-<p>Binning happens on the GPU, in the same command encoder as the render, with a scatter-write pass running between the last compute pass and the blit:</p>
+      <p>
+        Binning happens on the GPU, in the same command encoder as the render, with a scatter-write
+        pass running between the last compute pass and the blit:
+      </p>
 
-<pre><code>@group(0) @binding(0) var srcTex: texture_2d&lt;f32&gt;;
+      <pre><code>@group(0) @binding(0) var srcTex: texture_2d&lt;f32&gt;;
 @group(0) @binding(1) var&lt;storage, read_write&gt; bins: array&lt;atomic&lt;u32&gt;, 256&gt;;
 
 @compute @workgroup_size(16, 16)
@@ -567,69 +1236,239 @@ fn main(@builtin(global_invocation_id) gid: vec3&lt;u32&gt;) {
   atomicAdd(&amp;bins[bin], 1u);
 }</code></pre>
 
-<p>Every texel is counted exactly once — the pass is full-resolution, one invocation per pixel, exactly like the layer passes.<label for="sn-hist-res" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-hist-res" class="margin-toggle"/><span class="sidenote">A histogram exists to show what a reduction hides. Downsampling before binning would average clipped highlights and specular peaks into the body of the curve — smoothing away precisely the artifacts a histogram is for.</span> The shader is frontend-owned, like the blit (&sect;2): the engine generates chain shaders; presentation- and analysis-side WGSL lives in <code>GpuBackend</code>.</p>
+      <p>
+        Every texel is counted exactly once — the pass is full-resolution, one invocation per pixel,
+        exactly like the layer passes.<label
+          for="sn-hist-res"
+          class="margin-toggle sidenote-number"
+        ></label
+        ><input type="checkbox" id="sn-hist-res" class="margin-toggle" /><span class="sidenote"
+          >A histogram exists to show what a reduction hides. Downsampling before binning would
+          average clipped highlights and specular peaks into the body of the curve — smoothing away
+          precisely the artifacts a histogram is for.</span
+        >
+        The shader is frontend-owned, like the blit (&sect;2): the engine generates chain shaders;
+        presentation- and analysis-side WGSL lives in <code>GpuBackend</code>.
+      </p>
 
-<p>And this is the display path&rsquo;s one readback — the single exception to &ldquo;the frame never leaves the GPU.&rdquo; It is a scoped one: 1KB of aggregate statistics, never the frame, and it is the reason the readback machinery deserves its own diagram:</p>
+      <p>
+        And this is the display path&rsquo;s one readback — the single exception to &ldquo;the frame
+        never leaves the GPU.&rdquo; It is a scoped one: 1KB of aggregate statistics, never the
+        frame, and it is the reason the readback machinery deserves its own diagram:
+      </p>
 
-<div class="flow">
-  <div class="box"><span class="t">Histogram pass</span><span class="s">atomicAdd &rarr; bins accumulator (STORAGE | COPY_SRC | COPY_DST)</span></div>
-  <div class="arrow">&rarr;</div>
-  <div class="box"><span class="t">copyBufferToBuffer</span><span class="s">same encoder &rarr; this frame&rsquo;s ring slot (MAP_READ | COPY_DST)</span></div>
-  <div class="arrow">&rarr;</div>
-  <div class="box"><span class="t">mapAsync</span><span class="s">issued inside execute, the moment the submit completes</span></div>
-  <div class="arrow">&rarr;</div>
-  <div class="box"><span class="t">readHistogram</span><span class="s">consumes the slot a message later &rarr; 1KB &rarr; model</span></div>
-</div>
+      <div class="flow">
+        <div class="box">
+          <span class="t">Histogram pass</span
+          ><span class="s">atomicAdd &rarr; bins accumulator (STORAGE | COPY_SRC | COPY_DST)</span>
+        </div>
+        <div class="arrow">&rarr;</div>
+        <div class="box">
+          <span class="t">copyBufferToBuffer</span
+          ><span class="s"
+            >same encoder &rarr; this frame&rsquo;s ring slot (MAP_READ | COPY_DST)</span
+          >
+        </div>
+        <div class="arrow">&rarr;</div>
+        <div class="box">
+          <span class="t">mapAsync</span
+          ><span class="s">issued inside execute, the moment the submit completes</span>
+        </div>
+        <div class="arrow">&rarr;</div>
+        <div class="box">
+          <span class="t">readHistogram</span
+          ><span class="s">consumes the slot a message later &rarr; 1KB &rarr; model</span>
+        </div>
+      </div>
 
-<p><strong>Two buffers, bridged by a copy.</strong> The pass writes a storage-only accumulator, because WebGPU forbids combining <code>MAP_READ</code> with <code>STORAGE</code> on one buffer — usage flags are mutually exclusive in exactly the combinations you&rsquo;d want. The bins cross to the CPU through a <code>MAP_READ | COPY_DST</code> staging buffer, with the copy enqueued in the same encoder, so the GPU-to-GPU hop is free. The accumulator is zeroed once per render (a 1KB <code>writeBuffer</code>; atomics <em>add</em>, so bins would otherwise accumulate across frames) — which is why it also carries <code>COPY_DST</code>.</p>
+      <p>
+        <strong>Two buffers, bridged by a copy.</strong> The pass writes a storage-only accumulator,
+        because WebGPU forbids combining <code>MAP_READ</code> with <code>STORAGE</code> on one
+        buffer — usage flags are mutually exclusive in exactly the combinations you&rsquo;d want.
+        The bins cross to the CPU through a <code>MAP_READ | COPY_DST</code> staging buffer, with
+        the copy enqueued in the same encoder, so the GPU-to-GPU hop is free. The accumulator is
+        zeroed once per render (a 1KB <code>writeBuffer</code>; atomics <em>add</em>, so bins would
+        otherwise accumulate across frames) — which is why it also carries <code>COPY_DST</code>.
+      </p>
 
-<p><strong>Three staging buffers, mapped a frame ahead.</strong> The readback slots rotate in a ring of three, and each frame&rsquo;s map is issued inside <code>execute</code>, immediately after <code>queue.onSubmittedWorkDone</code> resolves — before any later render can submit.<label for="sn-hist-map" class="margin-toggle sidenote-number"></label><input type="checkbox" id="sn-hist-map" class="margin-toggle"/><span class="sidenote">mapAsync is enqueued on the queue timeline behind <em>every</em> pending submission (gpuweb#2646) — even ones that never touch the buffer. Issued from the readback command instead, the map would queue behind the next render — and the next after that during a drag — landing one or more frames late, where the stamp guard would drop it. Issued at the end of the frame&rsquo;s own submit, the queue behind it is empty, so the map resolves before the frame&rsquo;s RenderedFrame is even handled.</span> A slot is then mapped from that moment until <code>readHistogram</code> consumes it (map &rarr; read &rarr; unmap) in the same message cycle; three slots leave two full cycles of slack before a slot is reused, so a slow consumer can never collide with a copy. The abnormal flows are covered too: a slot whose map was never consumed (a dropped message) is reclaimed before reuse, and a readback for a session torn down mid-flight resolves with empty bins instead of failing.</p>
+      <p>
+        <strong>Three staging buffers, mapped a frame ahead.</strong> The readback slots rotate in a
+        ring of three, and each frame&rsquo;s map is issued inside <code>execute</code>, immediately
+        after <code>queue.onSubmittedWorkDone</code> resolves — before any later render can
+        submit.<label for="sn-hist-map" class="margin-toggle sidenote-number"></label
+        ><input type="checkbox" id="sn-hist-map" class="margin-toggle" /><span class="sidenote"
+          >mapAsync is enqueued on the queue timeline behind <em>every</em> pending submission
+          (gpuweb#2646) — even ones that never touch the buffer. Issued from the readback command
+          instead, the map would queue behind the next render — and the next after that during a
+          drag — landing one or more frames late, where the stamp guard would drop it. Issued at the
+          end of the frame&rsquo;s own submit, the queue behind it is empty, so the map resolves
+          before the frame&rsquo;s RenderedFrame is even handled.</span
+        >
+        A slot is then mapped from that moment until <code>readHistogram</code> consumes it (map
+        &rarr; read &rarr; unmap) in the same message cycle; three slots leave two full cycles of
+        slack before a slot is reused, so a slow consumer can never collide with a copy. The
+        abnormal flows are covered too: a slot whose map was never consumed (a dropped message) is
+        reclaimed before reuse, and a readback for a session torn down mid-flight resolves with
+        empty bins instead of failing.
+      </p>
 
-<p><strong>The app side.</strong> Every <code>RenderedFrame</code> dispatches a <code>ReadHistogram</code> command — stale frames included, so their slots are always consumed — and the resulting <code>HistogramComputed</code> lands in the model only when its stamp is still fresh (the same guard <code>RenderedFrame</code> itself uses; bins that arrive after a newer mutation are dropped). <code>HistogramFailed</code> is observability-only: the frame is already on the canvas, and a 1KB map is not worth retrying. Clearing the image resets the bins. The view then draws them: an SVG area polygon at 25% ink opacity with a 1px stroke on top, normalized linearly so the tallest bin fills the 220&times;110 card — and a flat baseline when every bin is zero, as an all-black frame would produce.</p>
+      <p>
+        <strong>The app side.</strong> Every <code>RenderedFrame</code> dispatches a
+        <code>ReadHistogram</code> command — stale frames included, so their slots are always
+        consumed — and the resulting <code>HistogramComputed</code> lands in the model only when its
+        stamp is still fresh (the same guard <code>RenderedFrame</code> itself uses; bins that
+        arrive after a newer mutation are dropped). <code>HistogramFailed</code> is
+        observability-only: the frame is already on the canvas, and a 1KB map is not worth retrying.
+        Clearing the image resets the bins. The view then draws them: an SVG area polygon at 25% ink
+        opacity with a 1px stroke on top, normalized linearly so the tallest bin fills the
+        220&times;110 card — and a flat baseline when every bin is zero, as an all-black frame would
+        produce.
+      </p>
 
-<p>The total cost of all this is one extra full-resolution dispatch per render and 1KB crossing back per frame, from three 1KB staging buffers and one session-scoped accumulator — no per-render allocations, no waiting, and the render loop never blocks on the map.</p>
+      <p>
+        The total cost of all this is one extra full-resolution dispatch per render and 1KB crossing
+        back per frame, from three 1KB staging buffers and one session-scoped accumulator — no
+        per-render allocations, no waiting, and the render loop never blocks on the map.
+      </p>
 
-<h2>9 · Reference tables</h2>
+      <h2>9 · Reference tables</h2>
 
-<table>
-  <tr><th>Constant</th><th>Value</th><th>Used by</th></tr>
-  <tr><td>Luma coefficients (Rec. 709)</td><td>0.2126, 0.7152, 0.0722</td><td>shadows, highlights, saturation, grain, clarity</td></tr>
-  <tr><td>Contrast pivot</td><td>0.2140 (linear value of sRGB 0.5)</td><td>contrast</td></tr>
-  <tr><td>sRGB breakpoints</td><td>0.04045 (encode), 0.0031308 (decode)</td><td>colorspace.ts</td></tr>
-  <tr><td>sRGB linear segment</td><td>&divide; / &times; 12.92</td><td>colorspace.ts</td></tr>
-  <tr><td>Grain amplitude</td><td>&plusmn;0.15 linear at texture 1, midtone</td><td>grain</td></tr>
-  <tr><td>CA corner shift</td><td>~4 px at amount 1 (16:9)</td><td>chromatic aberration</td></tr>
-  <tr><td>Vignette falloff band</td><td><code>size</code>&middot;0.6 &rarr; <code>size</code> (default 0.36 &rarr; 0.6)</td><td>vignette</td></tr>
-</table>
+      <table>
+        <tr>
+          <th>Constant</th>
+          <th>Value</th>
+          <th>Used by</th>
+        </tr>
+        <tr>
+          <td>Luma coefficients (Rec. 709)</td>
+          <td>0.2126, 0.7152, 0.0722</td>
+          <td>shadows, highlights, saturation, grain, clarity</td>
+        </tr>
+        <tr>
+          <td>Contrast pivot</td>
+          <td>0.2140 (linear value of sRGB 0.5)</td>
+          <td>contrast</td>
+        </tr>
+        <tr>
+          <td>sRGB breakpoints</td>
+          <td>0.04045 (encode), 0.0031308 (decode)</td>
+          <td>colorspace.ts</td>
+        </tr>
+        <tr>
+          <td>sRGB linear segment</td>
+          <td>&divide; / &times; 12.92</td>
+          <td>colorspace.ts</td>
+        </tr>
+        <tr>
+          <td>Grain amplitude</td>
+          <td>&plusmn;0.15 linear at texture 1, midtone</td>
+          <td>grain</td>
+        </tr>
+        <tr>
+          <td>CA corner shift</td>
+          <td>~4 px at amount 1 (16:9)</td>
+          <td>chromatic aberration</td>
+        </tr>
+        <tr>
+          <td>Vignette falloff band</td>
+          <td><code>size</code>&middot;0.6 &rarr; <code>size</code> (default 0.36 &rarr; 0.6)</td>
+          <td>vignette</td>
+        </tr>
+      </table>
 
-<table>
-  <tr><th>Texture / buffer</th><th>Format</th><th>Role</th></tr>
-  <tr><td><code>srcTex</code></td><td>rgba8unorm (sRGB-encoded bytes)</td><td>the uploaded image; read by pass 0 / linearize pass</td></tr>
-  <tr><td><code>inter[0..1]</code></td><td>rgba16float (linear)</td><td>ping-pong intermediates between layer passes</td></tr>
-  <tr><td><code>dstTex</code></td><td>rgba8unorm (sRGB after final encode)</td><td>display + export source</td></tr>
-  <tr><td><code>u_resolution</code></td><td>vec2&lt;f32&gt; uniform</td><td>image size for coordinate math</td></tr>
-  <tr><td><code>u_frame</code></td><td>u32 uniform</td><td>animation seed (grain); binding exists only when used</td></tr>
-  <tr><td><code>u_params</code></td><td>one f32 per layer field</td><td>the slider values; binding exists only when the layer has fields</td></tr>
-  <tr><td><code>lutTex</code></td><td>rgba32float 3D, 13&sup3; (one per applied LUT, cached by id)</td><td>the film color cube; binding 6, only on LUT passes</td></tr>
-  <tr><td><code>bins</code> (accumulator)</td><td>256 &times; u32 storage (STORAGE | COPY_SRC | COPY_DST)</td><td>histogram pass target; zeroed per render, copied out per render (&sect;8)</td></tr>
-  <tr><td>readback ring</td><td>3 &times; 1KB MAP_READ buffers</td><td>staging slots for the histogram bins; mapped a frame ahead (&sect;8)</td></tr>
-</table>
+      <table>
+        <tr>
+          <th>Texture / buffer</th>
+          <th>Format</th>
+          <th>Role</th>
+        </tr>
+        <tr>
+          <td><code>srcTex</code></td>
+          <td>rgba8unorm (sRGB-encoded bytes)</td>
+          <td>the uploaded image; read by pass 0 / linearize pass</td>
+        </tr>
+        <tr>
+          <td><code>inter[0..1]</code></td>
+          <td>rgba16float (linear)</td>
+          <td>ping-pong intermediates between layer passes</td>
+        </tr>
+        <tr>
+          <td><code>dstTex</code></td>
+          <td>rgba8unorm (sRGB after final encode)</td>
+          <td>display + export source</td>
+        </tr>
+        <tr>
+          <td><code>u_resolution</code></td>
+          <td>vec2&lt;f32&gt; uniform</td>
+          <td>image size for coordinate math</td>
+        </tr>
+        <tr>
+          <td><code>u_frame</code></td>
+          <td>u32 uniform</td>
+          <td>animation seed (grain); binding exists only when used</td>
+        </tr>
+        <tr>
+          <td><code>u_params</code></td>
+          <td>one f32 per layer field</td>
+          <td>the slider values; binding exists only when the layer has fields</td>
+        </tr>
+        <tr>
+          <td><code>lutTex</code></td>
+          <td>rgba32float 3D, 13&sup3; (one per applied LUT, cached by id)</td>
+          <td>the film color cube; binding 6, only on LUT passes</td>
+        </tr>
+        <tr>
+          <td><code>bins</code> (accumulator)</td>
+          <td>256 &times; u32 storage (STORAGE | COPY_SRC | COPY_DST)</td>
+          <td>histogram pass target; zeroed per render, copied out per render (&sect;8)</td>
+        </tr>
+        <tr>
+          <td>readback ring</td>
+          <td>3 &times; 1KB MAP_READ buffers</td>
+          <td>staging slots for the histogram bins; mapped a frame ahead (&sect;8)</td>
+        </tr>
+      </table>
 
-<h2>10 · Known limitations and the roadmap</h2>
+      <h2>10 · Known limitations and the roadmap</h2>
 
-<ul>
-  <li><strong>White balance is channel-scale approximation</strong> — the CCT/LMS-based model is the upgrade path.</li>
-  <li><strong>Shadows/highlights are additive lifts</strong> — fine for v1; lift/gamma/gain separation would match professional tools.</li>
-  <li><strong>Alpha is passed through untouched</strong> — correct for photographs (opaque), a known limitation once compositing appears.</li>
-  <li><strong>LUTs load on demand</strong> — each film cube fetches (~131KB) the first time it is applied, then stays cached in memory and on the GPU; the 296-cube library is vendored, so nothing depends on a third-party server at runtime.</li>
-  <li><strong>The histogram is luminance-only</strong> — one Rec. 709 luma curve. Per-channel (RGB parade) or waveform traces are the natural extension: the readback ring already carries the counts, and the bins array would simply grow to 3 &times; 256.</li>
-  <li>Every generated pass can be validated against <code>naga</code>, the reference WGSL validator — the shaders are pure strings, so a syntax bug in a generated pass is caught before it ever reaches a browser.</li>
-</ul>
+      <ul>
+        <li>
+          <strong>White balance is channel-scale approximation</strong> — the CCT/LMS-based model is
+          the upgrade path.
+        </li>
+        <li>
+          <strong>Shadows/highlights are additive lifts</strong> — fine for v1; lift/gamma/gain
+          separation would match professional tools.
+        </li>
+        <li>
+          <strong>Alpha is passed through untouched</strong> — correct for photographs (opaque), a
+          known limitation once compositing appears.
+        </li>
+        <li>
+          <strong>LUTs load on demand</strong> — each film cube fetches (~131KB) the first time it
+          is applied, then stays cached in memory and on the GPU; the 296-cube library is vendored,
+          so nothing depends on a third-party server at runtime.
+        </li>
+        <li>
+          <strong>The histogram is luminance-only</strong> — one Rec. 709 luma curve. Per-channel
+          (RGB parade) or waveform traces are the natural extension: the readback ring already
+          carries the counts, and the bins array would simply grow to 3 &times; 256.
+        </li>
+        <li>
+          Every generated pass can be validated against <code>naga</code>, the reference WGSL
+          validator — the shaders are pure strings, so a syntax bug in a generated pass is caught
+          before it ever reaches a browser.
+        </li>
+      </ul>
 
-<footer class="fineprint">
-  <p class="sans">Lutra &mdash; a color-grading app for film simulation. Engine: <code>@lutra/engine</code> (pure WGSL generation). Frontend: <code>@lutra/frontend</code> (WebGPU runtime). The engine&rsquo;s design decisions are recorded in <code>docs/adr/</code>.</p>
-</footer>
-
-</article>
-</body>
+      <footer class="fineprint">
+        <p class="sans">
+          Lutra &mdash; a color-grading app for film simulation. Engine:
+          <code>@lutra/engine</code> (pure WGSL generation). Frontend:
+          <code>@lutra/frontend</code> (WebGPU runtime). The engine&rsquo;s design decisions are
+          recorded in <code>docs/adr/</code>.
+        </p>
+      </footer>
+    </article>
+  </body>
 </html>

@@ -11,7 +11,7 @@ The frontend restructures to a **root Submodel** owning the top-level route and 
 
 **Consequences**:
 
-- The **foundational restructure** — root submodel, Gallery submodel, Editor-as-submodel — lands *before* the store/backend work (packages/frontend's `main.ts`/`view.ts`/`update.ts` relocate the editor under an `Editor` boundary; the `@lutra/store` seam is its first real consumer).
+- The **foundational restructure** — root submodel, Gallery submodel, Editor-as-submodel — lands _before_ the store/backend work (packages/frontend's `main.ts`/`view.ts`/`update.ts` relocate the editor under an `Editor` boundary; the `@lutra/store` seam is its first real consumer).
 - The editor's internal state machine (`phase.ts`, `command.ts`, render/export bookkeeping) is preserved, just relocated under the `Editor` submodel namespace. Its `update` is unchanged, so existing editor tests keep driving it directly.
 - Route shape: **Gallery** `= "/"`, **Editor** `= "/edit/:editId"` (the id segment decoded through `EditIdSchema` via `schemaSegment`, so malformed ids fall through to NotFound). Opening a tile pushes `/edit/<uuid>`; the editor re-loads by id from both `init` and `informRouteChanged`.
 - `Got*Message` wrappers follow the DevTools-submodel-filter convention.

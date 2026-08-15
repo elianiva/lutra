@@ -1,9 +1,9 @@
-export { VERSION } from "./version"
+export { VERSION } from './version'
 
 // Branded primitives — constructors (Brand.nominal) and the schemas
 // (Schema.fromBrand) that decode the same branded types at boundaries.
 // Each name exports both its value (constructor/schema) and type meaning.
-export { LayerId, LayerIdSchema, LutId, LutIdSchema, FieldKey, FieldKeySchema } from "./brands"
+export { LayerId, LayerIdSchema, LutId, LutIdSchema, FieldKey, FieldKeySchema } from './brands'
 
 // Layer data model
 export {
@@ -15,15 +15,26 @@ export {
   LayerPatch,
   LutLayer,
   ColorMixerLayer,
+  ToneCurveLayer,
+  CURVE_DEFAULT_POINTS,
+  CURVE_POINT_COUNT,
+  CURVE_X_EPS,
+  curvePointXField,
+  curvePointYField,
+  curvePointsOf,
+  isCurveNeutral,
+  moveCurvePoint,
+  resetCurve,
   UnknownLayerTypeError,
-} from "./layers"
+} from './layers'
 export type {
   FieldMeta,
   LayerEntry,
   LayerRegistry,
   RegistryInput,
   LayerType,
-} from "./layers"
+  CurvePoint,
+} from './layers'
 
 // Chain operations
 export {
@@ -33,26 +44,26 @@ export {
   updateLayerParam,
   toggleLayerVisibility,
   replaceChain,
-} from "./chain"
+} from './chain'
 
 // Render pipeline
 // The engine builds a render request (shader + uniforms + source + frame);
 // execution and canvas presentation live in the frontend's GPU backend.
-export { createRenderRequest, GpuError } from "./render"
-export type { RenderRequest } from "./render"
+export { createRenderRequest, GpuError } from './render'
+export type { RenderRequest } from './render'
 
 // LUT parsing
 // Pure `.cube` text → `LutCube`; fetching bytes and GPU upload are the
 // frontend's concern.
-export { parseCube, LutParseError } from "./luts/cube"
-export type { LutCube } from "./luts/cube"
+export { parseCube, LutParseError } from './luts/cube'
+export type { LutCube } from './luts/cube'
 
 // CPU LUT application
 // The pure-JS mirror of the WGSL LUT pass body (docs/adr/0013): per-photo
 // filmstrip previews render through this in the thumb worker, where the GPU
 // pipeline is not available. Exact match for a LUT-only chain (sRGB in,
 // sRGB out — no colorspace boundary).
-export { applyLutCpu } from "./luts/apply"
+export { applyLutCpu } from './luts/apply'
 
 // Shader generation
 export {
@@ -60,8 +71,8 @@ export {
   SRGB_TO_LINEAR,
   WORKGROUP_SIZE,
   MissingLutReferenceError,
-} from "./shaders"
-export type { ChainLayerInfo, ChainPass, ChainShader, UniformSlot, BodyRenderer } from "./shaders"
+} from './shaders'
+export type { ChainLayerInfo, ChainPass, ChainShader, UniformSlot, BodyRenderer } from './shaders'
 
 // Shader body renderers — one per layer type. Consumers build a registry
 // (`makeRegistry`) from these to drive both `createLayer` and `render`.
@@ -70,6 +81,7 @@ export {
   renderContrast,
   renderShadows,
   renderHighlights,
+  renderToneCurve,
   renderWhiteBalance,
   renderSaturation,
   renderColorMixer,
@@ -78,7 +90,7 @@ export {
   renderChromaticAberration,
   renderClarity,
   renderLut,
-} from "./shaders"
+} from './shaders'
 
 // Export encoding
 // The engine owns the encoder contract (`ImageEncoder` service) and the
@@ -99,11 +111,11 @@ export {
   ImageEncoder,
   ImageEncoderLive,
   encodeImage,
-} from "./encode"
+} from './encode'
 export type {
   ExportFormat as ExportFormatType,
   ExportQuality as ExportQualityType,
   ExportScale as ExportScaleType,
   ExportSettings as ExportSettingsType,
   ImageEncoderShape,
-} from "./encode"
+} from './encode'

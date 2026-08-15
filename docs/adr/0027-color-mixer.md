@@ -6,7 +6,7 @@ canonical implementation of this interaction. Research summary (the source
 material for every decision below): Adobe does not publish the Color Mixer's
 range math; the best-documented implementation of the same UI is **GIMP's
 hue-saturation operation** (GEGL `gimpoperationhuesaturation.c`, "HSLA float
-in sRGB space"), and Snapseed's "Selective" tool is a *different* feature
+in sRGB space"), and Snapseed's "Selective" tool is a _different_ feature
 (spatially anchored control points with attribute-similarity masks, Nik
 U-Point patent family) that this app does not need — color-based, not
 region-based, selection is the ask. Research sources are listed at the end.
@@ -78,7 +78,7 @@ drawer summary shows the active range's name plus its non-default values
 (e.g. "Blue -100%"); a pristine layer reads just "Red".
 
 This matches Lightroom's cloud/mobile "color dots" pattern and the research
-finding that the interaction is *choose a color, then drag* — the targeted
+finding that the interaction is _choose a color, then drag_ — the targeted
 adjustment tool (drag on the image to pick the color under the cursor) is a
 separate tool mode that would conflict with the canvas's pan/zoom drag; it
 is deliberately out of scope and noted as future work.

@@ -77,9 +77,13 @@ const fetchAndPut = (file: FillFile, opts: FillOptions): Effect.Effect<boolean, 
       const outcome = yield* Effect.gen(function* () {
         const res = yield* Effect.tryPromise({
           try: () => opts.fetchImpl(file.path),
-          catch: (cause) => ({ _tag: 'transient' as const, cause }),        })
+          catch: (cause) => ({ _tag: 'transient' as const, cause }),
+        })
         if (!res.ok) {
-          return yield* Effect.fail({ _tag: 'transient' as const, cause: new Error(`HTTP ${res.status}`) })
+          return yield* Effect.fail({
+            _tag: 'transient' as const,
+            cause: new Error(`HTTP ${res.status}`),
+          })
         }
         yield* opts.cache.put(file.path, res).pipe(
           Effect.mapError(
@@ -106,21 +110,22 @@ const fetchAndPut = (file: FillFile, opts: FillOptions): Effect.Effect<boolean, 
  *  deploy removed a LUT from the catalog): the offline cache would otherwise
  *  grow forever. Housekeeping — a failure is ignored, the next run retries.
  *  Emits nothing: a run's event stream is untouched. */
-const pruneOrphans = (files: ReadonlyArray<FillFile>, opts: FillOptions): Effect.Effect<void, never> => {
+const pruneOrphans = (
+  files: ReadonlyArray<FillFile>,
+  opts: FillOptions,
+): Effect.Effect<void, never> => {
   const allowed = new Set(files.map((file) => file.path))
-  return opts.cache
-    .keys()
-    .pipe(
-      Effect.flatMap((keys) =>
-        Effect.forEach(
-          keys.filter((key) => !allowed.has(key)),
-          (key) => opts.cache.delete(key),
-          { discard: true },
-        ),
+  return opts.cache.keys().pipe(
+    Effect.flatMap((keys) =>
+      Effect.forEach(
+        keys.filter((key) => !allowed.has(key)),
+        (key) => opts.cache.delete(key),
+        { discard: true },
       ),
-      Effect.option,
-      Effect.asVoid,
-    )
+    ),
+    Effect.option,
+    Effect.asVoid,
+  )
 }
 
 /**
@@ -169,9 +174,7 @@ export const fillFiles = (
           return
         }
         yield* emit(
-          outcome.success
-            ? { _tag: 'FillFileCompleted', file }
-            : { _tag: 'FillFileFailed', file },
+          outcome.success ? { _tag: 'FillFileCompleted', file } : { _tag: 'FillFileFailed', file },
         )
         if ((i + 1) % opts.batchSize === 0) yield* Effect.sleep(opts.batchDelay)
       }
@@ -232,9 +235,9 @@ export const OfflineFillLive = Layer.effect(
       // first visit on; a first-visit failure is a network-less session,
       // where a fill is pointless anyway. After the retries the run gives
       // up and re-arms (a later manual start can retry).
-      const catalog = yield* store.getCatalog().pipe(
-        Effect.retry({ times: 5, schedule: Schedule.exponential(Duration.millis(500), 2) }),
-      )
+      const catalog = yield* store
+        .getCatalog()
+        .pipe(Effect.retry({ times: 5, schedule: Schedule.exponential(Duration.millis(500), 2) }))
       yield* fillFiles(catalog, opts, publish)
     })
 

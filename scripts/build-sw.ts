@@ -38,7 +38,10 @@ export const generateSwSource = (
   shellCache: string = shellCacheName(precache),
 ): string =>
   source
-    .replace(/^declare const __(?:LUT_CACHE_NAME|PRECACHE_MANIFEST|SHELL_CACHE_NAME)__[^\n]*\n/gm, '')
+    .replace(
+      /^declare const __(?:LUT_CACHE_NAME|PRECACHE_MANIFEST|SHELL_CACHE_NAME)__[^\n]*\n/gm,
+      '',
+    )
     .replaceAll('__PRECACHE_MANIFEST__', JSON.stringify(precache))
     .replaceAll('__LUT_CACHE_NAME__', JSON.stringify(lutCacheName))
     .replaceAll('__SHELL_CACHE_NAME__', JSON.stringify(shellCache))
@@ -64,7 +67,9 @@ const run = async (): Promise<void> => {
     generateSwSource(source, precache, LUT_CACHE_NAME),
   )
   await writeFile(path.join(dist, 'sw.js'), bundled)
-  console.log(`sw.js written — ${precache.length} precached files, shell cache ${shellCacheName(precache)}`)
+  console.log(
+    `sw.js written — ${precache.length} precached files, shell cache ${shellCacheName(precache)}`,
+  )
 }
 
 if (import.meta.main) {

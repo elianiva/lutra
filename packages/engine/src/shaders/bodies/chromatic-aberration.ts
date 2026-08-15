@@ -1,4 +1,4 @@
-import type { BodyRenderer } from "../types"
+import type { BodyRenderer } from '../types'
 
 // Radial chromatic aberration: R is pushed outward and B inward along
 // the radial direction from the image center. The offset grows

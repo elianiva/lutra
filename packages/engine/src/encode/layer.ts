@@ -1,9 +1,8 @@
-import { Effect, Layer } from "effect"
-import { encodeImage } from "./jsquash"
-import { EncodeError, ImageEncoder } from "./service"
+import { Effect, Layer } from 'effect'
+import { encodeImage } from './jsquash'
+import { EncodeError, ImageEncoder } from './service'
 
-const errMsg = (cause: unknown): string =>
-  cause instanceof Error ? cause.message : String(cause)
+const errMsg = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause))
 
 /**
  * The jSquash-backed encoder: the default implementation of `ImageEncoder`.

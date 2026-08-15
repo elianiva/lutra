@@ -1,4 +1,4 @@
-import type { BodyRenderer } from "../types"
+import type { BodyRenderer } from '../types'
 
 // Temp shifts R and B in opposite directions; tint shifts G with a
 // smaller R/B pull. Multiplicative in linear light. temp: -1 cool /

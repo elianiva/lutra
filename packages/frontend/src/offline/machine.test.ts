@@ -24,8 +24,7 @@ import {
 // ignored — that absence IS the blocking (a Ready fill ignores everything; a
 // paused fill ignores a second pause).
 
-const step = (state: OfflinePhase, message: RootMessage) =>
-  offlineMachine.step(state, message)
+const step = (state: OfflinePhase, message: RootMessage) => offlineMachine.step(state, message)
 
 describe('offline machine', () => {
   it('starts Idle', () => {

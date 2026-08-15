@@ -1,5 +1,6 @@
 import type { IconNode } from 'lucide'
 import {
+  Activity,
   Aperture,
   Boxes,
   CircleDot,
@@ -15,11 +16,13 @@ import {
 } from 'lucide'
 import {
   FieldKey,
+  isCurveNeutral,
   makeRegistry,
   renderExposure,
   renderContrast,
   renderShadows,
   renderHighlights,
+  renderToneCurve,
   renderWhiteBalance,
   renderSaturation,
   renderColorMixer,
@@ -43,6 +46,7 @@ export const ENGINE_REGISTRY = makeRegistry({
   contrast: renderContrast,
   shadows: renderShadows,
   highlights: renderHighlights,
+  toneCurve: renderToneCurve,
   whiteBalance: renderWhiteBalance,
   saturation: renderSaturation,
   colorMixer: renderColorMixer,
@@ -139,8 +143,7 @@ const num = (layer: Layer, key: FieldKey) => {
   return typeof value === 'number' ? value : NaN
 }
 
-const wbK = (v: number) =>
-  v < 0 ? Math.round(6500 - (1 + v) * 4500) : Math.round(6500 + v * 5500)
+const wbK = (v: number) => (v < 0 ? Math.round(6500 - (1 + v) * 4500) : Math.round(6500 + v * 5500))
 
 /**
  * Frontend-only metadata keyed by `LayerType`. The engine `LayerEntry`
@@ -173,7 +176,7 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
     toggled: false,
     fields: { amount: { label: 'SHADOWS', format: formatSigned } },
     formatValue: (l) => formatSigned(num(l, FieldKey('amount'))),
-    description: "Lightens or darkens the darkest areas.",
+    description: 'Lightens or darkens the darkest areas.',
     when: 'Pull detail out of underexposed shadows.',
   },
   highlights: {
@@ -182,8 +185,27 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
     toggled: false,
     fields: { amount: { label: 'HIGHLIGHTS', format: formatSigned } },
     formatValue: (l) => formatSigned(num(l, FieldKey('amount'))),
-    description: "Lightens or darkens the brightest areas.",
+    description: 'Lightens or darkens the brightest areas.',
     when: 'Recover blown-out skies and bright spots.',
+  },
+  toneCurve: {
+    label: 'Tone Curve',
+    icon: Activity,
+    toggled: false,
+    // The 10 point fields have no ruler sliders — the drawer renders the
+    // curve widget instead (layer-drawer.ts branches on 'toneCurve'); these
+    // labels exist for the record and for any generic fallback.
+    fields: Object.fromEntries(
+      Array.from({ length: 5 }, (_, i) => [
+        [`p${i}x`, { label: `POINT ${i} X`, format: formatPercent }],
+        [`p${i}y`, { label: `POINT ${i} Y`, format: formatPercent }],
+      ]).flat(),
+    ),
+    // The drawer summary: the curve is either the identity or a custom
+    // shape — the reset button's visibility uses the same test.
+    formatValue: (l) => (isCurveNeutral(l) ? 'Neutral' : 'Custom'),
+    description: 'Shapes brightness across the whole range with a draggable curve.',
+    when: 'Bend the tones — an S-curve, lifted blacks, or a custom grade.',
   },
   whiteBalance: {
     label: 'White Balance',
@@ -193,7 +215,8 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
       temp: { label: 'TEMPERATURE', format: formatTemp },
       tint: { label: 'TINT', format: formatSigned },
     },
-    formatValue: (l) => `${wbK(num(l, FieldKey('temp')))} K · ${formatSigned(num(l, FieldKey('tint')))}`,
+    formatValue: (l) =>
+      `${wbK(num(l, FieldKey('temp')))} K · ${formatSigned(num(l, FieldKey('tint')))}`,
     description: 'Shifts the color cast: warm or cool, green or magenta.',
     when: 'Use it to fix an odd cast or set a mood.',
   },
@@ -217,7 +240,10 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
       MIXER_COLORS.flatMap((color) =>
         MIXER_CHANNELS.map((channel) => [
           `${color.key}${channel}`,
-          { label: channel.toUpperCase(), format: channel === 'Hue' ? formatHue : formatPercentSigned },
+          {
+            label: channel.toUpperCase(),
+            format: channel === 'Hue' ? formatHue : formatPercentSigned,
+          },
         ]),
       ),
     ),
@@ -258,7 +284,8 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
       amount: { label: 'VIGNETTE', format: formatSigned },
       size: { label: 'SIZE', format: formatPercent },
     },
-    formatValue: (l) => `A ${formatSigned(num(l, FieldKey('amount')))} · ${formatPercent(num(l, FieldKey('size')))}`,
+    formatValue: (l) =>
+      `A ${formatSigned(num(l, FieldKey('amount')))} · ${formatPercent(num(l, FieldKey('size')))}`,
     description: "Darkens or brightens the photo's edges.",
     when: 'Focus the center, or add a vintage frame.',
   },
@@ -268,7 +295,7 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
     toggled: false,
     fields: { amount: { label: 'CHROMATIC ABERRATION', format: formatSigned } },
     formatValue: (l) => formatSigned(num(l, FieldKey('amount'))),
-    description: "Splits red and blue at the edges, like an old lens.",
+    description: 'Splits red and blue at the edges, like an old lens.',
     when: 'Add a touch of analog imperfection.',
   },
   clarity: {
@@ -316,6 +343,9 @@ export const LAYER_TYPES_ORDER: ReadonlyArray<LayerType> = [
   'contrast',
   'shadows',
   'highlights',
+  // The tonal sibling of Highlights: a free-form bend of the whole range
+  // is the natural next step after the anchored shadows/highlights pulls.
+  'toneCurve',
   'whiteBalance',
   'saturation',
   // The per-color sibling of Saturation: choosing a tone and adjusting it

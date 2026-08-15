@@ -1,4 +1,4 @@
-import type { BodyRenderer } from "../types"
+import type { BodyRenderer } from '../types'
 
 // Film-emulation LUT application. The pass contract (docs/adr/0003) is that
 // `color` is sRGB-encoded here — the pass decodes linear light to sRGB on

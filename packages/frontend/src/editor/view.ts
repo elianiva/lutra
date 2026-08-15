@@ -35,11 +35,14 @@ const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
       // the mobile tab bar. `lg:` restores the side-by-side layout — the
       // sheets and the tab bar render hidden there (their classes are
       // `lg:`-scoped, so the desktop layout is untouched).
-      h.div([h.Class('flex min-h-0 flex-1 flex-col lg:flex-row')], [
-        toolPanel(h, model, model.mobileSheet === 'tools'),
-        canvasStage(h, model),
-        layerDrawer(h, model, model.mobileSheet === 'layers'),
-      ]),
+      h.div(
+        [h.Class('flex min-h-0 flex-1 flex-col lg:flex-row')],
+        [
+          toolPanel(h, model, model.mobileSheet === 'tools'),
+          canvasStage(h, model),
+          layerDrawer(h, model, model.mobileSheet === 'layers'),
+        ],
+      ),
       // The bottom LUT bar (docs/adr/0012): a third flex-col child, so the
       // canvas shrinks while it is open and the strip sits directly under
       // the photo. Renders nothing without a LUT target.
@@ -60,12 +63,7 @@ const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
  * The bar only renders below `lg` — desktop edits through the side panels.
  */
 const mobileTabBar = (h: HtmlBuilder<EditorMessage>, model: Model) => {
-  const panelTab = (
-    label: string,
-    Icon: IconNode,
-    active: boolean,
-    onClick: () => EditorMessage,
-  ) =>
+  const panelTab = (label: string, Icon: IconNode, active: boolean, onClick: () => EditorMessage) =>
     h.button(
       [
         h.OnClick(onClick()),
@@ -87,24 +85,16 @@ const mobileTabBar = (h: HtmlBuilder<EditorMessage>, model: Model) => {
       h.AriaLabel('Editor panels'),
     ],
     [
-      panelTab(
-        'Adjustments',
-        SlidersHorizontal,
-        model.mobileSheet === 'tools',
-        () => ToggledMobileSheet({ sheet: 'tools' }),
+      panelTab('Adjustments', SlidersHorizontal, model.mobileSheet === 'tools', () =>
+        ToggledMobileSheet({ sheet: 'tools' }),
       ),
-      panelTab(
-        'Layers',
-        LayersIcon,
-        model.mobileSheet === 'layers',
-        () => ToggledMobileSheet({ sheet: 'layers' }),
+      panelTab('Layers', LayersIcon, model.mobileSheet === 'layers', () =>
+        ToggledMobileSheet({ sheet: 'layers' }),
       ),
       // The LUT tab only exists while a LUT target exists (a drafting LUT
       // layer or a selected chain LUT layer) — same gate as the LUT bar.
       ...(Option.isSome(lutTarget(model))
-        ? [
-            panelTab('LUT', Boxes, model.lutBarOpen, () => ToggledLutPicker()),
-          ]
+        ? [panelTab('LUT', Boxes, model.lutBarOpen, () => ToggledLutPicker())]
         : []),
     ],
   )

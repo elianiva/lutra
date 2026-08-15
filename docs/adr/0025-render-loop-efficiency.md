@@ -20,7 +20,7 @@ and the structural fixes that landed.
 
 Net per tick: 2 full-image GPU transfers, 1 main-thread stall, 2 CPU pixel
 copies, ~8 GPU allocations. Renders outran the event interval, work piled up
-in the command queue, and the stale-stamp guard dropped *late results* only
+in the command queue, and the stale-stamp guard dropped _late results_ only
 after the GPU work ran — so the image trailed the slider and the backlog
 persisted after the drag.
 
@@ -42,10 +42,11 @@ trades `renderedBitmap` for a `hasRendered` flag.
 ### D2 — Persistent, image-scoped resources
 
 `srcTex` uploads once per image and lives for the image's lifetime; `dstTex`
-+ blit resources are cached per image size; param/resolution buffers and the
-bind group join the existing pipeline cache. A slider tick becomes:
-`writeBuffer(params)` + `writeBuffer(frame)` + 1 compute dispatch + 1 blit
-dispatch + submit. Zero allocations, no sync.
+
+- blit resources are cached per image size; param/resolution buffers and the
+  bind group join the existing pipeline cache. A slider tick becomes:
+  `writeBuffer(params)` + `writeBuffer(frame)` + 1 compute dispatch + 1 blit
+  dispatch + submit. Zero allocations, no sync.
 
 ### D3 — Coalesce renders (latest-wins)
 

@@ -3,7 +3,7 @@ import { Subscription } from 'foldkit'
 import { OfflineFill } from '../offline/fill'
 import { ConnectivityChanged, fillEventToMessage } from '../offline/messages'
 import type { Model } from './model'
-import type { RootMessage } from './message'/**
+import type { RootMessage } from './message' /**
  * The root's subscriptions (docs/adr/0015): the two bridges that feed the
  * offline slice from the outside world.
  *
@@ -26,8 +26,7 @@ export const subscriptions = Subscription.make<Model, RootMessage, OfflineFill>(
   connectivity: Subscription.persistent(
     Stream.callback<RootMessage>((queue) =>
       Effect.gen(function* () {
-        const emit = (online: boolean) =>
-          Queue.offerUnsafe(queue, ConnectivityChanged({ online }))
+        const emit = (online: boolean) => Queue.offerUnsafe(queue, ConnectivityChanged({ online }))
         // The initial state, then the browser's events.
         emit(typeof navigator === 'undefined' ? true : navigator.onLine)
         yield* Effect.acquireRelease(

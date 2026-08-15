@@ -24,9 +24,7 @@ export const ListEdits = Command.define('ListEdits', {
     const summaries = yield* store.list()
     return EditsListed({ summaries })
   }).pipe(
-    Effect.catchTag('StoreError', (err: StoreError) =>
-      Effect.succeed(ListFailed({ error: err })),
-    ),
+    Effect.catchTag('StoreError', (err: StoreError) => Effect.succeed(ListFailed({ error: err }))),
   ),
 })
 

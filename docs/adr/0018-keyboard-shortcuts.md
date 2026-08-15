@@ -13,16 +13,16 @@ All bindings are **editor-scoped**: they dispatch `EditorMessage`s, and the
 existing machine gating does the rest (no `SelectedTool`/`SelectedLayer` edge
 from `Drafting` means number keys naturally do nothing mid-draft).
 
-| Key | Action |
-|---|---|
-| `1`–`9`, `0` | Select layer by drawer position — 1 = newest (top of stack) |
-| `[` / `]` | Nudge the selected layer's active field (or the draft's first field) by 0.05 |
-| `/` | Toggle visibility of the selected layer |
-| `Backspace` / `Delete` | Remove the selected layer (prevents browser back-on-Backspace) |
-| `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z` | Undo / redo (docs/adr/0017) |
-| `\` | Compare flip: `Off` ↔ `Toggle` (Lightroom muscle memory) |
-| `Enter` | Confirm the draft |
-| `Esc` | Priority: LUT picker open → close it; draft active → cancel it; else nothing |
+| Key                              | Action                                                                       |
+| -------------------------------- | ---------------------------------------------------------------------------- |
+| `1`–`9`, `0`                     | Select layer by drawer position — 1 = newest (top of stack)                  |
+| `[` / `]`                        | Nudge the selected layer's active field (or the draft's first field) by 0.05 |
+| `/`                              | Toggle visibility of the selected layer                                      |
+| `Backspace` / `Delete`           | Remove the selected layer (prevents browser back-on-Backspace)               |
+| `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z` | Undo / redo (docs/adr/0017)                                                  |
+| `\`                              | Compare flip: `Off` ↔ `Toggle` (Lightroom muscle memory)                     |
+| `Enter`                          | Confirm the draft                                                            |
+| `Esc`                            | Priority: LUT picker open → close it; draft active → cancel it; else nothing |
 
 Deliberately **not** in this pass: space-to-pan, `+`/`-` zoom, per-channel
 nudges, split-divider arrow keys (pointer-only; a11y follow-up).

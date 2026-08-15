@@ -1,13 +1,18 @@
-import { Effect, Schema } from "effect"
-import { FieldKey, LutId } from "./brands"
-import type { Layer, LayerType } from "./layers/schemas"
-import type { LayerEntry } from "./layers/registry"
-import type { LutCube } from "./luts/cube"
-import { generateChainSource, type ChainLayerInfo, type ChainPass, type ChainShader } from "./shaders/chain-source"
+import { Effect, Schema } from 'effect'
+import { FieldKey, LutId } from './brands'
+import type { Layer, LayerType } from './layers/schemas'
+import type { LayerEntry } from './layers/registry'
+import type { LutCube } from './luts/cube'
+import {
+  generateChainSource,
+  type ChainLayerInfo,
+  type ChainPass,
+  type ChainShader,
+} from './shaders/chain-source'
 
 // ---- errors ----
 
-export class GpuError extends Schema.TaggedErrorClass<GpuError>()("GpuError", {
+export class GpuError extends Schema.TaggedErrorClass<GpuError>()('GpuError', {
   message: Schema.String,
   cause: Schema.optional(Schema.Unknown),
 }) {}
@@ -28,10 +33,7 @@ const readField = (layer: Layer, key: FieldKey): unknown => {
  * Pack one pass's layer parameter values into a flat Float32Array
  * following the slot layout returned by the assembler.
  */
-function packUniforms(
-  chain: ReadonlyArray<Layer>,
-  pass: ChainPass,
-): Float32Array {
+function packUniforms(chain: ReadonlyArray<Layer>, pass: ChainPass): Float32Array {
   const buf = new Float32Array(pass.uniforms.length)
   const visibleLayers = chain.filter((l) => l.visible)
 
@@ -41,7 +43,7 @@ function packUniforms(
       const value = readField(layer, slot.field)
       // Schema-validated layers always carry the field as a number; skip
       // anything else rather than coerce garbage.
-      if (typeof value === "number") {
+      if (typeof value === 'number') {
         buf[slot.offset] = value
       }
     }
@@ -98,10 +100,10 @@ export function createRenderRequest(
       // LUT layers carry a cube reference: resolve the id through the
       // LUT map the caller provided. The engine stays pure — it never
       // fetches or parses cubes, and an unresolvable id is a hard error.
-      if (l.type === "lut") {
-        const lutId = readField(l, FieldKey("lutId"))
-        if (typeof lutId !== "string") {
-          return yield* Effect.fail(new GpuError({ message: "LUT layer is missing a lutId" }))
+      if (l.type === 'lut') {
+        const lutId = readField(l, FieldKey('lutId'))
+        if (typeof lutId !== 'string') {
+          return yield* Effect.fail(new GpuError({ message: 'LUT layer is missing a lutId' }))
         }
         const id = LutId(lutId)
         const cube = luts.get(id)
@@ -127,7 +129,7 @@ export function createRenderRequest(
     try {
       shader = generateChainSource(chainLayers)
     } catch (e) {
-      return yield* Effect.fail(new GpuError({ message: "Shader generation failed", cause: e }))
+      return yield* Effect.fail(new GpuError({ message: 'Shader generation failed', cause: e }))
     }
 
     const uniforms = shader.passes.map((pass) => packUniforms(chain, pass))

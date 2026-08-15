@@ -1,4 +1,4 @@
-import type { ExportSettings } from "./settings"
+import type { ExportSettings } from './settings'
 
 /**
  * The pure jSquash encode: downscale (Lanczos) when the scale is below
@@ -13,33 +13,33 @@ export const encodeImage = async (
   let source = image
   if (settings.scale !== 1) {
     // oxlint-disable-next-line ts-no-dynamic-import
-    const { default: resize } = await import("@jsquash/resize")
+    const { default: resize } = await import('@jsquash/resize')
     source = await resize(image, {
       width: Math.max(1, Math.round(image.width * settings.scale)),
       height: Math.max(1, Math.round(image.height * settings.scale)),
-      method: "lanczos3",
+      method: 'lanczos3',
     })
   }
   const quality = settings.quality ?? 75
   switch (settings.format) {
-    case "png": {
+    case 'png': {
       // oxlint-disable-next-line ts-no-dynamic-import -- lazy codec load
-      const { encode } = await import("@jsquash/png")
+      const { encode } = await import('@jsquash/png')
       return new Uint8Array(await encode(source))
     }
-    case "jpeg": {
+    case 'jpeg': {
       // oxlint-disable-next-line ts-no-dynamic-import -- lazy codec load
-      const { encode } = await import("@jsquash/jpeg")
+      const { encode } = await import('@jsquash/jpeg')
       return new Uint8Array(await encode(source, { quality }))
     }
-    case "webp": {
+    case 'webp': {
       // oxlint-disable-next-line ts-no-dynamic-import -- lazy codec load
-      const { encode } = await import("@jsquash/webp")
+      const { encode } = await import('@jsquash/webp')
       return new Uint8Array(await encode(source, { quality }))
     }
-    case "avif": {
+    case 'avif': {
       // oxlint-disable-next-line ts-no-dynamic-import -- lazy codec load
-      const { encode } = await import("@jsquash/avif")
+      const { encode } = await import('@jsquash/avif')
       return new Uint8Array(await encode(source, { quality }))
     }
   }

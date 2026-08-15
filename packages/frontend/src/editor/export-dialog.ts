@@ -84,20 +84,31 @@ export const exportDialogView = (h: HtmlBuilder<EditorMessage>, model: Model) =>
                   ],
                   [
                     h.div(
-                      [h.Class('flex items-baseline justify-between border-b border-border px-4 py-3')],
                       [
-                        h.h2([...title, h.Class('text-sm font-semibold tracking-[0.14em]')], ['EXPORT']),
-                        h.span([h.Class('text-[10px] uppercase tracking-[0.14em] text-muted')], [
-                          `lutra-edit.${fileExtension(model.exportSettings.format)}`,
-                        ]),
+                        h.Class(
+                          'flex items-baseline justify-between border-b border-border px-4 py-3',
+                        ),
+                      ],
+                      [
+                        h.h2(
+                          [...title, h.Class('text-sm font-semibold tracking-[0.14em]')],
+                          ['EXPORT'],
+                        ),
+                        h.span(
+                          [h.Class('text-[10px] uppercase tracking-[0.14em] text-muted')],
+                          [`lutra-edit.${fileExtension(model.exportSettings.format)}`],
+                        ),
                       ],
                     ),
-                    h.div([h.Class('flex flex-col gap-4 px-4 py-4')], [
-                      formatSection(h, model),
-                      qualitySection(h, model),
-                      resolutionSection(h, model),
-                      statusSection(h, model),
-                    ]),
+                    h.div(
+                      [h.Class('flex flex-col gap-4 px-4 py-4')],
+                      [
+                        formatSection(h, model),
+                        qualitySection(h, model),
+                        resolutionSection(h, model),
+                        statusSection(h, model),
+                      ],
+                    ),
                     h.div(
                       [h.Class('flex justify-end gap-2 border-t border-border px-4 py-3')],
                       [
@@ -172,9 +183,7 @@ const qualitySection = (h: HtmlBuilder<EditorMessage>, model: Model) => {
 
 const resolutionSection = (h: HtmlBuilder<EditorMessage>, model: Model) => {
   const { exportImage, exportSettings } = model
-  const dims = exportImage
-    ? `${exportImage.width} × ${exportImage.height}`
-    : '—'
+  const dims = exportImage ? `${exportImage.width} × ${exportImage.height}` : '—'
   const scaled = exportImage
     ? `${Math.round(exportImage.width * exportSettings.scale)} × ${Math.round(exportImage.height * exportSettings.scale)}`
     : '—'
@@ -188,9 +197,10 @@ const resolutionSection = (h: HtmlBuilder<EditorMessage>, model: Model) => {
         exportSettings.scale,
         (value) => ChangedExportScale({ scale: value }),
       ),
-      h.span([h.Class('tnum text-xs text-muted')], [
-        exportSettings.scale === 1 ? dims : `${dims} → ${scaled}`,
-      ]),
+      h.span(
+        [h.Class('tnum text-xs text-muted')],
+        [exportSettings.scale === 1 ? dims : `${dims} → ${scaled}`],
+      ),
     ],
   )
 }

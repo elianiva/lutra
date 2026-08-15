@@ -24,6 +24,7 @@ import { editorMachine } from './phase'
 import { LAYER_UI } from '../editor/layer-meta'
 import { lutTarget } from './lut-bar'
 import { visibleEntries } from './lut-bar/catalog'
+import { moveCurvePoint, resetCurve } from '@lutra/engine'
 import {
   fileExtension,
   type ExportSettings,
@@ -246,11 +247,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         [],
         Option.none(),
       ],
-      CatalogFailed: ({ error }) => [
-        { ...model, phase, catalogError: error },
-        [],
-        Option.none(),
-      ],
+      CatalogFailed: ({ error }) => [{ ...model, phase, catalogError: error }, [], Option.none()],
 
       // ---- offline library (the LUT bar's per-row states, docs/adr/0015) ----
       // Root-delegated facts; the editor machine has no edges for them, so
@@ -278,11 +275,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         Option.none(),
       ],
       // The browser's online state flipped (dimming flag for the bar).
-      OfflineConnectivityChanged: ({ online }) => [
-        { ...model, phase, online },
-        [],
-        Option.none(),
-      ],
+      OfflineConnectivityChanged: ({ online }) => [{ ...model, phase, online }, [], Option.none()],
       // An undownloaded row was clicked while offline: the bar's name line
       // shows the distinct connect-once notice (the commit is blocked — the
       // click never reaches the chain).
@@ -714,6 +707,46 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         [],
         Option.none(),
       ],
+
+      // ---- tone curve widget (docs/adr/0028) ----
+      // A chain-layer drag is a plain data op (the machine has no edge from
+      // Selected — the chain lives in the model, not the phase); a draft
+      // drag goes through the machine's Drafting edge and only re-renders
+      // here. Any other phase has no edge and is ignored — the widget only
+      // renders while a toneCurve draft or selection exists, so the target
+      // is unambiguous. The engine clamps the move.
+      CurvePointDragged: ({ index, x, y }) => {
+        if (model.phase._tag === 'Selected') {
+          const id = model.phase.layerId
+          const layer = model.chain.find((l) => l.id === id)
+          if (!layer || layer.type !== 'toneCurve') return [model, [], Option.none()]
+          return renderNow({
+            ...model,
+            phase,
+            chain: model.chain.map((l) => (l.id === id ? moveCurvePoint(l, index, x, y) : l)),
+          })
+        }
+        if (!transitioned) return [model, [], Option.none()]
+        return renderNow({ ...model, phase })
+      },
+      // The reset button restores the identity curve: the same draft/chain
+      // split as the drag (machine edge for the draft, data op for the
+      // chain). The button only renders on a non-neutral curve, so a reset
+      // on a neutral curve is a stray message that changes nothing.
+      CurveReset: () => {
+        if (model.phase._tag === 'Selected') {
+          const id = model.phase.layerId
+          const layer = model.chain.find((l) => l.id === id)
+          if (!layer || layer.type !== 'toneCurve') return [model, [], Option.none()]
+          return renderNow({
+            ...model,
+            phase,
+            chain: model.chain.map((l) => (l.id === id ? resetCurve(l) : l)),
+          })
+        }
+        if (!transitioned) return [model, [], Option.none()]
+        return renderNow({ ...model, phase })
+      },
 
       // ---- reorder drag (drag operations reshuffle via ReorderedLayer) ----
       StartedLayerReorder: () => [model, [], Option.none()],

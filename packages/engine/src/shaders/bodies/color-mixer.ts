@@ -1,4 +1,4 @@
-import type { BodyRenderer } from "../types"
+import type { BodyRenderer } from '../types'
 
 // Color Mixer (Lightroom-style HSL panel, docs/adr/0027): eight hue
 // ranges, each with hue / saturation / luminance adjustments. The math
@@ -34,17 +34,17 @@ import type { BodyRenderer } from "../types"
 // (red 0°, orange 30°, yellow 60°, green 120°, aqua 180°, blue 240°,
 // purple 270°, magenta 300°); red crosses the 0/360 seam.
 const RANGES = [
-  { key: "red", left: 330, right: 15 },
-  { key: "orange", left: 15, right: 45 },
-  { key: "yellow", left: 45, right: 90 },
-  { key: "green", left: 90, right: 150 },
-  { key: "aqua", left: 150, right: 210 },
-  { key: "blue", left: 210, right: 255 },
-  { key: "purple", left: 255, right: 285 },
-  { key: "magenta", left: 285, right: 330 },
+  { key: 'red', left: 330, right: 15 },
+  { key: 'orange', left: 15, right: 45 },
+  { key: 'yellow', left: 45, right: 90 },
+  { key: 'green', left: 90, right: 150 },
+  { key: 'aqua', left: 150, right: 210 },
+  { key: 'blue', left: 210, right: 255 },
+  { key: 'purple', left: 255, right: 285 },
+  { key: 'magenta', left: 285, right: 330 },
 ] as const
 
-const CHANNELS = ["Hue", "Saturation", "Luminance"] as const
+const CHANNELS = ['Hue', 'Saturation', 'Luminance'] as const
 
 /** The normalized slider field name for a range + channel (redHue, ...). */
 const field = (range: (typeof RANGES)[number], channel: (typeof CHANNELS)[number]) =>
@@ -52,16 +52,17 @@ const field = (range: (typeof RANGES)[number], channel: (typeof CHANNELS)[number
 
 export const renderColorMixer: BodyRenderer = (i) => {
   const weights = RANGES.map(
-    (r) => `  let w${r.key[0]!.toUpperCase()}${r.key.slice(1)} = mixerWeight(h, ${r.left}.0, ${r.right}.0);`,
-  ).join("\n")
+    (r) =>
+      `  let w${r.key[0]!.toUpperCase()}${r.key.slice(1)} = mixerWeight(h, ${r.left}.0, ${r.right}.0);`,
+  ).join('\n')
 
   const sums = CHANNELS.map((channel) => {
-    const suffix = channel === "Hue" ? " * 90.0" : ""
+    const suffix = channel === 'Hue' ? ' * 90.0' : ''
     const terms = RANGES.map(
       (r) => `l${i}_${field(r, channel)} * w${r.key[0]!.toUpperCase()}${r.key.slice(1)}`,
-    ).join(" + ")
+    ).join(' + ')
     return `    let d${channel} = (${terms})${suffix};`
-  }).join("\n")
+  }).join('\n')
 
   return {
     helpers: `

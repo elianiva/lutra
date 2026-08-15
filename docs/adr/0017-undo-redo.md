@@ -1,7 +1,7 @@
 # Undo / redo: snapshot stack, not a command log
 
 Revert committed chain changes — add layer, remove, reorder, visibility toggle,
-LUT pick, finished slider adjustments. One undo step per *gesture*, never per
+LUT pick, finished slider adjustments. One undo step per _gesture_, never per
 slider tick.
 
 **Status**: decided (2026-08-07 planning session); not yet implemented.
@@ -25,7 +25,7 @@ phase machine.
 ### D2 — What pushes
 
 Every **committed** chain mutation in `update.ts` (the arms that call
-`renderNow`), pushing the *pre-mutation* chain: `ConfirmedDraft`,
+`renderNow`), pushing the _pre-mutation_ chain: `ConfirmedDraft`,
 `RemovedLayer`, `ReorderedLayer` (skip when `from === to`),
 `ToggledLayerVisibility`, `ChangedLayerLut`, and `UpdatedLayerParam` on
 release (D3). Draft param tweaks never push — the draft is still
@@ -34,7 +34,7 @@ mutation invalidates the redo branch) and clears `pending`.
 
 ### D3 — Slider drags: capture at start, commit at release
 
-`input` fires per tick, `change` on release; undo must restore the *pre-drag*
+`input` fires per tick, `change` on release; undo must restore the _pre-drag_
 value. `StartedLayerDrag` fires on pointerdown/keydown and stores the chain in
 `history.pending`; `EndedLayerDrag` on `change` pushes `pending` if the chain
 changed (click without a move discards). Draft sliders never dispatch

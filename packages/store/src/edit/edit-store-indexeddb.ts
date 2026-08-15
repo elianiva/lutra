@@ -57,35 +57,28 @@ export const EditStoreLive: Layer.Layer<
     })
 
     const save = (edit: EditType): Effect.Effect<void, StoreError> =>
-      table.upsert(edit).pipe(
-        Effect.asVoid,
-        Effect.mapError(mapQueryError),
-      )
+      table.upsert(edit).pipe(Effect.asVoid, Effect.mapError(mapQueryError))
 
     const load = (id: EditId): Effect.Effect<Option.Option<EditType>, StoreError> =>
-      table.select().equals(id).pipe(
-        Effect.map((rows) => Option.fromIterable(rows)),
-        Effect.mapError(mapQueryError),
-      )
+      table
+        .select()
+        .equals(id)
+        .pipe(
+          Effect.map((rows) => Option.fromIterable(rows)),
+          Effect.mapError(mapQueryError),
+        )
 
     const list = (): Effect.Effect<ReadonlyArray<EditSummary>, StoreError> =>
       table.select().pipe(
-        Effect.map((rows) =>
-          rows.map(toSummary).sort((a, b) => b.savedAt - a.savedAt),
-        ),
+        Effect.map((rows) => rows.map(toSummary).sort((a, b) => b.savedAt - a.savedAt)),
         Effect.mapError(mapQueryError),
       )
 
     const del = (id: EditId): Effect.Effect<void, StoreError> =>
-      table.delete().equals(id).pipe(
-        Effect.asVoid,
-        Effect.mapError(mapQueryError),
-      )
+      table.delete().equals(id).pipe(Effect.asVoid, Effect.mapError(mapQueryError))
 
     const clearAll = (): Effect.Effect<void, StoreError> =>
-      table.clear.pipe(
-        Effect.mapError(mapQueryError),
-      )
+      table.clear.pipe(Effect.mapError(mapQueryError))
 
     return EditStore.of({ save, load, list, delete: del, clearAll })
   }),

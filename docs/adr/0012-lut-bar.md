@@ -4,7 +4,7 @@ The LUT chooser moves out of the **layer drawer** into a dedicated bottom bar: c
 
 ## Why
 
-296 LUTs across 9 categories (Instant Pro alone: 68). The drawer accordion cost two interactions per browse and its 36px list rows made scanning density terrible. Every serious color tool (DaVinci LUT Browser, Lightroom/Photomator presets, LUTScope, Cinema Grade, VSCO) converged on the same pattern: **thumbnails of the LUT applied to an image + live preview on the actual photo + click to commit**. A bottom strip puts the thumbnails directly under the canvas — the picker's whole job is "see it on *your* photo" — and frees the drawer to stay a pure layer stack. The 500×500 square thumbnail assets were already ideal for a ~64px filmstrip.
+296 LUTs across 9 categories (Instant Pro alone: 68). The drawer accordion cost two interactions per browse and its 36px list rows made scanning density terrible. Every serious color tool (DaVinci LUT Browser, Lightroom/Photomator presets, LUTScope, Cinema Grade, VSCO) converged on the same pattern: **thumbnails of the LUT applied to an image + live preview on the actual photo + click to commit**. A bottom strip puts the thumbnails directly under the canvas — the picker's whole job is "see it on _your_ photo" — and frees the drawer to stay a pure layer stack. The 500×500 square thumbnail assets were already ideal for a ~64px filmstrip.
 
 ## Decisions
 
@@ -20,7 +20,7 @@ Hovering a thumb dispatches `PreviewedLut({ lutId })`, which sets `previewLut` i
 
 `renderNow` swaps the active LUT target's `lutId` at render time — the drafting LUT layer (`{ kind: 'draft' }`) or the focused chain LUT layer (`{ kind: 'layer' }`) — by composing the draft/chain arrays it hands to `RenderChain`. The machine-owned draft keeps its committed `lutId`; the chain is untouched. Belt-and-suspenders: the composition only applies when a LUT target exists, so a leaked `previewLut` can never corrupt a non-LUT render. `lutTarget(model)` is the single helper for "is there a LUT to preview/commit" — used by the view (visibility), by `PreviewedLut` (gate), and by `ToggledLutPicker` (gate).
 
-Compare interacts for free: in Toggle/Split the before side still shows the source while the after side shows the previewed grade — comparing *while choosing* is desirable.
+Compare interacts for free: in Toggle/Split the before side still shows the source while the after side shows the previewed grade — comparing _while choosing_ is desirable.
 
 ### D4 — `lutPickerOpen` renamed to `lutBarOpen`
 

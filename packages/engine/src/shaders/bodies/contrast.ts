@@ -1,4 +1,4 @@
-import type { BodyRenderer } from "../types"
+import type { BodyRenderer } from '../types'
 
 // S-curve contrast as a power curve pivoted on perceptual mid-grey
 // (0.2140 in linear Rec.709 — the linear value of sRGB 0.5). Positive

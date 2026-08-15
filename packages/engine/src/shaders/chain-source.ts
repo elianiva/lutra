@@ -1,8 +1,8 @@
-import { Schema } from "effect"
-import { SRGB_TO_LINEAR } from "./colorspace"
-import type { BodyRenderer, BodySource } from "./types"
-import type { FieldKey, LutId } from "../brands"
-import type { LayerType } from "../layers/schemas"
+import { Schema } from 'effect'
+import { SRGB_TO_LINEAR } from './colorspace'
+import type { BodyRenderer, BodySource } from './types'
+import type { FieldKey, LutId } from '../brands'
+import type { LayerType } from '../layers/schemas'
 
 // ---- errors ----
 
@@ -14,7 +14,7 @@ import type { LayerType } from "../layers/schemas"
  * Effect-failed.
  */
 export class MissingLutReferenceError extends Schema.TaggedErrorClass<MissingLutReferenceError>()(
-  "MissingLutReferenceError",
+  'MissingLutReferenceError',
   {
     message: Schema.String,
     cause: Schema.optional(Schema.Unknown),
@@ -106,7 +106,7 @@ export interface UniformSlot {
  * struct form so the assembler can place helpers at module scope.
  */
 function normalizeBody(render: string | BodySource): BodySource {
-  return typeof render === "string" ? { stmts: render } : render
+  return typeof render === 'string' ? { stmts: render } : render
 }
 
 /** Pure copy: reads the sRGB source texture and writes it unchanged. */
@@ -171,7 +171,7 @@ interface LayerPassOptions {
   /** Body samples through the filtered sampler (declares binding 5). */
   readonly needsSampler: boolean
   /** Storage format of the pass output. */
-  readonly dstFormat: "rgba8unorm" | "rgba16float"
+  readonly dstFormat: 'rgba8unorm' | 'rgba16float'
 }
 
 /**
@@ -188,19 +188,17 @@ function layerPass({
   needsSampler,
   dstFormat,
 }: LayerPassOptions): ChainPass {
-  const structFields = uniforms
-    .map((u) => `  l${u.layerIndex}_${u.field}: f32,`)
-    .join("\n")
-  const structDef = uniforms.length > 0 ? `struct LayerParams {\n${structFields}\n}` : ""
+  const structFields = uniforms.map((u) => `  l${u.layerIndex}_${u.field}: f32,`).join('\n')
+  const structDef = uniforms.length > 0 ? `struct LayerParams {\n${structFields}\n}` : ''
 
   // WGSL struct members are only in scope through the struct variable, but
   // bodies reference their params unqualified (e.g. `l0_stops`). Bind each
   // member to the bare name inside `main` before the body is inlined.
   const uniformAliases = uniforms
     .map((u) => `  let l${u.layerIndex}_${u.field} = u_params.l${u.layerIndex}_${u.field};`)
-    .join("\n")
+    .join('\n')
 
-  const usesFrame = body.includes("u_frame") || helpers.includes("u_frame")
+  const usesFrame = body.includes('u_frame') || helpers.includes('u_frame')
   // Structural flag, not WGSL text sniffing: a body that samples its
   // input with `textureLoad` (chromatic aberration) still sets
   // `samplesInput` for the linearize pass, but only `usesSampler`
@@ -208,20 +206,14 @@ function layerPass({
   // layout omits declared-but-unused bindings, so an entry for a
   // sampler the shader never references fails bind-group validation.
   const usesSampler = needsSampler
-  const colorspace = linearize || encode ? SRGB_TO_LINEAR : ""
-  const srcExpr = linearize ? "srgbToLinear(src.rgb)" : "src.rgb"
-  const outExpr = encode
-    ? "linearToSrgb(clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)))"
-    : "color"
+  const colorspace = linearize || encode ? SRGB_TO_LINEAR : ''
+  const srcExpr = linearize ? 'srgbToLinear(src.rgb)' : 'src.rgb'
+  const outExpr = encode ? 'linearToSrgb(clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)))' : 'color'
 
-  const frameDecl = usesFrame
-    ? "@group(0) @binding(3) var<uniform> u_frame: u32;\n"
-    : ""
-  const samplerDecl = usesSampler
-    ? "@group(0) @binding(5) var samp: sampler;\n"
-    : ""
+  const frameDecl = usesFrame ? '@group(0) @binding(3) var<uniform> u_frame: u32;\n' : ''
+  const samplerDecl = usesSampler ? '@group(0) @binding(5) var samp: sampler;\n' : ''
   const paramsDecl =
-    uniforms.length > 0 ? "@group(0) @binding(4) var<uniform> u_params: LayerParams;\n" : ""
+    uniforms.length > 0 ? '@group(0) @binding(4) var<uniform> u_params: LayerParams;\n' : ''
 
   const source = `
 ${structDef}
@@ -278,7 +270,7 @@ interface LutPassOptions {
    */
   readonly outputIsSrgb: boolean
   /** Storage format of the pass output. */
-  readonly dstFormat: "rgba8unorm" | "rgba16float"
+  readonly dstFormat: 'rgba8unorm' | 'rgba16float'
 }
 
 /**
@@ -299,27 +291,23 @@ function lutPass({
   outputIsSrgb,
   dstFormat,
 }: LutPassOptions): ChainPass {
-  const structFields = uniforms
-    .map((u) => `  l${u.layerIndex}_${u.field}: f32,`)
-    .join("\n")
-  const structDef = uniforms.length > 0 ? `struct LayerParams {\n${structFields}\n}` : ""
+  const structFields = uniforms.map((u) => `  l${u.layerIndex}_${u.field}: f32,`).join('\n')
+  const structDef = uniforms.length > 0 ? `struct LayerParams {\n${structFields}\n}` : ''
 
   const uniformAliases = uniforms
     .map((u) => `  let l${u.layerIndex}_${u.field} = u_params.l${u.layerIndex}_${u.field};`)
-    .join("\n")
+    .join('\n')
 
-  const usesFrame = body.includes("u_frame") || helpers.includes("u_frame")
+  const usesFrame = body.includes('u_frame') || helpers.includes('u_frame')
   const inputExpr = inputIsSrgb
-    ? "src.rgb"
-    : "linearToSrgb(clamp(src.rgb, vec3<f32>(0.0), vec3<f32>(1.0)))"
-  const outputExpr = outputIsSrgb ? "color" : "srgbToLinear(color)"
-  const colorspace = !inputIsSrgb || !outputIsSrgb ? SRGB_TO_LINEAR : ""
+    ? 'src.rgb'
+    : 'linearToSrgb(clamp(src.rgb, vec3<f32>(0.0), vec3<f32>(1.0)))'
+  const outputExpr = outputIsSrgb ? 'color' : 'srgbToLinear(color)'
+  const colorspace = !inputIsSrgb || !outputIsSrgb ? SRGB_TO_LINEAR : ''
 
-  const frameDecl = usesFrame
-    ? "@group(0) @binding(3) var<uniform> u_frame: u32;\n"
-    : ""
+  const frameDecl = usesFrame ? '@group(0) @binding(3) var<uniform> u_frame: u32;\n' : ''
   const paramsDecl =
-    uniforms.length > 0 ? "@group(0) @binding(4) var<uniform> u_params: LayerParams;\n" : ""
+    uniforms.length > 0 ? '@group(0) @binding(4) var<uniform> u_params: LayerParams;\n' : ''
 
   // The body does its own trilinear interpolation over texel coordinates
   // (textureLoad; 32-bit float textures are not filterable in WebGPU), so
@@ -414,26 +402,26 @@ export function generateChainSource(layers: ReadonlyArray<ChainLayerInfo>): Chai
       passes.push(
         lutPass({
           body: body.stmts,
-          helpers: body.helpers ?? "",
+          helpers: body.helpers ?? '',
           uniforms,
           lutId: lut.id,
           lutSize: lut.size,
           inputIsSrgb: li === 0 && !firstBodySamplesSource,
           outputIsSrgb: isLast,
-          dstFormat: isLast ? "rgba8unorm" : "rgba16float",
+          dstFormat: isLast ? 'rgba8unorm' : 'rgba16float',
         }),
       )
     } else {
       passes.push(
         layerPass({
           body: body.stmts,
-          helpers: body.helpers ?? "",
+          helpers: body.helpers ?? '',
           uniforms,
           samplesInput: body.samplesInput === true,
           needsSampler: body.usesSampler === true,
           linearize: li === 0 && !firstBodySamplesSource,
           encode: isLast,
-          dstFormat: isLast ? "rgba8unorm" : "rgba16float",
+          dstFormat: isLast ? 'rgba8unorm' : 'rgba16float',
         }),
       )
     }

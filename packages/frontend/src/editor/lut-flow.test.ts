@@ -500,7 +500,9 @@ describe('catalog load state (LUT card status slot)', () => {
     // LUT library is broken) — the tool panel shows the status caption.
     const [model] = update(
       { ...initialModel(), phase: Idle() },
-      CatalogFailed({ error: new LutLoadError({ message: 'Failed to load luts/film_luts.json: HTTP 500' }) }),
+      CatalogFailed({
+        error: new LutLoadError({ message: 'Failed to load luts/film_luts.json: HTTP 500' }),
+      }),
     )
     expect(model.catalogError?.message).toBe('Failed to load luts/film_luts.json: HTTP 500')
     // The catalog itself stays missing — the LUT tool remains inert.
@@ -510,7 +512,9 @@ describe('catalog load state (LUT card status slot)', () => {
   it('CatalogLoaded clears a previous failure', () => {
     const [failed] = update(
       { ...initialModel(), phase: Idle() },
-      CatalogFailed({ error: new LutLoadError({ message: 'Failed to load luts/film_luts.json: HTTP 500' }) }),
+      CatalogFailed({
+        error: new LutLoadError({ message: 'Failed to load luts/film_luts.json: HTTP 500' }),
+      }),
     )
     const [model] = update(failed, CatalogLoaded({ catalog }))
     expect(model.catalogError).toBeNull()

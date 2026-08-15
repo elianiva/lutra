@@ -128,9 +128,7 @@ export const Model = Schema.Struct({
   // one is open (null = neither, the canvas gets the full screen). Inert on
   // desktop: both panels are always visible there and the sheets render
   // hidden.
-  mobileSheet: Schema.NullOr(
-    Schema.Union([Schema.Literal('tools'), Schema.Literal('layers')]),
-  ),
+  mobileSheet: Schema.NullOr(Schema.Union([Schema.Literal('tools'), Schema.Literal('layers')])),
   // True while a RenderChain command is in flight; renderNow skips dispatch
   // while pending so the GPU queue never backs up (the in-flight render
   // re-triggers with the newest state when it completes).

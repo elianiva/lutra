@@ -20,12 +20,12 @@ sits next to `fieldBounds` in `layer-meta.ts`.
 Double-click-to-reset was **rejected**: foldkit has no `OnDblClick` builder
 helper — it would need a small `Mount.defineStream` (the `CompareDivider`
 pattern). Deferred; it can land later without touching the button. The
-button's conditional appearance *is* the discoverability: it doubles as the
+button's conditional appearance _is_ the discoverability: it doubles as the
 visible "off-default" affordance.
 
 ### D2 — Center-zero marker on bipolar fields only
 
-A 1px vertical line at the track's 50%, drawn *behind* the input (wrapped in
+A 1px vertical line at the track's 50%, drawn _behind_ the input (wrapped in
 a `relative` div, `pointer-events-none`, `--color-border`) — rendered only
 when `min < 0 < max`: exposure, contrast, shadows, highlights, white balance
 (temp + tint), saturation, vignette amount, chromatic aberration, clarity.

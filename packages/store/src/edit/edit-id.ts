@@ -15,8 +15,7 @@ export type EditId = string & Brand.Brand<'EditId'>
 
 export const EditId = Brand.nominal<EditId>()
 
-const UUID_REGEXP =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const UUID_REGEXP = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 /**
  * Decodes a string into an `EditId` at schema boundaries. The brand comes from
@@ -25,7 +24,10 @@ const UUID_REGEXP =
  * URL segment), which is what the router's `schemaSegment` and the storage
  * seam require.
  */
-export const EditIdSchema = Schema.fromBrand('EditId', EditId)(Schema.String).pipe(
+export const EditIdSchema = Schema.fromBrand(
+  'EditId',
+  EditId,
+)(Schema.String).pipe(
   Schema.refine((value): value is EditId => UUID_REGEXP.test(value), {
     message: 'must be a valid UUID',
   }),

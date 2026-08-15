@@ -105,7 +105,10 @@ export const LutThumbnailerLive = Layer.effect(
     // worker crash fails only its own requests. Cleared by each request's
     // completion path; a crash clears its worker's entries wholesale.
     const pendingRef = yield* Ref.make<
-      ReadonlyMap<number, { readonly deferred: Deferred.Deferred<Uint8Array, Error>; readonly worker: number }>
+      ReadonlyMap<
+        number,
+        { readonly deferred: Deferred.Deferred<Uint8Array, Error>; readonly worker: number }
+      >
     >(new Map())
     const nextIdRef = yield* Ref.make(0)
     // lutId -> the photo its in-flight render belongs to (the ImageBitmap
@@ -220,7 +223,9 @@ export const LutThumbnailerLive = Layer.effect(
           const id = yield* Ref.getAndUpdate(nextIdRef, (n) => n + 1)
           const deferred = yield* Deferred.make<Uint8Array, Error>()
           const index = (yield* Ref.updateAndGet(roundRobinRef, (n) => n + 1)) % workers.length
-          yield* Ref.update(pendingRef, (pending) => new Map(pending).set(id, { deferred, worker: index }))
+          yield* Ref.update(pendingRef, (pending) =>
+            new Map(pending).set(id, { deferred, worker: index }),
+          )
           const request: LutThumbRequest = { id, image, cube }
           workers[index]!.postMessage(request)
 

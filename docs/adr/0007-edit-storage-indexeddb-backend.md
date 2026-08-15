@@ -1,6 +1,6 @@
 # Edit storage is a swappable backend; local is IndexedDB for the whole self-contained Edit
 
-Edits (a **source image** + **edit chain** + **thumbnail**, one self-contained record per UUID) persist through a swappable storage abstraction. The v1 backend is the browser's **IndexedDB**, holding the *entire* Edit — chain JSON and source-image bytes together in one keyed record — via `@effect/platform-browser`'s IndexedDB-backed `KeyValueStore` with explicit database name `"lutra"`. This drops the previously-planned OPFS-for-source-images split.
+Edits (a **source image** + **edit chain** + **thumbnail**, one self-contained record per UUID) persist through a swappable storage abstraction. The v1 backend is the browser's **IndexedDB**, holding the _entire_ Edit — chain JSON and source-image bytes together in one keyed record — via `@effect/platform-browser`'s IndexedDB-backed `KeyValueStore` with explicit database name `"lutra"`. This drops the previously-planned OPFS-for-source-images split.
 
 **Status**: accepted
 

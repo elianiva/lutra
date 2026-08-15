@@ -17,7 +17,12 @@ import * as Gallery from '../gallery'
 import * as Editor from '../editor'
 import { offlineMachine } from '../offline/machine'
 import type { Offline } from '../offline/model'
-import { OfflineFileFetching, OfflineFileDownloaded, OfflineConnectivityChanged, type EditorMessage } from '../editor/message'
+import {
+  OfflineFileFetching,
+  OfflineFileDownloaded,
+  OfflineConnectivityChanged,
+  type EditorMessage,
+} from '../editor/message'
 import { StartOfflineFill, DismissOfflineToast } from './offline-command'
 import type { OfflineFill } from '../offline/fill'
 
@@ -148,9 +153,7 @@ export const update = (model: Model, message: RootMessage): UpdateReturn =>
       ],
       // A file fetch began; cube files mark their LUT row fetching.
       OfflineFileStarted: ({ lutId }) =>
-        lutId === null
-          ? [model, []]
-          : delegateToEditor(model, OfflineFileFetching({ lutId })),
+        lutId === null ? [model, []] : delegateToEditor(model, OfflineFileFetching({ lutId })),
       // A file landed in the cache: bump the count; cube files mark their
       // LUT row downloaded.
       OfflineFileCompleted: ({ lutId }) => {

@@ -51,7 +51,8 @@ const main = async (): Promise<void> => {
 
     // GitHub tarballs extract to <repo>-<commit-sha>.
     const entries = await readdir(extracted)
-    const srcDir = entries.find((e) => e.startsWith('Film-Luts-')) ?? fail('unexpected tarball layout')
+    const srcDir =
+      entries.find((e) => e.startsWith('Film-Luts-')) ?? fail('unexpected tarball layout')
     const src = join(extracted, srcDir)
 
     const expected = ['luts', 'thumbnails', 'film_luts.json', 'LICENSE']
@@ -122,7 +123,9 @@ See the upstream LICENSE file for the mirror's terms.
     if (missing > 0) fail(`${missing} catalog entries unresolvable`)
 
     const size = (await $`du -sh ${OUT}`.quiet().text()).trim()
-    process.stdout.write(`[vendor-luts] vendored ${luts.length} LUTs into ${OUT}/ (${size}) — done\n`)
+    process.stdout.write(
+      `[vendor-luts] vendored ${luts.length} LUTs into ${OUT}/ (${size}) — done\n`,
+    )
   } finally {
     await rm(tmpDir, { recursive: true, force: true })
   }

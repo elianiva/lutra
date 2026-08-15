@@ -1,4 +1,4 @@
-import type { BodyRenderer } from "../types"
+import type { BodyRenderer } from '../types'
 
 // Film-grain noise: 3-octave FBM over smooth value noise, with
 // midtone-weighted density. Replaces the mobile's per-pixel hash

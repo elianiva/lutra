@@ -17,18 +17,73 @@ const icons = path.resolve(here, '../packages/frontend/public/icons')
 // index.html must stay in sync with this list.
 export const SPLASH_SIZES = [
   // iPhones, oldest to newest.
-  ['splash-640x1136.png', 640, 1136, 'screen and (device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)'],
-  ['splash-750x1334.png', 750, 1334, 'screen and (device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)'],
-  ['splash-1125x2436.png', 1125, 2436, 'screen and (device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)'],
-  ['splash-1170x2532.png', 1170, 2532, 'screen and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)'],
-  ['splash-1179x2556.png', 1179, 2556, 'screen and (device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)'],
-  ['splash-1242x2688.png', 1242, 2688, 'screen and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)'],
-  ['splash-1284x2778.png', 1284, 2778, 'screen and (device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)'],
-  ['splash-1290x2796.png', 1290, 2796, 'screen and (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)'],
+  [
+    'splash-640x1136.png',
+    640,
+    1136,
+    'screen and (device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)',
+  ],
+  [
+    'splash-750x1334.png',
+    750,
+    1334,
+    'screen and (device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)',
+  ],
+  [
+    'splash-1125x2436.png',
+    1125,
+    2436,
+    'screen and (device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)',
+  ],
+  [
+    'splash-1170x2532.png',
+    1170,
+    2532,
+    'screen and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)',
+  ],
+  [
+    'splash-1179x2556.png',
+    1179,
+    2556,
+    'screen and (device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)',
+  ],
+  [
+    'splash-1242x2688.png',
+    1242,
+    2688,
+    'screen and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)',
+  ],
+  [
+    'splash-1284x2778.png',
+    1284,
+    2778,
+    'screen and (device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)',
+  ],
+  [
+    'splash-1290x2796.png',
+    1290,
+    2796,
+    'screen and (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)',
+  ],
   // iPads.
-  ['splash-1536x2048.png', 1536, 2048, 'screen and (device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)'],
-  ['splash-1668x2388.png', 1668, 2388, 'screen and (device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)'],
-  ['splash-2048x2732.png', 2048, 2732, 'screen and (device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)'],
+  [
+    'splash-1536x2048.png',
+    1536,
+    2048,
+    'screen and (device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)',
+  ],
+  [
+    'splash-1668x2388.png',
+    1668,
+    2388,
+    'screen and (device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)',
+  ],
+  [
+    'splash-2048x2732.png',
+    2048,
+    2732,
+    'screen and (device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)',
+  ],
 ] as const
 
 /** The icon's rendered size on a splash: 30% of the shorter edge, per the\n *  launch-screen convention of a small centered tile on a solid background. */

@@ -1,4 +1,4 @@
-import type { LutCube } from "./cube"
+import type { LutCube } from './cube'
 
 // CPU-side LUT application — the pure-JS mirror of the WGSL LUT pass body
 // (shaders/bodies/lut.ts). The bar's per-photo preview thumbnails run

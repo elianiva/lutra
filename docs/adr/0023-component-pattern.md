@@ -20,7 +20,7 @@ state, no DOM access, no side effects; side effects live in
   `Option.filter` → `Option.map` → `Option.getOrNull`; view-local absence is
   a plain `null` child, never a fabricated empty `h.div([], [])`.
 - **Union dispatch is `Match`**: `Match.value(x).pipe(Match.withReturnType<T>(),
-  Match.when(S.is(...), ...), Match.orElse(...))` — with schema guards for
+Match.when(S.is(...), ...), Match.orElse(...))` — with schema guards for
   domain unions. No `switch` statements (the one remaining `switch` is
   `components/icon.ts`'s tag-name string dispatch, which is the right tool).
 - **Data plumbing is `pipe`**: `Array.groupBy`/`Record.toEntries`,

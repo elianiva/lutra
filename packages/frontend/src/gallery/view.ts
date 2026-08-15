@@ -38,26 +38,29 @@ const header = (h: HtmlBuilder<GalleryMessage>) =>
     [h.Class('flex items-center justify-between border-b border-border bg-panel px-4 py-2')],
     [
       h.h1([h.Class('text-sm font-semibold tracking-[0.3em] text-accent')], ['LUTRA']),
-      h.div([h.Class('flex items-center gap-2')], [
-        h.button(
-          [
-            h.OnClick(OpenPhotoRequested()),
-            h.AriaLabel('Open a photo to start a new edit'),
-            h.Class(
-              'rounded border border-accent px-3 py-1 text-xs text-accent hover:border-ink hover:text-ink',
-            ),
-          ],
-          ['Open photo'],
-        ),
-        h.button(
-          [
-            h.OnClick(RefreshRequested()),
-            h.AriaLabel('Refresh'),
-            h.Class('px-2 text-xs text-muted hover:text-ink'),
-          ],
-          ['Refresh'],
-        ),
-      ]),
+      h.div(
+        [h.Class('flex items-center gap-2')],
+        [
+          h.button(
+            [
+              h.OnClick(OpenPhotoRequested()),
+              h.AriaLabel('Open a photo to start a new edit'),
+              h.Class(
+                'rounded border border-accent px-3 py-1 text-xs text-accent hover:border-ink hover:text-ink',
+              ),
+            ],
+            ['Open photo'],
+          ),
+          h.button(
+            [
+              h.OnClick(RefreshRequested()),
+              h.AriaLabel('Refresh'),
+              h.Class('px-2 text-xs text-muted hover:text-ink'),
+            ],
+            ['Refresh'],
+          ),
+        ],
+      ),
     ],
   )
 
@@ -69,17 +72,13 @@ const gridBody = (
     onIdle: () => spinner(h),
     onLoading: () => spinner(h),
     onRefreshing: () => spinner(h),
-    onSuccess: (summaries) =>
-      summaries.length === 0 ? emptyState(h) : gridTiles(h, summaries),
+    onSuccess: (summaries) => (summaries.length === 0 ? emptyState(h) : gridTiles(h, summaries)),
     onFailure: (error) => errorState(h, error.message),
     onStale: () => spinner(h),
   })
 
 const spinner = (h: HtmlBuilder<GalleryMessage>) =>
-  h.div(
-    [h.Class('flex flex-1 items-center justify-center text-sm text-muted')],
-    ['Loading…'],
-  )
+  h.div([h.Class('flex flex-1 items-center justify-center text-sm text-muted')], ['Loading…'])
 
 const emptyState = (h: HtmlBuilder<GalleryMessage>) =>
   h.div(
@@ -94,9 +93,7 @@ const emptyState = (h: HtmlBuilder<GalleryMessage>) =>
         ],
         ['Open a photo to start editing'],
       ),
-      h.p([h.Class('text-xs text-muted')], [
-        'Your edits will appear here.',
-      ]),
+      h.p([h.Class('text-xs text-muted')], ['Your edits will appear here.']),
     ],
   )
 
@@ -106,16 +103,16 @@ const errorState = (h: HtmlBuilder<GalleryMessage>, error: string) =>
     [
       h.p([], [`Could not load your gallery: ${error}`]),
       h.button(
-        [h.OnClick(RefreshRequested()), h.Class('cursor-pointer text-ink underline underline-offset-2')],
+        [
+          h.OnClick(RefreshRequested()),
+          h.Class('cursor-pointer text-ink underline underline-offset-2'),
+        ],
         ['Try again'],
       ),
     ],
   )
 
-const gridTiles = (
-  h: HtmlBuilder<GalleryMessage>,
-  summaries: ReadonlyArray<EditSummary>,
-) =>
+const gridTiles = (h: HtmlBuilder<GalleryMessage>, summaries: ReadonlyArray<EditSummary>) =>
   h.div(
     [h.Class('grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4 p-4')],
     summaries.map((summary) => tile(h, summary)),
@@ -140,9 +137,12 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) =>
           ),
         ],
         [
-          h.span([h.Class('text-[10px] text-white/80')], [
-            `${Number(summary.savedAt) > 0 ? new Date(summary.savedAt).toLocaleDateString() : ''}`,
-          ]),
+          h.span(
+            [h.Class('text-[10px] text-white/80')],
+            [
+              `${Number(summary.savedAt) > 0 ? new Date(summary.savedAt).toLocaleDateString() : ''}`,
+            ],
+          ),
           h.div(
             [h.Class('flex items-center gap-1')],
             [
@@ -152,7 +152,9 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) =>
                   h.AriaLabel('Delete saved edit'),
                   // size-7: a finger-sized hit target on touch screens
                   // (docs/adr/0024-mobile-ui) — the glyph stays small.
-                  h.Class('grid size-7 place-items-center text-[10px] text-white/80 hover:text-white'),
+                  h.Class(
+                    'grid size-7 place-items-center text-[10px] text-white/80 hover:text-white',
+                  ),
                   h.DataAttribute('delete-edit-id', summary.id),
                 ],
                 ['✕'],

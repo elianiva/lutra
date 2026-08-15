@@ -1,4 +1,4 @@
-import type { BodyRenderer } from "../types"
+import type { BodyRenderer } from '../types'
 
 // Local contrast ("clarity"): a 9-tap box blur of the pass input
 // (radius 4 px, bilinear-sampled so the sparse kernel stays smooth),

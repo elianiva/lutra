@@ -221,10 +221,7 @@ export const PanZoom = Mount.defineStream(
               const [a, b] = [...pointers.values()]
               const rect = stage.getBoundingClientRect()
               const d = Math.hypot(a!.x - b!.x, a!.y - b!.y)
-              const nextScale = Math.max(
-                0.1,
-                Math.min(8, pinch.startScale * (d / pinch.startDist)),
-              )
+              const nextScale = Math.max(0.1, Math.min(8, pinch.startScale * (d / pinch.startDist)))
               const k = nextScale / pinch.startScale
               const midX = (a!.x + b!.x) / 2 - rect.left
               const midY = (a!.y + b!.y) / 2 - rect.top
@@ -345,7 +342,8 @@ export const CompareDivider = Mount.defineStream(
     Effect.gen(function* () {
       const divider = asHtmlElement(element)
       const container = divider.parentElement
-      const emit = (position: number) => Queue.offerUnsafe(queue, ChangedSplitPosition({ position }))
+      const emit = (position: number) =>
+        Queue.offerUnsafe(queue, ChangedSplitPosition({ position }))
 
       let dragging = false
 

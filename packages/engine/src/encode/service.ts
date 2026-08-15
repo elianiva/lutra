@@ -1,9 +1,9 @@
-import { Context, Effect, Schema } from "effect"
-import type { ExportSettings } from "./settings"
+import { Context, Effect, Schema } from 'effect'
+import type { ExportSettings } from './settings'
 
 // ---- errors ----
 
-export class EncodeError extends Schema.TaggedErrorClass<EncodeError>()("EncodeError", {
+export class EncodeError extends Schema.TaggedErrorClass<EncodeError>()('EncodeError', {
   message: Schema.String,
   cause: Schema.optional(Schema.Unknown),
 }) {}
@@ -29,5 +29,5 @@ export interface ImageEncoderShape {
  * docs/adr/0006-image-encoder-engine-service.md).
  */
 export class ImageEncoder extends Context.Service<ImageEncoder, ImageEncoderShape>()(
-  "ImageEncoder",
+  'ImageEncoder',
 ) {}

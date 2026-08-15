@@ -1,5 +1,15 @@
 import { describe, it, expect } from 'vitest'
-import { Command, Mount, click, given, role, scene, label, text, expect as sceneExpect } from 'foldkit/scene'
+import {
+  Command,
+  Mount,
+  click,
+  given,
+  role,
+  scene,
+  label,
+  text,
+  expect as sceneExpect,
+} from 'foldkit/scene'
 import { FieldKey, type LayerType } from '@lutra/engine'
 import { EditId } from '@lutra/store'
 import { MockImageBitmap } from '../vitest-setup'
@@ -52,8 +62,7 @@ const mixerDraft = () => settled(update(loaded(), SelectedTool({ type: 'colorMix
 /** A committed Color Mixer layer (Selected phase, no render in flight). */
 const selectedMixer = () => settled(update(mixerDraft(), ConfirmedDraft())[0])
 
-const draftLayer = (model: Model) =>
-  model.phase._tag === 'Drafting' ? model.phase.layer : null
+const draftLayer = (model: Model) => (model.phase._tag === 'Drafting' ? model.phase.layer : null)
 
 const draftId = (model: Model) => draftLayer(model)?.id
 
@@ -218,10 +227,7 @@ describe('Color Mixer view', () => {
   it('switches the sliders to the tapped range', () => {
     // The draft has a red hue value set; the HUE slider shows +45° for it.
     const withDraft = settled(
-      update(
-        mixerDraft(),
-        UpdatedDraftParam({ field: FieldKey('redHue'), value: 0.5 }),
-      )[0],
+      update(mixerDraft(), UpdatedDraftParam({ field: FieldKey('redHue'), value: 0.5 }))[0],
     )
     scene(
       sceneConfig,
@@ -242,10 +248,7 @@ describe('Color Mixer view', () => {
     const withMixer = selectedMixer()
     const id = withMixer.chain[0]!.id
     const withValue = settled(
-      update(
-        withMixer,
-        UpdatedLayerParam({ id, field: FieldKey('redHue'), value: 0.5 }),
-      )[0],
+      update(withMixer, UpdatedLayerParam({ id, field: FieldKey('redHue'), value: 0.5 }))[0],
     )
     scene(
       sceneConfig,

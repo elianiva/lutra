@@ -1,6 +1,7 @@
-import type { Schema } from "effect"
-import type { BodyRenderer } from "../shaders/types"
-import type { LayerType } from "./schemas"
+import type { Schema } from 'effect'
+import type { BodyRenderer } from '../shaders/types'
+import { CURVE_DEFAULT_POINTS, CURVE_POINT_COUNT } from './curve'
+import type { LayerType } from './schemas'
 import {
   ChromaticAberrationLayer,
   ClarityLayer,
@@ -12,9 +13,10 @@ import {
   LutLayer,
   SaturationLayer,
   ShadowsLayer,
+  ToneCurveLayer,
   VignetteLayer,
   WhiteBalanceLayer,
-} from "./schemas"
+} from './schemas'
 
 // ---- per-field metadata ----
 
@@ -99,6 +101,16 @@ const FIELD_META = {
   },
   chromaticAberration: { amount: { default: 0, min: -1, max: 1 } },
   clarity: { amount: { default: 0, min: -1, max: 1 } },
+  // The Tone Curve's 5 control points (docs/adr/0028), one field per axis
+  // (p0x..p4y), all in [0, 1]. The identity defaults come from the curve
+  // module so the registry, the shader's reference, and the widget's reset
+  // target can never drift apart.
+  toneCurve: Object.fromEntries(
+    Array.from({ length: CURVE_POINT_COUNT }, (_, i) => [
+      [`p${i}x`, { default: CURVE_DEFAULT_POINTS[i]!.x, min: 0, max: 1 }],
+      [`p${i}y`, { default: CURVE_DEFAULT_POINTS[i]!.y, min: 0, max: 1 }],
+    ]).flat(),
+  ),
   // LUT defaults to full strength (1): the draft shows the look immediately.
   lut: { amount: { default: 1, min: 0, max: 1 } },
 } as const satisfies Record<string, Record<string, FieldMeta>>
@@ -110,6 +122,7 @@ export interface RegistryInput {
   contrast: BodyRenderer
   shadows: BodyRenderer
   highlights: BodyRenderer
+  toneCurve: BodyRenderer
   whiteBalance: BodyRenderer
   saturation: BodyRenderer
   colorMixer: BodyRenderer
@@ -125,35 +138,42 @@ export function makeRegistry(bodies: RegistryInput): Record<LayerType, LayerEntr
     exposure: {
       schema: ExposureLayer,
       body: bodies.exposure,
-      label: "Exposure",
+      label: 'Exposure',
       pinned: true,
       fields: FIELD_META.exposure,
     },
     contrast: {
       schema: ContrastLayer,
       body: bodies.contrast,
-      label: "Contrast",
+      label: 'Contrast',
       pinned: true,
       fields: FIELD_META.contrast,
     },
     shadows: {
       schema: ShadowsLayer,
       body: bodies.shadows,
-      label: "Shadows",
+      label: 'Shadows',
       pinned: false,
       fields: FIELD_META.shadows,
     },
     highlights: {
       schema: HighlightsLayer,
       body: bodies.highlights,
-      label: "Highlights",
+      label: 'Highlights',
       pinned: false,
       fields: FIELD_META.highlights,
+    },
+    toneCurve: {
+      schema: ToneCurveLayer,
+      body: bodies.toneCurve,
+      label: 'Tone Curve',
+      pinned: true,
+      fields: FIELD_META.toneCurve,
     },
     whiteBalance: {
       schema: WhiteBalanceLayer,
       body: bodies.whiteBalance,
-      label: "White Balance",
+      label: 'White Balance',
       pinned: true,
       toggled: true,
       fields: FIELD_META.whiteBalance,
@@ -161,28 +181,28 @@ export function makeRegistry(bodies: RegistryInput): Record<LayerType, LayerEntr
     saturation: {
       schema: SaturationLayer,
       body: bodies.saturation,
-      label: "Saturation",
+      label: 'Saturation',
       pinned: true,
       fields: FIELD_META.saturation,
     },
     colorMixer: {
       schema: ColorMixerLayer,
       body: bodies.colorMixer,
-      label: "Color Mixer",
+      label: 'Color Mixer',
       pinned: false,
       fields: FIELD_META.colorMixer,
     },
     grain: {
       schema: GrainLayer,
       body: bodies.grain,
-      label: "Grain",
+      label: 'Grain',
       pinned: false,
       fields: FIELD_META.grain,
     },
     vignette: {
       schema: VignetteLayer,
       body: bodies.vignette,
-      label: "Vignette",
+      label: 'Vignette',
       pinned: false,
       toggled: true,
       fields: FIELD_META.vignette,
@@ -190,27 +210,27 @@ export function makeRegistry(bodies: RegistryInput): Record<LayerType, LayerEntr
     chromaticAberration: {
       schema: ChromaticAberrationLayer,
       body: bodies.chromaticAberration,
-      label: "Chromatic Aberration",
+      label: 'Chromatic Aberration',
       pinned: false,
       fields: FIELD_META.chromaticAberration,
     },
     clarity: {
       schema: ClarityLayer,
       body: bodies.clarity,
-      label: "Clarity",
+      label: 'Clarity',
       pinned: false,
       fields: FIELD_META.clarity,
     },
     lut: {
       schema: LutLayer,
       body: bodies.lut,
-      label: "LUT",
+      label: 'LUT',
       pinned: false,
       fields: FIELD_META.lut,
       // The engine cannot know which LUTs exist (the catalog is a frontend
       // asset); the frontend overrides this with the first catalog entry
       // when creating a layer. An empty id renders as "Unknown LUT".
-      stringFields: { lutId: "" },
+      stringFields: { lutId: '' },
     },
   }
 }

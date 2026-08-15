@@ -5,7 +5,13 @@ import { initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
 import { Idle } from './phase'
-import { RenderedFrame, HistogramComputed, ClearedImage, ScaledCanvas, CanvasRegistered } from './message'
+import {
+  RenderedFrame,
+  HistogramComputed,
+  ClearedImage,
+  ScaledCanvas,
+  CanvasRegistered,
+} from './message'
 import { PanZoom, RegisterCanvas } from './canvas-stage'
 import { RenderHandle } from '../gpu/backend'
 
@@ -24,7 +30,10 @@ const loadedModel = () => ({ ...initialModel(), phase: Idle() })
 
 describe('histogram flow', () => {
   it('dispatches ReadHistogram for a rendered frame and stores the handle', () => {
-    const [model, commands] = update(loadedModel(), RenderedFrame({ stamp: 1, handle: stubHandle() }))
+    const [model, commands] = update(
+      loadedModel(),
+      RenderedFrame({ stamp: 1, handle: stubHandle() }),
+    )
     expect(model.renderedStamp).toBe(1)
     expect(model.lastRender).not.toBeNull()
     expect(model.renderPending).toBe(false)

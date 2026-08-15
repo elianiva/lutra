@@ -6,7 +6,7 @@ A third workspace package, `@lutra/store`, owns the persistence seam: the `Edit`
 
 **Considered Options**:
 
-- **Contract in `@lutra/engine`** — follows the ADR 0006 `ImageEncoder` pattern (engine owns contracts), but would push storage schemas *and* a browser IndexedDB implementation *and* a future network backend into a package documented as the pure, no-DOM computational core.
+- **Contract in `@lutra/engine`** — follows the ADR 0006 `ImageEncoder` pattern (engine owns contracts), but would push storage schemas _and_ a browser IndexedDB implementation _and_ a future network backend into a package documented as the pure, no-DOM computational core.
 - **Separate `@lutra/store` package** — keeps engine pure; gives the seam (which will have IndexedDB, worker, and server implementations) a single natural home that a future server can depend on. This is what we picked.
 - **Only create it when the server lands (YAGNI)** — saves the slicing now, but the local IndexedDB backend is already a substantial, distinct module, and retrofitting a package boundary later while adding auth is exactly when it gets painful.
 

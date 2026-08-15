@@ -72,8 +72,7 @@ const settled = (model: Model): Model =>
 const lutDraft = () => settled(update(loaded(), SelectedTool({ type: 'lut' }))[0])
 
 /** The same draft, but the device is offline. */
-const offlineLutDraft = () =>
-  update(lutDraft(), OfflineConnectivityChanged({ online: false }))[0]
+const offlineLutDraft = () => update(lutDraft(), OfflineConnectivityChanged({ online: false }))[0]
 
 /** The same draft, offline, with the cube already in the offline library. */
 const offlineLutDraftDownloaded = () =>

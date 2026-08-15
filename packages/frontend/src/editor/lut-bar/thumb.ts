@@ -42,9 +42,7 @@ export const thumb = (
           ? `Apply ${entry.name} — not downloaded, needs a connection`
           : `Apply ${entry.name}`,
       ),
-      h.Title(
-        unavailable ? `${entry.name} — not downloaded yet` : entry.name,
-      ),
+      h.Title(unavailable ? `${entry.name} — not downloaded yet` : entry.name),
       h.AriaPressed(String(current)),
       // Keyed by lutId: the Recents strip reorders on every commit (MRU
       // bump), and an unkeyed list would patch DOM nodes positionally —
@@ -62,9 +60,7 @@ export const thumb = (
         h.Src(src),
         h.Alt(entry.name),
         h.Loading('lazy'),
-        h.Class(
-          `size-full object-cover ${unavailable ? 'opacity-40' : ''}`,
-        ),
+        h.Class(`size-full object-cover ${unavailable ? 'opacity-40' : ''}`),
       ]),
       // The cube is being mirrored into the offline library right now.
       ...(downloadState === 'fetching'
@@ -72,11 +68,14 @@ export const thumb = (
             h.div(
               [h.Class('absolute inset-0 flex items-center justify-center bg-black/40')],
               [
-                h.span([
-                  h.Class(
-                    'size-5 animate-spin rounded-full border-2 border-white/30 border-t-accent',
-                  ),
-                ], []),
+                h.span(
+                  [
+                    h.Class(
+                      'size-5 animate-spin rounded-full border-2 border-white/30 border-t-accent',
+                    ),
+                  ],
+                  [],
+                ),
               ],
             ),
           ]

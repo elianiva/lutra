@@ -1,7 +1,7 @@
-import { Schema } from "effect"
-import { nextLayerId } from "./id"
-import type { LayerEntry } from "./registry"
-import type { Layer, LayerType } from "./schemas"
+import { Schema } from 'effect'
+import { nextLayerId } from './id'
+import type { LayerEntry } from './registry'
+import type { Layer, LayerType } from './schemas'
 
 // ---- errors ----
 
@@ -14,7 +14,7 @@ import type { Layer, LayerType } from "./schemas"
  * crossing the persistence boundary and the failure is recoverable.
  */
 export class UnknownLayerTypeError extends Schema.TaggedErrorClass<UnknownLayerTypeError>()(
-  "UnknownLayerTypeError",
+  'UnknownLayerTypeError',
   {
     message: Schema.String,
     cause: Schema.optional(Schema.Unknown),

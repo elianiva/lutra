@@ -25,15 +25,18 @@ import * as Editor from '../editor'
  */
 export const view = (model: Model, h: HtmlBuilder<RootMessage>): Document => ({
   title: 'Lutra',
-  body: h.div([h.Class('flex h-full flex-col bg-bg text-ink')], [
-    readyToast(model, h),
-    ...(Match.value(model.route).pipe(
-      Match.withReturnType<ReadonlyArray<Html>>(),
-      Match.when(S.is(GalleryRoute), () => [offlineCard(model, h)]),
-      Match.orElse(() => []),
-    )),
-    activeRoute(model, h),
-  ]),
+  body: h.div(
+    [h.Class('flex h-full flex-col bg-bg text-ink')],
+    [
+      readyToast(model, h),
+      ...Match.value(model.route).pipe(
+        Match.withReturnType<ReadonlyArray<Html>>(),
+        Match.when(S.is(GalleryRoute), () => [offlineCard(model, h)]),
+        Match.orElse(() => []),
+      ),
+      activeRoute(model, h),
+    ],
+  ),
 })
 
 // The "Offline ready" toast: shows on the fill's Filling → Ready transition
@@ -76,28 +79,33 @@ const offlineCard = (model: Model, h: HtmlBuilder<RootMessage>) => {
       ],
       content,
     )
-  const progress = h.div([h.Class('h-1 w-full bg-border-strong')], [
-    h.div([h.Class('h-full bg-accent'), h.Style({ width: `${pct}%` })], []),
-  ])
-  const counters = h.div([h.Class('text-xs text-muted tnum')], [
-    `${offline.downloaded} / ${offline.total} files`,
-  ])
+  const progress = h.div(
+    [h.Class('h-1 w-full bg-border-strong')],
+    [h.div([h.Class('h-full bg-accent'), h.Style({ width: `${pct}%` })], [])],
+  )
+  const counters = h.div(
+    [h.Class('text-xs text-muted tnum')],
+    [`${offline.downloaded} / ${offline.total} files`],
+  )
   const actionButton = (label: string, ariaLabel: string) =>
     h.button(
       [
         h.OnClick(OfflineFillRequested()),
         h.AriaLabel(ariaLabel),
-        h.Class('rounded border border-accent px-2 py-0.5 text-accent hover:border-ink hover:text-ink'),
+        h.Class(
+          'rounded border border-accent px-2 py-0.5 text-accent hover:border-ink hover:text-ink',
+        ),
       ],
       [label],
     )
   const titleRow = (title: string, trailing: string | null) =>
-    h.div([h.Class('flex items-baseline justify-between gap-3')], [
-      h.span([h.Class('text-sm text-ink')], [title]),
-      ...(trailing === null
-        ? []
-        : [h.span([h.Class('text-sm text-ink tnum')], [trailing])]),
-    ])
+    h.div(
+      [h.Class('flex items-baseline justify-between gap-3')],
+      [
+        h.span([h.Class('text-sm text-ink')], [title]),
+        ...(trailing === null ? [] : [h.span([h.Class('text-sm text-ink tnum')], [trailing])]),
+      ],
+    )
 
   switch (offline.phase._tag) {
     case 'Filling':
@@ -116,18 +124,22 @@ const offlineCard = (model: Model, h: HtmlBuilder<RootMessage>) => {
       return frame([
         titleRow('Storage full', `${pct}%`),
         h.div([h.Class('mt-2')], [progress]),
-        h.div([h.Class('mt-2 flex items-center justify-between gap-3')], [
-          h.span([h.Class('text-xs text-muted')], ['Offline library paused']),
-          actionButton('Retry', 'Retry preparing the offline library'),
-        ]),
+        h.div(
+          [h.Class('mt-2 flex items-center justify-between gap-3')],
+          [
+            h.span([h.Class('text-xs text-muted')], ['Offline library paused']),
+            actionButton('Retry', 'Retry preparing the offline library'),
+          ],
+        ),
       ])
     case 'Idle':
       return offline.saveData
         ? frame([
             h.div([h.Class('text-sm text-ink')], ['Offline library not downloaded']),
-            h.div([h.Class('mt-2 flex justify-end')], [
-              actionButton('Start offline download', 'Start preparing the offline library'),
-            ]),
+            h.div(
+              [h.Class('mt-2 flex justify-end')],
+              [actionButton('Start offline download', 'Start preparing the offline library')],
+            ),
           ])
         : null
     case 'Ready':
@@ -158,7 +170,4 @@ const activeRoute = (model: Model, h: HtmlBuilder<RootMessage>) =>
   )
 
 const notFound = (h: HtmlBuilder<RootMessage>) =>
-  h.div(
-    [h.Class('flex flex-1 items-center justify-center text-sm text-muted')],
-    ['Not found'],
-  )
+  h.div([h.Class('flex flex-1 items-center justify-center text-sm text-muted')], ['Not found'])

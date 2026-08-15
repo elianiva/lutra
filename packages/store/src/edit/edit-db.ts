@@ -12,11 +12,9 @@ import { EditTable } from './edit-table'
  * only during the database upgrade transaction, so fresh installs get the
  * store; later schema changes append versions via `.add`.
  */
-export const EditDbSchema = IndexedDbDatabase.make(
-  IndexedDbVersion.make(EditTable),
-  (toQuery) =>
-    Effect.gen(function* () {
-      yield* toQuery.createObjectStore(EditTable.tableName)
-      yield* toQuery.createIndex(EditTable.tableName, 'saved_at')
-    }),
+export const EditDbSchema = IndexedDbDatabase.make(IndexedDbVersion.make(EditTable), (toQuery) =>
+  Effect.gen(function* () {
+    yield* toQuery.createObjectStore(EditTable.tableName)
+    yield* toQuery.createIndex(EditTable.tableName, 'saved_at')
+  }),
 )

@@ -1,7 +1,15 @@
 import type { HtmlBuilder } from 'foldkit/html'
 import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, Eye, EyeOff, Trash2, X, Check } from 'lucide'
 import { icon } from '../components/icon'
-import { LAYER_UI, MIXER_COLORS, MIXER_CHANNELS, fieldBounds, formatHue, formatPercentSigned, lutName } from './layer-meta'
+import {
+  LAYER_UI,
+  MIXER_COLORS,
+  MIXER_CHANNELS,
+  fieldBounds,
+  formatHue,
+  formatPercentSigned,
+  lutName,
+} from './layer-meta'
 import {
   SelectedLayer,
   RemovedLayer,
@@ -17,6 +25,7 @@ import {
 } from './message'
 import type { EditorMessage } from './message'
 import type { Model } from './model'
+import { toneCurveWidget } from './tone-curve'
 import { FieldKey, type Layer, type LayerId, type LayerType } from '@lutra/engine'
 
 const num = (layer: Layer, key: FieldKey) => {
@@ -61,25 +70,32 @@ const mixerSummary = (model: Model, layer: Layer) => {
  * centers the shader classifies with; the active range gets the ring.
  * Tapping dispatches SelectedMixerColor — presentation-only, no render.
  */
-const mixerSwatches = (h: HtmlBuilder<EditorMessage>, active: number, onSelect: (index: number) => EditorMessage) =>
-  h.div([h.Class('flex items-center gap-1.5'), h.AriaLabel('Color ranges')], [
-    ...MIXER_COLORS.map((color, index) =>
-      h.button(
-        [
-          h.OnClick(onSelect(index)),
-          h.AriaLabel(`Select ${color.name}`),
-          h.AriaPressed(String(index === active)),
-          h.Class(
-            `size-5 shrink-0 rounded-full border ${
-              index === active ? 'border-ink ring-1 ring-ink' : 'border-border hover:border-muted'
-            }`,
-          ),
-          h.Style({ background: `hsl(${color.hue} 100% 50%)` }),
-        ],
-        [],
+const mixerSwatches = (
+  h: HtmlBuilder<EditorMessage>,
+  active: number,
+  onSelect: (index: number) => EditorMessage,
+) =>
+  h.div(
+    [h.Class('flex items-center gap-1.5'), h.AriaLabel('Color ranges')],
+    [
+      ...MIXER_COLORS.map((color, index) =>
+        h.button(
+          [
+            h.OnClick(onSelect(index)),
+            h.AriaLabel(`Select ${color.name}`),
+            h.AriaPressed(String(index === active)),
+            h.Class(
+              `size-5 shrink-0 rounded-full border ${
+                index === active ? 'border-ink ring-1 ring-ink' : 'border-border hover:border-muted'
+              }`,
+            ),
+            h.Style({ background: `hsl(${color.hue} 100% 50%)` }),
+          ],
+          [],
+        ),
       ),
-    ),
-  ])
+    ],
+  )
 
 /**
  * The active range's three sliders — HUE / SATURATION / LUMINANCE — bound
@@ -98,14 +114,8 @@ const mixerSliders = (
     const fieldUi = ui.fields[field]!
     const { min, max } = fieldBounds(layer.type, field)
     const value = num(layer, field)
-    return sliderControl(
-      h,
-      fieldUi.label,
-      fieldUi.format(value),
-      min,
-      max,
-      value,
-      (v) => onChange(field, v),
+    return sliderControl(h, fieldUi.label, fieldUi.format(value), min, max, value, (v) =>
+      onChange(field, v),
     )
   })
 }
@@ -131,6 +141,12 @@ const layerSliders = (
           : UpdatedLayerParam({ id: layer.id, field, value }),
       ),
     ]
+  }
+  // The Tone Curve has no sliders: the curve widget replaces the generic
+  // field list entirely (the 10 point fields are meaningless as rulers —
+  // docs/adr/0028).
+  if (layer.type === 'toneCurve') {
+    return [toneCurveWidget(h, layer)]
   }
   return Object.keys(ui.fields).map((field) =>
     kind === 'draft'
@@ -203,9 +219,7 @@ const draftRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer) => 
       ),
       h.div(
         [h.Class('flex flex-col gap-3 px-4 pb-3')],
-        [
-          ...layerSliders(h, model, layer, ui, 'draft'),
-        ],
+        [...layerSliders(h, model, layer, ui, 'draft')],
       ),
       h.div(
         [h.Class('flex items-center justify-end gap-2 px-4 py-2')],
@@ -271,7 +285,10 @@ const chainRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer, ind
           ),
           icon(h, ui.icon, ui.label),
           h.span([h.Class('min-w-0 flex-1 truncate text-sm')], [ui.label]),
-          h.span([h.Class('tnum min-w-0 truncate text-xs text-muted')], [summary(model, layer, ui)]),
+          h.span(
+            [h.Class('tnum min-w-0 truncate text-xs text-muted')],
+            [summary(model, layer, ui)],
+          ),
           h.div(
             [h.Class('flex items-center gap-0.5')],
             [
@@ -301,9 +318,7 @@ const chainRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer, ind
       selected
         ? h.div(
             [h.Class('flex flex-col gap-3 px-4 pb-4')],
-            [
-              ...layerSliders(h, model, layer, ui, 'chain'),
-            ],
+            [...layerSliders(h, model, layer, ui, 'chain')],
           )
         : null,
     ],

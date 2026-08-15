@@ -1,21 +1,22 @@
-import { Schema } from "effect"
-import { LayerIdSchema, LutIdSchema } from "../brands"
+import { Schema } from 'effect'
+import { LayerIdSchema, LutIdSchema } from '../brands'
 
 // ---- layer type literal ----
 
 export const LAYER_TYPES = [
-  "exposure",
-  "contrast",
-  "shadows",
-  "highlights",
-  "whiteBalance",
-  "saturation",
-  "colorMixer",
-  "grain",
-  "vignette",
-  "chromaticAberration",
-  "clarity",
-  "lut",
+  'exposure',
+  'contrast',
+  'shadows',
+  'highlights',
+  'toneCurve',
+  'whiteBalance',
+  'saturation',
+  'colorMixer',
+  'grain',
+  'vignette',
+  'chromaticAberration',
+  'clarity',
+  'lut',
 ] as const
 
 export type LayerType = (typeof LAYER_TYPES)[number]
@@ -31,35 +32,35 @@ const LayerCommon = Schema.Struct({
 
 export const ExposureLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal("exposure"),
+  type: Schema.Literal('exposure'),
   stops: Schema.Number,
 })
 export type ExposureLayer = typeof ExposureLayer.Type
 
 export const ContrastLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal("contrast"),
+  type: Schema.Literal('contrast'),
   amount: Schema.Number,
 })
 export type ContrastLayer = typeof ContrastLayer.Type
 
 export const ShadowsLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal("shadows"),
+  type: Schema.Literal('shadows'),
   amount: Schema.Number,
 })
 export type ShadowsLayer = typeof ShadowsLayer.Type
 
 export const HighlightsLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal("highlights"),
+  type: Schema.Literal('highlights'),
   amount: Schema.Number,
 })
 export type HighlightsLayer = typeof HighlightsLayer.Type
 
 export const WhiteBalanceLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal("whiteBalance"),
+  type: Schema.Literal('whiteBalance'),
   temp: Schema.Number,
   tint: Schema.Number,
 })
@@ -67,7 +68,7 @@ export type WhiteBalanceLayer = typeof WhiteBalanceLayer.Type
 
 export const SaturationLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal("saturation"),
+  type: Schema.Literal('saturation'),
   amount: Schema.Number,
 })
 export type SaturationLayer = typeof SaturationLayer.Type
@@ -107,14 +108,14 @@ const MixerChannelFields = {
 
 export const ColorMixerLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal("colorMixer"),
+  type: Schema.Literal('colorMixer'),
   ...MixerChannelFields,
 })
 export type ColorMixerLayer = typeof ColorMixerLayer.Type
 
 export const GrainLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal("grain"),
+  type: Schema.Literal('grain'),
   // Snapseed-style grain knobs: texture = strength, size = noise cell
   // size, blur = octave persistence (softness).
   texture: Schema.Number,
@@ -125,7 +126,7 @@ export type GrainLayer = typeof GrainLayer.Type
 
 export const VignetteLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal("vignette"),
+  type: Schema.Literal('vignette'),
   amount: Schema.Number,
   size: Schema.Number,
 })
@@ -133,21 +134,47 @@ export type VignetteLayer = typeof VignetteLayer.Type
 
 export const ChromaticAberrationLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal("chromaticAberration"),
+  type: Schema.Literal('chromaticAberration'),
   amount: Schema.Number,
 })
 export type ChromaticAberrationLayer = typeof ChromaticAberrationLayer.Type
 
 export const ClarityLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal("clarity"),
+  type: Schema.Literal('clarity'),
   amount: Schema.Number,
 })
 export type ClarityLayer = typeof ClarityLayer.Type
 
+// The Tone Curve (docs/adr/0028): 5 fixed control points — the black and
+// white anchors plus three interior points — each with an x (input tone)
+// and y (output tone) in [0, 1], stored as one numeric field per axis
+// (`p0x`, `p0y`, …, `p4x`, `p4y`) so the layer rides the registry's plain
+// per-field f32 uniform packing. The shader evaluates the piecewise-linear
+// curve through the x-ordered points; the drawer's curve widget drags them.
+const CurvePointFields = {
+  p0x: Schema.Number,
+  p0y: Schema.Number,
+  p1x: Schema.Number,
+  p1y: Schema.Number,
+  p2x: Schema.Number,
+  p2y: Schema.Number,
+  p3x: Schema.Number,
+  p3y: Schema.Number,
+  p4x: Schema.Number,
+  p4y: Schema.Number,
+} as const
+
+export const ToneCurveLayer = Schema.Struct({
+  ...LayerCommon.fields,
+  type: Schema.Literal('toneCurve'),
+  ...CurvePointFields,
+})
+export type ToneCurveLayer = typeof ToneCurveLayer.Type
+
 export const LutLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal("lut"),
+  type: Schema.Literal('lut'),
   // Reference into the LUT library (the vendored file path, e.g.
   // "luts/colorslide/fuji_velvia_50.cube"). A branded `LutId`, not a
   // uniform — the engine resolves it to a cube via the render request's
@@ -171,6 +198,7 @@ export const Layer = Schema.Union([
   VignetteLayer,
   ChromaticAberrationLayer,
   ClarityLayer,
+  ToneCurveLayer,
   LutLayer,
 ])
 export type Layer = typeof Layer.Type
@@ -214,6 +242,9 @@ export type ChromaticAberrationParams = typeof ChromaticAberrationParams.Type
 export const ClarityParams = Schema.Struct({ amount: Schema.Number })
 export type ClarityParams = typeof ClarityParams.Type
 
+export const ToneCurveParams = Schema.Struct(CurvePointFields)
+export type ToneCurveParams = typeof ToneCurveParams.Type
+
 export const LutParams = Schema.Struct({
   lutId: LutIdSchema,
   amount: Schema.Number,
@@ -223,17 +254,18 @@ export type LutParams = typeof LutParams.Type
 // ---- patch discriminated union ----
 
 export const LayerPatch = Schema.Union([
-  Schema.Struct({ type: Schema.Literal("exposure"), patch: ExposureParams }),
-  Schema.Struct({ type: Schema.Literal("contrast"), patch: ContrastParams }),
-  Schema.Struct({ type: Schema.Literal("shadows"), patch: ShadowsParams }),
-  Schema.Struct({ type: Schema.Literal("highlights"), patch: HighlightsParams }),
-  Schema.Struct({ type: Schema.Literal("whiteBalance"), patch: WhiteBalanceParams }),
-  Schema.Struct({ type: Schema.Literal("saturation"), patch: SaturationParams }),
-  Schema.Struct({ type: Schema.Literal("colorMixer"), patch: ColorMixerParams }),
-  Schema.Struct({ type: Schema.Literal("grain"), patch: GrainParams }),
-  Schema.Struct({ type: Schema.Literal("vignette"), patch: VignetteParams }),
-  Schema.Struct({ type: Schema.Literal("chromaticAberration"), patch: ChromaticAberrationParams }),
-  Schema.Struct({ type: Schema.Literal("clarity"), patch: ClarityParams }),
-  Schema.Struct({ type: Schema.Literal("lut"), patch: LutParams }),
+  Schema.Struct({ type: Schema.Literal('exposure'), patch: ExposureParams }),
+  Schema.Struct({ type: Schema.Literal('contrast'), patch: ContrastParams }),
+  Schema.Struct({ type: Schema.Literal('shadows'), patch: ShadowsParams }),
+  Schema.Struct({ type: Schema.Literal('highlights'), patch: HighlightsParams }),
+  Schema.Struct({ type: Schema.Literal('whiteBalance'), patch: WhiteBalanceParams }),
+  Schema.Struct({ type: Schema.Literal('saturation'), patch: SaturationParams }),
+  Schema.Struct({ type: Schema.Literal('colorMixer'), patch: ColorMixerParams }),
+  Schema.Struct({ type: Schema.Literal('grain'), patch: GrainParams }),
+  Schema.Struct({ type: Schema.Literal('vignette'), patch: VignetteParams }),
+  Schema.Struct({ type: Schema.Literal('chromaticAberration'), patch: ChromaticAberrationParams }),
+  Schema.Struct({ type: Schema.Literal('clarity'), patch: ClarityParams }),
+  Schema.Struct({ type: Schema.Literal('toneCurve'), patch: ToneCurveParams }),
+  Schema.Struct({ type: Schema.Literal('lut'), patch: LutParams }),
 ])
 export type LayerPatch = typeof LayerPatch.Type

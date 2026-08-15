@@ -1,4 +1,4 @@
-import { LayerId } from "../brands"
+import { LayerId } from '../brands'
 
 /**
  * Create a new unique LayerId.

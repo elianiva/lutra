@@ -32,11 +32,7 @@ const id = EditId('11111111-1111-4111-8111-111111111111')
 
 describe('gallery: open a photo (new edit)', () => {
   it('shows an Open photo button in the header', () => {
-    scene(
-      config,
-      given(initialModel()),
-      sceneExpect(text('Open photo')).toExist(),
-    )
+    scene(config, given(initialModel()), sceneExpect(text('Open photo')).toExist())
   })
 
   it('dispatches OpenPhoto when the button is clicked', () => {

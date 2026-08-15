@@ -24,70 +24,67 @@ export const topBar = (h: HtmlBuilder<EditorMessage>, model: Model, hasImage: bo
   const saving = model.saveStatus._tag === 'saving'
   const attachedId = model.attachedEdit?.id ?? null
   return h.header(
-    [
-      h.Class(
-        'flex items-center justify-between border-b border-border bg-panel px-4 py-2',
-      ),
-    ],
+    [h.Class('flex items-center justify-between border-b border-border bg-panel px-4 py-2')],
     [
       h.h1([h.Class('text-sm font-semibold tracking-[0.3em] text-accent')], ['LUTRA']),
-      h.div([h.Class('flex items-center gap-1')], [
-        saveStatusText(h, model),
-        h.button(
-          [
-            h.OnClick(SaveRequested()),
-            h.Disabled(!hasImage || saving),
-            h.AriaLabel('Save edit'),
-            h.Class(
-              'rounded bg-accent px-3 py-1 text-xs text-ink hover:opacity-80 disabled:opacity-30',
-            ),
-          ],
-          [saving ? 'Saving…' : 'Save'],
-        ),
-        h.button(
-          [
-            h.OnClick(SaveAsRequested()),
-            h.Disabled(!hasImage || saving || attachedId === null),
-            h.AriaLabel('Save as a new edit'),
-            h.Class(
-              'px-2 py-1 text-xs text-muted hover:text-ink disabled:opacity-30',
-            ),
-          ],
-          [
-            h.span([h.Class('hidden sm:inline')], ['Save as']),
-            h.span([h.Class('grid size-8 place-items-center sm:hidden')], [
-              icon(h, CopyPlus, 'Save as a new edit'),
-            ]),
-          ],
-        ),
-        h.button(
-          [
-            h.OnClick(ExportRequested()),
-            h.Disabled(!hasImage),
-            h.AriaLabel('Export image'),
-            h.Class(
-              'grid size-8 place-items-center text-muted hover:text-ink disabled:opacity-30',
-            ),
-          ],
-          [icon(h, Download, 'Export')],
-        ),
-        h.button(
-          [
-            h.OnClick(ClearedImage()),
-            h.Disabled(!hasImage),
-            h.AriaLabel('Start over'),
-            h.Class(
-              'px-2 py-1 text-xs text-muted hover:text-ink disabled:opacity-30',
-            ),
-          ],
-          [
-            h.span([h.Class('hidden sm:inline')], ['New']),
-            h.span([h.Class('grid size-8 place-items-center sm:hidden')], [
-              icon(h, Plus, 'Start over'),
-            ]),
-          ],
-        ),
-      ]),
+      h.div(
+        [h.Class('flex items-center gap-1')],
+        [
+          saveStatusText(h, model),
+          h.button(
+            [
+              h.OnClick(SaveRequested()),
+              h.Disabled(!hasImage || saving),
+              h.AriaLabel('Save edit'),
+              h.Class(
+                'rounded bg-accent px-3 py-1 text-xs text-ink hover:opacity-80 disabled:opacity-30',
+              ),
+            ],
+            [saving ? 'Saving…' : 'Save'],
+          ),
+          h.button(
+            [
+              h.OnClick(SaveAsRequested()),
+              h.Disabled(!hasImage || saving || attachedId === null),
+              h.AriaLabel('Save as a new edit'),
+              h.Class('px-2 py-1 text-xs text-muted hover:text-ink disabled:opacity-30'),
+            ],
+            [
+              h.span([h.Class('hidden sm:inline')], ['Save as']),
+              h.span(
+                [h.Class('grid size-8 place-items-center sm:hidden')],
+                [icon(h, CopyPlus, 'Save as a new edit')],
+              ),
+            ],
+          ),
+          h.button(
+            [
+              h.OnClick(ExportRequested()),
+              h.Disabled(!hasImage),
+              h.AriaLabel('Export image'),
+              h.Class(
+                'grid size-8 place-items-center text-muted hover:text-ink disabled:opacity-30',
+              ),
+            ],
+            [icon(h, Download, 'Export')],
+          ),
+          h.button(
+            [
+              h.OnClick(ClearedImage()),
+              h.Disabled(!hasImage),
+              h.AriaLabel('Start over'),
+              h.Class('px-2 py-1 text-xs text-muted hover:text-ink disabled:opacity-30'),
+            ],
+            [
+              h.span([h.Class('hidden sm:inline')], ['New']),
+              h.span(
+                [h.Class('grid size-8 place-items-center sm:hidden')],
+                [icon(h, Plus, 'Start over')],
+              ),
+            ],
+          ),
+        ],
+      ),
     ],
   )
 }
@@ -101,14 +98,16 @@ const saveStatusText = (h: HtmlBuilder<EditorMessage>, model: Model) =>
   Match.value(model.saveStatus).pipe(
     Match.withReturnType<Html>(),
     Match.when({ _tag: 'saved' }, (status) =>
-      h.span([h.Class('hidden pr-1 text-[10px] text-muted sm:inline')], [
-        `Saved ${new Date(status.at).toLocaleTimeString()}`,
-      ]),
+      h.span(
+        [h.Class('hidden pr-1 text-[10px] text-muted sm:inline')],
+        [`Saved ${new Date(status.at).toLocaleTimeString()}`],
+      ),
     ),
     Match.when({ _tag: 'failed' }, (status) =>
-      h.span([h.Class('hidden pr-1 text-[10px] text-accent sm:inline'), h.Title(status.error.message)], [
-        'Save failed',
-      ]),
+      h.span(
+        [h.Class('hidden pr-1 text-[10px] text-accent sm:inline'), h.Title(status.error.message)],
+        ['Save failed'],
+      ),
     ),
     Match.orElse(() => null),
   )

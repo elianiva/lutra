@@ -19,7 +19,14 @@ import { initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
 import { Idle } from './phase'
-import { SelectedTool, ConfirmedDraft, RenderedFrame, HistogramComputed, ScaledCanvas, CanvasRegistered } from './message'
+import {
+  SelectedTool,
+  ConfirmedDraft,
+  RenderedFrame,
+  HistogramComputed,
+  ScaledCanvas,
+  CanvasRegistered,
+} from './message'
 import { PanZoom, RegisterCanvas } from './canvas-stage'
 import { RenderChain, ReadHistogram } from './command'
 import { LutLoadError } from '../luts/store'
@@ -94,6 +101,7 @@ describe('tool panel cards', () => {
       sceneExpect(role('button', { name: 'Add Contrast adjustment' })).toExist(),
       sceneExpect(role('button', { name: 'Add Shadows adjustment' })).toExist(),
       sceneExpect(role('button', { name: 'Add Highlights adjustment' })).toExist(),
+      sceneExpect(role('button', { name: 'Add Tone Curve adjustment' })).toExist(),
       sceneExpect(role('button', { name: 'Add White Balance adjustment' })).toExist(),
       sceneExpect(role('button', { name: 'Add Saturation adjustment' })).toExist(),
       sceneExpect(role('button', { name: 'Add Color Mixer adjustment' })).toExist(),
@@ -106,10 +114,14 @@ describe('tool panel cards', () => {
       sceneExpect(text("Fix a photo that's too dark or too bright.")).toExist(),
       sceneExpect(text('Deepens shadows and lifts highlights.')).toExist(),
       sceneExpect(text('Make a flat photo punchier, or soften it.')).toExist(),
-      sceneExpect(text("Lightens or darkens the darkest areas.")).toExist(),
+      sceneExpect(text('Lightens or darkens the darkest areas.')).toExist(),
       sceneExpect(text('Pull detail out of underexposed shadows.')).toExist(),
-      sceneExpect(text("Lightens or darkens the brightest areas.")).toExist(),
+      sceneExpect(text('Lightens or darkens the brightest areas.')).toExist(),
       sceneExpect(text('Recover blown-out skies and bright spots.')).toExist(),
+      sceneExpect(
+        text('Shapes brightness across the whole range with a draggable curve.'),
+      ).toExist(),
+      sceneExpect(text('Bend the tones — an S-curve, lifted blacks, or a custom grade.')).toExist(),
       sceneExpect(text('Shifts the color cast: warm or cool, green or magenta.')).toExist(),
       sceneExpect(text('Use it to fix an odd cast or set a mood.')).toExist(),
       sceneExpect(text('Controls how vivid the colors are.')).toExist(),

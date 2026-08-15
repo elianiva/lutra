@@ -46,10 +46,7 @@ export const ImageEncoderWorkerLive = Layer.effect(
             const deferred = pending.get(id)
             if (!deferred) return Effect.void
             if (bytes) return Deferred.succeed(deferred, bytes)
-            return Deferred.fail(
-              deferred,
-              new EncodeError({ message: error ?? 'Encode failed' }),
-            )
+            return Deferred.fail(deferred, new EncodeError({ message: error ?? 'Encode failed' }))
           }),
         ),
       )

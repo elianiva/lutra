@@ -38,7 +38,7 @@ _Avoid_: "portrait mode" (a product-level marketing term; this is a depth-based 
 
 1. Layer data model (Schema definitions, registry, `createLayer`)
 2. Colorspace + WGSL utilities
-3. Shader bodies (10 WGSL body renderers)
+3. Shader bodies (13 WGSL body renderers)
 4. Chain source assembler
 5. Chain operations (add/remove/reorder/update param)
 6. Render request (`createRenderRequest`, pure: shader + packed uniforms + source + frame)
@@ -50,11 +50,11 @@ _Avoid_: "portrait mode" (a product-level marketing term; this is a depth-based 
 ```
 engine/src/
   layers/
-    registry.ts      ← source of truth (10 layer entries)
+    registry.ts      ← source of truth (13 layer entries)
     types.ts         ← Layer, LayerType, field types
     defaults.ts      ← createLayer factory
   shaders/
-    bodies/          ← 10 WGSL body renderers
+    bodies/          ← 13 WGSL body renderers
     chain-source.ts  ← assembler (concatenates bodies into one shader)
     colorspace.ts    ← sRGB↔linear WGSL functions
   chain.ts           ← Chain abstraction (add, remove, reorder, update param)
@@ -149,7 +149,7 @@ The camera-rendered JPEG inside a RAW file — the instant placeholder for the g
 _Avoid_: "thumbnail" on its own (the gallery's thumbnail is the graded **Edit summary** image).
 
 **As-shot white balance**:
-The camera's recorded WB multipliers, applied at **RAW decode** time so the untouched image matches what the camera previewed. The **White balance** layer then trims *relative* to as-shot — its ±30% R/B range would be too small to fix a neutral decode under tungsten.
+The camera's recorded WB multipliers, applied at **RAW decode** time so the untouched image matches what the camera previewed. The **White balance** layer then trims _relative_ to as-shot — its ±30% R/B range would be too small to fix a neutral decode under tungsten.
 
 **Bayer / X-Trans**:
 The sensor mosaic patterns in RAW files. X-Trans (Fuji RAF) needs dedicated demosaicing; LibRaw handles both on the CPU, which is why the decode is CPU-side rather than a GPU demosaic (docs/adr/0014).
@@ -157,7 +157,7 @@ The sensor mosaic patterns in RAW files. X-Trans (Fuji RAF) needs dedicated demo
 ### Editor UI
 
 **Tool panel**:
-A persistent panel in the **editor** showing all 12 **adjustment layer** types as cards (docs/adr/0016). Always visible — no distinction between "pinned" and "overflow" tools. Each card carries the layer's icon + label and an always-visible two-line description — what the layer does and when to reach for it — written in plain language from the shader body's actual behavior (never generic photo-editing semantics: **Chromatic aberration** here is a film effect, not a correction). A muted ×N badge marks tools already in the **edit chain**. The LUT card leads the picker and doubles as the **LUT library** load status: "Loading LUTs…" while the catalog is in flight, "LUTs unavailable" (the error message as the card's `title`) on failure. Selecting a tool from the panel creates a **draft layer**; the LUT tool stays disabled until the **LUT library** catalog has loaded. The whole panel is disabled until an image is loaded (see **Editor phase machine**).
+A persistent panel in the **editor** showing all 13 **adjustment layer** types as cards (docs/adr/0016). Always visible — no distinction between "pinned" and "overflow" tools. Each card carries the layer's icon + label and an always-visible two-line description — what the layer does and when to reach for it — written in plain language from the shader body's actual behavior (never generic photo-editing semantics: **Chromatic aberration** here is a film effect, not a correction). A muted ×N badge marks tools already in the **edit chain**. The LUT card leads the picker and doubles as the **LUT library** load status: "Loading LUTs…" while the catalog is in flight, "LUTs unavailable" (the error message as the card's `title`) on failure. Selecting a tool from the panel creates a **draft layer**; the LUT tool stays disabled until the **LUT library** catalog has loaded. The whole panel is disabled until an image is loaded (see **Editor phase machine**).
 _Avoid_: "toolbar" (too generic), "tool palette" (desktop jargon)
 
 **Draft layer**:
@@ -211,22 +211,23 @@ The persisted format / quality / scale choice shown in the **export dialog**. `q
 
 ### Adjustments
 
-The v1 palette — twelve **adjustment layer** types the user can add to the **edit chain**. Order is significant: the picker leads with the signature **LUT** layer, then the adjustment primitives (a deliberate deviation from the mobile reference ordering).
+The v1 palette — thirteen **adjustment layer** types the user can add to the **edit chain**. Order is significant: the picker leads with the signature **LUT** layer, then the adjustment primitives (a deliberate deviation from the mobile reference ordering).
 
-Most layers expose a single parameter with one ruler slider. Two layers — **White balance** and **Vignette** — have **toggled parameters**: two parameters sharing one layer, one visible at a time. **Color Mixer** has 24 parameters (8 ranges × 3 channels) behind a swatch row: pick a range, drag its three sliders.
+Most layers expose a single parameter with one ruler slider. Two layers — **White balance** and **Vignette** — have **toggled parameters**: two parameters sharing one layer, one visible at a time. **Color Mixer** has 24 parameters (8 ranges × 3 channels) behind a swatch row: pick a range, drag its three sliders. **Tone Curve** has 10 point coordinates behind the curve widget: drag the handles.
 
 1. **LUT** — applies a film-emulation color cube from the **LUT library** at 0 to 1 strength (default 1 = full apply, 0 = no-op). The cube is applied to sRGB-encoded values — the film LUTs are authored in sRGB space — so the layer round-trips through sRGB at its chain boundaries.
 2. **Exposure** — stops (-3 to +3, default 0). Multiplicative gain.
 3. **Contrast** — S-curve amount (-1 to +1, default 0). Anchored at mid-gray.
 4. **Shadows** — lifts dark tones (-1 to +1, default 0 = no-op).
 5. **Highlights** — lifts bright tones (-1 to +1, default 0 = no-op).
-6. **White balance** — toggled: temperature (-1 to +1, default 0, cool → warm) ↔ tint (-1 to +1, default 0). Approximated with direct linear-light channel scaling (R/B ±30%, G ±20% at full slider), not a CCT-based model.
-7. **Saturation** — multiplier (-1 to +1, default 0 = no-op).
-8. **Color Mixer** — Lightroom-style per-range HSL (docs/adr/0027): 24 normalized fields (8 ranges — red, orange, yellow, green, aqua, blue, purple, magenta — × hue/saturation/luminance, all -1 to +1, default 0). The drawer shows a swatch row + the active range's three sliders; hue rotates ±90° at full deflection, saturation is multiplicative (full left desaturates), luminance is asymmetric (compresses toward black / lifts toward white). GIMP's HSLA-in-sRGB math with partition-of-unity range weights (10° crossfade bands at midpoint boundaries); achromatic pixels are untouched.
-9. **Grain** — three Snapseed-style knobs, all 0–1 default 0 (no-op): **texture** (strength), **size** (base noise cell, log 1.5→10 px), **blur** (softness). 3-octave FBM value noise over an integer lattice hash, animated per frame. Amplitude ±0.15 linear at full texture, midtone-weighted.
-10. **Vignette** — toggled: amount (-1 to +1, default 0 = no-op) ↔ size (0.2 to 1, default 0.6).
-11. **Chromatic aberration** — radial R/B channel split (-1 to +1, default 0 = no-op).
-12. **Clarity** — midtone local contrast / structure enhancement (-1 to +1, default 0 = no-op).
+6. **Tone Curve** — a draggable piecewise-linear curve over the whole tonal range (docs/adr/0028): 5 fixed control points (black and white anchors plus three interior), each with x (input tone) and y (output tone) in [0, 1], default identity (the diagonal). The drawer shows the curve widget — grid, dashed identity diagonal, accent curve polyline, one handle per point — instead of sliders; dragging a handle updates the point live, the reset button (visible only while non-neutral) restores the diagonal. The curve applies per channel in sRGB space (the widget's coordinates are display values); the shader evaluates the same polyline the widget draws (WYSIWYG), flat beyond the anchors.
+7. **White balance** — toggled: temperature (-1 to +1, default 0, cool → warm) ↔ tint (-1 to +1, default 0). Approximated with direct linear-light channel scaling (R/B ±30%, G ±20% at full slider), not a CCT-based model.
+8. **Saturation** — multiplier (-1 to +1, default 0 = no-op).
+9. **Color Mixer** — Lightroom-style per-range HSL (docs/adr/0027): 24 normalized fields (8 ranges — red, orange, yellow, green, aqua, blue, purple, magenta — × hue/saturation/luminance, all -1 to +1, default 0). The drawer shows a swatch row + the active range's three sliders; hue rotates ±90° at full deflection, saturation is multiplicative (full left desaturates), luminance is asymmetric (compresses toward black / lifts toward white). GIMP's HSLA-in-sRGB math with partition-of-unity range weights (10° crossfade bands at midpoint boundaries); achromatic pixels are untouched.
+10. **Grain** — three Snapseed-style knobs, all 0–1 default 0 (no-op): **texture** (strength), **size** (base noise cell, log 1.5→10 px), **blur** (softness). 3-octave FBM value noise over an integer lattice hash, animated per frame. Amplitude ±0.15 linear at full texture, midtone-weighted.
+11. **Vignette** — toggled: amount (-1 to +1, default 0 = no-op) ↔ size (0.2 to 1, default 0.6).
+12. **Chromatic aberration** — radial R/B channel split (-1 to +1, default 0 = no-op).
+13. **Clarity** — midtone local contrast / structure enhancement (-1 to +1, default 0 = no-op).
 
 ### Screens
 

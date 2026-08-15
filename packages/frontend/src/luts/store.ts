@@ -98,7 +98,9 @@ export const LutStoreLive = Layer.effect(
     const catalogRef = yield* Ref.make<
       Option.Option<Effect.Effect<ReadonlyArray<LutCatalogEntry>, LutLoadError>>
     >(Option.none())
-    const cubeCacheRef = yield* Ref.make(new Map<LutId, Effect.Effect<LutCube, LutLoadError | LutParseError>>())
+    const cubeCacheRef = yield* Ref.make(
+      new Map<LutId, Effect.Effect<LutCube, LutLoadError | LutParseError>>(),
+    )
 
     return LutStore.of({
       getCatalog: () =>

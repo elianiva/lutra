@@ -11,7 +11,7 @@
  * exactly `size³` data points.
  */
 
-import { Schema } from "effect"
+import { Schema } from 'effect'
 
 /** A parsed 3D color cube. `data` holds `size³ × 3` floats in the file's
  * point order — for the vendored G'MIC cubes that is index
@@ -26,12 +26,9 @@ export interface LutCube {
   readonly data: Float32Array
 }
 
-export class LutParseError extends Schema.TaggedErrorClass<LutParseError>()(
-  "LutParseError",
-  {
-    message: Schema.String,
-  },
-) {}
+export class LutParseError extends Schema.TaggedErrorClass<LutParseError>()('LutParseError', {
+  message: Schema.String,
+}) {}
 
 const SIZE_RE = /^LUT_3D_SIZE\s+(\d+)/
 
@@ -48,7 +45,7 @@ export function parseCube(text: string): LutCube {
   const lines = text.split(/\r?\n/)
   for (const raw of lines) {
     const line = raw.trim()
-    if (line === "" || line.startsWith("#")) continue
+    if (line === '' || line.startsWith('#')) continue
 
     const sizeMatch = SIZE_RE.exec(line)
     if (sizeMatch) {
@@ -59,7 +56,7 @@ export function parseCube(text: string): LutCube {
       continue
     }
 
-    if (line.startsWith("TITLE") || line.startsWith("DOMAIN")) continue
+    if (line.startsWith('TITLE') || line.startsWith('DOMAIN')) continue
 
     // Data line: at least three floats (extra columns are tolerated and
     // ignored, e.g. an alpha column in some exporters' output).
@@ -70,7 +67,7 @@ export function parseCube(text: string): LutCube {
     values.push(parts[0]!, parts[1]!, parts[2]!)
   }
 
-  if (size === 0) throw new LutParseError({ message: "Missing LUT_3D_SIZE header" })
+  if (size === 0) throw new LutParseError({ message: 'Missing LUT_3D_SIZE header' })
   const expected = size * size * size
   if (values.length !== expected * 3) {
     throw new LutParseError({

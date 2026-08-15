@@ -52,7 +52,8 @@ export const lutBar = (h: HtmlBuilder<EditorMessage>, model: Model) =>
         current,
         Option.flatMap((lutId) => lookup(catalog, lutId)),
       )
-      const nameLine = model.offlineLutNotice ??
+      const nameLine =
+        model.offlineLutNotice ??
         pipe(
           hovered,
           Option.orElse(() => currentEntry),

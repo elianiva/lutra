@@ -1,9 +1,9 @@
-import { Schema } from "effect"
+import { Schema } from 'effect'
 
 // ---- export formats ----
 
 /** The file formats the export dialog offers, in display order. */
-export const EXPORT_FORMATS = ["png", "jpeg", "webp", "avif"] as const
+export const EXPORT_FORMATS = ['png', 'jpeg', 'webp', 'avif'] as const
 
 export const ExportFormat = Schema.Literals(EXPORT_FORMATS)
 export type ExportFormat = typeof ExportFormat.Type
@@ -36,20 +36,20 @@ export const ExportSettings = Schema.Struct({
 export type ExportSettings = typeof ExportSettings.Type
 
 export const defaultExportSettings = (): ExportSettings => ({
-  format: "png",
+  format: 'png',
   quality: null,
   scale: 1,
 })
 
-export const isLossy = (format: ExportFormat): boolean => format !== "png"
+export const isLossy = (format: ExportFormat): boolean => format !== 'png'
 
 export const fileExtension = (format: ExportFormat): string => format
 
 export const mimeFor = (format: ExportFormat): string =>
-  format === "png"
-    ? "image/png"
-    : format === "jpeg"
-      ? "image/jpeg"
-      : format === "webp"
-        ? "image/webp"
-        : "image/avif"
+  format === 'png'
+    ? 'image/png'
+    : format === 'jpeg'
+      ? 'image/jpeg'
+      : format === 'webp'
+        ? 'image/webp'
+        : 'image/avif'

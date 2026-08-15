@@ -264,6 +264,26 @@ export const SelectedMixerColor = Message.m('SelectedMixerColor', {
   color: S.Number,
 })
 
+// ---- tone curve widget (docs/adr/0028) ----
+
+// The curve widget (editor/tone-curve.ts) emits pointer positions in unit
+// space (0..1, y up). The mount owns hit-testing and the drag session; the
+// engine's moveCurvePoint clamps and applies the move (x stays between the
+// point's neighbors, y in [0, 1]) to the toneCurve draft — through the
+// machine's Drafting edge — or to the focused chain toneCurve layer. The
+// widget only renders while a toneCurve draft or selection exists, so the
+// target is unambiguous.
+export const CurvePointDragged = Message.m('CurvePointDragged', {
+  // 0..CURVE_POINT_COUNT - 1; rounded and clamped in the engine.
+  index: S.Number,
+  x: S.Number,
+  y: S.Number,
+})
+// The widget's reset button: every point back to the identity curve
+// (docs/adr/0019's one-gesture reset convention applied to the whole
+// curve). Draft drags go through the machine, chain layers are plain data.
+export const CurveReset = Message.m('CurveReset')
+
 // ---- layer drawer reorder (drag) ----
 
 export const StartedLayerReorder = Message.m('StartedLayerReorder', { id: LayerIdSchema })
@@ -442,6 +462,8 @@ export const EditorMessage = S.Union([
   LutThumbsRevoked,
   CycledToggledField,
   SelectedMixerColor,
+  CurvePointDragged,
+  CurveReset,
   StartedLayerReorder,
   MovedLayerReorder,
   ChangedCompareMode,

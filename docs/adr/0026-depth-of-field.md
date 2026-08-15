@@ -57,37 +57,37 @@ sampled via the existing binding-5 sampler), a `usesDepth` flag on
 `ChainPass`, `RenderRequest` gaining a depth source, and a `needsDepth`
 `BodySource` flag.
 
-| | A. One-pass gather | B1. Layered blurs | B2. Mip pyramid |
-|---|---|---|---|
-| Engine surgery | None (new binding only) | Pass groups, multi-input, ring changes | + per-pass resolution, mip textures |
-| Passes per DOF layer | 1 | ~7 | K+1 |
-| Radius ceiling | ~16px (soft) | ~20px | Unbounded |
-| Quality | Disc structure/banding at cap; depth-edge fringing | Smooth gaussian | Best, but worst edge leakage (needs guard) |
-| Time to ship | Days | A week+ | A week+ |
+|                      | A. One-pass gather                                 | B1. Layered blurs                      | B2. Mip pyramid                            |
+| -------------------- | -------------------------------------------------- | -------------------------------------- | ------------------------------------------ |
+| Engine surgery       | None (new binding only)                            | Pass groups, multi-input, ring changes | + per-pass resolution, mip textures        |
+| Passes per DOF layer | 1                                                  | ~7                                     | K+1                                        |
+| Radius ceiling       | ~16px (soft)                                       | ~20px                                  | Unbounded                                  |
+| Quality              | Disc structure/banding at cap; depth-edge fringing | Smooth gaussian                        | Best, but worst edge leakage (needs guard) |
+| Time to ship         | Days                                               | A week+                                | A week+                                    |
 
 **Recommendation: A for v1** — fits the "intentionally limited" philosophy,
 needs no engine surgery, and depth-map quality (518px, upsampled) will be the
 visual bottleneck first. B1/B2 are the documented upgrade path. Cheap probe:
-prototype A with a *fake* depth map (radial gradient uploaded as the depth
+prototype A with a _fake_ depth map (radial gradient uploaded as the depth
 texture) and judge banding/fringing visually.
 
 ## Open questions (each with a recommendation)
 
 1. **Depth-map lifecycle** — compute on image load in a background Web
    Worker, cached per image/session; `amount = 0` covers the not-ready gap.
-   *Recommended: background precompute on load; never block the draft.*
+   _Recommended: background precompute on load; never block the draft._
 2. **Persistence** — depth maps are deterministic from the Edit's source
-   copy; do not store them (regenerate on open, ~1–2s local). *Recommended:
-   not persisted.*
+   copy; do not store them (regenerate on open, ~1–2s local). _Recommended:
+   not persisted._
 3. **Depth texture format** — upload as `rgba8unorm`, sample `.r` (256
-   levels is enough for focus selection). *Recommended.*
+   levels is enough for focus selection). _Recommended._
 4. **Model management** — CDN + browser cache vs vendoring ~50MB (the LUT
    library precedent is vendored, but 50MB is a different class).
-   *Recommended: CDN first; vendor only if offline-first demands it.*
+   _Recommended: CDN first; vendor only if offline-first demands it._
 5. **WASM fallback** — hard-require WebGPU (the app's floor already is).
-   *Recommended: hard WebGPU; WASM is ~10× slower.*
+   _Recommended: hard WebGPU; WASM is ~10× slower._
 6. **Focus-distance default** — middle of the visible depth range.
-   *Recommended; subject detection is a separate feature.*
+   _Recommended; subject detection is a separate feature._
 
 ## Consequences
 

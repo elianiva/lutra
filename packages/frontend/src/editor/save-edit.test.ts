@@ -1,7 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import { Option } from 'effect'
 import { Command } from 'foldkit'
-import { Command as SceneCommand, Mount, click, expect as sceneExpect, expectOutMessage, given, role, scene, text } from 'foldkit/scene'
+import {
+  Command as SceneCommand,
+  Mount,
+  click,
+  expect as sceneExpect,
+  expectOutMessage,
+  given,
+  role,
+  scene,
+  text,
+} from 'foldkit/scene'
 import { MockImageBitmap } from '../vitest-setup'
 import { RenderHandle } from '../gpu/backend'
 import { EditId, StoreError } from '@lutra/store'

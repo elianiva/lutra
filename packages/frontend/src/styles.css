@@ -17,10 +17,8 @@
   --color-muted: #a3a3a3;
   --color-accent: #cc0000;
 
-  --font-sans: 'Electrolize', ui-sans-serif, system-ui, -apple-system,
-    'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code',
-    monospace;
+  --font-sans: 'Electrolize', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
 }
 
 html,
