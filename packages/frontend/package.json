@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "portless run vite",
     "build": "bun ../../scripts/build-icons.ts && vite build && bun ../../scripts/build-sw.ts",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
@@ -30,8 +30,12 @@
     "@webgpu/types": "^0.1.60",
     "fast-check": "^4.9.0",
     "happy-dom": "^20.11.1",
+    "portless": "^0.15.5",
     "typescript": "^7.0.2",
     "vite": "^8.1.5",
     "vitest": "^4.1.10"
+  },
+  "portless": {
+    "name": "lutra"
   }
 }
