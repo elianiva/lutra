@@ -3,10 +3,10 @@ import { Idle, OfflinePhase } from './machine'
 import type { LutId } from '@lutra/engine'
 
 // The root's offline slice (CONTEXT.md "Offline library"): the fill
-// machine's state plus the counters the main menu's progress strip and the
+// machine's state plus the counters the main menu's progress card and the
 // "Offline ready" toast read. Owned by the root because it spans both
-// Submodels — the strip renders on the main menu, the per-LUT download
-// states reach the editor's LUT bar through the root's delegation.
+// Submodels — the card floats bottom-right on the main menu, the per-LUT
+// download states reach the editor's LUT bar through the root's delegation.
 
 // ---- per-LUT download states (the LUT bar's rows) ----
 
@@ -25,10 +25,10 @@ export const stateFor = (downloads: LutDownloads, lutId: LutId): LutDownloadStat
   downloads[lutId] ?? 'not-downloaded'
 
 // The root's offline slice (CONTEXT.md "Offline library"): the fill
-// machine's state plus the counters the main menu's progress strip and the
+// machine's state plus the counters the main menu's progress card and the
 // "Offline ready" toast read. Owned by the root because it spans both
-// Submodels — the strip renders on the main menu, the per-LUT download
-// states reach the editor's LUT bar through the root's delegation.
+// Submodels — the card floats bottom-right on the main menu, the per-LUT
+// download states reach the editor's LUT bar through the root's delegation.
 
 export const Offline = S.Struct({
   // The fill's lifecycle (./machine.ts): Idle | Filling | Paused | Ready |

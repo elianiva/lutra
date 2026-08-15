@@ -9,7 +9,7 @@ import type { LutId } from '@lutra/engine'
 // without a connection. Page-driven by design (docs/adr/0015): the fill
 // runs as a fiber in a service layer, publishing per-file events into a
 // PubSub; a root subscription bridges those events into the message loop
-// (per-LUT rows, the progress strip, the "Offline ready" toast all read the
+// (per-LUT rows, the progress card, the "Offline ready" toast all read the
 // same channel). The service worker never drives this — it only serves the
 // cache the fill writes.
 

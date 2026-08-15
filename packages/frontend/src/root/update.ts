@@ -182,7 +182,7 @@ export const update = (model: Model, message: RootMessage): UpdateReturn =>
       ],
       // Storage filled up: the machine shows QuotaError and the app retries
       // once — gated on a fresh persist() grant (a denied grant stops the
-      // loop; the strip's retry button is the manual path back in).
+      // loop; the card's retry button is the manual path back in).
       OfflineQuotaError: () => [
         evo(model, { offline: (o) => stepOffline(o, message) }),
         [StartOfflineFill({ requirePersist: true })],

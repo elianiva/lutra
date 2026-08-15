@@ -68,7 +68,7 @@ export const init = (url: Url.Url): InitReturn => {
       offline,
     },
     // The offline fill's boot auto-start (docs/adr/0015): unless the device
-    // asked for reduced data usage — then the strip's manual start button
+    // asked for reduced data usage — then the card's manual start button
     // is the only path in, and `start` stays idempotent for both. The
     // persist() request rides along ungated (a bonus, not a precondition).
     offline.saveData ? commands : [...commands, StartOfflineFill({ requirePersist: false })],

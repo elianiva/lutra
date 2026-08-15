@@ -18,7 +18,7 @@ import { OfflineReadyDismissed, StoragePersisted } from '../offline/messages'
  *
  * `requirePersist` gates the start on the persist() grant: the quota retry
  * sets it, so a denied grant stops the retry loop (the machine stays in
- * QuotaError until the user retries from the strip). The auto-start and the
+ * QuotaError until the user retries from the card). The auto-start and the
  * button don't gate — persist() is a bonus there, not a precondition.
  */
 export const StartOfflineFill = Command.define('StartOfflineFill', {

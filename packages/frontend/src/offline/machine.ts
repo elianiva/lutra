@@ -5,7 +5,7 @@ import { ts } from 'foldkit/schema'
 import { RootMessage } from '../root/message'
 
 // The offline library's fill state machine (CONTEXT.md "Offline fill"). One
-// state union owning the fill's lifecycle — the main menu's progress strip
+// state union owning the fill's lifecycle — the main menu's progress card
 // and the "Offline ready" toast read it. The machine is not a runtime:
 // `phase` lives in the root Model's offline slice, and root update steps it
 // with every landed message. Messages with no edge from the current state
