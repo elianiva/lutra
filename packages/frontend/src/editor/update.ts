@@ -228,8 +228,19 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       FilePickCancelled: () => [model, [], Option.none()],
 
       // ---- LUT library ----
-      CatalogLoaded: ({ catalog }) => [{ ...model, phase, catalog }, [], Option.none()],
-      CatalogFailed: () => [model, [], Option.none()],
+      // The load result drives the LUT card's status slot (plan 06): a
+      // failure records the error (the card shows "LUTs unavailable" with
+      // the message as its title); a success clears it.
+      CatalogLoaded: ({ catalog }) => [
+        { ...model, phase, catalog, catalogError: null },
+        [],
+        Option.none(),
+      ],
+      CatalogFailed: ({ error }) => [
+        { ...model, phase, catalogError: error },
+        [],
+        Option.none(),
+      ],
 
       // ---- offline library (the LUT bar's per-row states, docs/adr/0015) ----
       // Root-delegated facts; the editor machine has no edges for them, so

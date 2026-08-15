@@ -1,0 +1,220 @@
+import { describe, it } from 'vitest'
+import {
+  Command,
+  Mount,
+  click,
+  given,
+  inside,
+  role,
+  scene,
+  label,
+  testId,
+  text,
+  expect as sceneExpect,
+} from 'foldkit/scene'
+import { LutId } from '@lutra/engine'
+import { MockImageBitmap } from '../vitest-setup'
+import { RenderHandle } from '../gpu/backend'
+import { initialModel } from './model'
+import { update } from './update'
+import { view } from './view'
+import { Idle } from './phase'
+import { SelectedTool, ConfirmedDraft, RenderedFrame, HistogramComputed, ScaledCanvas, CanvasRegistered } from './message'
+import { PanZoom, RegisterCanvas } from './canvas-stage'
+import { RenderChain, ReadHistogram } from './command'
+import { LutLoadError } from '../luts/store'
+import type { Catalog } from './message'
+import type { Model } from './model'
+
+// ---- helpers ----
+
+const catalog: Catalog = [
+  {
+    name: 'Kodak 2393 Cuspclip',
+    lut_file: LutId('luts/print/kodak_2393_cuspclip.cube'),
+    category: 'Print',
+    thumbnail: 'thumbnails/print/kodak_2393_cuspclip.jpg',
+  },
+]
+
+/** A stub handle — the tests never execute GPU work, so only its type flows
+ *  through the model (same pattern as lut-flow.test.ts). */
+const stubHandle = () =>
+  // oxlint-disable-next-line consistent-type-assertions
+  new RenderHandle({} as GPUTexture, 200, 150, { buffer: {} as GPUBuffer, map: null })
+
+/** A model in the Idle phase with a loaded image and the catalog. */
+const loaded = () => ({
+  ...initialModel(),
+  phase: Idle(),
+  catalog,
+  source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
+})
+
+/** Settle the in-flight render the way RenderedFrame does, so the next
+ *  renderNow dispatches a fresh RenderChain (assertable in tests). */
+const settled = (model: Model): Model =>
+  update(model, RenderedFrame({ stamp: model.revision, handle: stubHandle() }))[0]
+
+/** An edit with two committed Exposure layers (the ×2 badge fixture). */
+const twoExposureLayers = () => {
+  const [a] = update(loaded(), SelectedTool({ type: 'exposure' }))
+  const [b] = update(a, ConfirmedDraft())
+  const [c] = update(b, SelectedTool({ type: 'exposure' }))
+  const [d] = update(c, ConfirmedDraft())
+  return d
+}
+
+/** A LUT draft (Drafting phase — no new picks allowed). */
+const lutDraft = () => settled(update(loaded(), SelectedTool({ type: 'lut' }))[0])
+
+// ---- view (scene) ----
+
+const sceneConfig = { update, view } as const
+
+const stageMounts = [
+  Mount.resolve(PanZoom, ScaledCanvas({ scale: 1, offsetX: 0, offsetY: 0 })),
+  Mount.resolve(RegisterCanvas, CanvasRegistered()),
+]
+
+const resolveRender = () => [
+  Command.resolve(RenderChain, RenderedFrame({ stamp: 999, handle: stubHandle() })),
+  Command.resolve(ReadHistogram, HistogramComputed({ bins: new Uint32Array(256), stamp: 999 })),
+]
+
+describe('tool panel cards', () => {
+  it('renders every tool as a card with its two copy lines', () => {
+    scene(
+      sceneConfig,
+      given(loaded()),
+      ...stageMounts,
+      // Every tool is a card (the LUT card leads the picker).
+      sceneExpect(role('button', { name: 'Add LUT adjustment' })).toExist(),
+      sceneExpect(role('button', { name: 'Add Exposure adjustment' })).toExist(),
+      sceneExpect(role('button', { name: 'Add Contrast adjustment' })).toExist(),
+      sceneExpect(role('button', { name: 'Add Shadows adjustment' })).toExist(),
+      sceneExpect(role('button', { name: 'Add Highlights adjustment' })).toExist(),
+      sceneExpect(role('button', { name: 'Add White Balance adjustment' })).toExist(),
+      sceneExpect(role('button', { name: 'Add Saturation adjustment' })).toExist(),
+      sceneExpect(role('button', { name: 'Add Grain adjustment' })).toExist(),
+      sceneExpect(role('button', { name: 'Add Vignette adjustment' })).toExist(),
+      sceneExpect(role('button', { name: 'Add Chromatic Aberration adjustment' })).toExist(),
+      sceneExpect(role('button', { name: 'Add Clarity adjustment' })).toExist(),
+      // The description block: what it does + when to use it.
+      sceneExpect(text('Brightens or darkens the whole photo.')).toExist(),
+      sceneExpect(text("Fix a photo that's too dark or too bright.")).toExist(),
+      sceneExpect(text('Deepens shadows and lifts highlights.')).toExist(),
+      sceneExpect(text('Make a flat photo punchier, or soften it.')).toExist(),
+      sceneExpect(text("Lightens or darkens the darkest areas.")).toExist(),
+      sceneExpect(text('Pull detail out of underexposed shadows.')).toExist(),
+      sceneExpect(text("Lightens or darkens the brightest areas.")).toExist(),
+      sceneExpect(text('Recover blown-out skies and bright spots.')).toExist(),
+      sceneExpect(text('Shifts the color cast: warm or cool, green or magenta.')).toExist(),
+      sceneExpect(text('Use it to fix an odd cast or set a mood.')).toExist(),
+      sceneExpect(text('Controls how vivid the colors are.')).toExist(),
+      sceneExpect(text('Make colors pop, or pull back for a faded look.')).toExist(),
+      sceneExpect(text('Adds animated film grain for an analog feel.')).toExist(),
+      sceneExpect(text('Give the photo texture, like classic film.')).toExist(),
+      sceneExpect(text("Darkens or brightens the photo's edges.")).toExist(),
+      sceneExpect(text('Focus the center, or add a vintage frame.')).toExist(),
+      sceneExpect(text('Splits red and blue at the edges, like an old lens.')).toExist(),
+      sceneExpect(text('Add a touch of analog imperfection.')).toExist(),
+      sceneExpect(text('Adds punch to textures and fine detail.')).toExist(),
+      sceneExpect(text('Make surfaces pop, or go softer and dreamy.')).toExist(),
+      // With the catalog loaded, the LUT card shows its copy and is enabled.
+      sceneExpect(text('Applies the look of a classic film stock.')).toExist(),
+      sceneExpect(text('Give your photo instant analog character.')).toExist(),
+      sceneExpect(role('button', { name: 'Add LUT adjustment' })).toBeEnabled(),
+      Command.expectNone(),
+    )
+  })
+
+  it('shows the in-edit badge only on cards for tools already in the chain', () => {
+    scene(
+      sceneConfig,
+      given(twoExposureLayers()),
+      ...stageMounts,
+      // Two committed Exposure layers: the card carries ×2…
+      inside(
+        role('button', { name: 'Add Exposure adjustment' }),
+        sceneExpect(testId('in-edit-badge')).toExist(),
+      ),
+      sceneExpect(text('×2')).toExist(),
+      // …tools not in the chain carry no badge.
+      inside(
+        role('button', { name: 'Add Contrast adjustment' }),
+        sceneExpect(testId('in-edit-badge')).toBeAbsent(),
+      ),
+      Command.expectNone(),
+    )
+  })
+
+  it('a single committed layer shows ×1', () => {
+    const [withDraft] = update(loaded(), SelectedTool({ type: 'vignette' }))
+    const [committed] = update(withDraft, ConfirmedDraft())
+    scene(
+      sceneConfig,
+      given(committed),
+      ...stageMounts,
+      inside(
+        role('button', { name: 'Add Vignette adjustment' }),
+        sceneExpect(testId('in-edit-badge')).toExist(),
+      ),
+      sceneExpect(text('×1')).toExist(),
+      Command.expectNone(),
+    )
+  })
+
+  it('the LUT card shows the loading caption while the catalog is in flight', () => {
+    scene(
+      sceneConfig,
+      given({ ...loaded(), catalog: null }),
+      ...stageMounts,
+      sceneExpect(text('Loading LUTs…')).toExist(),
+      sceneExpect(role('button', { name: 'Add LUT adjustment' })).toBeDisabled(),
+      Command.expectNone(),
+    )
+  })
+
+  it('the LUT card shows the failure caption with the error as its title', () => {
+    scene(
+      sceneConfig,
+      given({
+        ...loaded(),
+        catalog: null,
+        catalogError: new LutLoadError({ message: 'Failed to load luts/film_luts.json: HTTP 500' }),
+      }),
+      ...stageMounts,
+      sceneExpect(text('LUTs unavailable')).toExist(),
+      sceneExpect(role('button', { name: 'Add LUT adjustment' })).toHaveAttr(
+        'title',
+        'Failed to load luts/film_luts.json: HTTP 500',
+      ),
+      sceneExpect(role('button', { name: 'Add LUT adjustment' })).toBeDisabled(),
+      Command.expectNone(),
+    )
+  })
+
+  it('clicking a card starts the draft (the drawer shows the draft row)', () => {
+    scene(
+      sceneConfig,
+      given(loaded()),
+      ...stageMounts,
+      click(role('button', { name: 'Add Exposure adjustment' })),
+      ...resolveRender(),
+      sceneExpect(label('Exposure draft')).toExist(),
+      Command.expectNone(),
+    )
+  })
+
+  it('every card is disabled while a draft is active', () => {
+    scene(
+      sceneConfig,
+      given(lutDraft()),
+      ...stageMounts,
+      sceneExpect(role('button', { name: 'Add Exposure adjustment' })).toBeDisabled(),
+      sceneExpect(role('button', { name: 'Add LUT adjustment' })).toBeDisabled(),
+      Command.expectNone(),
+    )
+  })
+})

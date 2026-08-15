@@ -93,6 +93,14 @@ export interface LayerUi {
   readonly fields: Readonly<Record<string, FieldUi>>
   /** One-line summary of the layer's current values for the layer drawer. */
   readonly formatValue: (layer: Layer) => string
+  /**
+   * Plain-language "what it does" line for the tool panel card — written
+   * from the shader body's actual behavior, never generic photo-editing
+   * semantics (docs/plans/11).
+   */
+  readonly description: string
+  /** "When to use it" line for the tool panel card (docs/plans/11). */
+  readonly when: string
 }
 
 // Read a numeric field off a heterogeneous Layer without paying for a
@@ -119,6 +127,8 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
     toggled: false,
     fields: { stops: { label: 'EXPOSURE', format: formatEV } },
     formatValue: (l) => formatEV(num(l, FieldKey('stops'))),
+    description: 'Brightens or darkens the whole photo.',
+    when: "Fix a photo that's too dark or too bright.",
   },
   contrast: {
     label: 'Contrast',
@@ -126,6 +136,8 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
     toggled: false,
     fields: { amount: { label: 'CONTRAST', format: formatSigned } },
     formatValue: (l) => formatSigned(num(l, FieldKey('amount'))),
+    description: 'Deepens shadows and lifts highlights.',
+    when: 'Make a flat photo punchier, or soften it.',
   },
   shadows: {
     label: 'Shadows',
@@ -133,6 +145,8 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
     toggled: false,
     fields: { amount: { label: 'SHADOWS', format: formatSigned } },
     formatValue: (l) => formatSigned(num(l, FieldKey('amount'))),
+    description: "Lightens or darkens the darkest areas.",
+    when: 'Pull detail out of underexposed shadows.',
   },
   highlights: {
     label: 'Highlights',
@@ -140,6 +154,8 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
     toggled: false,
     fields: { amount: { label: 'HIGHLIGHTS', format: formatSigned } },
     formatValue: (l) => formatSigned(num(l, FieldKey('amount'))),
+    description: "Lightens or darkens the brightest areas.",
+    when: 'Recover blown-out skies and bright spots.',
   },
   whiteBalance: {
     label: 'White Balance',
@@ -150,6 +166,8 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
       tint: { label: 'TINT', format: formatSigned },
     },
     formatValue: (l) => `${wbK(num(l, FieldKey('temp')))} K · ${formatSigned(num(l, FieldKey('tint')))}`,
+    description: 'Shifts the color cast: warm or cool, green or magenta.',
+    when: 'Use it to fix an odd cast or set a mood.',
   },
   saturation: {
     label: 'Saturation',
@@ -157,6 +175,8 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
     toggled: false,
     fields: { amount: { label: 'SATURATION', format: formatSigned } },
     formatValue: (l) => formatSigned(num(l, FieldKey('amount'))),
+    description: 'Controls how vivid the colors are.',
+    when: 'Make colors pop, or pull back for a faded look.',
   },
   grain: {
     label: 'Grain',
@@ -169,6 +189,8 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
     },
     formatValue: (l) =>
       `T ${formatPercent(num(l, FieldKey('texture')))} · S ${formatPercent(num(l, FieldKey('size')))} · B ${formatPercent(num(l, FieldKey('blur')))}`,
+    description: 'Adds animated film grain for an analog feel.',
+    when: 'Give the photo texture, like classic film.',
   },
   vignette: {
     label: 'Vignette',
@@ -179,6 +201,8 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
       size: { label: 'SIZE', format: formatPercent },
     },
     formatValue: (l) => `A ${formatSigned(num(l, FieldKey('amount')))} · ${formatPercent(num(l, FieldKey('size')))}`,
+    description: "Darkens or brightens the photo's edges.",
+    when: 'Focus the center, or add a vintage frame.',
   },
   chromaticAberration: {
     label: 'Chromatic Aberration',
@@ -186,6 +210,8 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
     toggled: false,
     fields: { amount: { label: 'CHROMATIC ABERRATION', format: formatSigned } },
     formatValue: (l) => formatSigned(num(l, FieldKey('amount'))),
+    description: "Splits red and blue at the edges, like an old lens.",
+    when: 'Add a touch of analog imperfection.',
   },
   clarity: {
     label: 'Clarity',
@@ -193,6 +219,8 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
     toggled: false,
     fields: { amount: { label: 'CLARITY', format: formatSigned } },
     formatValue: (l) => formatSigned(num(l, FieldKey('amount'))),
+    description: 'Adds punch to textures and fine detail.',
+    when: 'Make surfaces pop, or go softer and dreamy.',
   },
   lut: {
     label: 'LUT',
@@ -202,6 +230,8 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
     // The drawer renders the picker + "Name · %" summary for LUT layers;
     // the catalog lookup lives there (the model holds the catalog).
     formatValue: (l) => formatPercent(num(l, FieldKey('amount'))),
+    description: 'Applies the look of a classic film stock.',
+    when: 'Give your photo instant analog character.',
   },
 }
 
@@ -219,6 +249,11 @@ export const lutName = (
 }
 
 export const LAYER_TYPES_ORDER: ReadonlyArray<LayerType> = [
+  // The app's signature feature leads the picker (docs/plans/11 D5): the
+  // novice's most likely intent is "make my photo look like film", and the
+  // LUT library is the fast path to it. Deliberate deviation from the
+  // mobile reference ordering.
+  'lut',
   'exposure',
   'contrast',
   'shadows',
@@ -229,5 +264,4 @@ export const LAYER_TYPES_ORDER: ReadonlyArray<LayerType> = [
   'vignette',
   'chromaticAberration',
   'clarity',
-  'lut',
 ]

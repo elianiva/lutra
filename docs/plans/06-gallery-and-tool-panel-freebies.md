@@ -1,7 +1,10 @@
 # Gallery + tool panel freebies
 
 Status: **decided** — both items resolved (inline two-step confirm; tracked
-failure + caption). Ready to implement.
+failure + caption). Ready to implement. Note: §2 (LUT tool caption) landed
+as part of [11-tool-panel-cards.md](./11-tool-panel-cards.md) (docs/adr/0016) —
+the caption became the LUT card's status slot. §1 (gallery delete confirm)
+is still pending.
 
 ## 1. Gallery delete confirmation
 

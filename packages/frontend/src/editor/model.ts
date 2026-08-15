@@ -12,6 +12,7 @@ import {
 import { EditIdSchema } from '@lutra/store'
 import { EditorPhase, editorMachine } from './phase'
 import { DownloadState } from '../offline/model'
+import { LutLoadError } from '../luts/store'
 
 // The editor's interaction mode is a foldkit Machine (./phase.ts): the
 // `phase` field is its state. The image lifecycle (Empty/Loading/Error), the
@@ -64,6 +65,10 @@ export const Model = Schema.Struct({
   // The LUT library catalog; null until the startup fetch lands (the LUT
   // tool stays disabled while null).
   catalog: Schema.NullOr(Catalog),
+  // Why the catalog is missing, when it is (plan 06): null while the
+  // startup fetch is still in flight or after a successful load — the LUT
+  // card shows "Loading LUTs…" / "LUTs unavailable" from this pair.
+  catalogError: Schema.NullOr(LutLoadError),
   // The attached Edit's identity + stored source bytes (null while no image
   // is loaded — see AttachedEdit above).
   attachedEdit: AttachedEdit,
@@ -163,6 +168,7 @@ export const initialModel = (): Model => ({
   offsetX: 0,
   offsetY: 0,
   catalog: null,
+  catalogError: null,
   attachedEdit: null,
   saveStatus: { _tag: 'idle' },
   lutBarOpen: false,

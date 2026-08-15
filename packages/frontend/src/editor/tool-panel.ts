@@ -7,10 +7,18 @@ import type { Model } from './model'
 import type { EditorPhase } from './phase'
 import type { LayerType } from '@lutra/engine'
 
+/**
+ * The left "Adjustments" panel: one card per tool (docs/plans/11). A card
+ * is icon + title on one line, an always-visible two-line description
+ * ("what it does" / "when to use it") below, and a muted ×N badge when the
+ * tool is already in the chain. The LUT card's description slot doubles as
+ * the catalog status slot (loading / failed) while the library isn't
+ * available — plan 06's caption absorbed into the card.
+ */
 export const toolPanel = (h: HtmlBuilder<EditorMessage>, model: Model) =>
   h.aside(
     [
-      h.Class('flex w-60 shrink-0 flex-col border-r border-border bg-panel'),
+      h.Class('flex w-72 shrink-0 flex-col border-r border-border bg-panel'),
       h.AriaLabel('Adjustment tools'),
     ],
     [
@@ -22,10 +30,12 @@ export const toolPanel = (h: HtmlBuilder<EditorMessage>, model: Model) =>
         ],
         ['Adjustments'],
       ),
+      // The card list scrolls under the pinned header, like the LUT bar's
+      // tab column — 11 cards outgrow short viewports.
       h.nav(
-        [h.Class('flex flex-col')],
+        [h.Class('flex min-h-0 flex-1 flex-col overflow-y-auto')],
         LAYER_TYPES_ORDER.map((type) =>
-          toolRow(h, type, canPickTool(model.phase), model.catalog !== null),
+          toolCard(h, model, type, canPickTool(model.phase), model.catalog !== null),
         ),
       ),
     ],
@@ -37,8 +47,14 @@ export const toolPanel = (h: HtmlBuilder<EditorMessage>, model: Model) =>
 const canPickTool = (phase: EditorPhase) =>
   phase._tag === 'Idle' || phase._tag === 'Selected'
 
-const toolRow = (
+/** How many committed chain layers of this type are in the edit — the
+ *  card's "in your edit" badge (docs/plans/11 D4). */
+export const chainCount = (model: Model, type: LayerType): number =>
+  model.chain.filter((layer) => layer.type === type).length
+
+const toolCard = (
   h: HtmlBuilder<EditorMessage>,
+  model: Model,
   type: LayerType,
   editable: boolean,
   lutEnabled: boolean,
@@ -46,15 +62,59 @@ const toolRow = (
   const ui = LAYER_UI[type]
   // The LUT tool needs the catalog: a draft must reference a real lutId.
   const disabled = !editable || (type === 'lut' && !lutEnabled)
+  const count = chainCount(model, type)
+  // While the catalog is loading or failed (plan 06), the LUT card's
+  // description slot shows the status instead of the copy — the tool is
+  // disabled anyway, and the failure keeps its `title` error message.
+  const catalogStatus =
+    type === 'lut' && model.catalog === null
+      ? model.catalogError === null
+        ? 'Loading LUTs…'
+        : 'LUTs unavailable'
+      : null
   return h.button(
     [
       h.OnClick(SelectedTool({ type })),
       h.Disabled(disabled),
+      ...(catalogStatus !== null && model.catalogError !== null
+        ? [h.Title(model.catalogError.message)]
+        : []),
       h.AriaLabel(`Add ${ui.label} adjustment`),
       h.Class(
-        'flex items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors hover:bg-panel-alt disabled:cursor-not-allowed disabled:opacity-40',
+        'flex flex-col gap-1.5 border-b border-border px-4 py-3 text-left transition-colors hover:bg-panel-alt disabled:cursor-not-allowed disabled:opacity-40',
       ),
     ],
-    [icon(h, ui.icon, ui.label), h.span([h.Class('text-sm')], [ui.label])],
+    [
+      h.div(
+        [h.Class('flex items-center gap-3')],
+        [
+          icon(h, ui.icon, ui.label),
+          h.span([h.Class('text-sm font-medium')], [ui.label]),
+          // "Already in your edit": a muted ×N pill, right-aligned on the
+          // title line. Only when the tool is in the chain — a first-time
+          // user sees nothing (docs/plans/11 D4).
+          ...(count > 0
+            ? [
+                h.span(
+                  [
+                    h.AriaLabel(`In your edit: ${count}`),
+                    h.Attribute('data-testid', 'in-edit-badge'),
+                    h.Class(
+                      'ml-auto shrink-0 rounded-sm border border-border px-1.5 py-0.5 text-[10px] leading-none text-muted',
+                    ),
+                  ],
+                  [`×${count}`],
+                ),
+              ]
+            : []),
+        ],
+      ),
+      h.div(
+        [h.Class('text-xs leading-4 text-muted')],
+        catalogStatus !== null
+          ? [catalogStatus]
+          : [h.span([h.Class('block')], [ui.description]), h.span([h.Class('block')], [ui.when])],
+      ),
+    ],
   )
 }

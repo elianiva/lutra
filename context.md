@@ -157,7 +157,7 @@ The sensor mosaic patterns in RAW files. X-Trans (Fuji RAF) needs dedicated demo
 ### Editor UI
 
 **Tool panel**:
-A persistent panel in the **editor** showing all 11 **adjustment layer** types. Always visible — no distinction between "pinned" and "overflow" tools. Selecting a tool from the panel creates a **draft layer**; the LUT tool stays disabled until the **LUT library** catalog has loaded. The whole panel is disabled until an image is loaded (see **Editor phase machine**).
+A persistent panel in the **editor** showing all 11 **adjustment layer** types as cards (docs/adr/0016). Always visible — no distinction between "pinned" and "overflow" tools. Each card carries the layer's icon + label and an always-visible two-line description — what the layer does and when to reach for it — written in plain language from the shader body's actual behavior (never generic photo-editing semantics: **Chromatic aberration** here is a film effect, not a correction). A muted ×N badge marks tools already in the **edit chain**. The LUT card leads the picker and doubles as the **LUT library** load status: "Loading LUTs…" while the catalog is in flight, "LUTs unavailable" (the error message as the card's `title`) on failure. Selecting a tool from the panel creates a **draft layer**; the LUT tool stays disabled until the **LUT library** catalog has loaded. The whole panel is disabled until an image is loaded (see **Editor phase machine**).
 _Avoid_: "toolbar" (too generic), "tool palette" (desktop jargon)
 
 **Draft layer**:
@@ -211,26 +211,26 @@ The persisted format / quality / scale choice shown in the **export dialog**. `q
 
 ### Adjustments
 
-The v1 palette — eleven **adjustment layer** types the user can add to the **edit chain**. Order is significant.
+The v1 palette — eleven **adjustment layer** types the user can add to the **edit chain**. Order is significant: the picker leads with the signature **LUT** layer, then the adjustment primitives (a deliberate deviation from the mobile reference ordering).
 
 Most layers expose a single parameter with one ruler slider. Two layers — **White balance** and **Vignette** — have **toggled parameters**: two parameters sharing one layer, one visible at a time.
 
-1. **Exposure** — stops (-3 to +3, default 0). Multiplicative gain.
-2. **Contrast** — S-curve amount (-1 to +1, default 0). Anchored at mid-gray.
-3. **Shadows** — lifts dark tones (-1 to +1, default 0 = no-op).
-4. **Highlights** — lifts bright tones (-1 to +1, default 0 = no-op).
-5. **White balance** — toggled: temperature (-1 to +1, default 0, cool → warm) ↔ tint (-1 to +1, default 0). Approximated with direct linear-light channel scaling (R/B ±30%, G ±20% at full slider), not a CCT-based model.
-6. **Saturation** — multiplier (-1 to +1, default 0 = no-op).
-7. **Grain** — three Snapseed-style knobs, all 0–1 default 0 (no-op): **texture** (strength), **size** (base noise cell, log 1.5→10 px), **blur** (softness). 3-octave FBM value noise over an integer lattice hash, animated per frame. Amplitude ±0.15 linear at full texture, midtone-weighted.
-8. **Vignette** — toggled: amount (-1 to +1, default 0 = no-op) ↔ size (0.2 to 1, default 0.6).
-9. **Chromatic aberration** — radial R/B channel split (-1 to +1, default 0 = no-op).
-10. **Clarity** — midtone local contrast / structure enhancement (-1 to +1, default 0 = no-op).
-11. **LUT** — applies a film-emulation color cube from the **LUT library** at 0 to 1 strength (default 1 = full apply, 0 = no-op). The cube is applied to sRGB-encoded values — the film LUTs are authored in sRGB space — so the layer round-trips through sRGB at its chain boundaries.
+1. **LUT** — applies a film-emulation color cube from the **LUT library** at 0 to 1 strength (default 1 = full apply, 0 = no-op). The cube is applied to sRGB-encoded values — the film LUTs are authored in sRGB space — so the layer round-trips through sRGB at its chain boundaries.
+2. **Exposure** — stops (-3 to +3, default 0). Multiplicative gain.
+3. **Contrast** — S-curve amount (-1 to +1, default 0). Anchored at mid-gray.
+4. **Shadows** — lifts dark tones (-1 to +1, default 0 = no-op).
+5. **Highlights** — lifts bright tones (-1 to +1, default 0 = no-op).
+6. **White balance** — toggled: temperature (-1 to +1, default 0, cool → warm) ↔ tint (-1 to +1, default 0). Approximated with direct linear-light channel scaling (R/B ±30%, G ±20% at full slider), not a CCT-based model.
+7. **Saturation** — multiplier (-1 to +1, default 0 = no-op).
+8. **Grain** — three Snapseed-style knobs, all 0–1 default 0 (no-op): **texture** (strength), **size** (base noise cell, log 1.5→10 px), **blur** (softness). 3-octave FBM value noise over an integer lattice hash, animated per frame. Amplitude ±0.15 linear at full texture, midtone-weighted.
+9. **Vignette** — toggled: amount (-1 to +1, default 0 = no-op) ↔ size (0.2 to 1, default 0.6).
+10. **Chromatic aberration** — radial R/B channel split (-1 to +1, default 0 = no-op).
+11. **Clarity** — midtone local contrast / structure enhancement (-1 to +1, default 0 = no-op).
 
 ### Screens
 
 **Editor**:
-The screen at `/editor` (current root behaviour). Three-column Lightroom-style layout: left sidebar (**tool panel**, ~240px), center (**canvas** with pannable/zoomable image), right sidebar (**layer drawer**, ~280px). Top bar: app wordmark (**LUTRA**) left-aligned; right-aligned are the **Save** / **Save as** controls, the export button, and the start-over button. The **LUT bar** sits below the three columns as a full-width bottom strip while open (the canvas shrinks; the stage re-fits only while untouched).
+The screen at `/editor` (current root behaviour). Three-column Lightroom-style layout: left sidebar (**tool panel**, ~288px), center (**canvas** with pannable/zoomable image), right sidebar (**layer drawer**, ~280px). Top bar: app wordmark (**LUTRA**) left-aligned; right-aligned are the **Save** / **Save as** controls, the export button, and the start-over button. The **LUT bar** sits below the three columns as a full-width bottom strip while open (the canvas shrinks; the stage re-fits only while untouched).
 _Avoid_: "color grading menu", "workspace"
 
 **Main menu**:

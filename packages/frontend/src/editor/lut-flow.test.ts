@@ -45,9 +45,12 @@ import {
   HistogramComputed,
   ScaledCanvas,
   CanvasRegistered,
+  CatalogLoaded,
+  CatalogFailed,
 } from './message'
 import { PanZoom, RegisterCanvas } from './canvas-stage'
 import { GenerateLutThumb, RenderChain, ReadHistogram, SaveLutRecents } from './command'
+import { LutLoadError } from '../luts/store'
 import type { Catalog } from './message'
 import type { Model } from './model'
 
@@ -488,6 +491,32 @@ describe('persistence-during-preview dismissal', () => {
     const [next, nextCommands] = update(model, ExportRequested())
     expect(next.exportDialog.isOpen).toBe(true)
     expect(nextCommands.some((c) => c.name === 'SnapshotForExport')).toBe(true)
+  })
+})
+
+describe('catalog load state (LUT card status slot)', () => {
+  it('CatalogFailed records the error for the LUT card caption', () => {
+    // A catalog-less model: the startup fetch is still in flight (or the
+    // LUT library is broken) — the tool panel shows the status caption.
+    const [model] = update(
+      { ...initialModel(), phase: Idle() },
+      CatalogFailed({ error: new LutLoadError({ message: 'Failed to load luts/film_luts.json: HTTP 500' }) }),
+    )
+    expect(model.catalogError?.message).toBe('Failed to load luts/film_luts.json: HTTP 500')
+    // The catalog itself stays missing — the LUT tool remains inert.
+    expect(model.catalog).toBeNull()
+  })
+
+  it('CatalogLoaded clears a previous failure', () => {
+    const [failed] = update(
+      { ...initialModel(), phase: Idle() },
+      CatalogFailed({ error: new LutLoadError({ message: 'Failed to load luts/film_luts.json: HTTP 500' }) }),
+    )
+    const [model] = update(failed, CatalogLoaded({ catalog }))
+    expect(model.catalogError).toBeNull()
+    // The message boundary re-validates the payload — structural equality,
+    // not identity.
+    expect(model.catalog).toEqual(catalog)
   })
 })
 
