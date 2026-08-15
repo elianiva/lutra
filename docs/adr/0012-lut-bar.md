@@ -48,7 +48,7 @@ Auto-open on LUT draft creation; auto-close on confirm/cancel/select; chevron on
 
 ### D10 — Keyboard scrub is deliberately deferred
 
-Arrow-key strip scrubbing needs `OnKeyDownPreventDefault` with event-target gating (plan 02, unimplemented — a root-level ←/→ handler would fight the range sliders' native arrow behavior). When plan 02 lands, add: ←/→ move a "hover" index, Enter commits. The mouse path is complete without it.
+Arrow-key strip scrubbing needs `OnKeyDownPreventDefault` with event-target gating (docs/adr/0018, unimplemented — a root-level ←/→ handler would fight the range sliders' native arrow behavior). When 0018 lands, add: ←/→ move a "hover" index, Enter commits. The mouse path is complete without it.
 
 ## Layout
 

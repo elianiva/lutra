@@ -115,7 +115,7 @@ export const Model = Schema.Struct({
   compareMode: CompareMode,
   compareSplitAt: Schema.Number,
   compareToggleBefore: Schema.Boolean,
-  // Which bottom sheet is open on mobile (docs/plans/12): under the `lg`
+  // Which bottom sheet is open on mobile (docs/adr/0024-mobile-ui): under the `lg`
   // breakpoint the tool panel and the layer drawer collapse into full-width
   // bottom sheets toggled by the mobile tab bar — this field tracks which
   // one is open (null = neither, the canvas gets the full screen). Inert on

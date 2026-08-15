@@ -91,7 +91,7 @@ export const lutBar = (h: HtmlBuilder<EditorMessage>, model: Model) =>
       // strip). The tab list and the filmstrip scroll independently inside
       // it, so the bar's height never follows the row count (Instant Pro
       // alone is 7 rows at 1280px). On phones the bar stacks instead
-      // (docs/plans/12): tabs become a horizontal row on top, the filmstrip
+      // (docs/adr/0024-mobile-ui): tabs become a horizontal row on top, the filmstrip
       // below — the two-column layout would leave a ~150px strip on a
       // 360px screen. Taller, capped to 40dvh so a landscape phone keeps
       // some canvas.

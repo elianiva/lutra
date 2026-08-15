@@ -1,6 +1,6 @@
 # Informative tool panel cards
 
-The left **Adjustments** panel shows each adjustment as an **always-visible card**: icon + label on one line, a plain-language two-line description ("what it does" / "when to use it") below, and a muted ×N badge when the tool is already in the edit chain. The panel widens 240px → 288px, the LUT card leads the picker, and its description slot doubles as the LUT library load status (docs/plans/06's caption, absorbed).
+The left **Adjustments** panel shows each adjustment as an **always-visible card**: icon + label on one line, a plain-language two-line description ("what it does" / "when to use it") below, and a muted ×N badge when the tool is already in the edit chain. The panel widens 240px → 288px, the LUT card leads the picker, and its description slot doubles as the LUT library load status (the caption from the gallery/tool-panel freebie, absorbed; its other half — gallery delete confirm — is docs/adr/0022).
 
 ## Why
 
@@ -14,7 +14,7 @@ The cards' job is *understand before you add*. The right **layer drawer** stays 
 
 ### D2 — Copy is hand-authored from the shader bodies, not borrowed
 
-Each card carries two short lines: what the tool does (physical) and when to use it (intent). The copy was written from `engine/src/shaders/bodies/` because several tools' purpose in this app is the opposite of generic photo-editing semantics: Chromatic Aberration is an *aesthetic* film effect (radial R-out/B-in split, zero at center, strongest at corners), not a lens correction; White Balance is a creative cast shift; Grain is added texture, not noise removal. Voice: warm, film-enthusiast, zero jargon, never "filter"/"preset". The copy lives in the frontend's `LAYER_UI` metadata (presentation — same convention as icons and formatters); the engine is untouched. The exact lines are in docs/plans/11 and locked by scene tests.
+Each card carries two short lines: what the tool does (physical) and when to use it (intent). The copy was written from `engine/src/shaders/bodies/` because several tools' purpose in this app is the opposite of generic photo-editing semantics: Chromatic Aberration is an *aesthetic* film effect (radial R-out/B-in split, zero at center, strongest at corners), not a lens correction; White Balance is a creative cast shift; Grain is added texture, not noise removal. Voice: warm, film-enthusiast, zero jargon, never "filter"/"preset". The copy lives in the frontend's `LAYER_UI` metadata (presentation — same convention as icons and formatters); the engine is untouched. The exact lines live in the frontend's `LAYER_UI` and are locked by scene tests.
 
 ### D3 — Always-visible text, `w-72`, bordered rows
 

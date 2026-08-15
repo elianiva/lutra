@@ -31,7 +31,7 @@ const summary = (model: Model, layer: Layer, ui: (typeof LAYER_UI)[LayerType]) =
     : ui.formatValue(layer)
 
 /**
- * The right "Layers" sidebar (docs/plans/12): always visible as a side
+ * The right "Layers" sidebar (docs/adr/0024-mobile-ui): always visible as a side
  * column at `lg`+, and a full-width bottom sheet below `lg` — `open` is the
  * mobile sheet state (visible only while its tab is active).
  */

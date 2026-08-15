@@ -165,7 +165,7 @@ export const ScaledCanvas = Message.m('ScaledCanvas', {
   offsetY: S.Number,
 })
 
-// ---- mobile (bottom sheets + tab bar, docs/plans/12) ----
+// ---- mobile (bottom sheets + tab bar, docs/adr/0024-mobile-ui) ----
 
 // The two mobile bottom sheets: the tool panel ('tools') and the layer
 // drawer ('layers'). Under the `lg` breakpoint both panels collapse into

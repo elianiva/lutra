@@ -35,7 +35,7 @@ export const asHtmlElement = (element: Element): HTMLElement => {
  *  the cursor; drag pans. The stage resizes re-fit only while the user hasn't
  *  touched the view (zoomed or panned) since the last fit.
  *
- *  Touch (docs/plans/12): the stage is `touch-none`, so pointer drags pan
+ *  Touch (docs/adr/0024-mobile-ui): the stage is `touch-none`, so pointer drags pan
  *  without the browser hijacking the gesture; two fingers pinch-zoom about
  *  the midpoint, and a double-tap toggles between the fit and 2×.
  */
@@ -566,7 +566,7 @@ const histogramOverlay = (h: HtmlBuilder<EditorMessage>, bins: Uint32Array | nul
       ),
       // The SVG's viewBox scales with the box, so the same points render at
       // any size — the responsive box shrinks the overlay on phones
-      // (docs/plans/12), where 220px would collide with the Compare control.
+      // (docs/adr/0024-mobile-ui), where 220px would collide with the Compare control.
     ],
     [
       h.svg(
@@ -611,7 +611,7 @@ const loadedStage = (h: HtmlBuilder<EditorMessage>, model: Model) => {
       // below is anchored to the stage origin and pan/zoom offsets are plain
       // stage coordinates (no flex centering to compensate for).
       // touch-none: the browser must not hijack touch gestures into
-      // scroll/zoom — pointer pan and pinch own the stage (docs/plans/12).
+      // scroll/zoom — pointer pan and pinch own the stage (docs/adr/0024-mobile-ui).
       h.Class('absolute inset-0 touch-none'),
       h.OnMount(PanZoom({ imageWidth: contentWidth, imageHeight: src.height })),
     ],
@@ -663,7 +663,7 @@ const loadedStage = (h: HtmlBuilder<EditorMessage>, model: Model) => {
  *  rendered canvas with pan/zoom, and always the Compare control (dimmed
  *  without an image). Which stage shows is the phase machine's call
  *  (./phase.ts): Empty/Loading → upload zone, Error → error stage,
- *  order-1/min-h-0: in the mobile column layout (docs/plans/12) the stage
+ *  order-1/min-h-0: in the mobile column layout (docs/adr/0024-mobile-ui) the stage
  *  is the flex-1 child above the bottom sheets; `lg:` restores the side
  *  column order. */
 export const canvasStage = (h: HtmlBuilder<EditorMessage>, model: Model) => {

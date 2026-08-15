@@ -1,6 +1,6 @@
 # Raw support — research (everything we know before implementing)
 
-Status: **Resolved** — every question below was decided in the 2026-02-19 grilling session; the decisions are recorded in §8 and the architecture rationale is docs/adr/0014. Terms marked with a **bold term** landed in `context.md`'s Language section. No code written yet — the **implementation plan is `docs/plans/09-raw-support.md`** (decisions D1–D9, phases, shapes); this document is the research reference behind it.
+Status: **Resolved** — every question below was decided in the 2026-02-19 grilling session; the decisions are recorded in §8 and the architecture rationale is docs/adr/0014. Terms marked with a **bold term** landed in `context.md`'s Language section. No code written yet — docs/adr/0014 owns the architecture; this document is the research reference behind it.
 
 Scope: opening camera RAW files (CR2/CR3, NEF, ARW, RW2, ORF, PEF, SRW, RAF, DNG — including phone DNGs) in the web app, decoded **client-side, full resolution**, and graded through the existing WebGPU chain like any other source image. "Proper" means real demosaicing of the full-res sensor data with as-shot white balance and camera color matrix — not the embedded JPEG preview (which stays as a fast-path placeholder) and not the mobile app's platform transcode (which lands on the embedded thumbnail on Android).
 

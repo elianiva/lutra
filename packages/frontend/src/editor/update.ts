@@ -218,7 +218,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
   return Match.value(message).pipe(
     Match.withReturnType<UpdateReturn>(),
     Match.tagsExhaustive({
-      // ---- mobile bottom sheets (docs/plans/12) ----
+      // ---- mobile bottom sheets (docs/adr/0024-mobile-ui) ----
       // Toggle the tapped sheet: tapping the active tab closes it, tapping
       // the other switches. Desktop never reads this — the panels render
       // side-by-side there regardless (the sheet classes are `lg:`-scoped).
@@ -328,7 +328,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           saveStatus: { _tag: 'idle' },
           lutThumbs: {},
           // A new photo is a new context: close the mobile sheets so the
-          // canvas is the first thing on screen (docs/plans/12).
+          // canvas is the first thing on screen (docs/adr/0024-mobile-ui).
           mobileSheet: null,
         })
         return [
@@ -365,7 +365,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             // A cleared image has no LUT target — a stale hover preview must
             // not leak into a future render.
             previewLut: null,
-            // The mobile sheets close with the image (docs/plans/12).
+            // The mobile sheets close with the image (docs/adr/0024-mobile-ui).
             mobileSheet: null,
             attachedEdit: null,
             saveStatus: { _tag: 'idle' },
@@ -400,7 +400,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           // mode itself persists across images).
           compareSplitAt: 0.5,
           // And closes the mobile sheets — the canvas is the first thing
-          // on screen (docs/plans/12).
+          // on screen (docs/adr/0024-mobile-ui).
           mobileSheet: null,
           attachedEdit: { id, source },
           saveStatus: { _tag: 'idle' },
@@ -476,7 +476,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         if (!transitioned || phase._tag !== 'Drafting') return [model, [], Option.none()]
         const layer = phase.layer
         // A pick is an edit action: on mobile the sheet follows the draft
-        // to the layer drawer, where the sliders live (docs/plans/12).
+        // to the layer drawer, where the sliders live (docs/adr/0024-mobile-ui).
         let next: Model = { ...model, phase, previewLut: null, mobileSheet: 'layers' }
         if (type === 'lut') {
           const catalog = model.catalog
@@ -612,7 +612,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         // has no edge and is ignored.
         if (!transitioned) return [model, [], Option.none()]
         // Selecting a layer opens its sliders: on mobile the sheet follows
-        // to the layer drawer (docs/plans/12).
+        // to the layer drawer (docs/adr/0024-mobile-ui).
         return [
           { ...model, phase, lutBarOpen: false, previewLut: null, mobileSheet: 'layers' },
           [],

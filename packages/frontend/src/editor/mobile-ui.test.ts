@@ -69,7 +69,7 @@ const loaded = () => ({
 const settled = (model: Model): Model =>
   update(model, RenderedFrame({ stamp: model.revision, handle: stubHandle() }))[0]
 
-// ---- update flow (docs/plans/12) ----
+// ---- update flow (docs/adr/0024-mobile-ui) ----
 
 describe('mobile bottom sheets', () => {
   it('starts closed', () => {

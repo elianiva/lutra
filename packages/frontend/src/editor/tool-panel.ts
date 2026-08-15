@@ -8,14 +8,14 @@ import type { EditorPhase } from './phase'
 import type { LayerType } from '@lutra/engine'
 
 /**
- * The left "Adjustments" panel: one card per tool (docs/plans/11). A card
+ * The left "Adjustments" panel: one card per tool (docs/adr/0016-tool-panel-cards). A card
  * is icon + title on one line, an always-visible two-line description
  * ("what it does" / "when to use it") below, and a muted ×N badge when the
  * tool is already in the chain. The LUT card's description slot doubles as
  * the catalog status slot (loading / failed) while the library isn't
  * available — plan 06's caption absorbed into the card.
  *
- * `open` is the mobile sheet state (docs/plans/12): under `lg` the panel
+ * `open` is the mobile sheet state (docs/adr/0024-mobile-ui): under `lg` the panel
  * renders as a full-width bottom sheet, visible only while its tab is
  * active; the classes flip back to the in-flow side column at `lg`.
  */
@@ -54,7 +54,7 @@ const canPickTool = (phase: EditorPhase) =>
   phase._tag === 'Idle' || phase._tag === 'Selected'
 
 /** How many committed chain layers of this type are in the edit — the
- *  card's "in your edit" badge (docs/plans/11 D4). */
+ *  card's "in your edit" badge (docs/adr/0016-tool-panel-cards D4). */
 export const chainCount = (model: Model, type: LayerType): number =>
   model.chain.filter((layer) => layer.type === type).length
 
@@ -98,7 +98,7 @@ const toolCard = (
           h.span([h.Class('text-sm font-medium')], [ui.label]),
           // "Already in your edit": a muted ×N pill, right-aligned on the
           // title line. Only when the tool is in the chain — a first-time
-          // user sees nothing (docs/plans/11 D4).
+          // user sees nothing (docs/adr/0016-tool-panel-cards D4).
           ...(count > 0
             ? [
                 h.span(

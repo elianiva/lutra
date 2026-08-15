@@ -29,7 +29,7 @@ body,
   height: 100%;
 }
 
-/* The app shell tracks the DYNAMIC viewport (docs/plans/12): on phones the
+/* The app shell tracks the DYNAMIC viewport (docs/adr/0024-mobile-ui): on phones the
  * URL bar collapses on scroll, and a `100%` root would leave the canvas cut
  * off under the remaining chrome. Browsers without dvh fall back to 100%. */
 #root {
@@ -89,7 +89,7 @@ input[type='range'].lutra-range::-moz-range-thumb {
   font-feature-settings: 'tnum';
 }
 
-/* Touch devices (docs/plans/12): the 16px desktop thumb is fine under a
+/* Touch devices (docs/adr/0024-mobile-ui): the 16px desktop thumb is fine under a
  * cursor, too small for a finger. A coarse pointer gets a bigger thumb and
  * a taller hit area; `pointer: fine` devices keep the compact slider. */
 @media (pointer: coarse) {

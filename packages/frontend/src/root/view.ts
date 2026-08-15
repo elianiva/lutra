@@ -45,7 +45,7 @@ const readyToast = (model: Model, h: HtmlBuilder<RootMessage>) =>
     ? h.div(
         [
           h.OnClick(OfflineReadyDismissed()),
-          // inset-x-4 on phones (docs/plans/12): the card spans the viewport
+          // inset-x-4 on phones (docs/adr/0024-mobile-ui): the card spans the viewport
           // width instead of floating in the corner; `md:` restores the
           // fixed-width corner float.
           h.Class(
@@ -67,7 +67,7 @@ const offlineCard = (model: Model, h: HtmlBuilder<RootMessage>) => {
   const frame = (content: ReadonlyArray<Html>) =>
     h.div(
       [
-        // inset-x-4 on phones (docs/plans/12): the card spans the viewport
+        // inset-x-4 on phones (docs/adr/0024-mobile-ui): the card spans the viewport
         // width instead of floating in the corner; `md:` restores the
         // fixed-width corner float.
         h.Class(

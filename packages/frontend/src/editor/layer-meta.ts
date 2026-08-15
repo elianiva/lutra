@@ -96,10 +96,10 @@ export interface LayerUi {
   /**
    * Plain-language "what it does" line for the tool panel card — written
    * from the shader body's actual behavior, never generic photo-editing
-   * semantics (docs/plans/11).
+   * semantics (docs/adr/0016-tool-panel-cards).
    */
   readonly description: string
-  /** "When to use it" line for the tool panel card (docs/plans/11). */
+  /** "When to use it" line for the tool panel card (docs/adr/0016-tool-panel-cards). */
   readonly when: string
 }
 
@@ -249,7 +249,7 @@ export const lutName = (
 }
 
 export const LAYER_TYPES_ORDER: ReadonlyArray<LayerType> = [
-  // The app's signature feature leads the picker (docs/plans/11 D5): the
+  // The app's signature feature leads the picker (docs/adr/0016-tool-panel-cards D5): the
   // novice's most likely intent is "make my photo look like film", and the
   // LUT library is the fast path to it. Deliberate deviation from the
   // mobile reference ordering.

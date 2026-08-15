@@ -30,7 +30,7 @@ const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
     [h.Class('flex h-full flex-col bg-bg text-ink')],
     [
       topBar(h, model, imageLoaded),
-      // The three columns stack on mobile (docs/plans/12): the canvas
+      // The three columns stack on mobile (docs/adr/0024-mobile-ui): the canvas
       // first, the two panels below as max-height bottom sheets toggled by
       // the mobile tab bar. `lg:` restores the side-by-side layout — the
       // sheets and the tab bar render hidden there (their classes are
@@ -44,7 +44,7 @@ const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
       // canvas shrinks while it is open and the strip sits directly under
       // the photo. Renders nothing without a LUT target.
       lutBar(h, model),
-      // The mobile tab bar (docs/plans/12): toggles the two bottom sheets,
+      // The mobile tab bar (docs/adr/0024-mobile-ui): toggles the two bottom sheets,
       // plus a LUT toggle while a LUT target exists. Hidden on desktop.
       mobileTabBar(h, model),
       exportDialogView(h, model),
@@ -53,7 +53,7 @@ const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
 }
 
 /**
- * The mobile tab bar (docs/plans/12): "Adjustments" and "Layers" toggle the
+ * The mobile tab bar (docs/adr/0024-mobile-ui): "Adjustments" and "Layers" toggle the
  * two bottom sheets (tapping the active tab closes it); a "LUT" tab appears
  * while a LUT target exists and toggles the LUT bar, giving the filmstrip
  * a first-class affordance on phones (the drawer chevron stays as backup).
