@@ -110,11 +110,19 @@ export type ColorMixerLayer = typeof ColorMixerLayer.Type
 export const GrainLayer = Schema.Struct({
   ...LayerCommon.fields,
   type: Schema.Literal('grain'),
-  // Snapseed-style grain knobs: texture = strength, size = noise cell
-  // size, blur = octave persistence (softness).
-  texture: Schema.Number,
+  // amount: grain strength (0 = off, 1 = heavy)
+  // profile: film stock character preset (0–4, integer steps)
+  //   0 = Subtle (fine 35mm, low intensity)
+  //   1 = Medium (balanced 35mm, peak midtones)
+  //   2 = Heavy (pushed film, visible in shadows)
+  //   3 = Vintage (soft, warm chroma, coarse grain)
+  //   4 = Cinematic (coarse 16mm, high chroma)
+  // size: manual grain size override (0 = use profile default)
+  // chroma: color grain strength (0 = monochrome, 1 = full RGB)
+  amount: Schema.Number,
+  profile: Schema.Number,
   size: Schema.Number,
-  blur: Schema.Number,
+  chroma: Schema.Number,
 })
 export type GrainLayer = typeof GrainLayer.Type
 
@@ -217,9 +225,10 @@ export const ColorMixerParams = Schema.Struct(MixerChannelFields)
 export type ColorMixerParams = typeof ColorMixerParams.Type
 
 export const GrainParams = Schema.Struct({
-  blur: Schema.Number,
+  amount: Schema.Number,
+  profile: Schema.Number,
   size: Schema.Number,
-  texture: Schema.Number,
+  chroma: Schema.Number,
 })
 export type GrainParams = typeof GrainParams.Type
 

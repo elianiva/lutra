@@ -254,7 +254,7 @@ describe('generateChainSource', () => {
     const layers: ChainLayerInfo[] = [
       {
         body: renderGrain,
-        fieldKeys: [FieldKey('texture'), FieldKey('size'), FieldKey('blur')],
+        fieldKeys: [FieldKey('amount'), FieldKey('profile'), FieldKey('size'), FieldKey('chroma')],
         type: 'grain',
       },
     ]
@@ -279,7 +279,7 @@ describe('generateChainSource', () => {
       { body: renderExposure, fieldKeys: [FieldKey('stops')], type: 'exposure' },
       {
         body: renderGrain,
-        fieldKeys: [FieldKey('texture'), FieldKey('size'), FieldKey('blur')],
+        fieldKeys: [FieldKey('amount'), FieldKey('profile'), FieldKey('size'), FieldKey('chroma')],
         type: 'grain',
       },
     ]

@@ -91,7 +91,7 @@ const DEFAULTS = {
     yellowLuminance: 0,
     yellowSaturation: 0,
   },
-  grain: { blur: 0, size: 0, texture: 0 },
+  grain: { amount: 0, chroma: 0.2, profile: 1, size: 0 },
   vignette: { amount: 0, size: 0.6 },
   chromaticAberration: { amount: 0 },
   clarity: { amount: 0 },

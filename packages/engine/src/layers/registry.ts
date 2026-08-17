@@ -84,9 +84,10 @@ const FIELD_META = {
     yellowSaturation: { default: 0, max: 1, min: -1 },
   },
   grain: {
-    blur: { default: 0, max: 1, min: 0 },
+    amount: { default: 0, max: 1, min: 0 },
+    profile: { default: 1, max: 4, min: 0 },
     size: { default: 0, max: 1, min: 0 },
-    texture: { default: 0, max: 1, min: 0 },
+    chroma: { default: 0.2, max: 1, min: 0 },
   },
   vignette: {
     amount: { default: 0, max: 1, min: -1 },

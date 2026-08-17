@@ -137,6 +137,16 @@ export const MIXER_CHANNELS = ['Hue', 'Saturation', 'Luminance'] as const
 
 const wbK = (v: number) => (v < 0 ? Math.round(6500 - (1 + v) * 4500) : Math.round(6500 + v * 5500))
 
+// Film grain profile presets — each maps to shader parameters.
+// The profile index is stored as a float uniform (0–4), rounded to int in the shader.
+const GRAIN_PROFILES = [
+  { name: 'Subtle', grainSize: 0.3, peak: 0.4, rolloff: 0.35, blur: 0.6 },
+  { name: 'Medium', grainSize: 0.5, peak: 0.38, rolloff: 0.4, blur: 0.55 },
+  { name: 'Heavy', grainSize: 0.7, peak: 0.35, rolloff: 0.5, blur: 0.45 },
+  { name: 'Vintage', grainSize: 0.8, peak: 0.42, rolloff: 0.55, blur: 0.35 },
+  { name: 'Cinematic', grainSize: 1.0, peak: 0.36, rolloff: 0.45, blur: 0.4 },
+] as const
+
 /**
  * Frontend-only metadata keyed by `LayerType`. The engine `LayerEntry`
  * owns the truth about min/max/default and the shader body; this lives
@@ -216,14 +226,18 @@ export const LAYER_UI = {
     when: "Fix a photo that's too dark or too bright.",
   },
   grain: {
-    description: 'Adds animated film grain for an analog feel.',
+    description: 'Luminance-aware film grain with stock-specific character.',
     fields: {
-      blur: { format: formatPercent, label: 'BLUR' },
+      amount: { format: formatPercent, label: 'AMOUNT' },
+      chroma: { format: formatPercent, label: 'CHROMA' },
+      profile: { format: (v: number) => GRAIN_PROFILES[Math.round(v)]?.name ?? 'Medium', label: 'PROFILE' },
       size: { format: formatPercent, label: 'SIZE' },
-      texture: { format: formatPercent, label: 'TEXTURE' },
     },
-    formatValue: (l) =>
-      `T ${formatPercent(numField(l, FieldKey('texture')))} · S ${formatPercent(numField(l, FieldKey('size')))} · B ${formatPercent(numField(l, FieldKey('blur')))}`,
+    formatValue: (l) => {
+      const amt = numField(l, FieldKey('amount'))
+      const prof = GRAIN_PROFILES[Math.round(numField(l, FieldKey('profile')))]?.name ?? 'Medium'
+      return amt === 0 ? 'Off' : `${prof} · ${formatPercent(amt)}`
+    },
     icon: Shirt,
     label: 'Grain',
     toggled: false,
