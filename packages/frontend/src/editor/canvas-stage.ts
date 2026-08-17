@@ -49,7 +49,7 @@ export const PanZoom = Mount.defineStream(
   ({ imageWidth, imageHeight }) =>
     (element) =>
       Stream.callback<typeof ScaledCanvas.Type>((queue) =>
-        Effect.gen(function* PanZoom() {
+        Effect.fn('PanZoom')(function* () {
           const stage = asHtmlElement(element)
           const state = {
             scale: 1,
@@ -317,7 +317,7 @@ export const PanZoom = Mount.defineStream(
               }),
           )
           return yield* Effect.never
-        }),
+        })(),
       ),
 )
 
@@ -340,12 +340,12 @@ export const RegisterCanvas = Mount.define(
   'RegisterCanvas',
   CanvasRegistered,
 )((element) =>
-  Effect.gen(function* RegisterCanvas() {
+  Effect.fn('RegisterCanvas')(function* () {
     if (element instanceof HTMLCanvasElement) {
       yield* registerCanvas(canvasRef, element)
     }
     return CanvasRegistered()
-  }),
+  })(),
 )
 
 // ---- compare (before/after viewing) ----
@@ -363,7 +363,7 @@ export const CompareDivider = Mount.defineStream(
   ChangedSplitPosition,
 )((element) =>
   Stream.callback<typeof ChangedSplitPosition.Type>((queue) =>
-    Effect.gen(function* CompareDivider() {
+    Effect.fn('CompareDivider')(function* () {
       const divider = asHtmlElement(element)
       const container = divider.parentElement
       const emit = (position: number) =>
@@ -414,7 +414,7 @@ export const CompareDivider = Mount.defineStream(
           }),
       )
       return yield* Effect.never
-    }),
+    })(),
   ),
 )
 

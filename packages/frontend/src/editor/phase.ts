@@ -1,9 +1,9 @@
 import { Option, Schema as S } from 'effect'
 import { Machine } from 'foldkit/experimental'
-import { to, when } from 'foldkit/experimental/machine'
+import { otherwise, to, when } from 'foldkit/experimental/machine'
 import { ts } from 'foldkit/schema'
 import { Layer, LayerIdSchema, moveCurvePoint, resetCurve } from '@lutra/engine'
-import { createLayerFor, DecodeImage } from './command'
+import { CreateLayer, DecodeImage } from './command'
 import { EditorMessage } from './message'
 
 // ---- editor phase ----
@@ -18,7 +18,7 @@ import { EditorMessage } from './message'
 // the machine with every message. Messages with no edge from the current
 // state are `Ignored` — the phase is unchanged and update treats them as
 // no-ops. That absence of an edge IS the editor's blocking: there is no
-// SelectedTool edge from Empty/Loading/Error/Drafting, so a draft is
+// SelectedTool edge from Empty/Loading/Error/Creating/Drafting, so a draft is
 // structurally impossible without an image or while another draft is active.
 
 /** No image yet — the upload zone is showing and the editor is blocked. */
@@ -29,6 +29,9 @@ export const Loading = ts('Loading')
 export const ErrorState = ts('Error')
 /** An image is loaded and nothing is mid-flight — tools are available. */
 export const Idle = ts('Idle')
+/** A layer factory is running. Tool selection is blocked until the command
+ *  reports either a constructed draft or a typed creation failure. */
+export const Creating = ts('Creating', { selectedLayerId: S.NullOr(LayerIdSchema) })
 /** A draft layer is active: the drawer shows its slider and tool/layer
  *  selection are blocked until the draft is confirmed or cancelled. The
  *  draft layer lives in the state (not the model) so the machine owns every
@@ -37,7 +40,7 @@ export const Drafting = ts('Drafting', { layer: Layer })
 /** A committed layer is focused in the drawer. */
 export const Selected = ts('Selected', { layerId: LayerIdSchema })
 
-export const EditorPhase = S.Union([Empty, Loading, ErrorState, Idle, Drafting, Selected])
+export const EditorPhase = S.Union([Empty, Loading, ErrorState, Idle, Creating, Drafting, Selected])
 export type EditorPhase = typeof EditorPhase.Type
 
 // ---- machine ----
@@ -125,8 +128,10 @@ export const editorMachine = Machine.define({
         ImageFailedToDecode: to('Error', () => ErrorState()),
         // ...and when both picks succeed, the last one to land wins.
         ImageDecoded: to('Idle', () => Idle()),
-        SelectedTool: to('Drafting', ({ message }) =>
-          Drafting({ layer: createLayerFor(message.type) }),
+        SelectedTool: to(
+          'Creating',
+          () => Creating({ selectedLayerId: null }),
+          ({ message }) => [CreateLayer({ type: message.type })],
         ),
         SelectedLayer: [
           when(
@@ -158,12 +163,30 @@ export const editorMachine = Machine.define({
         EditLoadFailed: to('Error', () => ErrorState()),
       },
     },
+    Creating: {
+      on: {
+        LayerCreated: to('Drafting', ({ message }) => Drafting({ layer: message.layer })),
+        LayerCreationFailed: [
+          when(
+            (state) => Option.fromNullOr(state.selectedLayerId),
+            'Selected',
+            ({ guardValue }) => Selected({ layerId: guardValue }),
+          ),
+          otherwise(to('Idle', () => Idle())),
+        ],
+        ClearedImage: to('Empty', () => Empty()),
+        EditLoaded: to('Idle', () => Idle()),
+        EditLoadFailed: to('Error', () => ErrorState()),
+      },
+    },
     Selected: {
       on: {
-        // A new tool replaces the selection with a draft (the draft takes
-        // priority in the drawer).
-        SelectedTool: to('Drafting', ({ message }) =>
-          Drafting({ layer: createLayerFor(message.type) }),
+        // A new tool first runs the engine factory as a Command. The phase
+        // keeps the selected layer id so a typed failure can restore focus.
+        SelectedTool: to(
+          'Creating',
+          ({ state }) => Creating({ selectedLayerId: state.layerId }),
+          ({ message }) => [CreateLayer({ type: message.type })],
         ),
         SelectedLayer: [
           when(
@@ -196,4 +219,7 @@ export const editorMachine = Machine.define({
  *  editor can work in. Empty/Loading/Error render the upload zone (or the
  *  error stage) instead. */
 export const hasImage = (phase: EditorPhase) =>
-  phase._tag === 'Idle' || phase._tag === 'Drafting' || phase._tag === 'Selected'
+  phase._tag === 'Idle' ||
+  phase._tag === 'Creating' ||
+  phase._tag === 'Drafting' ||
+  phase._tag === 'Selected'

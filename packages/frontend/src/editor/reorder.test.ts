@@ -20,10 +20,10 @@ import { createLayerFor } from './command'
 import { ReorderedLayer } from './message'
 import type { Model } from './model'
 
-import { Option } from 'effect'
+import { Effect, Option } from 'effect'
 import type { Scene } from 'foldkit/test'
 
-const layer = (type: Parameters<typeof createLayerFor>[0]) => createLayerFor(type)
+const layer = (type: Parameters<typeof createLayerFor>[0]) => Effect.runSync(createLayerFor(type))
 
 const modelWith = (types: Parameters<typeof createLayerFor>[0][]) => {
   const chain = types.map(layer)

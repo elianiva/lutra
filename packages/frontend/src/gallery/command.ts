@@ -19,7 +19,7 @@ import {
  * an error state.
  */
 export const ListEdits = Command.define('ListEdits', {
-  execute: Effect.gen(function* execute() {
+  execute: Effect.fn('execute')(function* () {
     const store = yield* EditStore
     const summaries = yield* store.list()
     return EditsListed({ summaries })
@@ -36,16 +36,15 @@ export const ListEdits = Command.define('ListEdits', {
  */
 export const DeleteEdit = Command.define('DeleteEdit', {
   args: { id: EditIdSchema },
-  execute: ({ id }) =>
-    Effect.gen(function* execute() {
-      const store = yield* EditStore
-      yield* store.delete(id)
-      return EditDeleted()
-    }).pipe(
-      Effect.catchTag('StoreError', (err: StoreError) =>
-        Effect.succeed(DeleteFailed({ error: err })),
-      ),
+  execute: Effect.fn('execute')(function* ({ id }) {
+    const store = yield* EditStore
+    yield* store.delete(id)
+    return EditDeleted()
+  }).pipe(
+    Effect.catchTag('StoreError', (err: StoreError) =>
+      Effect.succeed(DeleteFailed({ error: err })),
     ),
+  ),
   messages: [EditDeleted, DeleteFailed],
 })
 
@@ -74,7 +73,7 @@ const thumbnailBytes = (
   file: File,
   maxDim = 320,
 ): Effect.Effect<Uint8Array, ImageDecodeError | ThumbnailEncodeError> =>
-  Effect.gen(function* thumbnailBytes() {
+  Effect.fn('thumbnailBytes')(function* () {
     const bitmap = yield* Effect.tryPromise({
       catch: (cause) =>
         new ImageDecodeError({
@@ -113,7 +112,7 @@ const thumbnailBytes = (
     } finally {
       bitmap.close()
     }
-  })
+  })()
 
 /**
  * The gallery's "open a photo" flow (mirrors the mobile main menu): open the
@@ -125,7 +124,7 @@ const thumbnailBytes = (
  * dropping the photo.
  */
 export const OpenPhoto = Command.define('OpenPhoto', {
-  execute: Effect.gen(function* execute() {
+  execute: Effect.fn('execute')(function* () {
     const picked = yield* FoldkitFile.select(IMAGE_TYPES)
     if (Option.isNone(picked)) {
       return PhotoPickCancelled()

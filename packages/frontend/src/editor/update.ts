@@ -24,7 +24,7 @@ import { editorMachine } from './phase'
 import { LAYER_UI } from '../editor/layer-meta'
 import { lutTarget } from './lut-bar'
 import { visibleEntries } from './lut-bar/catalog'
-import { moveCurvePoint, resetCurve, fileExtension } from '@lutra/engine'
+import { moveCurvePoint, resetCurve } from '@lutra/engine'
 import type { ExportSettings, ImageEncoder, LayerId, LutId } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import type { EditStore } from '@lutra/store'
@@ -324,6 +324,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           phase,
           source: { bitmap, error: null, height, width },
           attachedEdit: { id: null, source },
+          layerCreationError: null,
           saveStatus: { _tag: 'idle' },
           lutThumbs: {},
           // A new photo is a new context: close the mobile sheets so the
@@ -355,6 +356,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             phase,
             source: { bitmap: null, error: null, height: 0, width: 0 },
             chain: [],
+            layerCreationError: null,
             activeFieldIndex: {},
             activeMixerColor: {},
             renderPending: false,
@@ -396,6 +398,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           phase,
           chain,
           source: { bitmap, error: null, height, width },
+          layerCreationError: null,
           activeFieldIndex: {},
           activeMixerColor: {},
           // A new attached edit closes the bar and its hover preview.
@@ -478,28 +481,46 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       ],
 
       // ---- tool panel / draft ----
-      SelectedTool: ({ type }) => {
-        // The machine built the draft (Drafting); the branch fills in what
-        // needs model data: the LUT default selection and the field index.
-        // A new draft context also drops any bar hover preview — the old
-        // target is gone (D9).
-        if (!transitioned || phase._tag !== 'Drafting') {
+      SelectedTool: () => {
+        // The machine moved into Creating and attached CreateLayer as its
+        // command. Keep the old visual context until that Effect reports;
+        // the command is the only caller that consumes createLayerFor.
+        if (!transitioned || phase._tag !== 'Creating') {
+          return [model, [], Option.none()]
+        }
+        return [
+          {
+            ...model,
+            layerCreationError: null,
+            lutBarOpen: false,
+            mobileSheet: 'layers',
+            phase,
+            previewLut: null,
+          },
+          machineCommands,
+          Option.none(),
+        ]
+      },
+      LayerCreated: () => {
+        // The machine accepts a result only while the matching creation is
+        // pending, then installs the validated layer as the draft.
+        if (!transitioned || from._tag !== 'Creating' || phase._tag !== 'Drafting') {
           return [model, [], Option.none()]
         }
         const { layer } = phase
-        // A pick is an edit action: on mobile the sheet follows the draft
-        // to the layer drawer, where the sliders live (docs/adr/0024-mobile-ui).
-        let next: Model = { ...model, mobileSheet: 'layers', phase, previewLut: null }
-        if (type === 'lut') {
+        let next: Model = {
+          ...model,
+          layerCreationError: null,
+          mobileSheet: 'layers',
+          phase,
+          previewLut: null,
+        }
+        if (layer.type === 'lut') {
           const { catalog } = model
-          // Unreachable — the pre-guard above blocks LUT picks without a
-          // catalog before the machine steps. Kept for the type-checker.
+          // SelectedTool is gated above, so a successful LUT creation always
+          // has a catalog. Keep the check at this boundary for stale startup
+          // messages rather than indexing an absent entry.
           if (!catalog || catalog.length === 0) {
-            return [model, [], Option.none()]
-          }
-          // The machine built this draft from a lut pick, so the layer is the
-          // LUT variant; the check narrows it for the spread below.
-          if (layer.type !== 'lut') {
             return [model, [], Option.none()]
           }
           next = {
@@ -516,6 +537,12 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         }
         const [after, commands] = renderNow(rendered)
         return [after, [...commands, ...generateThumbCommands(rendered)], Option.none()]
+      },
+      LayerCreationFailed: ({ error }) => {
+        if (!transitioned || from._tag !== 'Creating') {
+          return [model, [], Option.none()]
+        }
+        return [{ ...model, layerCreationError: error, phase }, [], Option.none()]
       },
       ConfirmedDraft: () => {
         if (!transitioned || from._tag !== 'Drafting') {
@@ -971,7 +998,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         if (!model.exportDialog.isOpen) {
           return [model, [RevokeExportUrl({ url })], Option.none()]
         }
-        const filename = `lutra-edit.${fileExtension(model.exportSettings.format)}`
+        const filename = `lutra-edit.${model.exportSettings.format}`
         return [
           {
             ...model,

@@ -2,14 +2,10 @@ import type { Effect } from 'effect'
 import { Context, Schema } from 'effect'
 import type { ExportSettings } from './settings'
 
-// ---- errors ----
-
 export class EncodeError extends Schema.TaggedErrorClass<EncodeError>()('EncodeError', {
   cause: Schema.optional(Schema.Unknown),
   message: Schema.String,
 }) {}
-
-// ---- service ----
 
 export interface ImageEncoderContract {
   /**

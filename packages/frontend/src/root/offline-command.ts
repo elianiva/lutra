@@ -23,17 +23,16 @@ import { OfflineReadyDismissed, StoragePersisted } from '../offline/messages'
  */
 export const StartOfflineFill = Command.define('StartOfflineFill', {
   args: { requirePersist: S.Boolean },
-  execute: ({ requirePersist }) =>
-    Effect.gen(function* execute() {
-      const fill = yield* OfflineFill
-      const persisted = yield* Effect.tryPromise(
-        async () => await navigator.storage.persist(),
-      ).pipe(Effect.option, Effect.map(Option.getOrElse(() => false)))
-      if (!requirePersist || persisted) {
-        yield* fill.start()
-      }
-      return StoragePersisted({ persisted })
-    }),
+  execute: Effect.fn('execute')(function* ({ requirePersist }) {
+    const fill = yield* OfflineFill
+    const persisted = yield* Effect.tryPromise(
+      async () => await navigator.storage.persist(),
+    ).pipe(Effect.option, Effect.map(Option.getOrElse(() => false)))
+    if (!requirePersist || persisted) {
+      yield* fill.start()
+    }
+    return StoragePersisted({ persisted })
+  }),
   messages: [StoragePersisted],
 })
 

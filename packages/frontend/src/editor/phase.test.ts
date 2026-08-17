@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest'
+import { Effect } from 'effect'
 import { FieldKey } from '@lutra/engine'
 import { MockImageBitmap } from '../vitest-setup'
 import { Idle, editorMachine } from './phase'
 import { initialModel } from './model'
 import { update } from './update'
 import { createLayerFor } from './command'
-import { ImageDecodeError } from '../errors'
+import { selectTool } from './test-layer'
+import { ImageDecodeError, LayerCreationError } from '../errors'
 import {
   SelectedTool,
   SelectedLayer,
@@ -17,6 +19,8 @@ import {
   SelectedImageFile,
   ImageDecoded,
   ImageFailedToDecode,
+  LayerCreated,
+  LayerCreationFailed,
 } from './message'
 import type { Model } from './model'
 
@@ -71,19 +75,44 @@ describe('editor phase machine', () => {
     expect(model.phase._tag).toBe('Error')
   })
 
+  it('runs layer creation as a command and installs its result', () => {
+    const [pending, commands] = update(loadedModel(), SelectedTool({ type: 'exposure' }))
+    expect(pending.phase._tag).toBe('Creating')
+    expect(commands.map((command) => command.name)).toEqual(['CreateLayer'])
+
+    const [model] = update(
+      pending,
+      LayerCreated({ layer: Effect.runSync(createLayerFor('exposure')) }),
+    )
+    expect(model.phase._tag).toBe('Drafting')
+    expect(draftOf(model)?.type).toBe('exposure')
+  })
+
+  it('restores the idle phase and records a layer creation failure', () => {
+    const [pending] = update(loadedModel(), SelectedTool({ type: 'exposure' }))
+    const error = new LayerCreationError({ message: 'registry failure' })
+    const [model, commands] = update(pending, LayerCreationFailed({ error }))
+    expect(model.phase._tag).toBe('Idle')
+    expect(model.layerCreationError).toMatchObject({
+      _tag: 'LayerCreationError',
+      message: 'registry failure',
+    })
+    expect(commands).toEqual([])
+  })
+
   it('creates a draft from a tool pick once an image is loaded', () => {
-    const [model] = update(loadedModel(), SelectedTool({ type: 'exposure' }))
+    const [model] = selectTool(loadedModel(), 'exposure')
     expect(model.phase._tag).toBe('Drafting')
     expect(draftOf(model)?.type).toBe('exposure')
   })
 
   it('blocks tool selection and layer selection while a draft is active', () => {
-    const layer = createLayerFor('saturation')
+    const layer = Effect.runSync(createLayerFor('saturation'))
     const withChain = { ...loadedModel(), chain: [layer] }
-    const [withDraft] = update(withChain, SelectedTool({ type: 'exposure' }))
+    const [withDraft] = selectTool(withChain, 'exposure')
     expect(draftOf(withDraft)?.type).toBe('exposure')
 
-    const [m1] = update(withDraft, SelectedTool({ type: 'contrast' }))
+    const [m1] = selectTool(withDraft, 'contrast')
     expect(m1.phase._tag).toBe('Drafting')
     expect(draftOf(m1)?.type).toBe('exposure')
 
@@ -96,7 +125,7 @@ describe('editor phase machine', () => {
   })
 
   it('confirms the draft into the chain and focuses it', () => {
-    const [withDraft] = update(loadedModel(), SelectedTool({ type: 'exposure' }))
+    const [withDraft] = selectTool(loadedModel(), 'exposure')
     const layer = draftOf(withDraft)!
     const [model] = update(withDraft, ConfirmedDraft())
     expect(model.phase._tag).toBe('Selected')
@@ -107,7 +136,7 @@ describe('editor phase machine', () => {
   })
 
   it('cancelling the draft returns to Idle and discards it', () => {
-    const [withDraft] = update(loadedModel(), SelectedTool({ type: 'exposure' }))
+    const [withDraft] = selectTool(loadedModel(), 'exposure')
     const [model] = update(withDraft, CancelledDraft())
     expect(model.phase._tag).toBe('Idle')
     expect(model.chain).toEqual([])
@@ -115,7 +144,7 @@ describe('editor phase machine', () => {
   })
 
   it('updates the draft layer in place through the machine', () => {
-    const [withDraft] = update(loadedModel(), SelectedTool({ type: 'exposure' }))
+    const [withDraft] = selectTool(loadedModel(), 'exposure')
     const [model] = update(withDraft, UpdatedDraftParam({ field: FieldKey('stops'), value: 1.5 }))
     expect(draftOf(model)).toMatchObject({ stops: 1.5, type: 'exposure' })
   })
@@ -186,7 +215,7 @@ describe('editor phase machine', () => {
   })
 
   it('clearing the image discards the draft and resets the chain', () => {
-    const [withDraft] = update(loadedModel(), SelectedTool({ type: 'exposure' }))
+    const [withDraft] = selectTool(loadedModel(), 'exposure')
     const [model] = update(withDraft, ClearedImage())
     expect(model.phase._tag).toBe('Empty')
     expect(model.source.bitmap).toBeNull()
@@ -194,7 +223,7 @@ describe('editor phase machine', () => {
   })
 
   it('removing the focused layer deselects it', () => {
-    const layer = createLayerFor('exposure')
+    const layer = Effect.runSync(createLayerFor('exposure'))
     const withChain = { ...loadedModel(), chain: [layer] }
     const [withSelected] = update(withChain, SelectedLayer({ id: layer.id }))
     expect(withSelected.phase._tag).toBe('Selected')
@@ -204,8 +233,8 @@ describe('editor phase machine', () => {
   })
 
   it('removing a non-focused layer keeps the selection', () => {
-    const a = createLayerFor('exposure')
-    const b = createLayerFor('contrast')
+    const a = Effect.runSync(createLayerFor('exposure'))
+    const b = Effect.runSync(createLayerFor('contrast'))
     const withChain = { ...loadedModel(), chain: [a, b] }
     const [withSelected] = update(withChain, SelectedLayer({ id: a.id }))
     expect(withSelected.phase._tag).toBe('Selected')

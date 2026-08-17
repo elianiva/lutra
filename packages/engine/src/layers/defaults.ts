@@ -1,17 +1,13 @@
-import { Schema } from 'effect'
+import { Effect, Schema } from 'effect'
 import { nextLayerId } from './id'
 import type { LayerEntry } from './registry'
 import type { Layer, LayerType } from './schemas'
 
-// ---- errors ----
-
 /**
  * A layer factory was asked for a type the registry does not define. The
  * registries are static and the UI only picks from `LAYER_TYPES`, so this
- * is a defect (a programmer error), not a recoverable failure — it is
- * thrown, not Effect-failed. Distinct from `GpuError`'s "Unknown layer
- * type" case in `createRenderRequest`, where the chain is user data
- * crossing the persistence boundary and the failure is recoverable.
+ * should be unreachable for normal callers. It remains a typed failure so
+ * callers can compose layer creation without a synchronous exception.
  */
 export class UnknownLayerTypeError extends Schema.TaggedErrorClass<UnknownLayerTypeError>()(
   'UnknownLayerTypeError',
@@ -21,14 +17,13 @@ export class UnknownLayerTypeError extends Schema.TaggedErrorClass<UnknownLayerT
   },
 ) {}
 
-export function createLayer<K extends LayerType>(
-  type: K,
+export const createLayer = Effect.fn('createLayer')(function* (
+  type: LayerType,
   registry: Record<LayerType, LayerEntry>,
-): Extract<Layer, { type: K }>
-export function createLayer(type: LayerType, registry: Record<LayerType, LayerEntry>): Layer {
-  const entry = registry[type]
+) {
+  const entry = Object.hasOwn(registry, type) ? registry[type] : undefined
   if (!entry) {
-    throw new UnknownLayerTypeError({ message: `Unknown layer type: ${type}` })
+    return yield* Effect.fail(new UnknownLayerTypeError({ message: `Unknown layer type: ${type}` }))
   }
 
   const fields: Record<string, number> = {}
@@ -53,11 +48,11 @@ export function createLayer(type: LayerType, registry: Record<LayerType, LayerEn
   // Decode the assembled representation with the entry's owner schema before
   // returning it. This keeps the dynamic field assembly at the boundary and
   // gives the returned layer the same contract as persisted layers.
-  return Schema.decodeUnknownSync(entry.schema)({
+  return yield* Schema.decodeUnknownEffect(entry.schema)({
     id: nextLayerId(),
     type,
     visible: true,
     ...fields,
     ...stringFields,
   })
-}
+})

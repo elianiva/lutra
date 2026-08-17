@@ -1,17 +1,13 @@
-import { Schema } from 'effect'
+import { Effect, Schema } from 'effect'
 import { SRGB_TO_LINEAR } from './colorspace'
 import type { BodyRenderer, BodySource } from './types'
 import type { FieldKey, LutId } from '../brands'
 import type { LayerType } from '../layers/schemas'
 
-// ---- errors ----
-
 /**
- * The assembler hit a LUT pass whose layer carries no cube reference. The
- * caller-facing boundary (`createRenderRequest`) validates LUT references
- * before assembling, so reaching this throw means the invariant was broken
- * upstream — a defect, not a recoverable failure; it is thrown, not
- * Effect-failed.
+ * The assembler hit a LUT pass whose layer carries no cube reference.
+ * `generateChainSource` reports this on its Effect error channel so callers
+ * can compose the failure without a synchronous throw.
  */
 export class MissingLutReferenceError extends Schema.TaggedErrorClass<MissingLutReferenceError>()(
   'MissingLutReferenceError',
@@ -27,8 +23,6 @@ export class MissingLutReferenceError extends Schema.TaggedErrorClass<MissingLut
  * most desktop GPUs; the frontend dispatches with this same value.
  */
 export const WORKGROUP_SIZE = 16
-
-// ---- public types ----
 
 /** Per-layer entry used by the assembler. */
 export interface ChainLayerInfo {
@@ -97,8 +91,6 @@ export interface UniformSlot {
   /** Offset into this pass's uniform buffer (in f32 slots). */
   readonly offset: number
 }
-
-// ---- pass templates ----
 
 /**
  * A body renderer emits either plain statements (string) or a
@@ -246,8 +238,6 @@ ${body}
   return { source, uniforms, usesFrame, usesSampler }
 }
 
-// ---- LUT pass ----
-
 interface LutPassOptions {
   readonly body: string
   /** Module-scope WGSL (functions) emitted ahead of the entry point. */
@@ -348,8 +338,6 @@ ${body}
   return { lutId, source, uniforms, usesFrame, usesSampler: false }
 }
 
-// ---- assembler ----
-
 /**
  * Generate the ordered WGSL compute passes for the given chain of
  * layers. Each layer runs as its own pass and reads the previous pass's
@@ -360,8 +348,13 @@ ${body}
  *
  * When the first layer samples its input, a dedicated linearize pass is
  * inserted ahead of it so sampled texels are always linear light.
+ *
+ * Fails with `MissingLutReferenceError` when a LUT body has no cube
+ * reference.
  */
-export function generateChainSource(layers: readonly ChainLayerInfo[]): ChainShader {
+export const generateChainSource = Effect.fn('generateChainSource')(function* (
+  layers: readonly ChainLayerInfo[],
+) {
   if (layers.length === 0) {
     return { passes: [passthroughPass()], usesFrame: false }
   }
@@ -395,9 +388,11 @@ export function generateChainSource(layers: readonly ChainLayerInfo[]): ChainSha
       // the way out, skipping either end when it is already sRGB.
       const { lut } = layer
       if (!lut) {
-        throw new MissingLutReferenceError({
-          message: `LUT layer at index ${li} is missing its cube reference`,
-        })
+        return yield* Effect.fail(
+          new MissingLutReferenceError({
+            message: `LUT layer at index ${li} is missing its cube reference`,
+          }),
+        )
       }
       passes.push(
         lutPass({
@@ -431,4 +426,4 @@ export function generateChainSource(layers: readonly ChainLayerInfo[]): ChainSha
     passes,
     usesFrame: passes.some((p) => p.usesFrame),
   }
-}
+})

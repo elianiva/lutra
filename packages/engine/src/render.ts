@@ -7,14 +7,10 @@ import type { LutCube } from './luts/cube'
 import { generateChainSource } from './shaders/chain-source'
 import type { ChainLayerInfo, ChainPass, ChainShader } from './shaders/chain-source'
 
-// ---- errors ----
-
 export class GpuError extends Schema.TaggedErrorClass<GpuError>()('GpuError', {
   cause: Schema.optional(Schema.Unknown),
   message: Schema.String,
 }) {}
-
-// ---- uniform packing ----
 
 /**
  * Pack one pass's layer parameter values into a flat Float32Array
@@ -38,8 +34,6 @@ function packUniforms(chain: readonly Layer[], pass: ChainPass): Float32Array {
 
   return buf
 }
-
-// ---- render request ----
 
 /**
  * Everything the GPU backend needs to render one frame: the assembled
@@ -69,60 +63,56 @@ export interface RenderRequest {
  * assembler emits a passthrough shader, so the request presents the
  * source image unchanged.
  */
-export function createRenderRequest(
-  chain: readonly Layer[],
-  registry: Record<LayerType, LayerEntry>,
-  srcBitmap: ImageBitmap,
-  frame: number,
-  luts: ReadonlyMap<LutId, LutCube>,
-): Effect.Effect<RenderRequest, GpuError> {
-  return Effect.gen(function* () {
-    const chainLayers: ChainLayerInfo[] = []
-    for (const l of chain) {
-      if (!l.visible) {
-        continue
-      }
-      const entry = registry[l.type]
-      if (!entry) {
-        return yield* Effect.fail(new GpuError({ message: `Unknown layer type: ${l.type}` }))
-      }
-      // LUT layers carry a cube reference: resolve the id through the
-      // LUT map the caller provided. The engine stays pure — it never
-      // fetches or parses cubes, and an unresolvable id is a hard error.
-      if (l.type === 'lut') {
-        const lutId = strField(l, FieldKey('lutId'))
-        if (lutId === '') {
-          return yield* Effect.fail(new GpuError({ message: 'LUT layer is missing a lutId' }))
-        }
-        const id = LutId(lutId)
-        const cube = luts.get(id)
-        if (!cube) {
-          return yield* Effect.fail(new GpuError({ message: `Unknown LUT: ${id}` }))
-        }
-        chainLayers.push({
-          body: entry.body,
-          fieldKeys: Object.keys(entry.fields).map(FieldKey),
-          lut: { id, size: cube.size },
-          type: l.type,
-        })
-      } else {
-        chainLayers.push({
-          body: entry.body,
-          fieldKeys: Object.keys(entry.fields).map(FieldKey),
-          type: l.type,
-        })
-      }
+export const createRenderRequest = Effect.fn('createRenderRequest')(
+  function* (
+    chain: readonly Layer[],
+    registry: Record<LayerType, LayerEntry>,
+    srcBitmap: ImageBitmap,
+    frame: number,
+    luts: ReadonlyMap<LutId, LutCube>,
+  ) {
+  const chainLayers: ChainLayerInfo[] = []
+  for (const l of chain) {
+    if (!l.visible) continue
+
+    const entry = registry[l.type]
+    if (!entry) {
+      return yield* Effect.fail(new GpuError({ message: `Unknown layer type: ${l.type}` }))
     }
 
-    let shader: ChainShader
-    try {
-      shader = generateChainSource(chainLayers)
-    } catch (error) {
-      return yield* Effect.fail(new GpuError({ cause: error, message: 'Shader generation failed' }))
+    // LUT layers carry a cube reference: resolve the id through the
+    // LUT map the caller provided. The engine stays pure — it never
+    // fetches or parses cubes, and an unresolvable id is a hard error.
+    if (l.type === 'lut') {
+      const lutId = strField(l, FieldKey('lutId'))
+      if (lutId === '') {
+        return yield* Effect.fail(new GpuError({ message: 'LUT layer is missing a lutId' }))
+      }
+      const id = LutId(lutId)
+      const cube = luts.get(id)
+      if (!cube) {
+        return yield* Effect.fail(new GpuError({ message: `Unknown LUT: ${id}` }))
+      }
+      chainLayers.push({
+        body: entry.body,
+        fieldKeys: Object.keys(entry.fields).map(FieldKey),
+        lut: { id, size: cube.size },
+        type: l.type,
+      })
+    } else {
+      chainLayers.push({
+        body: entry.body,
+        fieldKeys: Object.keys(entry.fields).map(FieldKey),
+        type: l.type,
+      })
     }
+  }
 
-    const uniforms = shader.passes.map((pass) => packUniforms(chain, pass))
+  const shader = yield* generateChainSource(chainLayers).pipe(
+    Effect.mapError((cause) => new GpuError({ cause, message: 'Shader generation failed' })),
+  )
 
-    return { frame, luts, shader, srcBitmap, uniforms }
-  })
-}
+  const uniforms = shader.passes.map((pass) => packUniforms(chain, pass))
+
+  return { frame, luts, shader, srcBitmap, uniforms }
+})

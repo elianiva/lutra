@@ -19,8 +19,9 @@ import { initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
 import { Idle } from './phase'
+import { selectTool, createTestLayer } from './test-layer'
 import {
-  SelectedTool,
+  LayerCreated,
   ConfirmedDraft,
   RenderedFrame,
   HistogramComputed,
@@ -28,7 +29,7 @@ import {
   CanvasRegistered,
 } from './message'
 import { PanZoom, RegisterCanvas } from './canvas-stage'
-import { RenderChain, ReadHistogram } from './command'
+import { CreateLayer, RenderChain, ReadHistogram } from './command'
 import { LutLoadError } from '../luts/store'
 import type { Catalog } from './message'
 import type { Model } from './model'
@@ -64,15 +65,15 @@ const settled = (model: Model): Model =>
 
 /** An edit with two committed Exposure layers (the ×2 badge fixture). */
 const twoExposureLayers = () => {
-  const [a] = update(loaded(), SelectedTool({ type: 'exposure' }))
+  const [a] = selectTool(loaded(), 'exposure')
   const [b] = update(a, ConfirmedDraft())
-  const [c] = update(b, SelectedTool({ type: 'exposure' }))
+  const [c] = selectTool(b, 'exposure')
   const [d] = update(c, ConfirmedDraft())
   return d
 }
 
 /** A LUT draft (Drafting phase — no new picks allowed). */
-const lutDraft = () => settled(update(loaded(), SelectedTool({ type: 'lut' }))[0])
+const lutDraft = () => settled(selectTool(loaded(), 'lut')[0])
 
 // ---- view (scene) ----
 
@@ -166,7 +167,7 @@ describe('tool panel cards', () => {
   })
 
   it('a single committed layer shows ×1', () => {
-    const [withDraft] = update(loaded(), SelectedTool({ type: 'vignette' }))
+    const [withDraft] = selectTool(loaded(), 'vignette')
     const [committed] = update(withDraft, ConfirmedDraft())
     scene(
       sceneConfig,
@@ -217,6 +218,7 @@ describe('tool panel cards', () => {
       given(loaded()),
       ...stageMounts,
       click(role('button', { name: 'Add Exposure adjustment' })),
+      Command.resolve(CreateLayer, LayerCreated({ layer: createTestLayer('exposure') })),
       ...resolveRender(),
       sceneExpect(label('Exposure draft')).toExist(),
       Command.expectNone(),

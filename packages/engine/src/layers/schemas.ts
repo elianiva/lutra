@@ -1,8 +1,6 @@
 import { Schema } from 'effect'
 import { LayerIdSchema, LutIdSchema } from '../brands'
 
-// ---- layer type literal ----
-
 export const LAYER_TYPES = [
   'exposure',
   'contrast',
@@ -21,14 +19,10 @@ export const LAYER_TYPES = [
 
 export type LayerType = (typeof LAYER_TYPES)[number]
 
-// ---- common fields ----
-
 const LayerCommon = Schema.Struct({
   id: LayerIdSchema,
   visible: Schema.Boolean,
 })
-
-// ---- per-layer param schemas ----
 
 export const ExposureLayer = Schema.Struct({
   ...LayerCommon.fields,
@@ -184,8 +178,6 @@ export const LutLayer = Schema.Struct({
 })
 export type LutLayer = typeof LutLayer.Type
 
-// ---- discriminated union: the Layer type ----
-
 export const Layer = Schema.Union([
   ExposureLayer,
   ContrastLayer,
@@ -202,8 +194,6 @@ export const Layer = Schema.Union([
   LutLayer,
 ])
 export type Layer = typeof Layer.Type
-
-// ---- param-only schemas (for patch validation) ----
 
 export const ExposureParams = Schema.Struct({ stops: Schema.Number })
 export type ExposureParams = typeof ExposureParams.Type
@@ -250,8 +240,6 @@ export const LutParams = Schema.Struct({
   lutId: LutIdSchema,
 })
 export type LutParams = typeof LutParams.Type
-
-// ---- patch discriminated union ----
 
 export const LayerPatch = Schema.Union([
   Schema.Struct({ patch: ExposureParams, type: Schema.Literal('exposure') }),

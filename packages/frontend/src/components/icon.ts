@@ -1,7 +1,7 @@
 import type { IconNode } from 'lucide'
 import type { HtmlBuilder } from 'foldkit/html'
+import { Match } from 'effect'
 
-/** Mirrors the Dearly helper so the tool panel, layer rows, and top bar share one icon implementation. */
 export const icon = <Message>(
   h: HtmlBuilder<Message>,
   node: IconNode,
@@ -26,25 +26,13 @@ export const icon = <Message>(
       const attributes = Object.entries(properties).map(([name, value]) =>
         h.Attribute(name, String(value)),
       )
-      switch (tag) {
-        case 'circle': {
-          return h.circle(attributes, [])
-        }
-        case 'line': {
-          return h.line(attributes, [])
-        }
-        case 'path': {
-          return h.path(attributes, [])
-        }
-        case 'polyline': {
-          return h.polyline(attributes, [])
-        }
-        case 'rect': {
-          return h.rect(attributes, [])
-        }
-        default: {
-          return null
-        }
-      }
+      return Match.value(tag).pipe(
+        Match.when('circle', () => h.circle(attributes, [])),
+        Match.when('line', () => h.line(attributes, [])),
+        Match.when('path', () => h.path(attributes, [])),
+        Match.when('polyline', () => h.polyline(attributes, [])),
+        Match.when('rect', () => h.rect(attributes, [])),
+        Match.orElse(() => null),
+      )
     }),
   )

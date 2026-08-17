@@ -18,15 +18,11 @@ import {
 } from './schemas'
 import type { Layer } from './schemas'
 
-// ---- per-field metadata ----
-
 export interface FieldMeta {
   default: number
   min: number
   max: number
 }
-
-// ---- per-layer entry ----
 
 export interface LayerEntry {
   // Entries own their concrete schemas, but the registry only needs their
@@ -46,8 +42,6 @@ export interface LayerEntry {
    */
   readonly stringFields?: Readonly<Record<string, string>>
 }
-
-// ---- field metadata (shared by registry and createLayer) ----
 
 const FIELD_META = {
   exposure: { stops: { default: 0, max: 3, min: -3 } },
@@ -113,8 +107,6 @@ const FIELD_META = {
   // LUT defaults to full strength (1): the draft shows the look immediately.
   lut: { amount: { default: 1, max: 1, min: 0 } },
 } as const satisfies Record<string, Record<string, FieldMeta>>
-
-// ---- registry builder (bodies are injected by the index module) ----
 
 export interface RegistryInput {
   exposure: BodyRenderer

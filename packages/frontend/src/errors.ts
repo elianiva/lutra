@@ -68,6 +68,19 @@ export class CanvasUnavailableError extends Schema.TaggedErrorClass<CanvasUnavai
 ) {}
 
 /**
+ * A requested adjustment layer could not be assembled or validated against
+ * the engine registry. The command boundary keeps this typed failure out of
+ * the synchronous phase transition.
+ */
+export class LayerCreationError extends Schema.TaggedErrorClass<LayerCreationError>()(
+  'LayerCreationError',
+  {
+    cause: Schema.optional(Schema.Unknown),
+    message: Schema.String,
+  },
+) {}
+
+/**
  * The attached Edit (`/edit/:id`) does not exist — a stale URL or a deleted
  * tile. The store reports an absent id as `Option.None` (not an error), so
  * the command synthesizes this when it resolves `None` into the load

@@ -13,9 +13,10 @@ import { EditIdSchema } from '@lutra/store'
 import { EditorPhase, editorMachine } from './phase'
 import { DownloadState } from '../offline/model'
 import { LutLoadError } from '../luts/store'
+import { LayerCreationError } from '../errors'
 
 // The editor's interaction mode is a foldkit Machine (./phase.ts): the
-// `phase` field is its state. The image lifecycle (Empty/Loading/Error), the
+// `phase` field is its state. The image lifecycle (Empty/Loading/Error/Creating), the
 // draft (Drafting), and the focused layer (Selected) are machine states, not
 // model flags — the machine makes "no draft without an image" structural.
 // The model keeps the data those states reference: the chain, the source
@@ -57,8 +58,12 @@ export const Model = Schema.Struct({
   source: SourceImage,
   // The committed edit chain. Laptop-visible order = render order.
   chain: Schema.Array(Layer),
+  // A failed layer factory stays visible to diagnostics while the phase
+  // returns to its previous idle/selected state; a successful new selection
+  // clears it.
+  layerCreationError: Schema.NullOr(LayerCreationError),
   // Editor phase machine state (./phase.ts): Empty | Loading | Error |
-  // Idle | Drafting | Selected. Owns the image lifecycle, the draft, and the
+  // Idle | Creating | Drafting | Selected. Owns the image lifecycle, the draft, and the
   // selection — replaced the old draft/selectedLayerId/source.status flags.
   phase: EditorPhase,
   // Per-layer index into the toggled layer's two fields.
@@ -177,6 +182,7 @@ export const initialModel = (): Model => ({
   catalogError: null,
   chain: [],
   compareMode: 'off',
+  layerCreationError: null,
   compareSplitAt: 0.5,
   compareToggleBefore: false,
   exportDialog: Dialog.init({ id: 'export-dialog' }),

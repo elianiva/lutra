@@ -16,8 +16,8 @@ import { initialModel } from '../model'
 import { update } from '../update'
 import { view } from '../view'
 import { Idle } from '../phase'
+import { selectTool } from '../test-layer'
 import {
-  SelectedTool,
   RenderedFrame,
   OfflineConnectivityChanged,
   OfflineFileDownloaded,
@@ -70,7 +70,7 @@ const settled = (model: Model): Model =>
   update(model, RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
 
 /** A LUT draft with the bar open (the draft selects the first catalog entry). */
-const lutDraft = () => settled(update(loaded(), SelectedTool({ type: 'lut' }))[0])
+const lutDraft = () => settled(selectTool(loaded(), 'lut')[0])
 
 /** The same draft, but the device is offline. */
 const offlineLutDraft = () => update(lutDraft(), OfflineConnectivityChanged({ online: false }))[0]

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { Effect } from 'effect'
 import * as fc from 'fast-check'
 import { Command, Mount, given, scene, selector, label, expect as sceneExpect } from 'foldkit/scene'
 import { MockImageBitmap } from '../vitest-setup'
@@ -102,7 +103,10 @@ describe('compare flow', () => {
     const [split] = update(loadedModel(), ChangedCompareMode({ mode: 'split' }))
     const [moved] = update(split, ChangedSplitPosition({ position: 0.3 }))
     const [toggled] = update(moved, ChangedCompareMode({ mode: 'toggle' }))
-    const [, commands] = update(toggled, RemovedLayer({ id: createLayerFor('exposure').id }))
+    const [, commands] = update(
+      toggled,
+      RemovedLayer({ id: Effect.runSync(createLayerFor('exposure')).id }),
+    )
     const render = commands.find((c) => c.name === 'RenderChain')
     expect(render?.args?.present).toEqual({
       mode: 'toggle',

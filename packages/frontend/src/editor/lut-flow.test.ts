@@ -22,6 +22,7 @@ import { initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
 import { Idle } from './phase'
+import { selectTool } from './test-layer'
 import {
   SelectedTool,
   ChangedDraftLut,
@@ -96,7 +97,7 @@ const settled = (model: Model): Model =>
   update(model, RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
 
 /** A LUT draft (Drafting phase, bar open, no render in flight). */
-const lutDraft = () => settled(update(loaded(), SelectedTool({ type: 'lut' }))[0])
+const lutDraft = () => settled(selectTool(loaded(), 'lut')[0])
 
 /** A committed LUT layer (Selected phase, bar closed, no render in flight). */
 const selectedLut = () => settled(update(lutDraft(), ConfirmedDraft())[0])
@@ -104,7 +105,7 @@ const selectedLut = () => settled(update(lutDraft(), ConfirmedDraft())[0])
 /** A committed lut + exposure chain with the LUT layer selected. */
 const selectedLutWithExposure = () => {
   const committed = selectedLut()
-  const [withExposure] = update(committed, SelectedTool({ type: 'exposure' }))
+  const [withExposure] = selectTool(committed, 'exposure')
   const [done] = update(withExposure, ConfirmedDraft())
   const lutLayer = done.chain.find((l) => l.type === 'lut')
   if (!lutLayer) {
@@ -130,7 +131,7 @@ describe('LUT layer flow', () => {
   })
 
   it('creates a LUT draft with the first catalog entry and the bar open', () => {
-    const [model] = update(loaded(), SelectedTool({ type: 'lut' }))
+    const [model] = selectTool(loaded(), 'lut')
     expect(model.phase._tag).toBe('Drafting')
     if (model.phase._tag === 'Drafting' && model.phase.layer.type === 'lut') {
       expect(model.phase.layer.lutId).toBe(lutPrint)
@@ -140,21 +141,21 @@ describe('LUT layer flow', () => {
   })
 
   it('swaps the draft LUT through the machine and keeps the draft', () => {
-    const [withDraft] = update(loaded(), SelectedTool({ type: 'lut' }))
+    const [withDraft] = selectTool(loaded(), 'lut')
     const [model] = update(withDraft, ChangedDraftLut({ lutId: lutBw }))
     expect(model.phase._tag).toBe('Drafting')
     expect(draftLutId(model)).toBe(lutBw)
   })
 
   it('ignores a LUT swap on a non-LUT draft', () => {
-    const [withDraft] = update(loaded(), SelectedTool({ type: 'exposure' }))
+    const [withDraft] = selectTool(loaded(), 'exposure')
     const [model] = update(withDraft, ChangedDraftLut({ lutId: lutBw }))
     expect(model.phase._tag).toBe('Drafting')
     expect(draftLayerType(model)).toBe('exposure')
   })
 
   it('confirms the draft into the chain and closes the bar', () => {
-    const [withDraft] = update(loaded(), SelectedTool({ type: 'lut' }))
+    const [withDraft] = selectTool(loaded(), 'lut')
     const [model] = update(withDraft, ConfirmedDraft())
     expect(model.chain).toHaveLength(1)
     expect(model.phase._tag).toBe('Selected')
@@ -170,12 +171,12 @@ describe('LUT layer flow', () => {
     expect(m1.lutBarOpen).toBe(false)
 
     // With a LUT draft: toggles
-    const [withDraft] = update(loaded(), SelectedTool({ type: 'lut' }))
+    const [withDraft] = selectTool(loaded(), 'lut')
     const [m2] = update(withDraft, ToggledLutPicker())
     expect(m2.lutBarOpen).toBe(false)
 
     // A non-LUT draft: no-op
-    const [withExposure] = update(loaded(), SelectedTool({ type: 'exposure' }))
+    const [withExposure] = selectTool(loaded(), 'exposure')
     const [m3] = update(withExposure, ToggledLutPicker())
     expect(m3.lutBarOpen).toBe(false)
   })
@@ -285,7 +286,7 @@ describe('LUT bar commit + recents', () => {
   })
 
   it('the SelectedTool auto-default does not bump recents', () => {
-    const [model] = update(loaded(), SelectedTool({ type: 'lut' }))
+    const [model] = selectTool(loaded(), 'lut')
     expect(model.lutBarOpen).toBe(true)
     expect(model.lutRecents).toEqual([])
   })
@@ -302,12 +303,12 @@ describe('per-photo LUT thumbnails (lazy generation)', () => {
 
   it('a LUT draft auto-open generates the visible group', () => {
     // Effective tab: recents-empty falls back to the first category (Print).
-    const [, commands] = update(loaded(), SelectedTool({ type: 'lut' }))
+    const [, commands] = selectTool(loaded(), 'lut')
     expect(genIds(commands)).toEqual([lutPrint])
   })
 
   it('a non-LUT draft does not generate (the bar stays closed)', () => {
-    const [, commands] = update(loaded(), SelectedTool({ type: 'exposure' }))
+    const [, commands] = selectTool(loaded(), 'exposure')
     expect(genIds(commands)).toEqual([])
   })
 
@@ -392,7 +393,7 @@ describe('preview cleanup on bar-closing transitions', () => {
     readonly fire: (model: Model) => Model
   }[] = [
     {
-      fire: (m) => update(m, SelectedTool({ type: 'exposure' }))[0],
+      fire: (m) => selectTool(m, 'exposure')[0],
       make: selectedLut,
       name: 'SelectedTool (new draft context)',
     },
@@ -465,7 +466,7 @@ describe('persistence-during-preview dismissal', () => {
   })
 
   const hoveredDraft = () => {
-    const [withDraft] = update(saveReady(), SelectedTool({ type: 'lut' }))
+    const [withDraft] = selectTool(saveReady(), 'lut')
     return update(withDraft, PreviewedLut({ lutId: lutBw }))[0]
   }
 

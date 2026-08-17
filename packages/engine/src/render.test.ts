@@ -22,8 +22,6 @@ import {
 } from './shaders'
 import type { LutCube } from './luts/cube'
 
-// ---- helpers ----
-
 const registry = makeRegistry({
   chromaticAberration: renderChromaticAberration,
   clarity: renderClarity,
@@ -85,7 +83,7 @@ const sceneArb = fc
     let valueIdx = 0
     const usedLutIds: string[] = []
     for (let i = 0; i < types.length; i++) {
-      const layer = createLayer(types[i]!, registry)
+      const layer = Effect.runSync(createLayer(types[i]!, registry))
       const record: Record<string, number | string | boolean> = layer
       record.visible = visibility[i] ?? true
       for (const key of fieldKeysOf(types[i]!)) {
@@ -124,8 +122,6 @@ const hasUnknownVisibleLut = (
   chain: readonly Layer[],
   luts: ReadonlyMap<LutId, LutCube>,
 ): boolean => chain.some((l) => l.visible && l.type === 'lut' && isMissingLut(l, luts))
-
-// ---- tests ----
 
 describe('createRenderRequest', () => {
   it('resolves any chain into passes, uniforms, and luts coherently', () => {

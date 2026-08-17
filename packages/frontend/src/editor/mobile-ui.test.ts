@@ -17,8 +17,9 @@ import { initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
 import { Idle } from './phase'
+import { selectTool, createTestLayer } from './test-layer'
 import {
-  SelectedTool,
+  LayerCreated,
   SelectedLayer,
   ConfirmedDraft,
   ClearedImage,
@@ -31,7 +32,7 @@ import {
   CanvasRegistered,
 } from './message'
 import { PanZoom, RegisterCanvas } from './canvas-stage'
-import { RenderChain, ReadHistogram } from './command'
+import { CreateLayer, RenderChain, ReadHistogram } from './command'
 import type { Catalog } from './message'
 import type { Model } from './model'
 
@@ -93,13 +94,13 @@ describe('mobile bottom sheets', () => {
   })
 
   it('picking a tool follows the draft to the Layers sheet', () => {
-    const [model] = update(loaded(), SelectedTool({ type: 'exposure' }))
+    const [model] = selectTool(loaded(), 'exposure')
     expect(model.phase._tag).toBe('Drafting')
     expect(model.mobileSheet).toBe('layers')
   })
 
   it('selecting a layer opens the Layers sheet', () => {
-    const [withDraft] = update(loaded(), SelectedTool({ type: 'exposure' }))
+    const [withDraft] = selectTool(loaded(), 'exposure')
     const [committed] = update(withDraft, ConfirmedDraft())
     const layer = committed.chain[0]
     if (!layer) {
@@ -174,7 +175,7 @@ describe('mobile tab bar view', () => {
   })
 
   it('the LUT tab appears only while a LUT target exists and reflects the bar', () => {
-    const lutDraft = settled(update(loaded(), SelectedTool({ type: 'lut' }))[0])
+    const lutDraft = settled(selectTool(loaded(), 'lut')[0])
     scene(
       sceneConfig,
       given(lutDraft),
@@ -206,6 +207,7 @@ describe('mobile tab bar view', () => {
       ...stageMounts,
       click(role('button', { name: 'Adjustments' })),
       click(role('button', { name: 'Add Exposure adjustment' })),
+      Command.resolve(CreateLayer, LayerCreated({ layer: createTestLayer('exposure') })),
       ...resolveRender(),
       sceneExpect(role('button', { name: 'Adjustments' })).toHaveAttr('aria-pressed', 'false'),
       sceneExpect(role('button', { name: 'Layers' })).toHaveAttr('aria-pressed', 'true'),

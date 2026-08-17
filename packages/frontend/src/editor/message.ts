@@ -22,6 +22,7 @@ import {
   CanvasUnavailableError,
   EditNotFoundError,
   ImageDecodeError,
+  LayerCreationError,
   ThumbnailEncodeError,
 } from '../errors'
 
@@ -182,6 +183,15 @@ export const SelectedTool = Message.m('SelectedTool', {
   // Literal union so handlers get a narrowed LayerType without casts.
   type: S.Literals(LAYER_TYPES),
 })
+
+// Layer creation runs as a Command because the engine factory now exposes an
+// Effect. The phase machine waits in Creating until one of these messages
+// arrives, so a failed factory never throws through update.
+export const LayerCreated = Message.m('LayerCreated', { layer: Layer })
+export const LayerCreationFailed = Message.m('LayerCreationFailed', {
+  error: LayerCreationError,
+})
+
 export const ConfirmedDraft = Message.m('ConfirmedDraft')
 export const CancelledDraft = Message.m('CancelledDraft')
 export const UpdatedDraftParam = Message.m('UpdatedDraftParam', {
@@ -442,6 +452,8 @@ export const EditorMessage = S.Union([
   OfflineLutUnavailable,
   ScaledCanvas,
   SelectedTool,
+  LayerCreated,
+  LayerCreationFailed,
   ConfirmedDraft,
   CancelledDraft,
   UpdatedDraftParam,

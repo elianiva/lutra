@@ -2,8 +2,6 @@ import { Effect, Layer } from 'effect'
 import { encodeImage } from './jsquash'
 import { EncodeError, ImageEncoder } from './service'
 
-const errMsg = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause))
-
 /**
  * The jSquash-backed encoder: the default implementation of `ImageEncoder`.
  * Runs the encode inline in the calling context; the frontend provides a
@@ -14,7 +12,11 @@ export const ImageEncoderLive = Layer.succeed(
   ImageEncoder.of({
     encode: ({ image, settings }) =>
       Effect.tryPromise({
-        catch: (cause) => new EncodeError({ cause, message: errMsg(cause) }),
+        catch: (cause) =>
+          new EncodeError({
+            cause,
+            message: cause instanceof Error ? cause.message : String(cause),
+          }),
         try: async () => await encodeImage(image, settings),
       }),
   }),

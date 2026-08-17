@@ -53,7 +53,7 @@ const isOnline = (): boolean => globalThis.navigator === undefined || navigator.
 /** Blocks while the device is offline, polling `pollInterval`. Returns true
  *  when it actually had to wait (the caller announces Paused/Resumed). */
 const waitIfOffline = (opts: FillOptions): Effect.Effect<boolean> =>
-  Effect.gen(function* waitIfOffline() {
+  Effect.fn('waitIfOffline')(function* () {
     let online = yield* Effect.sync(isOnline)
     if (online) {
       return false
@@ -63,7 +63,7 @@ const waitIfOffline = (opts: FillOptions): Effect.Effect<boolean> =>
       online = yield* Effect.sync(isOnline)
     }
     return true
-  })
+  })()
 
 /** One file: fetch (transient failures retried with backoff, waiting out
  *  offline periods) then mirror into the cache. Succeeds with true when the
@@ -75,9 +75,9 @@ const fetchAndPut = (file: FillFile, opts: FillOptions): Effect.Effect<boolean, 
     | { readonly _tag: 'quota'; readonly message: string }
 
   const attempt = (n: number): Effect.Effect<boolean, string> =>
-    Effect.gen(function* () {
+    Effect.fn('attempt')(function* () {
       yield* waitIfOffline(opts)
-      const outcome = yield* Effect.gen(function* outcome() {
+      const outcome = yield* Effect.fn('outcome')(function* () {
         const res = yield* Effect.tryPromise({
           catch: (cause) => ({ _tag: 'transient' as const, cause }),
           try: async () => await opts.fetchImpl(file.path),
@@ -98,7 +98,7 @@ const fetchAndPut = (file: FillFile, opts: FillOptions): Effect.Effect<boolean, 
           ),
         )
         return true
-      }).pipe(Effect.result)
+      })().pipe(Effect.result)
       if (outcome._tag === 'Success') {
         return true
       }
@@ -110,7 +110,7 @@ const fetchAndPut = (file: FillFile, opts: FillOptions): Effect.Effect<boolean, 
       }
       yield* Effect.sleep(opts.backoff(n))
       return yield* attempt(n + 1)
-    })
+    })()
   return attempt(1)
 }
 
@@ -148,7 +148,7 @@ export const fillFiles = (
   opts: FillOptions,
   emit: (event: FillEvent) => Effect.Effect<void>,
 ): Effect.Effect<void> =>
-  Effect.gen(function* fillFiles() {
+  Effect.fn('fillFiles')(function* () {
     const files = libraryFiles(catalog)
     // The start gate: an unavailable cache (the Cache API threw) means the
     // offline library cannot work at all — the fill stays silent and the
@@ -192,7 +192,7 @@ export const fillFiles = (
     // Every run — full or silent — sweeps orphans left by earlier runs or
     // catalog shrinks (a deploy removed a LUT).
     yield* pruneOrphans(files, opts)
-  })
+  })()
 
 // ---- service ----
 
@@ -212,7 +212,7 @@ export class OfflineFill extends Context.Service<OfflineFill, OfflineFillContrac
 
 export const OfflineFillLive = Layer.effect(
   OfflineFill,
-  Effect.gen(function* OfflineFillLive() {
+  Effect.fn('OfflineFillLive')(function* () {
     const events = yield* PubSub.unbounded<FillEvent>()
     // Start signals: `start()` publishes; a supervisor fiber owned by the
     // layer's scope (killed with the app) runs one fill loop per signal.
@@ -232,16 +232,16 @@ export const OfflineFillLive = Layer.effect(
     }
 
     const publish = (event: FillEvent): Effect.Effect<void> =>
-      Effect.gen(function* publish() {
+      Effect.fn('publish')(function* () {
         // A quota stop re-arms the fill so the persist-retry can start a
         // fresh run (the machine's QuotaError → OfflineFillStarted edge).
         if (event._tag === 'FillQuotaError') {
           yield* Ref.set(startedRef, false)
         }
         yield* PubSub.publish(events, event)
-      })
+      })()
 
-    const run = Effect.gen(function* run() {
+    const run = Effect.fn('run')(function* () {
       // The catalog must land before the diff. Served by the SW from the
       // first visit on; a first-visit failure is a network-less session,
       // where a fill is pointless anyway. After the retries the run gives
@@ -250,7 +250,7 @@ export const OfflineFillLive = Layer.effect(
         .getCatalog()
         .pipe(Effect.retry({ schedule: Schedule.exponential(Duration.millis(500), 2), times: 5 }))
       yield* fillFiles(catalog, opts, publish)
-    })
+    })()
 
     // The supervisor: one fill loop per start signal, forever. The fiber is
     // scoped to the layer — it lives for the app's lifetime and dies with
@@ -263,16 +263,15 @@ export const OfflineFillLive = Layer.effect(
 
     return OfflineFill.of({
       events,
-      start: () =>
-        Effect.gen(function* start() {
-          if (yield* Ref.get(startedRef)) {
-            return
-          }
-          yield* Ref.set(startedRef, true)
-          yield* PubSub.publish(startSignal, void 0)
-        }),
+      start: Effect.fn('start')(function* () {
+        if (yield* Ref.get(startedRef)) {
+          return
+        }
+        yield* Ref.set(startedRef, true)
+        yield* PubSub.publish(startSignal, void 0)
+      }),
     })
-  }),
+  })(),
 ).pipe(
   // Self-contained (Layer.merge does not subtract requirements at the type
   // level in this effect version): the fill brings its own LutCache and

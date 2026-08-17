@@ -1,5 +1,3 @@
-export { VERSION } from './version'
-
 // Branded primitives — constructors (Brand.nominal) and the schemas
 // (Schema.fromBrand) that decode the same branded types at boundaries.
 // Each name exports both its value (constructor/schema) and type meaning.
@@ -39,16 +37,6 @@ export type {
   CurvePoint,
   LayerFieldValue,
 } from './layers'
-
-// Chain operations
-export {
-  addLayer,
-  removeLayer,
-  reorderLayer,
-  updateLayerParam,
-  toggleLayerVisibility,
-  replaceChain,
-} from './chain'
 
 // Render pipeline
 // The engine builds a render request (shader + uniforms + source + frame);
@@ -109,7 +97,6 @@ export {
   ExportSettings,
   defaultExportSettings,
   isLossy,
-  fileExtension,
   mimeFor,
   EncodeError,
   ImageEncoder,

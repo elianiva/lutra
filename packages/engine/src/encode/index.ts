@@ -7,7 +7,6 @@ export {
   ExportSettings,
   defaultExportSettings,
   isLossy,
-  fileExtension,
   mimeFor,
 } from './settings'
 export type {

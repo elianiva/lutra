@@ -95,7 +95,7 @@ const thumbImageData = (bitmap: ImageBitmap): Effect.Effect<ImageData, Thumbnail
 
 export const LutThumbnailerLive = Layer.effect(
   LutThumbnailer,
-  Effect.gen(function* LutThumbnailerLive() {
+  Effect.fn('LutThumbnailerLive')(function* () {
     // The pool: 4 workers, or the machine's core count, whichever is lower
     // (a single-core machine degrades to the pre-pool one-worker behavior).
     // Each worker lazily instantiates its own jSquash wasm on first use;
@@ -204,9 +204,8 @@ export const LutThumbnailerLive = Layer.effect(
     )
 
     return LutThumbnailer.of({
-      render: (lutId, bitmap, cube) =>
-        Effect.gen(function* render() {
-          // Downscale once per photo: the slot is keyed by bitmap identity,
+      render: Effect.fn('render')(function* (lutId, bitmap, cube) {
+        // Downscale once per photo: the slot is keyed by bitmap identity,
           // so a group's concurrent commands share one canvas-2D op. The
           // ImageData is then structured-cloned into each request — one
           // buffer serves the whole pool, so it cannot be transferred.
@@ -264,7 +263,7 @@ export const LutThumbnailerLive = Layer.effect(
             return next
           })
           return result
-        }),
+      }),
     })
-  }),
+  })(),
 )

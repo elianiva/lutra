@@ -20,8 +20,8 @@ import { initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
 import { Idle } from './phase'
+import { selectTool } from './test-layer'
 import {
-  SelectedTool,
   ConfirmedDraft,
   CurvePointDragged,
   CurveReset,
@@ -55,7 +55,7 @@ const settled = (model: Model): Model =>
   update(model, RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
 
 /** A Tone Curve draft (Drafting phase, no render in flight). */
-const curveDraft = () => settled(update(loaded(), SelectedTool({ type: 'toneCurve' }))[0])
+const curveDraft = () => settled(selectTool(loaded(), 'toneCurve')[0])
 
 /** A committed Tone Curve layer (Selected phase, no render in flight). */
 const selectedCurve = () => settled(update(curveDraft(), ConfirmedDraft())[0])
@@ -71,7 +71,7 @@ const drag = (model: Model, index: number, x: number, y: number) =>
 
 describe('Tone Curve layer flow', () => {
   it('creates a Tone Curve draft as the identity curve', () => {
-    const [model] = update(loaded(), SelectedTool({ type: 'toneCurve' }))
+    const [model] = selectTool(loaded(), 'toneCurve')
     expect(model.phase._tag).toBe('Drafting')
     const layer = draftLayer(model)
     expect(layer?.type).toBe('toneCurve')
@@ -98,7 +98,7 @@ describe('Tone Curve layer flow', () => {
   })
 
   it('a drag clamps the draft point between its neighbors', () => {
-    const [withDraft] = update(loaded(), SelectedTool({ type: 'toneCurve' }))
+    const [withDraft] = selectTool(loaded(), 'toneCurve')
     // Dragging p1 far right must stop before p2's x.
     const [model] = drag(withDraft, 1, 0.9, 0.5)
     const layer = draftLayer(model)
@@ -161,7 +161,7 @@ describe('Tone Curve layer flow', () => {
     expect(idleCommands).toHaveLength(0)
 
     // A non-curve selection is not a drag target either.
-    const [withExposure] = update(loaded(), SelectedTool({ type: 'exposure' }))
+    const [withExposure] = selectTool(loaded(), 'exposure')
     const [confirmed] = update(withExposure, ConfirmedDraft())
     const exposure = settled(confirmed)
     const [afterDrag, commands] = drag(exposure, 2, 0.5, 0.7)

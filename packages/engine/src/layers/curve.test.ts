@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import * as fc from 'fast-check'
-import { Schema } from 'effect'
+import { Effect, Schema } from 'effect'
 import { createLayer, makeRegistry, CURVE_POINT_COUNT, CURVE_X_EPS } from '../layers'
 import type { Layer } from '../layers'
 import type { BodySource } from '../shaders'
@@ -39,7 +39,7 @@ const registry = makeRegistry({
   whiteBalance: renderWhiteBalance,
 })
 
-const curveLayer = () => createLayer('toneCurve', registry)
+const curveLayer = () => Effect.runSync(createLayer('toneCurve', registry))
 
 /** A point moved by the UI: the layer's fields after one moveCurvePoint call. */
 const move = (layer: Layer, index: number, x: number, y: number) =>
@@ -144,7 +144,7 @@ describe('moveCurvePoint', () => {
   })
 
   it('is a no-op for other layer types (the widget can never produce it, but a stray message must be safe)', () => {
-    const exposure = createLayer('exposure', registry)
+    const exposure = Effect.runSync(createLayer('exposure', registry))
     expect(move(exposure, 2, 0.5, 0.6)).toBe(exposure)
   })
 })
@@ -168,7 +168,7 @@ describe('resetCurve', () => {
   })
 
   it('is a no-op for other layer types', () => {
-    const exposure = createLayer('exposure', registry)
+    const exposure = Effect.runSync(createLayer('exposure', registry))
     expect(resetCurve(exposure)).toBe(exposure)
   })
 })

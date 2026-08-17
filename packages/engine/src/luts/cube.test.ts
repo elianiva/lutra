@@ -2,8 +2,6 @@ import { describe, it, expect } from 'vitest'
 import * as fc from 'fast-check'
 import { parseCube, LutParseError } from './cube'
 
-// ---- generators ----
-
 /** A size-2 cube with every texel value generated, in file point order. */
 const cubeTextArb = fc.integer({ max: 8, min: 2 }).chain((size) =>
   fc
@@ -41,8 +39,6 @@ const indexCube = (size: number): string => {
   }
   return lines.join('\n')
 }
-
-// ---- tests ----
 
 describe('parseCube', () => {
   it('round-trips any generated cube through its own serialization', () => {

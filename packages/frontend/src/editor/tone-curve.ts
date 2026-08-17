@@ -49,7 +49,7 @@ export const CurveWidget = Mount.defineStream(
   CurvePointDragged,
 )((element) =>
   Stream.callback<typeof CurvePointDragged.Type>((queue) =>
-    Effect.gen(function* CurveWidget() {
+    Effect.fn('CurveWidget')(function* () {
       // Narrow to the SVG element (the mount target is always the widget's
       // svg) so the listeners get typed PointerEvents, like the canvas
       // stage's HTMLElement narrowing.
@@ -142,7 +142,7 @@ export const CurveWidget = Mount.defineStream(
           }),
       )
       return yield* Effect.never
-    }),
+    })(),
   ),
 )
 

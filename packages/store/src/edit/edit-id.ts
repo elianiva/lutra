@@ -39,4 +39,4 @@ export const EditIdSchema = Schema.fromBrand(
  * `[1-8]`, variant nibble `[89ab]`). Used when a new Edit is created — the
  * gallery's "open a photo" flow, and the editor's Save-as fork.
  */
-export const newEditId = (): EditId => EditId(crypto.randomUUID())
+export const newEditId = () => EditId(crypto.randomUUID())

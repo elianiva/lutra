@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { Effect } from 'effect'
 import { MockImageBitmap } from '../vitest-setup'
 import { EditId } from '@lutra/store'
 import { initialModel } from './model'
@@ -6,6 +7,7 @@ import { update } from './update'
 import { init } from './init'
 import { informRouteChanged } from './inform-route-changed'
 import { createLayerFor } from './command'
+import { selectTool } from './test-layer'
 import { EditLoaded, EditLoadFailed } from './message'
 import { EditNotFoundError } from '../errors'
 import { Idle } from './phase'
@@ -39,7 +41,7 @@ describe('attached edit load (gallery → /edit/:id)', () => {
   })
 
   it('EditLoaded seeds the chain + source bitmap and lands Idle, then renders', () => {
-    const exposure = createLayerFor('exposure')
+    const exposure = Effect.runSync(createLayerFor('exposure'))
     const [model, commands] = update(
       initialModel(),
       EditLoaded({
@@ -72,7 +74,7 @@ describe('attached edit load (gallery → /edit/:id)', () => {
       phase: Idle(),
       source: { bitmap: bitmap(), error: null, height: 480, width: 640 },
     }
-    const [drafting] = update(withDraft, { _tag: 'SelectedTool', type: 'exposure' })
+    const [drafting] = selectTool(withDraft, 'exposure')
     expect(drafting.phase._tag).toBe('Drafting')
 
     // …is discarded when EditLoaded lands (the machine edge Drafting → Idle).

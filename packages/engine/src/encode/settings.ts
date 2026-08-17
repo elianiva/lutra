@@ -1,14 +1,10 @@
-import { Schema } from 'effect'
+import { Match, Schema } from 'effect'
 
-// ---- export formats ----
-
-/** The file formats the export dialog offers, in display order. */
 export const EXPORT_FORMATS = ['png', 'jpeg', 'webp', 'avif'] as const
 
 export const ExportFormat = Schema.Literals(EXPORT_FORMATS)
 export type ExportFormat = typeof ExportFormat.Type
 
-/** Lossy fidelity knob, 0–100. `null` means lossless (PNG). */
 export const ExportQuality = Schema.Number.pipe(
   Schema.check(Schema.isBetween({ maximum: 100, minimum: 0 })),
 )
@@ -41,15 +37,13 @@ export const defaultExportSettings = (): ExportSettings => ({
   scale: 1,
 })
 
-export const isLossy = (format: ExportFormat): boolean => format !== 'png'
-
-export const fileExtension = (format: ExportFormat): string => format
+export const isLossy = (format: ExportFormat) => format !== 'png'
 
 export const mimeFor = (format: ExportFormat): string =>
-  format === 'png'
-    ? 'image/png'
-    : format === 'jpeg'
-      ? 'image/jpeg'
-      : format === 'webp'
-        ? 'image/webp'
-        : 'image/avif'
+  Match.value(format).pipe(
+    Match.when('png', () => 'image/png'),
+    Match.when('jpeg', () => 'image/jpeg'),
+    Match.when('webp', () => 'image/webp'),
+    Match.when('avif', () => 'image/avif'),
+    Match.exhaustive,
+  )

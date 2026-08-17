@@ -3,8 +3,6 @@ import * as fc from 'fast-check'
 import { applyLutCpu } from './apply'
 import type { LutCube } from './cube'
 
-// ---- generators ----
-
 const channel = fc.integer({ max: 255, min: 0 })
 const amountArb = fc.float({ max: 1, min: 0, noDefaultInfinity: true, noNaN: true })
 
@@ -31,8 +29,6 @@ const cubeOfSize = (size: number) =>
 const cubeArb = fc.integer({ max: 8, min: 2 }).chain(cubeOfSize)
 
 const sceneArb = fc.record({ amount: amountArb, cube: cubeArb, image: imageArb })
-
-// ---- reference ----
 
 /**
  * A textbook trilinear sampler, deliberately structured differently from

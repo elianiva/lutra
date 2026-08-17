@@ -3,7 +3,6 @@ export type { ChainLayerInfo, ChainPass, ChainShader, UniformSlot } from './chai
 export { SRGB_TO_LINEAR } from './colorspace'
 export type { BodyRenderer, BodySource } from './types'
 
-// Body renderers
 export { renderExposure } from './bodies/exposure'
 export { renderContrast } from './bodies/contrast'
 export { renderShadows } from './bodies/shadows'

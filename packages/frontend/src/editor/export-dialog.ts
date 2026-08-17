@@ -10,7 +10,7 @@ import {
   ExportDownloadRequested,
   GotExportDialogMessage,
 } from './message'
-import { EXPORT_FORMATS, EXPORT_SCALES, fileExtension, isLossy } from '@lutra/engine'
+import { EXPORT_FORMATS, EXPORT_SCALES, isLossy } from '@lutra/engine'
 
 const fmtBytes = (bytes: number) => {
   if (bytes < 1024) {
@@ -101,7 +101,7 @@ export const exportDialogView = (h: HtmlBuilder<EditorMessage>, model: Model) =>
                         ),
                         h.span(
                           [h.Class('text-[10px] uppercase tracking-[0.14em] text-muted')],
-                          [`lutra-edit.${fileExtension(model.exportSettings.format)}`],
+                          [`lutra-edit.${model.exportSettings.format}`],
                         ),
                       ],
                     ),

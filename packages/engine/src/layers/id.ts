@@ -8,4 +8,4 @@ import { LayerId } from '../brands'
  * no counter, no reset hook, and no ordering guarantee — two chains created
  * independently (tests, a second app instance, SSR) cannot collide.
  */
-export const nextLayerId = (): LayerId => LayerId(crypto.randomUUID())
+export const nextLayerId = () => LayerId(crypto.randomUUID())

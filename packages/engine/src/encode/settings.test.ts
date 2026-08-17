@@ -7,11 +7,8 @@ import {
   ExportSettings,
   defaultExportSettings,
   isLossy,
-  fileExtension,
   mimeFor,
 } from './settings'
-
-// ---- generators ----
 
 const formatArb = fc.constantFrom(...EXPORT_FORMATS)
 const scaleArb = fc.constantFrom(...EXPORT_SCALES)
@@ -23,8 +20,6 @@ const validSettingsArb = fc.record({
   quality: qualityArb,
   scale: scaleArb,
 })
-
-// ---- tests ----
 
 describe('ExportSettings', () => {
   it('round-trips any valid settings object', () => {
@@ -117,14 +112,6 @@ describe('format helpers', () => {
     fc.assert(
       fc.property(formatArb, (format) => {
         expect(isLossy(format)).toBe(format !== 'png')
-      }),
-    )
-  })
-
-  it('fileExtension matches the format name', () => {
-    fc.assert(
-      fc.property(formatArb, (format) => {
-        expect(fileExtension(format)).toBe(format)
       }),
     )
   })

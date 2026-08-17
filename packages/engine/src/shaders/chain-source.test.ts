@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { generateChainSource, WORKGROUP_SIZE } from '../shaders/chain-source'
+import { Effect } from 'effect'
+import {
+  generateChainSource as generateChainSourceEffect,
+  WORKGROUP_SIZE,
+} from '../shaders/chain-source'
 import type { ChainLayerInfo } from '../shaders/chain-source'
 import { FieldKey, LutId } from '../brands'
 import { renderExposure } from '../shaders/bodies/exposure'
@@ -21,6 +25,9 @@ const lutLayer = (over: Partial<ChainLayerInfo> = {}): ChainLayerInfo => ({
   type: 'lut',
   ...over,
 })
+
+const generateChainSource = (layers: readonly ChainLayerInfo[]) =>
+  Effect.runSync(generateChainSourceEffect(layers))
 
 describe('generateChainSource', () => {
   it('emits a single passthrough pass for an empty chain', () => {
@@ -388,11 +395,20 @@ describe('generateChainSource', () => {
     expect(lut.source).toContain('rgba8unorm')
   })
 
-  it('throws when a LUT body has no cube reference', () => {
+  it('fails on the Effect error channel when a LUT body has no cube reference', () => {
     const layers: ChainLayerInfo[] = [
       { body: renderLut, fieldKeys: [FieldKey('amount')], type: 'lut' },
     ]
-    expect(() => generateChainSource(layers)).toThrow(/missing its cube reference/)
+    const result = Effect.runSync(
+      Effect.match(generateChainSourceEffect(layers), {
+        onFailure: (error) => ({ _tag: 'failure' as const, error }),
+        onSuccess: () => ({ _tag: 'success' as const }),
+      }),
+    )
+    expect(result._tag).toBe('failure')
+    if (result._tag === 'failure') {
+      expect(result.error.message).toMatch(/missing its cube reference/)
+    }
   })
 
   it('binds every uniform reference used by a body to u_params', () => {

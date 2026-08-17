@@ -14,6 +14,7 @@ import {
   mimeFor,
   ImageEncoder,
   Layer,
+  LAYER_TYPES,
   LutIdSchema,
   type LayerType,
   type LutCube,
@@ -28,6 +29,7 @@ import {
   CanvasUnavailableError,
   EditNotFoundError,
   ImageDecodeError,
+  LayerCreationError,
   ThumbnailEncodeError,
 } from '../errors'
 import {
@@ -60,12 +62,50 @@ import {
   FramePresented,
   PresentState,
   SelectedImageFile,
+  LayerCreated,
+  LayerCreationFailed,
 } from './message'
 import { ENGINE_REGISTRY } from '../editor/layer-meta'
 
 // The frontend consumes the engine's registry directly — no duplicate layer
-// definitions.
-export const createLayerFor = (type: LayerType): Layer => createLayer(type, ENGINE_REGISTRY)
+// definitions. Layer creation stays an Effect until the CreateLayer command
+// crosses into the foldkit message boundary.
+export const createLayerFor = (type: LayerType) => createLayer(type, ENGINE_REGISTRY)
+
+/**
+ * Assemble a draft layer outside the synchronous phase transition. A schema
+ * or registry failure is converted to a message carrying a frontend error;
+ * defects remain defects and are not relabeled as user failures.
+ */
+export const CreateLayer = Command.define('CreateLayer', {
+  args: { type: Schema.Literals(LAYER_TYPES) },
+  execute: Effect.fn('execute')(function* ({ type }) {
+    const layer = yield* createLayerFor(type)
+    return LayerCreated({ layer })
+  }).pipe(
+      Effect.catchTags({
+        SchemaError: (cause) =>
+          Effect.succeed(
+            LayerCreationFailed({
+              error: new LayerCreationError({
+                cause,
+                message: `Failed to create ${type} layer: ${String(cause)}`,
+              }),
+            }),
+          ),
+        UnknownLayerTypeError: (cause) =>
+          Effect.succeed(
+            LayerCreationFailed({
+              error: new LayerCreationError({
+                cause,
+                message: `Failed to create ${type} layer: ${String(cause)}`,
+              }),
+            }),
+          ),
+      }),
+    ),
+  messages: [LayerCreated, LayerCreationFailed],
+})
 
 /**
  * Opens the native file picker restricted to image files. If the user selects
@@ -91,12 +131,11 @@ export const PickImageFile = Command.define('PickImageFile', {
  */
 export const DecodeImage = Command.define('DecodeImage', {
   args: { file: Schema.instanceOf(File) },
-  execute: ({ file }) =>
-    Effect.gen(function* execute() {
-      // Read the picked file's stored bytes alongside the decode: they are
-      // the Edit's source image, so a later Save-as-new can persist them
-      // without holding the File (the store's carrier is bytes).
-      const source = yield* Effect.tryPromise({
+  execute: Effect.fn('execute')(function* ({ file }) {
+    // Read the picked file's stored bytes alongside the decode: they are
+    // the Edit's source image, so a later Save-as-new can persist them
+    // without holding the File (the store's carrier is bytes).
+    const source = yield* Effect.tryPromise({
         catch: (cause) =>
           new ImageDecodeError({
             message: `Failed to read image: ${String(cause)}`,
@@ -112,17 +151,17 @@ export const DecodeImage = Command.define('DecodeImage', {
           }),
         try: async () => await createImageBitmap(file),
       })
-      return ImageDecoded({
-        bitmap,
-        height: bitmap.height,
-        source: new Uint8Array(source),
-        width: bitmap.width,
-      })
-    }).pipe(
-      Effect.catchTag('ImageDecodeError', (err: ImageDecodeError) =>
-        Effect.succeed(ImageFailedToDecode({ error: err })),
-      ),
+    return ImageDecoded({
+      bitmap,
+      height: bitmap.height,
+      source: new Uint8Array(source),
+      width: bitmap.width,
+    })
+  }).pipe(
+    Effect.catchTag('ImageDecodeError', (err: ImageDecodeError) =>
+      Effect.succeed(ImageFailedToDecode({ error: err })),
     ),
+  ),
   messages: [ImageDecoded, ImageFailedToDecode],
 })
 
@@ -135,11 +174,10 @@ export const DecodeImage = Command.define('DecodeImage', {
  */
 export const LoadEdit = Command.define('LoadEdit', {
   args: { id: EditIdSchema },
-  execute: ({ id }) =>
-    Effect.gen(function* execute() {
-      const store = yield* EditStore
-      const maybeEdit = yield* store.load(id)
-      if (Option.isNone(maybeEdit)) {
+  execute: Effect.fn('execute')(function* ({ id }) {
+    const store = yield* EditStore
+    const maybeEdit = yield* store.load(id)
+    if (Option.isNone(maybeEdit)) {
         return EditLoadFailed({ error: new EditNotFoundError({ message: 'edit not found' }) })
       }
       const edit = maybeEdit.value
@@ -161,15 +199,15 @@ export const LoadEdit = Command.define('LoadEdit', {
         height: bitmap.height,
         // The stored source bytes: Save writes them back untouched.
         source: edit.source,
-      })
-    }).pipe(
-      Effect.catchTag('StoreError', (err: StoreError) =>
-        Effect.succeed(EditLoadFailed({ error: err })),
-      ),
-      Effect.catchTag('ImageDecodeError', (err: ImageDecodeError) =>
-        Effect.succeed(EditLoadFailed({ error: err })),
-      ),
+    })
+  }).pipe(
+    Effect.catchTag('StoreError', (err: StoreError) =>
+      Effect.succeed(EditLoadFailed({ error: err })),
     ),
+    Effect.catchTag('ImageDecodeError', (err: ImageDecodeError) =>
+      Effect.succeed(EditLoadFailed({ error: err })),
+    ),
+  ),
   messages: [EditLoaded, EditLoadFailed],
 })
 
@@ -234,17 +272,16 @@ export const SaveEdit = Command.define('SaveEdit', {
     id: Schema.NullOr(EditIdSchema),
     source: Schema.Uint8Array,
   },
-  execute: ({ id, chain, source, handle }) =>
-    Effect.gen(function* execute() {
-      const backend = yield* GpuBackend
-      const frame = yield* backend.snapshot(handle)
-      const thumbnail = yield* thumbnailFromFrame(frame)
-      const store = yield* EditStore
-      const editId = id ?? newEditId()
-      const savedAt = Date.now()
-      yield* store.save(Edit.make({ chain, id: editId, savedAt, source, thumbnail }))
-      return EditSaved({ id: editId, savedAt })
-    }).pipe(
+  execute: Effect.fn('execute')(function* ({ id, chain, source, handle }) {
+    const backend = yield* GpuBackend
+    const frame = yield* backend.snapshot(handle)
+    const thumbnail = yield* thumbnailFromFrame(frame)
+    const store = yield* EditStore
+    const editId = id ?? newEditId()
+    const savedAt = Date.now()
+    yield* store.save(Edit.make({ chain, id: editId, savedAt, source, thumbnail }))
+    return EditSaved({ id: editId, savedAt })
+  }).pipe(
       Effect.catchTag('GpuError', (err: GpuError) => Effect.succeed(SaveFailed({ error: err }))),
       Effect.catchTag('StoreError', (err: StoreError) =>
         Effect.succeed(SaveFailed({ error: err })),
@@ -262,7 +299,7 @@ export const SaveEdit = Command.define('SaveEdit', {
  * the app doesn't know.
  */
 export const LoadCatalog = Command.define('LoadCatalog', {
-  execute: Effect.gen(function* execute() {
+  execute: Effect.fn('execute')(function* () {
     const store = yield* LutStore
     const catalog = yield* store.getCatalog()
     return CatalogLoaded({ catalog })
@@ -282,7 +319,7 @@ export const LoadCatalog = Command.define('LoadCatalog', {
 const resolveLuts = (
   layers: readonly Layer[],
 ): Effect.Effect<ReadonlyMap<LutId, LutCube>, LutLoadError | LutParseError, LutStore> =>
-  Effect.gen(function* resolveLuts() {
+  Effect.fn('resolveLuts')(function* () {
     const store = yield* LutStore
     const luts = new Map<LutId, LutCube>()
     for (const layer of layers) {
@@ -296,7 +333,7 @@ const resolveLuts = (
       luts.set(layer.lutId, cube)
     }
     return luts
-  })
+  })()
 
 /**
  * Render the current chain (plus an optional draft appended last) through
@@ -324,31 +361,30 @@ export const RenderChain = Command.define('RenderChain', {
     // blit applies the current mode and split position.
     present: PresentState,
   },
-  execute: ({ layers, draft, bitmap, stamp, present }) =>
-    Effect.gen(function* execute() {
-      yield* Render.afterCommit
-      // The canvas is registered into the CanvasRef service when it mounts;
-      // resolve it from the app context instead of a global DOM query. The
-      // afterCommit wait guarantees the mount that registered it has run
-      // (mounts fork right after the patch; afterCommit resumes a frame
-      // later).
-      const canvasRef = yield* CanvasRef
-      const canvas = yield* Ref.get(canvasRef)
-      if (Option.isNone(canvas)) {
-        return RenderFailed({ error: new CanvasUnavailableError({ message: 'Canvas not ready' }) })
-      }
+  execute: Effect.fn('execute')(function* ({ layers, draft, bitmap, stamp, present }) {
+    yield* Render.afterCommit
+    // The canvas is registered into the CanvasRef service when it mounts;
+    // resolve it from the app context instead of a global DOM query. The
+    // afterCommit wait guarantees the mount that registered it has run
+    // (mounts fork right after the patch; afterCommit resumes a frame
+    // later).
+    const canvasRef = yield* CanvasRef
+    const canvas = yield* Ref.get(canvasRef)
+    if (Option.isNone(canvas)) {
+      return RenderFailed({ error: new CanvasUnavailableError({ message: 'Canvas not ready' }) })
+    }
 
-      const chain: Layer[] = [...layers]
-      if (draft) {
-        chain.push(draft)
-      }
+    const chain: Layer[] = [...layers]
+    if (draft) {
+      chain.push(draft)
+    }
 
-      const luts = yield* resolveLuts(chain)
-      const request = yield* createRenderRequest(chain, ENGINE_REGISTRY, bitmap, stamp, luts)
-      const backend = yield* GpuBackend
-      const handle = yield* backend.execute(request, canvas.value, present)
-      return RenderedFrame({ handle, stamp })
-    }).pipe(
+    const luts = yield* resolveLuts(chain)
+    const request = yield* createRenderRequest(chain, ENGINE_REGISTRY, bitmap, stamp, luts)
+    const backend = yield* GpuBackend
+    const handle = yield* backend.execute(request, canvas.value, present)
+    return RenderedFrame({ handle, stamp })
+  }).pipe(
       // Every failure of this command surfaces as RenderFailed; the message
       // schema names the failure set.
       Effect.catchTags({
@@ -371,18 +407,17 @@ export const RenderChain = Command.define('RenderChain', {
  */
 export const PresentFrame = Command.define('PresentFrame', {
   args: { present: PresentState },
-  execute: ({ present }) =>
-    Effect.gen(function* execute() {
-      yield* Render.afterCommit
-      const canvasRef = yield* CanvasRef
-      const canvas = yield* Ref.get(canvasRef)
-      if (Option.isNone(canvas)) {
-        return FramePresented()
-      }
-      const backend = yield* GpuBackend
-      yield* backend.present(canvas.value, present)
+  execute: Effect.fn('execute')(function* ({ present }) {
+    yield* Render.afterCommit
+    const canvasRef = yield* CanvasRef
+    const canvas = yield* Ref.get(canvasRef)
+    if (Option.isNone(canvas)) {
       return FramePresented()
-    }).pipe(
+    }
+    const backend = yield* GpuBackend
+    yield* backend.present(canvas.value, present)
+    return FramePresented()
+  }).pipe(
       // A present failure (a defect surfaced as GpuError) is best-effort by
       // nature: the next render or present re-blits anyway, so there is
       // nothing to surface and nothing that wedges — unlike a failed
@@ -402,12 +437,11 @@ export const PresentFrame = Command.define('PresentFrame', {
  */
 export const ReadHistogram = Command.define('ReadHistogram', {
   args: { handle: Schema.instanceOf(RenderHandle), stamp: Schema.Number },
-  execute: ({ handle, stamp }) =>
-    Effect.gen(function* execute() {
-      const backend = yield* GpuBackend
-      const bins = yield* backend.readHistogram(handle)
-      return HistogramComputed({ bins, stamp })
-    }).pipe(
+  execute: Effect.fn('execute')(function* ({ handle, stamp }) {
+    const backend = yield* GpuBackend
+    const bins = yield* backend.readHistogram(handle)
+    return HistogramComputed({ bins, stamp })
+  }).pipe(
       Effect.catchTag('GpuError', (err: GpuError) =>
         Effect.succeed(HistogramFailed({ error: err })),
       ),
@@ -426,12 +460,11 @@ const EXPORT_SETTINGS_KEY = 'exportSettings'
  */
 export const SnapshotForExport = Command.define('SnapshotForExport', {
   args: { handle: Schema.instanceOf(RenderHandle) },
-  execute: ({ handle }) =>
-    Effect.gen(function* execute() {
-      const backend = yield* GpuBackend
-      const image = yield* backend.snapshot(handle)
-      return ExportSnapshotted({ image })
-    }).pipe(
+  execute: Effect.fn('execute')(function* ({ handle }) {
+    const backend = yield* GpuBackend
+    const image = yield* backend.snapshot(handle)
+    return ExportSnapshotted({ image })
+  }).pipe(
       Effect.catchTag('GpuError', (err: GpuError) =>
         Effect.succeed(ExportSnapshotFailed({ error: err })),
       ),
@@ -451,21 +484,20 @@ export const PrepareExport = Command.define('PrepareExport', {
     previousUrl: Schema.NullOr(Schema.String),
     settings: ExportSettings,
   },
-  execute: ({ image, settings, previousUrl }) =>
-    Effect.gen(function* execute() {
-      if (previousUrl) {
-        yield* Effect.sync(() => {
-          URL.revokeObjectURL(previousUrl)
-        })
-      }
-      const encoder = yield* ImageEncoder
-      const bytes = yield* encoder.encode({ image, settings })
-      // SAFETY: the encoder returned its output over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
-      // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
-      const blob = new Blob([bytes as BlobPart], { type: mimeFor(settings.format) })
-      const url = URL.createObjectURL(blob)
-      return ExportPrepared({ sizeBytes: bytes.byteLength, url })
-    }).pipe(
+  execute: Effect.fn('execute')(function* ({ image, settings, previousUrl }) {
+    if (previousUrl) {
+      yield* Effect.sync(() => {
+        URL.revokeObjectURL(previousUrl)
+      })
+    }
+    const encoder = yield* ImageEncoder
+    const bytes = yield* encoder.encode({ image, settings })
+    // SAFETY: the encoder returned its output over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
+    // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
+    const blob = new Blob([bytes as BlobPart], { type: mimeFor(settings.format) })
+    const url = URL.createObjectURL(blob)
+    return ExportPrepared({ sizeBytes: bytes.byteLength, url })
+  }).pipe(
       Effect.catchTag('EncodeError', (err: EncodeError) =>
         Effect.succeed(ExportEncodeFailed({ error: err })),
       ),
@@ -500,7 +532,7 @@ export const RevokeExportUrl = Command.define('RevokeExportUrl', {
 
 /** Restore persisted export settings (dispatched once at startup). */
 export const LoadExportSettings = Command.define('LoadExportSettings', {
-  execute: Effect.gen(function* execute() {
+  execute: Effect.fn('execute')(function* () {
     const store = yield* Persistence.KeyValueStore
     const schemaStore = Persistence.toSchemaStore(store, ExportSettings)
     // `Effect.option` wraps the success (itself an Option) — flatten.
@@ -518,14 +550,13 @@ export const LoadExportSettings = Command.define('LoadExportSettings', {
 /** Persist export settings (fired on every change; localStorage is cheap). */
 export const SaveExportSettings = Command.define('SaveExportSettings', {
   args: { settings: ExportSettings },
-  execute: ({ settings }) =>
-    Effect.gen(function* execute() {
-      const store = yield* Persistence.KeyValueStore
-      yield* Persistence.toSchemaStore(store, ExportSettings)
-        .set(EXPORT_SETTINGS_KEY, settings)
-        .pipe(Effect.ignore)
-      return ExportSettingsSaved()
-    }),
+  execute: Effect.fn('execute')(function* ({ settings }) {
+    const store = yield* Persistence.KeyValueStore
+    yield* Persistence.toSchemaStore(store, ExportSettings)
+      .set(EXPORT_SETTINGS_KEY, settings)
+      .pipe(Effect.ignore)
+    return ExportSettingsSaved()
+  }),
   messages: [ExportSettingsSaved],
 })
 
@@ -536,7 +567,7 @@ const LUT_RECENTS_KEY = 'lutRecents'
 /** Restore persisted LUT recents (dispatched once at startup, like
  *  LoadExportSettings). Missing or corrupt recents fall back to []. */
 export const LoadLutRecents = Command.define('LoadLutRecents', {
-  execute: Effect.gen(function* execute() {
+  execute: Effect.fn('execute')(function* () {
     const store = yield* Persistence.KeyValueStore
     const schemaStore = Persistence.toSchemaStore(store, Schema.Array(LutIdSchema))
     // `Effect.option` wraps the success (itself an Option) — flatten.
@@ -549,14 +580,13 @@ export const LoadLutRecents = Command.define('LoadLutRecents', {
 /** Persist LUT recents (fired on every bump; localStorage is cheap). */
 export const SaveLutRecents = Command.define('SaveLutRecents', {
   args: { recents: Schema.Array(LutIdSchema) },
-  execute: ({ recents }) =>
-    Effect.gen(function* execute() {
-      const store = yield* Persistence.KeyValueStore
-      yield* Persistence.toSchemaStore(store, Schema.Array(LutIdSchema))
-        .set(LUT_RECENTS_KEY, recents)
-        .pipe(Effect.ignore)
-      return LutRecentsSaved()
-    }),
+  execute: Effect.fn('execute')(function* ({ recents }) {
+    const store = yield* Persistence.KeyValueStore
+    yield* Persistence.toSchemaStore(store, Schema.Array(LutIdSchema))
+      .set(LUT_RECENTS_KEY, recents)
+      .pipe(Effect.ignore)
+    return LutRecentsSaved()
+  }),
   messages: [LutRecentsSaved],
 })
 
@@ -578,23 +608,22 @@ export const GenerateLutThumb = Command.define('GenerateLutThumb', {
     bitmap: Schema.instanceOf(ImageBitmap),
     lutId: LutIdSchema,
   },
-  execute: ({ lutId, bitmap }) =>
-    Effect.gen(function* execute() {
-      const store = yield* LutStore
-      const thumbs = yield* LutThumbnailer
-      const cube = yield* store.getCube(lutId).pipe(Effect.option)
-      if (Option.isNone(cube)) {
-        return LutThumbFailed({ lutId })
-      }
-      const bytes = yield* thumbs.render(lutId, bitmap, cube.value)
-      if (Option.isNone(bytes)) {
-        return LutThumbFailed({ lutId })
-      }
-      // SAFETY: the thumb encoder returned its JPEG over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
-      // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
-      const blob = new Blob([bytes.value as BlobPart], { type: 'image/jpeg' })
-      return LutThumbGenerated({ bitmap, lutId, url: URL.createObjectURL(blob) })
-    }),
+  execute: Effect.fn('execute')(function* ({ lutId, bitmap }) {
+    const store = yield* LutStore
+    const thumbs = yield* LutThumbnailer
+    const cube = yield* store.getCube(lutId).pipe(Effect.option)
+    if (Option.isNone(cube)) {
+      return LutThumbFailed({ lutId })
+    }
+    const bytes = yield* thumbs.render(lutId, bitmap, cube.value)
+    if (Option.isNone(bytes)) {
+      return LutThumbFailed({ lutId })
+    }
+    // SAFETY: the thumb encoder returned its JPEG over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
+    // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
+    const blob = new Blob([bytes.value as BlobPart], { type: 'image/jpeg' })
+    return LutThumbGenerated({ bitmap, lutId, url: URL.createObjectURL(blob) })
+  }),
   messages: [LutThumbGenerated, LutThumbFailed],
 })
 
