@@ -31,13 +31,16 @@ const galleryUrl = () => Option.getOrThrow(Url.fromString('https://lutra.test/')
 
 const galleryModel = (): Model => init(galleryUrl())[0]
 
-const fillStarted = () => update(galleryModel(), OfflineFillStarted({ total: 593, done: 7 }))
+const fillStarted = () => update(galleryModel(), OfflineFillStarted({ done: 7, total: 593 }))
 
 describe('root: offline library', () => {
   afterEach(() => {
     // Restore any saveData stub.
-    type ConnectionHost = { connection?: unknown }
-    // oxlint-disable-next-line consistent-type-assertions
+    interface ConnectionHost {
+      connection?: unknown
+    }
+    // SAFETY: navigator.connection is a non-standard extension; the stub checks for its presence to decide the offline posture.
+    // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
     const nav = navigator as ConnectionHost
     delete nav.connection
   })

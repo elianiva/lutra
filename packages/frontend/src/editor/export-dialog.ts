@@ -13,9 +13,13 @@ import {
 import { EXPORT_FORMATS, EXPORT_SCALES, fileExtension, isLossy } from '@lutra/engine'
 
 const fmtBytes = (bytes: number) => {
-  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024) {
+    return `${bytes} B`
+  }
   const kb = bytes / 1024
-  if (kb < 1024) return `${kb.toFixed(1)} KB`
+  if (kb < 1024) {
+    return `${kb.toFixed(1)} KB`
+  }
   return `${(kb / 1024).toFixed(2)} MB`
 }
 
@@ -59,8 +63,9 @@ const segmentedRow = <T extends string | number>(
  */
 export const exportDialogView = (h: HtmlBuilder<EditorMessage>, model: Model) =>
   h.submodel({
-    slotId: model.exportDialog.id,
     model: model.exportDialog,
+    slotId: model.exportDialog.id,
+    toParentMessage: (message) => GotExportDialogMessage({ message }),
     view: Dialog.view,
     viewInputs: {
       toView: ({ dialog, backdrop, panel, title, closeButton, isVisible }) =>
@@ -137,7 +142,6 @@ export const exportDialogView = (h: HtmlBuilder<EditorMessage>, model: Model) =>
             : [],
         ),
     },
-    toParentMessage: (message) => GotExportDialogMessage({ message }),
   })
 
 const formatSection = (h: HtmlBuilder<EditorMessage>, model: Model) =>

@@ -59,16 +59,16 @@ export type Offline = typeof Offline.Type
 /** The offline slice at boot. Reads the browser's connectivity/saveData
  *  signals; both degrade to the non-offline posture when absent. */
 export const initialOffline = (): Offline => {
-  // oxlint-disable-next-line consistent-type-assertions
-  const connection = (navigator as Navigator & { connection?: { readonly saveData?: boolean } })
-    .connection
+  // SAFETY: navigator.connection/saveData are non-standard; read them structurally and degrade to the non-offline posture when absent.
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
+  const { connection } = navigator as Navigator & { connection?: { readonly saveData?: boolean } }
   return {
-    phase: Idle(),
-    online: typeof navigator === 'undefined' ? true : navigator.onLine,
-    saveData: typeof navigator === 'undefined' ? false : connection?.saveData === true,
     downloaded: 0,
-    total: 0,
+    online: globalThis.navigator === undefined ? true : navigator.onLine,
     persisted: null,
+    phase: Idle(),
     readyToast: false,
+    saveData: globalThis.navigator === undefined ? false : connection?.saveData === true,
+    total: 0,
   }
 }

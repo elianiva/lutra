@@ -1,4 +1,5 @@
-import { encodeImage, type ExportSettings } from '@lutra/engine'
+import { encodeImage } from '@lutra/engine'
+import type { ExportSettings } from '@lutra/engine'
 
 // The encode worker. The main thread posts `{ id, image, settings }`; this
 // runs the engine's pure jSquash encode and replies `{ id, bytes }` (buffer
@@ -20,19 +21,22 @@ export interface EncodeResponse {
 
 // The DOM lib types `self.postMessage` for windows (targetOrigin arg); a
 // worker's postMessage takes a transfer list. Narrow the global here.
-// oxlint-disable-next-line consistent-type-assertions
-const ctx = self as unknown as {
+// SAFETY: this file only runs inside a dedicated worker, where postMessage accepts a transfer list.
+// oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
+const ctx = self as {
   postMessage(message: EncodeResponse, transfer?: Transferable[]): void
 }
 
 self.onmessage = (event: MessageEvent<EncodeRequest>) => {
   const { id, image, settings } = event.data
   encodeImage(image, settings)
-    .then((bytes) => ctx.postMessage({ id, bytes }, [bytes.buffer]))
-    .catch((cause) =>
+    .then((bytes) => {
+      ctx.postMessage({ bytes, id }, [bytes.buffer])
+    })
+    .catch((error) => {
       ctx.postMessage({
+        error: error instanceof Error ? error.message : String(error),
         id,
-        error: cause instanceof Error ? cause.message : String(cause),
-      }),
-    )
+      })
+    })
 }

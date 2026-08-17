@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach } from 'vitest'
-import fc from 'fast-check'
+import * as fc from 'fast-check'
 import { Effect, Option } from 'effect'
 import { EditId } from './edit-id'
 import { EditStore, EditStoreIndexedDb, Edit } from '../index'
@@ -7,42 +7,42 @@ import { EditStore, EditStoreIndexedDb, Edit } from '../index'
 type EditRecord = typeof Edit.Type
 
 /** A distinct source/thumbnail byte blob so we can tell records apart by field. */
-const bytes = (...xs: Array<number>) => new Uint8Array(xs)
+const bytes = (...xs: number[]) => new Uint8Array(xs)
 
 const edit = (id: string, savedAt: number): EditRecord =>
   Edit.make({
-    id: EditId(id),
     chain: [],
+    id: EditId(id),
+    savedAt,
     source: bytes(1, 2, 3),
     thumbnail: bytes(9, 9),
-    savedAt,
   })
 
 // The store is a Context.Service: reached via `yield* EditStore` inside an
 // Effect, then run against the real IndexedDB backend.
-const run = <A, E>(effect: Effect.Effect<A, E, EditStore>) =>
-  Effect.runPromise(Effect.provide(effect, EditStoreIndexedDb))
+const run = async <A, E>(effect: Effect.Effect<A, E, EditStore>) =>
+  await Effect.runPromise(Effect.provide(effect, EditStoreIndexedDb))
 
 const save = (e: EditRecord) =>
-  Effect.gen(function* () {
+  Effect.gen(function* save() {
     const store = yield* EditStore
     yield* store.save(e)
   })
 
 const load = (id: EditId) =>
-  Effect.gen(function* () {
+  Effect.gen(function* load() {
     const store = yield* EditStore
     return yield* store.load(id)
   })
 
 const list = () =>
-  Effect.gen(function* () {
+  Effect.gen(function* list() {
     const store = yield* EditStore
     return yield* store.list()
   })
 
 const del = (id: EditId) =>
-  Effect.gen(function* () {
+  Effect.gen(function* del() {
     const store = yield* EditStore
     yield* store.delete(id)
   })
@@ -67,28 +67,28 @@ class Model {
 
 /** The gallery summary the store's list() must produce for one row. */
 const summaryOf = (e: EditRecord) => ({
-  id: e.id,
-  chain: e.chain,
-  thumbnail: e.thumbnail,
   byteLength: e.thumbnail.byteLength,
+  chain: e.chain,
+  id: e.id,
   savedAt: e.savedAt,
+  thumbnail: e.thumbnail,
 })
 
 /** A random Edit whose id is a format-valid UUID (the EditIdSchema check). */
 const editArb = fc
   .record({
     id: fc.uuid(),
-    savedAt: fc.integer({ min: 0, max: 10_000 }),
-    source: fc.uint8Array({ minLength: 0, maxLength: 24 }),
-    thumbnail: fc.uint8Array({ minLength: 0, maxLength: 24 }),
+    savedAt: fc.integer({ max: 10_000, min: 0 }),
+    source: fc.uint8Array({ maxLength: 24, minLength: 0 }),
+    thumbnail: fc.uint8Array({ maxLength: 24, minLength: 0 }),
   })
   .map((r) =>
     Edit.make({
-      id: EditId(r.id),
       chain: [],
+      id: EditId(r.id),
+      savedAt: r.savedAt,
       source: r.source,
       thumbnail: r.thumbnail,
-      savedAt: r.savedAt,
     }),
   )
 
@@ -173,7 +173,9 @@ describe('EditStoreIndexedDb (IndexedDB local backend)', () => {
             }),
           )
           for (const command of commands) {
-            if (command.check(model)) await command.run(model, undefined)
+            if (command.check(model)) {
+              await command.run(model, undefined)
+            }
           }
         },
       ),

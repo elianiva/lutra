@@ -18,24 +18,19 @@ import type { RootMessage } from './message' /**
  *   Paused transition and the LUT bar's dimming.
  */
 export const subscriptions = Subscription.make<Model, RootMessage, OfflineFill>()((_entry) => ({
-  offlineFill: Subscription.persistent(
-    Stream.flatMap(Stream.service(OfflineFill), (service) =>
-      Stream.fromPubSub(service.events),
-    ).pipe(Stream.map((event): RootMessage => fillEventToMessage(event))),
-  ),
   connectivity: Subscription.persistent(
     Stream.callback<RootMessage>((queue) =>
-      Effect.gen(function* () {
+      Effect.gen(function* connectivity() {
         const emit = (online: boolean) => Queue.offerUnsafe(queue, ConnectivityChanged({ online }))
         // The initial state, then the browser's events.
-        emit(typeof navigator === 'undefined' ? true : navigator.onLine)
+        emit(globalThis.navigator === undefined ? true : navigator.onLine)
         yield* Effect.acquireRelease(
           Effect.sync(() => {
             const onOnline = () => emit(true)
             const onOffline = () => emit(false)
             window.addEventListener('online', onOnline)
             window.addEventListener('offline', onOffline)
-            return { onOnline, onOffline }
+            return { onOffline, onOnline }
           }),
           ({ onOnline, onOffline }) =>
             Effect.sync(() => {
@@ -46,5 +41,10 @@ export const subscriptions = Subscription.make<Model, RootMessage, OfflineFill>(
         return yield* Effect.never
       }),
     ),
+  ),
+  offlineFill: Subscription.persistent(
+    Stream.flatMap(Stream.service(OfflineFill), (service) =>
+      Stream.fromPubSub(service.events),
+    ).pipe(Stream.map((event): RootMessage => fillEventToMessage(event))),
   ),
 }))

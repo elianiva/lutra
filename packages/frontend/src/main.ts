@@ -1,5 +1,6 @@
 import { Layer } from 'effect'
-import { Runtime, Url } from 'foldkit'
+import type { Url } from 'foldkit'
+import { Runtime } from 'foldkit'
 import { overlay } from '@foldkit/devtools'
 import { BrowserKeyValueStore } from '@effect/platform-browser'
 import type { UrlRequest } from 'foldkit/navigation'
@@ -27,10 +28,9 @@ import { OfflineFillLive } from './offline/fill'
  */
 export const application = Runtime.makeApplication({
   Model,
+  container: document.querySelector('#root'),
+  devTools: { Message: RootMessage, overlay },
   init: (url: Url.Url) => init(url),
-  update,
-  view,
-  container: document.getElementById('root'),
   resources: Layer.merge(
     GpuBackendLive,
     Layer.merge(
@@ -54,10 +54,11 @@ export const application = Runtime.makeApplication({
       ),
     ),
   ),
-  subscriptions,
   routing: {
-    onUrlRequest: (request: UrlRequest) => Navigated({ request }),
     onUrlChange: (url: Url.Url) => ChangedRoute({ route: parseRoute(url) }),
+    onUrlRequest: (request: UrlRequest) => Navigated({ request }),
   },
-  devTools: { Message: RootMessage, overlay },
+  subscriptions,
+  update,
+  view,
 })

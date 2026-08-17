@@ -1,14 +1,15 @@
 import { Match as M, Option } from 'effect'
-import { Command } from 'foldkit'
-import { EditStore } from '@lutra/store'
+import type { Command } from 'foldkit'
+import type { EditStore } from '@lutra/store'
 import type { GalleryMessage, GalleryOutMessage } from './message'
 import { OpenedEdit } from './message'
 import { DeleteEdit, ListEdits, OpenPhoto } from './command'
-import { Model, editList } from './model'
+import type { Model } from './model'
+import { editList } from './model'
 
 export type UpdateReturn = readonly [
   Model,
-  ReadonlyArray<Command.Command<GalleryMessage, never, EditStore>>,
+  readonly Command.Command<GalleryMessage, never, EditStore>[],
   Option.Option<GalleryOutMessage>,
 ]
 

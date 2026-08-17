@@ -1,18 +1,20 @@
 import { Effect, Layer, Option } from 'effect'
-import { IndexedDb, IndexedDbDatabase } from '@effect/platform-browser'
+import type { IndexedDbDatabase } from '@effect/platform-browser'
+import { IndexedDb } from '@effect/platform-browser'
 import { EditDbSchema } from './edit-db'
 import { EditTable } from './edit-table'
-import { type Edit as EditType } from './edit'
-import { EditSummary } from './edit-summary'
+import type { Edit as EditType } from './edit'
+import type { EditSummary } from './edit-summary'
 import type { EditId } from './edit-id'
-import { EditStore, type EditStoreShape } from './edit-store'
+import { EditStore } from './edit-store'
+import type { EditStoreContract } from './edit-store'
 import { StoreError } from './store-error'
 
-const mapQueryError = (error: unknown): StoreError =>
-  new StoreError({ message: 'edit store query failed', cause: error })
+const mapQueryError = (cause: unknown): StoreError =>
+  new StoreError({ cause, message: 'edit store query failed' })
 
 const unavailable = (reason: string): StoreError =>
-  new StoreError({ message: reason, cause: undefined })
+  new StoreError({ cause: undefined, message: reason })
 
 /**
  * A store that rejects every operation with a `StoreError` — the fallback
@@ -20,13 +22,13 @@ const unavailable = (reason: string): StoreError =>
  * mode, quota, missing backend). The app stays alive and the gallery surfaces
  * the failure rather than silently dropping data.
  */
-const EditStoreUnavailable = (reason: string): EditStoreShape =>
+const EditStoreUnavailable = (reason: string): EditStoreContract =>
   EditStore.of({
-    save: () => Effect.fail(unavailable(reason)),
-    load: () => Effect.fail(unavailable(reason)),
-    list: () => Effect.fail(unavailable(reason)),
-    delete: () => Effect.fail(unavailable(reason)),
     clearAll: () => Effect.fail(unavailable(reason)),
+    delete: () => Effect.fail(unavailable(reason)),
+    list: () => Effect.fail(unavailable(reason)),
+    load: () => Effect.fail(unavailable(reason)),
+    save: () => Effect.fail(unavailable(reason)),
   })
 
 /**
@@ -44,16 +46,16 @@ export const EditStoreLive: Layer.Layer<
   IndexedDbDatabase.IndexedDbDatabase
 > = Layer.effect(
   EditStore,
-  Effect.gen(function* () {
+  Effect.gen(function* EditStoreLive() {
     const builder = yield* EditDbSchema
     const table = builder.from(EditTable.tableName)
 
     const toSummary = (edit: EditType): EditSummary => ({
-      id: edit.id,
-      chain: edit.chain,
-      thumbnail: edit.thumbnail,
       byteLength: edit.thumbnail.byteLength,
+      chain: edit.chain,
+      id: edit.id,
       savedAt: edit.savedAt,
+      thumbnail: edit.thumbnail,
     })
 
     const save = (edit: EditType): Effect.Effect<void, StoreError> =>
@@ -68,7 +70,7 @@ export const EditStoreLive: Layer.Layer<
           Effect.mapError(mapQueryError),
         )
 
-    const list = (): Effect.Effect<ReadonlyArray<EditSummary>, StoreError> =>
+    const list = (): Effect.Effect<readonly EditSummary[], StoreError> =>
       table.select().pipe(
         Effect.map((rows) => rows.map(toSummary).sort((a, b) => b.savedAt - a.savedAt)),
         Effect.mapError(mapQueryError),
@@ -80,7 +82,7 @@ export const EditStoreLive: Layer.Layer<
     const clearAll = (): Effect.Effect<void, StoreError> =>
       table.clear.pipe(Effect.mapError(mapQueryError))
 
-    return EditStore.of({ save, load, list, delete: del, clearAll })
+    return EditStore.of({ clearAll, delete: del, list, load, save })
   }),
 )
 
@@ -93,7 +95,7 @@ export const EditStoreLive: Layer.Layer<
  * its error state instead of the app failing to boot. Wire this into the app
  * resource stack.
  */
-export const EditStoreIndexedDb: Layer.Layer<EditStore, never> = EditStoreLive.pipe(
+export const EditStoreIndexedDb: Layer.Layer<EditStore> = EditStoreLive.pipe(
   Layer.provide(EditDbSchema.layer('lutra')),
   Layer.provide(IndexedDb.layerWindow),
   Layer.catch((error) =>

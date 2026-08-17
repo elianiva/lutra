@@ -1,49 +1,36 @@
 import { Effect, Schema } from 'effect'
 import { FieldKey, LutId } from './brands'
+import { numField, strField } from './layers/fields'
 import type { Layer, LayerType } from './layers/schemas'
 import type { LayerEntry } from './layers/registry'
 import type { LutCube } from './luts/cube'
-import {
-  generateChainSource,
-  type ChainLayerInfo,
-  type ChainPass,
-  type ChainShader,
-} from './shaders/chain-source'
+import { generateChainSource } from './shaders/chain-source'
+import type { ChainLayerInfo, ChainPass, ChainShader } from './shaders/chain-source'
 
 // ---- errors ----
 
 export class GpuError extends Schema.TaggedErrorClass<GpuError>()('GpuError', {
-  message: Schema.String,
   cause: Schema.optional(Schema.Unknown),
+  message: Schema.String,
 }) {}
 
 // ---- uniform packing ----
 
 /**
- * Read a field off a heterogeneous `Layer` union by key. The union
- * members are plain object types, so a widened annotation (not an
- * assertion) yields the record view.
- */
-const readField = (layer: Layer, key: FieldKey): unknown => {
-  const record: Record<string, unknown> = layer
-  return record[key]
-}
-
-/**
  * Pack one pass's layer parameter values into a flat Float32Array
  * following the slot layout returned by the assembler.
  */
-function packUniforms(chain: ReadonlyArray<Layer>, pass: ChainPass): Float32Array {
+function packUniforms(chain: readonly Layer[], pass: ChainPass): Float32Array {
   const buf = new Float32Array(pass.uniforms.length)
   const visibleLayers = chain.filter((l) => l.visible)
 
   for (const slot of pass.uniforms) {
     const layer = visibleLayers[slot.layerIndex]
     if (layer) {
-      const value = readField(layer, slot.field)
       // Schema-validated layers always carry the field as a number; skip
       // anything else rather than coerce garbage.
-      if (typeof value === 'number') {
+      const value = numField(layer, slot.field)
+      if (!Number.isNaN(value)) {
         buf[slot.offset] = value
       }
     }
@@ -66,7 +53,7 @@ function packUniforms(chain: ReadonlyArray<Layer>, pass: ChainPass): Float32Arra
 export interface RenderRequest {
   readonly shader: ChainShader
   /** Packed uniforms, one Float32Array per pass (aligned with shader.passes). */
-  readonly uniforms: ReadonlyArray<Float32Array>
+  readonly uniforms: readonly Float32Array[]
   readonly srcBitmap: ImageBitmap
   readonly frame: number
   /**
@@ -83,7 +70,7 @@ export interface RenderRequest {
  * source image unchanged.
  */
 export function createRenderRequest(
-  chain: ReadonlyArray<Layer>,
+  chain: readonly Layer[],
   registry: Record<LayerType, LayerEntry>,
   srcBitmap: ImageBitmap,
   frame: number,
@@ -92,7 +79,9 @@ export function createRenderRequest(
   return Effect.gen(function* () {
     const chainLayers: ChainLayerInfo[] = []
     for (const l of chain) {
-      if (!l.visible) continue
+      if (!l.visible) {
+        continue
+      }
       const entry = registry[l.type]
       if (!entry) {
         return yield* Effect.fail(new GpuError({ message: `Unknown layer type: ${l.type}` }))
@@ -101,8 +90,8 @@ export function createRenderRequest(
       // LUT map the caller provided. The engine stays pure — it never
       // fetches or parses cubes, and an unresolvable id is a hard error.
       if (l.type === 'lut') {
-        const lutId = readField(l, FieldKey('lutId'))
-        if (typeof lutId !== 'string') {
+        const lutId = strField(l, FieldKey('lutId'))
+        if (lutId === '') {
           return yield* Effect.fail(new GpuError({ message: 'LUT layer is missing a lutId' }))
         }
         const id = LutId(lutId)
@@ -111,16 +100,16 @@ export function createRenderRequest(
           return yield* Effect.fail(new GpuError({ message: `Unknown LUT: ${id}` }))
         }
         chainLayers.push({
-          type: l.type,
           body: entry.body,
           fieldKeys: Object.keys(entry.fields).map(FieldKey),
           lut: { id, size: cube.size },
+          type: l.type,
         })
       } else {
         chainLayers.push({
-          type: l.type,
           body: entry.body,
           fieldKeys: Object.keys(entry.fields).map(FieldKey),
+          type: l.type,
         })
       }
     }
@@ -128,12 +117,12 @@ export function createRenderRequest(
     let shader: ChainShader
     try {
       shader = generateChainSource(chainLayers)
-    } catch (e) {
-      return yield* Effect.fail(new GpuError({ message: 'Shader generation failed', cause: e }))
+    } catch (error) {
+      return yield* Effect.fail(new GpuError({ cause: error, message: 'Shader generation failed' }))
     }
 
     const uniforms = shader.passes.map((pass) => packUniforms(chain, pass))
 
-    return { shader, uniforms, srcBitmap, frame, luts }
+    return { frame, luts, shader, srcBitmap, uniforms }
   })
 }

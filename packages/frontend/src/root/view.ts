@@ -1,4 +1,4 @@
-import { Document, type Html, type HtmlBuilder } from 'foldkit/html'
+import { type Document, type Html, type HtmlBuilder } from 'foldkit/html'
 import { Match, Schema as S } from 'effect'
 import type { Model } from './model'
 import type { RootMessage } from './message'
@@ -24,19 +24,19 @@ import * as Editor from '../editor'
  * menu, the toast is global, and both read the offline slice directly.
  */
 export const view = (model: Model, h: HtmlBuilder<RootMessage>): Document => ({
-  title: 'Lutra',
   body: h.div(
     [h.Class('flex h-full flex-col bg-bg text-ink')],
     [
       readyToast(model, h),
       ...Match.value(model.route).pipe(
-        Match.withReturnType<ReadonlyArray<Html>>(),
+        Match.withReturnType<readonly Html[]>(),
         Match.when(S.is(GalleryRoute), () => [offlineCard(model, h)]),
         Match.orElse(() => []),
       ),
       activeRoute(model, h),
     ],
   ),
+  title: 'Lutra',
 })
 
 // The "Offline ready" toast: shows on the fill's Filling → Ready transition
@@ -65,9 +65,9 @@ const readyToast = (model: Model, h: HtmlBuilder<RootMessage>) =>
 // (the toast announced it) — and nothing renders in the editor; the fill is
 // housekeeping, the editor is for grading.
 const offlineCard = (model: Model, h: HtmlBuilder<RootMessage>) => {
-  const offline = model.offline
+  const { offline } = model
   const pct = offline.total > 0 ? Math.round((offline.downloaded / offline.total) * 100) : 0
-  const frame = (content: ReadonlyArray<Html>) =>
+  const frame = (content: readonly Html[]) =>
     h.div(
       [
         // inset-x-4 on phones (docs/adr/0024-mobile-ui): the card spans the viewport
@@ -108,19 +108,21 @@ const offlineCard = (model: Model, h: HtmlBuilder<RootMessage>) => {
     )
 
   switch (offline.phase._tag) {
-    case 'Filling':
+    case 'Filling': {
       return frame([
         titleRow('Preparing offline library', `${pct}%`),
         h.div([h.Class('mt-2')], [progress]),
         h.div([h.Class('mt-1.5')], [counters]),
       ])
-    case 'Paused':
+    }
+    case 'Paused': {
       return frame([
         titleRow('Offline library paused', `${pct}%`),
         h.div([h.Class('mt-2')], [progress]),
         h.div([h.Class('mt-1.5 text-xs text-muted')], ['Waiting for a connection']),
       ])
-    case 'QuotaError':
+    }
+    case 'QuotaError': {
       return frame([
         titleRow('Storage full', `${pct}%`),
         h.div([h.Class('mt-2')], [progress]),
@@ -132,7 +134,8 @@ const offlineCard = (model: Model, h: HtmlBuilder<RootMessage>) => {
           ],
         ),
       ])
-    case 'Idle':
+    }
+    case 'Idle': {
       return offline.saveData
         ? frame([
             h.div([h.Class('text-sm text-ink')], ['Offline library not downloaded']),
@@ -142,8 +145,10 @@ const offlineCard = (model: Model, h: HtmlBuilder<RootMessage>) => {
             ),
           ])
         : null
-    case 'Ready':
+    }
+    case 'Ready': {
       return null
+    }
   }
 }
 
@@ -152,18 +157,18 @@ const activeRoute = (model: Model, h: HtmlBuilder<RootMessage>) =>
     Match.withReturnType<Html>(),
     Match.when(S.is(GalleryRoute), () =>
       h.submodel({
-        slotId: 'gallery',
         model: model.gallery,
-        view: Gallery.view,
+        slotId: 'gallery',
         toParentMessage: (message) => GotGalleryMessage({ message }),
+        view: Gallery.view,
       }),
     ),
     Match.when(S.is(EditorRoute), () =>
       h.submodel({
-        slotId: 'editor',
         model: model.editor,
-        view: Editor.view,
+        slotId: 'editor',
         toParentMessage: (message) => GotEditorMessage({ message }),
+        view: Editor.view,
       }),
     ),
     Match.orElse(() => notFound(h)),

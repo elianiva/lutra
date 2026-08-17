@@ -2,8 +2,7 @@ import { Option, Schema as S } from 'effect'
 import { Machine } from 'foldkit/experimental'
 import { to, when } from 'foldkit/experimental/machine'
 import { ts } from 'foldkit/schema'
-import { Layer, LayerIdSchema } from '@lutra/engine'
-import { moveCurvePoint, resetCurve } from '@lutra/engine'
+import { Layer, LayerIdSchema, moveCurvePoint, resetCurve } from '@lutra/engine'
 import { createLayerFor, DecodeImage } from './command'
 import { EditorMessage } from './message'
 
@@ -44,11 +43,45 @@ export type EditorPhase = typeof EditorPhase.Type
 // ---- machine ----
 
 export const editorMachine = Machine.define({
-  state: EditorPhase,
   message: EditorMessage,
+  state: EditorPhase,
 })({
   initial: Empty(),
   states: {
+    Drafting: {
+      on: {
+        ConfirmedDraft: to('Selected', ({ state }) => Selected({ layerId: state.layer.id })),
+        CancelledDraft: to('Idle', () => Idle()),
+        UpdatedDraftParam: to('Drafting', ({ state, message }) =>
+          Drafting({ layer: { ...state.layer, [message.field]: message.value } }),
+        ),
+        // The curve widget's drag: the engine clamps the move into the
+        // curve's invariants (x stays between neighbors, y in [0, 1]) and
+        // no-ops for non-toneCurve drafts — the widget only renders for a
+        // toneCurve draft, so the edge is a formality for stray messages.
+        CurvePointDragged: to('Drafting', ({ state, message }) =>
+          Drafting({
+            layer: moveCurvePoint(state.layer, message.index, message.x, message.y),
+          }),
+        ),
+        // The curve widget's reset button: every point back to identity.
+        CurveReset: to('Drafting', ({ state }) => Drafting({ layer: resetCurve(state.layer) })),
+        // Only a LUT draft can swap its LUT; anything else is ignored. The
+        // guard extracts the LUT layer so the build sees a narrowed variant.
+        ChangedDraftLut: [
+          when(
+            (state) => (state.layer.type === 'lut' ? Option.some(state.layer) : Option.none()),
+            'Drafting',
+            ({ guardValue, message }) =>
+              Drafting({ layer: { ...guardValue, lutId: message.lutId } }),
+          ),
+        ],
+        ClearedImage: to('Empty', () => Empty()),
+        // A different attached edit discards the draft.
+        EditLoaded: to('Idle', () => Idle()),
+        EditLoadFailed: to('Error', () => ErrorState()),
+      },
+    },
     Empty: {
       on: {
         // Picking a file starts the decode; this edge carries the command
@@ -62,23 +95,6 @@ export const editorMachine = Machine.define({
         ),
         // The attached edit's load (gallery → /edit/:id) lands the editor
         // straight in Idle — the source + chain are seeded by update.
-        EditLoaded: to('Idle', () => Idle()),
-        EditLoadFailed: to('Error', () => ErrorState()),
-      },
-    },
-    Loading: {
-      on: {
-        // A re-pick while decoding supersedes the first pick: the self-loop
-        // stays in Loading and fires a second decode.
-        SelectedImageFile: to(
-          'Loading',
-          () => Loading(),
-          ({ message }) => [DecodeImage({ file: message.file })],
-        ),
-        ImageDecoded: to('Idle', () => Idle()),
-        ImageFailedToDecode: to('Error', () => ErrorState()),
-        ClearedImage: to('Empty', () => Empty()),
-        // An attached-edit load landing mid-decode supersedes the pick.
         EditLoaded: to('Idle', () => Idle()),
         EditLoadFailed: to('Error', () => ErrorState()),
       },
@@ -125,36 +141,19 @@ export const editorMachine = Machine.define({
         EditLoadFailed: to('Error', () => ErrorState()),
       },
     },
-    Drafting: {
+    Loading: {
       on: {
-        ConfirmedDraft: to('Selected', ({ state }) => Selected({ layerId: state.layer.id })),
-        CancelledDraft: to('Idle', () => Idle()),
-        UpdatedDraftParam: to('Drafting', ({ state, message }) =>
-          Drafting({ layer: { ...state.layer, [message.field]: message.value } }),
+        // A re-pick while decoding supersedes the first pick: the self-loop
+        // stays in Loading and fires a second decode.
+        SelectedImageFile: to(
+          'Loading',
+          () => Loading(),
+          ({ message }) => [DecodeImage({ file: message.file })],
         ),
-        // The curve widget's drag: the engine clamps the move into the
-        // curve's invariants (x stays between neighbors, y in [0, 1]) and
-        // no-ops for non-toneCurve drafts — the widget only renders for a
-        // toneCurve draft, so the edge is a formality for stray messages.
-        CurvePointDragged: to('Drafting', ({ state, message }) =>
-          Drafting({
-            layer: moveCurvePoint(state.layer, message.index, message.x, message.y),
-          }),
-        ),
-        // The curve widget's reset button: every point back to identity.
-        CurveReset: to('Drafting', ({ state }) => Drafting({ layer: resetCurve(state.layer) })),
-        // Only a LUT draft can swap its LUT; anything else is ignored. The
-        // guard extracts the LUT layer so the build sees a narrowed variant.
-        ChangedDraftLut: [
-          when(
-            (state) => (state.layer.type === 'lut' ? Option.some(state.layer) : Option.none()),
-            'Drafting',
-            ({ guardValue, message }) =>
-              Drafting({ layer: { ...guardValue, lutId: message.lutId } }),
-          ),
-        ],
+        ImageDecoded: to('Idle', () => Idle()),
+        ImageFailedToDecode: to('Error', () => ErrorState()),
         ClearedImage: to('Empty', () => Empty()),
-        // A different attached edit discards the draft.
+        // An attached-edit load landing mid-decode supersedes the pick.
         EditLoaded: to('Idle', () => Idle()),
         EditLoadFailed: to('Error', () => ErrorState()),
       },

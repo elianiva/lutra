@@ -41,8 +41,8 @@ export type FillEvent =
 // ---- root messages (bridged from the PubSub, plus the UI's requests) ----
 
 export const OfflineFillStarted = Message.m('OfflineFillStarted', {
-  total: S.Number,
   done: S.Number,
+  total: S.Number,
 })
 export const OfflineFileStarted = Message.m('OfflineFileStarted', {
   lutId: S.NullOr(LutIdSchema),
@@ -96,7 +96,7 @@ export type OfflineMessage = typeof OfflineMessage.Type
 /** FillEvent → RootMessage, the bridge the root subscription applies. */
 export const fillEventToMessage = (event: FillEvent): OfflineMessage =>
   event._tag === 'FillStarted'
-    ? OfflineFillStarted({ total: event.total, done: event.done })
+    ? OfflineFillStarted({ done: event.done, total: event.total })
     : event._tag === 'FillFileStarted'
       ? OfflineFileStarted({ lutId: event.file.lutId })
       : event._tag === 'FillFileCompleted'

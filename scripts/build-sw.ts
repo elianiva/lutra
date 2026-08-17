@@ -11,10 +11,9 @@
 import { createHash } from 'node:crypto'
 import { readFile, readdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { LUT_CACHE_NAME } from '../packages/frontend/src/offline/cache.js'
 
-const here = path.dirname(fileURLToPath(import.meta.url))
+const here = import.meta.dirname
 const frontend = path.resolve(here, '../packages/frontend')
 const dist = path.join(frontend, 'dist')
 
@@ -23,7 +22,7 @@ const dist = path.join(frontend, 'dist')
  *  deploy installs into a fresh cache and activate purges the previous
  *  deploy's shell wholesale — old hashed assets never accumulate across
  *  releases (docs/adr/0015). Exported for the SW-coupling test. */
-export const shellCacheName = (precache: ReadonlyArray<string>): string =>
+export const shellCacheName = (precache: readonly string[]): string =>
   `lutra-shell-${createHash('sha256').update(JSON.stringify(precache)).digest('hex').slice(0, 8)}`
 
 /** Inject the precache manifest, the shell cache name, and the shared cache
@@ -33,12 +32,12 @@ export const shellCacheName = (precache: ReadonlyArray<string>): string =>
  *  tokens) are stripped first: the tokens only exist at build time. */
 export const generateSwSource = (
   source: string,
-  precache: ReadonlyArray<string>,
+  precache: readonly string[],
   lutCacheName: string,
   shellCache: string = shellCacheName(precache),
 ): string =>
   source
-    .replace(
+    .replaceAll(
       /^declare const __(?:LUT_CACHE_NAME|PRECACHE_MANIFEST|SHELL_CACHE_NAME)__[^\n]*\n/gm,
       '',
     )
@@ -62,7 +61,7 @@ const run = async (): Promise<void> => {
     ...assets.map((file) => `/assets/${file}`),
   ]
 
-  const source = await readFile(path.join(frontend, 'sw/sw.ts'), 'utf8')
+  const source = await readFile(path.join(frontend, 'sw/sw.ts'), 'utf-8')
   const bundled = new Bun.Transpiler({ loader: 'ts' }).transformSync(
     generateSwSource(source, precache, LUT_CACHE_NAME),
   )

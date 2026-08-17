@@ -9,6 +9,6 @@ import { Schema } from 'effect'
  * failures through new error classes.
  */
 export class StoreError extends Schema.TaggedErrorClass<StoreError>()('StoreError', {
-  message: Schema.String,
   cause: Schema.optional(Schema.Unknown),
+  message: Schema.String,
 }) {}

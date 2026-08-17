@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
+import { Schema } from 'effect'
 
 // Node has no `ImageData` global (browser API). The jSquash codecs read
 // `.data/.width/.height` and construct `ImageData` internally (e.g. resize
@@ -15,28 +16,31 @@ class TestImageData {
   }
 }
 
-// oxlint-disable-next-line consistent-type-assertions
-globalThis.ImageData = TestImageData as unknown as typeof ImageData
+// SAFETY: Node has no ImageData global; the shim above implements the .data/.width/.height surface the codecs read.
+// oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
+globalThis.ImageData = TestImageData as typeof ImageData
 
 // The emscripten wasm glue loads its codec via
 // `fetch(new URL('*.wasm', import.meta.url))` — a `file://` URL in node,
 // which undici's fetch does not implement. Serve those from disk.
 const originalFetch = globalThis.fetch
+const isStringInput = (input: RequestInfo | URL): input is string => Schema.is(Schema.String)(input)
+
 const filePathOf = (input: RequestInfo | URL): string | null => {
-  const href = typeof input === 'string' ? input : input instanceof URL ? input.href : null
+  const href = isStringInput(input) ? input : input instanceof URL ? input.href : null
   return href?.startsWith('file:') ? fileURLToPath(href) : null
 }
-const fileFetch = (input: RequestInfo | URL): Promise<Response> => {
+const fileFetch = async (input: RequestInfo | URL): Promise<Response> => {
   const path = filePathOf(input)
   if (path !== null) {
-    return readFile(path).then(
+    return await readFile(path).then(
       (buffer) =>
         new Response(buffer, {
           headers: { 'Content-Type': 'application/wasm' },
         }),
     )
   }
-  return originalFetch(input)
+  return await originalFetch(input)
 }
 
 globalThis.fetch = fileFetch

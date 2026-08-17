@@ -31,7 +31,7 @@ const bytes = () => new Uint8Array([1, 2, 3])
 const loadedModel = (): Model => ({
   ...initialModel(),
   phase: Idle(),
-  source: { bitmap: bitmap(640, 480), width: 640, height: 480, error: null },
+  source: { bitmap: bitmap(640, 480), error: null, height: 480, width: 640 },
 })
 
 const file = () => new File(['x'], 'a.png')
@@ -101,7 +101,9 @@ describe('editor phase machine', () => {
     const [model] = update(withDraft, ConfirmedDraft())
     expect(model.phase._tag).toBe('Selected')
     expect(model.chain).toEqual([layer])
-    if (model.phase._tag === 'Selected') expect(model.phase.layerId).toBe(layer.id)
+    if (model.phase._tag === 'Selected') {
+      expect(model.phase.layerId).toBe(layer.id)
+    }
   })
 
   it('cancelling the draft returns to Idle and discards it', () => {
@@ -115,7 +117,7 @@ describe('editor phase machine', () => {
   it('updates the draft layer in place through the machine', () => {
     const [withDraft] = update(loadedModel(), SelectedTool({ type: 'exposure' }))
     const [model] = update(withDraft, UpdatedDraftParam({ field: FieldKey('stops'), value: 1.5 }))
-    expect(draftOf(model)).toMatchObject({ type: 'exposure', stops: 1.5 })
+    expect(draftOf(model)).toMatchObject({ stops: 1.5, type: 'exposure' })
   })
 
   it('drops a stale decode that lands after the image was cleared', () => {
@@ -124,7 +126,7 @@ describe('editor phase machine', () => {
     expect(cleared.phase._tag).toBe('Empty')
     const [model] = update(
       cleared,
-      ImageDecoded({ bitmap: bitmap(1, 1), width: 1, height: 1, source: bytes() }),
+      ImageDecoded({ bitmap: bitmap(1, 1), height: 1, source: bytes(), width: 1 }),
     )
     expect(model.phase._tag).toBe('Empty')
     expect(model.source.bitmap).toBeNull()
@@ -150,7 +152,7 @@ describe('editor phase machine', () => {
     const b1 = bitmap(1, 1)
     const [first] = update(
       stillLoading,
-      ImageDecoded({ bitmap: b1, width: 1, height: 1, source: bytes() }),
+      ImageDecoded({ bitmap: b1, height: 1, source: bytes(), width: 1 }),
     )
     expect(first.source.bitmap).toBe(b1)
     const [failed] = update(
@@ -162,10 +164,10 @@ describe('editor phase machine', () => {
     // Both succeed: the last one to land wins.
     const [m2] = update(
       stillLoading,
-      ImageDecoded({ bitmap: b1, width: 1, height: 1, source: bytes() }),
+      ImageDecoded({ bitmap: b1, height: 1, source: bytes(), width: 1 }),
     )
     const b2 = bitmap(2, 2)
-    const [second] = update(m2, ImageDecoded({ bitmap: b2, width: 2, height: 2, source: bytes() }))
+    const [second] = update(m2, ImageDecoded({ bitmap: b2, height: 2, source: bytes(), width: 2 }))
     expect(second.source.bitmap).toBe(b2)
     expect(second.phase._tag).toBe('Idle')
 
@@ -177,7 +179,7 @@ describe('editor phase machine', () => {
     expect(errored.phase._tag).toBe('Error')
     const [recovered] = update(
       errored,
-      ImageDecoded({ bitmap: b2, width: 2, height: 2, source: bytes() }),
+      ImageDecoded({ bitmap: b2, height: 2, source: bytes(), width: 2 }),
     )
     expect(recovered.source.bitmap).toBe(b2)
     expect(recovered.phase._tag).toBe('Idle')

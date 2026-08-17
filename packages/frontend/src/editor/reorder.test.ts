@@ -1,5 +1,5 @@
 import { describe, it, expect as vitestExpect } from 'vitest'
-import fc from 'fast-check'
+import * as fc from 'fast-check'
 import {
   Command,
   click,
@@ -152,26 +152,30 @@ describe('layer reorder semantics (property-based)', () => {
   it('any click sequence swaps adjacent rows and keeps the chain a permutation', () => {
     fc.assert(
       fc.property(
-        fc.array(layerTypeArb, { minLength: 1, maxLength: 6 }),
+        fc.array(layerTypeArb, { maxLength: 6, minLength: 1 }),
         fc.array(clickArb, { maxLength: 12 }),
         (types, clicks) => {
           let model: Model = modelWith(types)
           const original = model.chain.map((l) => l.id)
           // The rendered order (top→bottom) the drawer shows: chain reversed.
-          let rendered = [...original].reverse()
+          const rendered = [...original].reverse()
 
           for (const click of clicks) {
             const n = rendered.length
             // A click on a row that does not exist (the drawer has fewer rows
             // than the generated index) is not a dispatch at all.
-            if (click.row < 0 || click.row >= n) continue
+            if (click.row < 0 || click.row >= n) {
+              continue
+            }
             const chainIndex = n - 1 - click.row
             // "Move up" needs a row above (rendered row > 0); "Move down" a
             // row below. The buttons are disabled otherwise, so the click never
             // dispatches.
             const legalUp = click.dir === 'up' && click.row > 0
             const legalDown = click.dir === 'down' && click.row < n - 1
-            if (!legalUp && !legalDown) continue
+            if (!legalUp && !legalDown) {
+              continue
+            }
 
             // Reference model: the adjacent swap in rendered order.
             const neighbor = click.dir === 'up' ? click.row - 1 : click.row + 1
@@ -183,7 +187,7 @@ describe('layer reorder semantics (property-based)', () => {
 
             vitestExpect(model.chain.map((l) => l.id).reverse()).toEqual(rendered)
             // The chain is always a permutation of the original layers.
-            vitestExpect([...model.chain.map((l) => l.id)].sort()).toEqual([...original].sort())
+            vitestExpect(model.chain.map((l) => l.id).sort()).toEqual([...original].sort())
             vitestExpect(new Set(model.chain.map((l) => l.id)).size).toBe(model.chain.length)
           }
         },

@@ -27,18 +27,24 @@ export const icon = <Message>(
         h.Attribute(name, String(value)),
       )
       switch (tag) {
-        case 'circle':
+        case 'circle': {
           return h.circle(attributes, [])
-        case 'line':
+        }
+        case 'line': {
           return h.line(attributes, [])
-        case 'path':
+        }
+        case 'path': {
           return h.path(attributes, [])
-        case 'polyline':
+        }
+        case 'polyline': {
           return h.polyline(attributes, [])
-        case 'rect':
+        }
+        case 'rect': {
           return h.rect(attributes, [])
-        default:
+        }
+        default: {
           return null
+        }
       }
     }),
   )

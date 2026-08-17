@@ -10,7 +10,7 @@ export type ExportFormat = typeof ExportFormat.Type
 
 /** Lossy fidelity knob, 0–100. `null` means lossless (PNG). */
 export const ExportQuality = Schema.Number.pipe(
-  Schema.check(Schema.isBetween({ minimum: 0, maximum: 100 })),
+  Schema.check(Schema.isBetween({ maximum: 100, minimum: 0 })),
 )
 export type ExportQuality = typeof ExportQuality.Type
 

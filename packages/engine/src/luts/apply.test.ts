@@ -1,38 +1,36 @@
 import { describe, it, expect } from 'vitest'
-import fc from 'fast-check'
+import * as fc from 'fast-check'
 import { applyLutCpu } from './apply'
 import type { LutCube } from './cube'
 
 // ---- generators ----
 
-const channel = fc.integer({ min: 0, max: 255 })
-const amountArb = fc.float({ min: 0, max: 1, noDefaultInfinity: true, noNaN: true })
+const channel = fc.integer({ max: 255, min: 0 })
+const amountArb = fc.float({ max: 1, min: 0, noDefaultInfinity: true, noNaN: true })
 
 const imageArb = fc
-  .tuple(fc.integer({ min: 1, max: 8 }), fc.integer({ min: 1, max: 8 }))
+  .tuple(fc.integer({ max: 8, min: 1 }), fc.integer({ max: 8, min: 1 }))
   .chain(([width, height]) =>
     fc
-      .array(channel, { minLength: width * height * 4, maxLength: width * height * 4 })
+      .array(channel, { maxLength: width * height * 4, minLength: width * height * 4 })
       .map((px) => new ImageData(new Uint8ClampedArray(px), width, height)),
   )
 
 /** A cube of a fixed size with arbitrary texel values. */
 const cubeOfSize = (size: number) =>
   fc
-    .array(fc.float({ min: 0, max: 1, noDefaultInfinity: true, noNaN: true }), {
-      minLength: size * size * size * 3,
+    .array(fc.float({ max: 1, min: 0, noDefaultInfinity: true, noNaN: true }), {
       maxLength: size * size * size * 3,
+      minLength: size * size * size * 3,
     })
-    .map(
-      (values): LutCube => ({
-        size,
-        data: new Float32Array(values.map((v) => (v === 0 ? 0 : v))),
-      }),
-    )
+    .map((values): LutCube => ({
+      data: new Float32Array(values.map((v) => (v === 0 ? 0 : v))),
+      size,
+    }))
 
-const cubeArb = fc.integer({ min: 2, max: 8 }).chain(cubeOfSize)
+const cubeArb = fc.integer({ max: 8, min: 2 }).chain(cubeOfSize)
 
-const sceneArb = fc.record({ image: imageArb, cube: cubeArb, amount: amountArb })
+const sceneArb = fc.record({ amount: amountArb, cube: cubeArb, image: imageArb })
 
 // ---- reference ----
 
@@ -90,7 +88,7 @@ const identityCube = (size: number): LutCube => {
       }
     }
   }
-  return { size, data }
+  return { data, size }
 }
 
 describe('applyLutCpu', () => {
@@ -132,7 +130,7 @@ describe('applyLutCpu', () => {
   it('applying the identity cube is the identity on every channel', () => {
     fc.assert(
       fc.property(
-        fc.tuple(imageArb, fc.integer({ min: 2, max: 8 }), amountArb),
+        fc.tuple(imageArb, fc.integer({ max: 8, min: 2 }), amountArb),
         ([image, size, amount]) => {
           const out = applyLutCpu(image, identityCube(size), amount)
           for (let i = 0; i < image.data.length; i++) {
@@ -154,7 +152,7 @@ describe('applyLutCpu', () => {
         fc
           .constantFrom(2, 16)
           .chain((size) =>
-            fc.tuple(fc.constant(size), fc.integer({ min: 0, max: size - 1 }), cubeOfSize(size)),
+            fc.tuple(fc.constant(size), fc.integer({ max: size - 1, min: 0 }), cubeOfSize(size)),
           ),
         ([size, k, cube]) => {
           const byte = (k * 255) / (size - 1)

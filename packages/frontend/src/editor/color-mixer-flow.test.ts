@@ -10,7 +10,8 @@ import {
   text,
   expect as sceneExpect,
 } from 'foldkit/scene'
-import { FieldKey, type LayerType } from '@lutra/engine'
+import { FieldKey, numField } from '@lutra/engine'
+import type { Layer } from '@lutra/engine'
 import { EditId } from '@lutra/store'
 import { MockImageBitmap } from '../vitest-setup'
 import { RenderHandle } from '../gpu/backend'
@@ -38,23 +39,22 @@ import type { Model } from './model'
 
 // ---- helpers ----
 
-/** A stub handle — the tests never execute GPU work, so only its type flows
- *  through the model (same pattern as lut-flow.test.ts). */
+// SAFETY: fabricated GPU handle stub — tests never execute GPU work, so only its type flows through the model; the buffer has no backing storage and is never read.
 const stubHandle = () =>
-  // oxlint-disable-next-line consistent-type-assertions
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
   new RenderHandle({} as GPUTexture, 200, 150, { buffer: {} as GPUBuffer, map: null })
 
 /** A model in the Idle phase with a loaded image. */
 const loaded = () => ({
   ...initialModel(),
   phase: Idle(),
-  source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
+  source: { bitmap: new MockImageBitmap(200, 150), error: null, height: 150, width: 200 },
 })
 
 /** Settle the in-flight render the way RenderedFrame does, so the next
  *  renderNow dispatches a fresh RenderChain (assertable in tests). */
 const settled = (model: Model): Model =>
-  update(model, RenderedFrame({ stamp: model.revision, handle: stubHandle() }))[0]
+  update(model, RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
 
 /** A Color Mixer draft (Drafting phase, no render in flight). */
 const mixerDraft = () => settled(update(loaded(), SelectedTool({ type: 'colorMixer' }))[0])
@@ -67,11 +67,7 @@ const draftLayer = (model: Model) => (model.phase._tag === 'Drafting' ? model.ph
 const draftId = (model: Model) => draftLayer(model)?.id
 
 /** Read a numeric field off a heterogeneous layer. */
-const field = (layer: { type: LayerType; id: string }, key: string): number => {
-  const record: Record<string, unknown> = layer
-  const value = record[key]
-  return typeof value === 'number' ? value : NaN
-}
+const field = (layer: Layer, key: string): number => numField(layer, FieldKey(key))
 
 // ---- update flow ----
 
@@ -108,16 +104,16 @@ describe('Color Mixer layer flow', () => {
     const id = draftId(withDraft)
     expect(id).toBeDefined()
     // Presentation-only: no render is dispatched for a swatch tap.
-    const [selected] = update(withDraft, SelectedMixerColor({ id: id!, color: 5 }))
+    const [selected] = update(withDraft, SelectedMixerColor({ color: 5, id: id! }))
     expect(selected.activeMixerColor[id!]).toBe(5)
-    const [clamped] = update(selected, SelectedMixerColor({ id: id!, color: 99 }))
+    const [clamped] = update(selected, SelectedMixerColor({ color: 99, id: id! }))
     expect(clamped.activeMixerColor[id!]).toBe(7)
   })
 
   it('keeps the active range selection across confirm (same layer id)', () => {
     const [withDraft] = update(loaded(), SelectedTool({ type: 'colorMixer' }))
     const id = draftId(withDraft)
-    const [withColor] = update(withDraft, SelectedMixerColor({ id: id!, color: 3 }))
+    const [withColor] = update(withDraft, SelectedMixerColor({ color: 3, id: id! }))
     const [model] = update(withColor, ConfirmedDraft())
     expect(model.chain).toHaveLength(1)
     expect(model.chain[0]?.id).toBe(id)
@@ -126,24 +122,24 @@ describe('Color Mixer layer flow', () => {
 
   it('updates a committed mixer field and the active range', () => {
     let model = selectedMixer()
-    const id = model.chain[0]!.id
+    const { id } = model.chain[0]!
     expect(model.phase._tag).toBe('Selected')
 
     const [updated] = update(
       model,
-      UpdatedLayerParam({ id, field: FieldKey('redHue'), value: 0.5 }),
+      UpdatedLayerParam({ field: FieldKey('redHue'), id, value: 0.5 }),
     )
     expect(field(updated.chain[0]!, 'redHue')).toBe(0.5)
 
     model = updated
-    const [withColor] = update(model, SelectedMixerColor({ id, color: 6 }))
+    const [withColor] = update(model, SelectedMixerColor({ color: 6, id }))
     expect(withColor.activeMixerColor[id]).toBe(6)
   })
 
   it('clears the selection entry on cancel and on remove', () => {
     const [withDraft] = update(loaded(), SelectedTool({ type: 'colorMixer' }))
     const id = draftId(withDraft)!
-    const [withColor] = update(withDraft, SelectedMixerColor({ id, color: 2 }))
+    const [withColor] = update(withDraft, SelectedMixerColor({ color: 2, id }))
     const [cancelled] = update(withColor, CancelledDraft())
     expect(cancelled.activeMixerColor[id]).toBeUndefined()
 
@@ -155,22 +151,22 @@ describe('Color Mixer layer flow', () => {
   it('resets the selection map when the image clears or an edit loads', () => {
     const [withDraft] = update(loaded(), SelectedTool({ type: 'colorMixer' }))
     const id = draftId(withDraft)!
-    const [withColor] = update(withDraft, SelectedMixerColor({ id, color: 4 }))
+    const [withColor] = update(withDraft, SelectedMixerColor({ color: 4, id }))
 
     const [cleared] = update(withColor, ClearedImage())
     expect(cleared.activeMixerColor).toEqual({})
 
     const [loaded2] = update(loaded(), SelectedTool({ type: 'colorMixer' }))
-    const [withColor2] = update(loaded2, SelectedMixerColor({ id: draftId(loaded2)!, color: 1 }))
+    const [withColor2] = update(loaded2, SelectedMixerColor({ color: 1, id: draftId(loaded2)! }))
     const [editLoaded] = update(
       withColor2,
       EditLoaded({
-        id: EditId('11111111-1111-4111-8111-111111111111'),
-        chain: [],
         bitmap: new MockImageBitmap(200, 150),
-        width: 200,
+        chain: [],
         height: 150,
+        id: EditId('11111111-1111-4111-8111-111111111111'),
         source: new Uint8Array(0),
+        width: 200,
       }),
     )
     expect(editLoaded.activeMixerColor).toEqual({})
@@ -182,7 +178,7 @@ describe('Color Mixer layer flow', () => {
 const sceneConfig = { update, view } as const
 
 const stageMounts = [
-  Mount.resolve(PanZoom, ScaledCanvas({ scale: 1, offsetX: 0, offsetY: 0 })),
+  Mount.resolve(PanZoom, ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
   Mount.resolve(RegisterCanvas, CanvasRegistered()),
 ]
 
@@ -246,9 +242,9 @@ describe('Color Mixer view', () => {
 
   it('shows the committed row summary with the active range’s values', () => {
     const withMixer = selectedMixer()
-    const id = withMixer.chain[0]!.id
+    const { id } = withMixer.chain[0]!
     const withValue = settled(
-      update(withMixer, UpdatedLayerParam({ id, field: FieldKey('redHue'), value: 0.5 }))[0],
+      update(withMixer, UpdatedLayerParam({ field: FieldKey('redHue'), id, value: 0.5 }))[0],
     )
     scene(
       sceneConfig,

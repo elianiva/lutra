@@ -43,12 +43,12 @@ describe('attached edit load (gallery → /edit/:id)', () => {
     const [model, commands] = update(
       initialModel(),
       EditLoaded({
-        id: id(),
-        chain: [exposure],
         bitmap: bitmap(),
-        width: 640,
+        chain: [exposure],
         height: 480,
+        id: id(),
         source: new Uint8Array([9, 9]),
+        width: 640,
       }),
     )
 
@@ -70,7 +70,7 @@ describe('attached edit load (gallery → /edit/:id)', () => {
     const withDraft = {
       ...initialModel(),
       phase: Idle(),
-      source: { bitmap: bitmap(), width: 640, height: 480, error: null },
+      source: { bitmap: bitmap(), error: null, height: 480, width: 640 },
     }
     const [drafting] = update(withDraft, { _tag: 'SelectedTool', type: 'exposure' })
     expect(drafting.phase._tag).toBe('Drafting')
@@ -79,12 +79,12 @@ describe('attached edit load (gallery → /edit/:id)', () => {
     const [model] = update(
       drafting,
       EditLoaded({
-        id: id(),
-        chain: [],
         bitmap: bitmap(),
-        width: 640,
+        chain: [],
         height: 480,
+        id: id(),
         source: new Uint8Array([9, 9]),
+        width: 640,
       }),
     )
     expect(model.phase._tag).toBe('Idle')

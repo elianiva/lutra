@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import fc from 'fast-check'
+import * as fc from 'fast-check'
 import { Command, Mount, given, scene, selector, label, expect as sceneExpect } from 'foldkit/scene'
 import { MockImageBitmap } from '../vitest-setup'
 import { initialModel } from './model'
@@ -24,13 +24,19 @@ import { createLayerFor, PresentFrame } from './command'
 const loadedModel = () => ({
   ...initialModel(),
   phase: Idle(),
-  source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
+  source: { bitmap: new MockImageBitmap(200, 150), error: null, height: 150, width: 200 },
 })
 
 /** The compare presentation state on a dispatched PresentFrame, if any. */
-const presented = (
-  commands: ReadonlyArray<{ readonly name: string; readonly args?: Record<string, unknown> }>,
-) => commands.find((c) => c.name === 'PresentFrame')?.args?.present
+interface PresentArgs {
+  readonly present?: {
+    readonly mode: string
+    readonly showBefore: boolean
+    readonly splitAt: number
+  }
+}
+const presented = (commands: readonly { readonly name: string; readonly args?: PresentArgs }[]) =>
+  commands.find((c) => c.name === 'PresentFrame')?.args?.present
 
 // ---- update flow ----
 
@@ -41,7 +47,7 @@ describe('compare flow', () => {
     expect(model.compareToggleBefore).toBe(true)
     expect(commands.some((c) => c.name === 'PresentFrame')).toBe(true)
     expect(commands.some((c) => c.name === 'RenderChain')).toBe(false)
-    expect(presented(commands)).toEqual({ mode: 'toggle', splitAt: 0.5, showBefore: true })
+    expect(presented(commands)).toEqual({ mode: 'toggle', showBefore: true, splitAt: 0.5 })
   })
 
   it('clicking the active Toggle segment flips back to the graded output', () => {
@@ -49,7 +55,7 @@ describe('compare flow', () => {
     const [model, commands] = update(toggled, ChangedCompareMode({ mode: 'toggle' }))
     expect(model.compareMode).toBe('toggle')
     expect(model.compareToggleBefore).toBe(false)
-    expect(presented(commands)).toEqual({ mode: 'toggle', splitAt: 0.5, showBefore: false })
+    expect(presented(commands)).toEqual({ mode: 'toggle', showBefore: false, splitAt: 0.5 })
   })
 
   it('switching modes keeps the split position and shows the graded side', () => {
@@ -63,7 +69,7 @@ describe('compare flow', () => {
   it('clamps any split position into [0, 1]', () => {
     fc.assert(
       fc.property(
-        fc.double({ min: -1_000_000, max: 1_000_000, noNaN: true, noDefaultInfinity: true }),
+        fc.double({ max: 1_000_000, min: -1_000_000, noDefaultInfinity: true, noNaN: true }),
         (position) => {
           const [model] = update(loadedModel(), ChangedSplitPosition({ position }))
           expect(model.compareSplitAt).toBeGreaterThanOrEqual(0)
@@ -100,8 +106,8 @@ describe('compare flow', () => {
     const render = commands.find((c) => c.name === 'RenderChain')
     expect(render?.args?.present).toEqual({
       mode: 'toggle',
-      splitAt: 0.3,
       showBefore: true,
+      splitAt: 0.3,
     })
   })
 })
@@ -111,7 +117,7 @@ describe('compare flow', () => {
 const sceneConfig = { update, view } as const
 
 const loadedStageMounts = [
-  Mount.resolve(PanZoom, ScaledCanvas({ scale: 1, offsetX: 0, offsetY: 0 })),
+  Mount.resolve(PanZoom, ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
   Mount.resolve(RegisterCanvas, CanvasRegistered()),
 ]
 
@@ -122,7 +128,7 @@ describe('compare control view', () => {
       given({
         ...initialModel(),
         phase: Idle(),
-        source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
+        source: { bitmap: new MockImageBitmap(200, 150), error: null, height: 150, width: 200 },
       }),
       ...loadedStageMounts,
       sceneExpect(label('Off')).toExist(),
@@ -151,9 +157,9 @@ describe('compare control view', () => {
       sceneConfig,
       given({
         ...initialModel(),
-        phase: Idle(),
-        source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
         compareMode: 'side-by-side',
+        phase: Idle(),
+        source: { bitmap: new MockImageBitmap(200, 150), error: null, height: 150, width: 200 },
       }),
       ...loadedStageMounts,
       // The canvas is 2× the image width: each half shows its image at
@@ -170,9 +176,9 @@ describe('compare control view', () => {
       sceneConfig,
       given({
         ...initialModel(),
-        phase: Idle(),
-        source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
         compareMode: 'split',
+        phase: Idle(),
+        source: { bitmap: new MockImageBitmap(200, 150), error: null, height: 150, width: 200 },
       }),
       ...loadedStageMounts,
       Mount.resolve(CompareDivider, ChangedSplitPosition({ position: 0.5 })),
@@ -188,10 +194,10 @@ describe('compare control view', () => {
       sceneConfig,
       given({
         ...initialModel(),
-        phase: Idle(),
-        source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
         compareMode: 'split',
         compareSplitAt: 0.3,
+        phase: Idle(),
+        source: { bitmap: new MockImageBitmap(200, 150), error: null, height: 150, width: 200 },
       }),
       ...loadedStageMounts,
       // Resolving the mount feeds its message through update, which
@@ -213,14 +219,14 @@ describe('compare control view', () => {
       sceneConfig,
       given({
         ...initialModel(),
-        phase: Idle(),
-        source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
         compareMode: 'split',
         compareSplitAt: 0.3,
+        phase: Idle(),
+        source: { bitmap: new MockImageBitmap(200, 150), error: null, height: 150, width: 200 },
       }),
       // The zoomed view comes from the PanZoom mount, like a real stage
       // measure: a 2× scale lands in the model and flows into the divider.
-      Mount.resolve(PanZoom, ScaledCanvas({ scale: 2, offsetX: 0, offsetY: 0 })),
+      Mount.resolve(PanZoom, ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 2 })),
       Mount.resolve(RegisterCanvas, CanvasRegistered()),
       Mount.resolve(CompareDivider, ChangedSplitPosition({ position: 0.3 })),
       Command.resolve(PresentFrame, FramePresented()),

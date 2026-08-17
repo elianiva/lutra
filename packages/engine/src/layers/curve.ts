@@ -23,7 +23,7 @@ export const CURVE_X_EPS = 0.02
  * positions are the layer's defaults, the widget's reset target, and the
  * reference `isCurveNeutral` compares against.
  */
-export const CURVE_DEFAULT_POINTS: ReadonlyArray<{ readonly x: number; readonly y: number }> = [
+export const CURVE_DEFAULT_POINTS: readonly { readonly x: number; readonly y: number }[] = [
   { x: 0, y: 0 },
   { x: 0.25, y: 0.25 },
   { x: 0.5, y: 0.5 },
@@ -42,12 +42,7 @@ export const curvePointXField = (index: number): FieldKey => FieldKey(`p${index}
 /** The field key of a point's y (output tone): `p{i}y` (e.g. "p2y"). */
 export const curvePointYField = (index: number): FieldKey => FieldKey(`p${index}y`)
 
-/** Read a numeric field off a layer; NaN when absent or non-numeric. */
-const num = (layer: Layer, key: FieldKey): number => {
-  const record: Record<string, unknown> = layer
-  const value = record[key]
-  return typeof value === 'number' && Number.isFinite(value) ? value : NaN
-}
+import { numField } from './fields'
 
 /**
  * The layer's control points in index order. Values outside [0, 1] (a
@@ -56,10 +51,10 @@ const num = (layer: Layer, key: FieldKey): number => {
  * point is safe; only non-finite values fall back to the identity
  * positions.
  */
-export const curvePointsOf = (layer: Layer): ReadonlyArray<CurvePoint> =>
+export const curvePointsOf = (layer: Layer): readonly CurvePoint[] =>
   Array.from({ length: CURVE_POINT_COUNT }, (_, i) => {
-    const x = num(layer, curvePointXField(i))
-    const y = num(layer, curvePointYField(i))
+    const x = numField(layer, curvePointXField(i))
+    const y = numField(layer, curvePointYField(i))
     const fallback = CURVE_DEFAULT_POINTS[i]!
     return {
       x: Number.isFinite(x) ? x : fallback.x,
@@ -77,7 +72,9 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
  * 0..CURVE_POINT_COUNT - 1. Non-toneCurve layers pass through untouched.
  */
 export const moveCurvePoint = (layer: Layer, index: number, x: number, y: number): Layer => {
-  if (layer.type !== 'toneCurve') return layer
+  if (layer.type !== 'toneCurve') {
+    return layer
+  }
   const i = Math.min(CURVE_POINT_COUNT - 1, Math.max(0, Math.round(index)))
   const points = curvePointsOf(layer)
   const xLo = i === 0 ? 0 : points[i - 1]!.x + CURVE_X_EPS
@@ -94,7 +91,9 @@ export const moveCurvePoint = (layer: Layer, index: number, x: number, y: number
  * Non-toneCurve layers pass through untouched.
  */
 export const resetCurve = (layer: Layer): Layer => {
-  if (layer.type !== 'toneCurve') return layer
+  if (layer.type !== 'toneCurve') {
+    return layer
+  }
   const fields: Record<string, number> = {}
   for (let i = 0; i < CURVE_POINT_COUNT; i++) {
     const point = CURVE_DEFAULT_POINTS[i]!
@@ -106,9 +105,12 @@ export const resetCurve = (layer: Layer): Layer => {
 
 /** Whether every point sits at its identity position (the curve is a no-op). */
 export const isCurveNeutral = (layer: Layer): boolean => {
-  if (layer.type !== 'toneCurve') return true
+  if (layer.type !== 'toneCurve') {
+    return true
+  }
   return CURVE_DEFAULT_POINTS.every(
     (point, i) =>
-      num(layer, curvePointXField(i)) === point.x && num(layer, curvePointYField(i)) === point.y,
+      numField(layer, curvePointXField(i)) === point.x &&
+      numField(layer, curvePointYField(i)) === point.y,
   )
 }

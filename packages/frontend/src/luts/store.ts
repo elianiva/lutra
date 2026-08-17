@@ -1,5 +1,6 @@
 import { Context, Effect, Layer, Option, Ref, Schema } from 'effect'
-import { LutParseError, parseCube, type LutCube, type LutId } from '@lutra/engine'
+import { LutParseError, parseCube } from '@lutra/engine'
+import type { LutCube, LutId } from '@lutra/engine'
 
 // The LUT library lives in the frontend's static assets (vendored from the
 // Film-Luts mirror — see packages/frontend/public/luts/README.md). This
@@ -27,23 +28,30 @@ export interface LutCatalogEntry {
  * un-wrapped: a load error means the bytes never arrived.
  */
 export class LutLoadError extends Schema.TaggedErrorClass<LutLoadError>()('LutLoadError', {
-  message: Schema.String,
   cause: Schema.optional(Schema.Unknown),
+  message: Schema.String,
 }) {}
 
 // ---- service ----
 
-export interface LutStoreShape {
+export interface LutStoreContract {
   /** The LUT library catalog (film_luts.json). Memoized; failures are not cached. */
-  readonly getCatalog: () => Effect.Effect<ReadonlyArray<LutCatalogEntry>, LutLoadError>
+  readonly getCatalog: () => Effect.Effect<readonly LutCatalogEntry[], LutLoadError>
   /** Parse the `.cube` for a lutId, memoized per id. Failures are not cached. */
   readonly getCube: (lutId: LutId) => Effect.Effect<LutCube, LutLoadError | LutParseError>
 }
 
-export class LutStore extends Context.Service<LutStore, LutStoreShape>()('LutStore') {}
+export class LutStore extends Context.Service<LutStore, LutStoreContract>()('LutStore') {}
 
 const fetchText = (path: string): Effect.Effect<string, LutLoadError> =>
   Effect.tryPromise({
+    catch: (cause) =>
+      cause instanceof LutLoadError
+        ? cause
+        : new LutLoadError({
+            cause,
+            message: `Failed to load ${path}: ${cause instanceof Error ? cause.message : String(cause)}`,
+          }),
     try: async () => {
       const res = await fetch(path)
       if (!res.ok) {
@@ -51,39 +59,32 @@ const fetchText = (path: string): Effect.Effect<string, LutLoadError> =>
       }
       return await res.text()
     },
-    catch: (cause) =>
-      cause instanceof LutLoadError
-        ? cause
-        : new LutLoadError({
-            message: `Failed to load ${path}: ${cause instanceof Error ? cause.message : String(cause)}`,
-            cause,
-          }),
   })
 
 /** Parse `.cube` text, passing the engine's `LutParseError` through un-wrapped. */
 const parseCubeText = (lutId: LutId, text: string): Effect.Effect<LutCube, LutParseError> =>
   Effect.try({
-    try: () => parseCube(text),
     catch: (cause) =>
       cause instanceof LutParseError
         ? cause
         : new LutParseError({
             message: `Failed to parse LUT ${lutId}: ${cause instanceof Error ? cause.message : String(cause)}`,
           }),
+    try: () => parseCube(text),
   })
 
 /** Parse the catalog JSON; the upstream shape is `{ filmLUTs: [...] }`. */
-const parseCatalog = (text: string): Effect.Effect<ReadonlyArray<LutCatalogEntry>, LutLoadError> =>
+const parseCatalog = (text: string): Effect.Effect<readonly LutCatalogEntry[], LutLoadError> =>
   Effect.try({
-    try: () => {
-      const parsed: { filmLUTs: ReadonlyArray<LutCatalogEntry> } = JSON.parse(text)
-      return parsed.filmLUTs
-    },
     catch: (cause) =>
       new LutLoadError({
-        message: `Failed to parse LUT catalog: ${cause instanceof Error ? cause.message : String(cause)}`,
         cause,
+        message: `Failed to parse LUT catalog: ${cause instanceof Error ? cause.message : String(cause)}`,
       }),
+    try: () => {
+      const parsed: { filmLUTs: readonly LutCatalogEntry[] } = JSON.parse(text)
+      return parsed.filmLUTs
+    },
   })
 
 /**
@@ -94,9 +95,9 @@ const parseCatalog = (text: string): Effect.Effect<ReadonlyArray<LutCatalogEntry
  */
 export const LutStoreLive = Layer.effect(
   LutStore,
-  Effect.gen(function* () {
+  Effect.gen(function* LutStoreLive() {
     const catalogRef = yield* Ref.make<
-      Option.Option<Effect.Effect<ReadonlyArray<LutCatalogEntry>, LutLoadError>>
+      Option.Option<Effect.Effect<readonly LutCatalogEntry[], LutLoadError>>
     >(Option.none())
     const cubeCacheRef = yield* Ref.make(
       new Map<LutId, Effect.Effect<LutCube, LutLoadError | LutParseError>>(),
@@ -104,7 +105,7 @@ export const LutStoreLive = Layer.effect(
 
     return LutStore.of({
       getCatalog: () =>
-        Effect.gen(function* () {
+        Effect.gen(function* getCatalog() {
           const cached = yield* Ref.get(catalogRef)
           if (Option.isSome(cached)) {
             return yield* cached.value
@@ -121,7 +122,7 @@ export const LutStoreLive = Layer.effect(
         }),
 
       getCube: (lutId) =>
-        Effect.gen(function* () {
+        Effect.gen(function* getCube() {
           const cached = yield* Ref.get(cubeCacheRef).pipe(Effect.map((cache) => cache.get(lutId)))
           if (cached) {
             return yield* cached

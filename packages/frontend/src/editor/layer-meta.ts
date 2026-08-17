@@ -18,6 +18,7 @@ import {
   FieldKey,
   isCurveNeutral,
   makeRegistry,
+  numField,
   renderExposure,
   renderContrast,
   renderShadows,
@@ -32,40 +33,39 @@ import {
   renderClarity,
   renderLut,
   UnknownLayerTypeError,
-  type Layer,
-  type LayerType,
-  type LutId,
 } from '@lutra/engine'
+import type { Layer, LayerType, LutId } from '@lutra/engine'
 import { UnknownFieldError } from '../errors'
 
 // The engine registry owns min/max/default per field; the UI metadata below
 // owns only presentation (icon, label, formatter). `fieldBounds` joins them so
 // the slider view gets everything it needs in one lookup.
 export const ENGINE_REGISTRY = makeRegistry({
-  exposure: renderExposure,
-  contrast: renderContrast,
-  shadows: renderShadows,
-  highlights: renderHighlights,
-  toneCurve: renderToneCurve,
-  whiteBalance: renderWhiteBalance,
-  saturation: renderSaturation,
-  colorMixer: renderColorMixer,
-  grain: renderGrain,
-  vignette: renderVignette,
   chromaticAberration: renderChromaticAberration,
   clarity: renderClarity,
+  colorMixer: renderColorMixer,
+  contrast: renderContrast,
+  exposure: renderExposure,
+  grain: renderGrain,
+  highlights: renderHighlights,
   lut: renderLut,
+  saturation: renderSaturation,
+  shadows: renderShadows,
+  toneCurve: renderToneCurve,
+  vignette: renderVignette,
+  whiteBalance: renderWhiteBalance,
 })
 
-export const fieldBounds = (
-  type: LayerType,
-  field: FieldKey,
-): { readonly min: number; readonly max: number } => {
+export const fieldBounds = (type: LayerType, field: FieldKey) => {
   const entry = ENGINE_REGISTRY[type]
-  if (!entry) throw new UnknownLayerTypeError({ message: `Unknown layer type ${type}` })
+  if (!entry) {
+    throw new UnknownLayerTypeError({ message: `Unknown layer type ${type}` })
+  }
   const meta = entry.fields[field]
-  if (!meta) throw new UnknownFieldError({ message: `Unknown field ${field} on ${type}` })
-  return { min: meta.min, max: meta.max }
+  if (!meta) {
+    throw new UnknownFieldError({ message: `Unknown field ${field} on ${type}` })
+  }
+  return { max: meta.max, min: meta.min }
 }
 
 // ---- value formatters ----
@@ -120,28 +120,20 @@ export interface LayerUi {
 // range's center on the hue wheel — the same centers the shader classifies
 // with, so a swatch's color is exactly the color its range governs.
 export const MIXER_COLORS = [
-  { key: 'red', name: 'Red', hue: 0 },
-  { key: 'orange', name: 'Orange', hue: 30 },
-  { key: 'yellow', name: 'Yellow', hue: 60 },
-  { key: 'green', name: 'Green', hue: 120 },
-  { key: 'aqua', name: 'Aqua', hue: 180 },
-  { key: 'blue', name: 'Blue', hue: 240 },
-  { key: 'purple', name: 'Purple', hue: 270 },
-  { key: 'magenta', name: 'Magenta', hue: 300 },
+  { hue: 0, key: 'red', name: 'Red' },
+  { hue: 30, key: 'orange', name: 'Orange' },
+  { hue: 60, key: 'yellow', name: 'Yellow' },
+  { hue: 120, key: 'green', name: 'Green' },
+  { hue: 180, key: 'aqua', name: 'Aqua' },
+  { hue: 240, key: 'blue', name: 'Blue' },
+  { hue: 270, key: 'purple', name: 'Purple' },
+  { hue: 300, key: 'magenta', name: 'Magenta' },
 ] as const
 
 export type MixerColor = (typeof MIXER_COLORS)[number]
 
 /** The channel field suffixes on a Color Mixer layer, in slider order. */
 export const MIXER_CHANNELS = ['Hue', 'Saturation', 'Luminance'] as const
-
-// Read a numeric field off a heterogeneous Layer without paying for a
-// discriminated-union collapse at every call site.
-const num = (layer: Layer, key: FieldKey) => {
-  const record: Record<string, unknown> = layer
-  const value = record[key]
-  return typeof value === 'number' ? value : NaN
-}
 
 const wbK = (v: number) => (v < 0 ? Math.round(6500 - (1 + v) * 4500) : Math.round(6500 + v * 5500))
 
@@ -151,83 +143,24 @@ const wbK = (v: number) => (v < 0 ? Math.round(6500 - (1 + v) * 4500) : Math.rou
  * beside it to add the lucide icon and the value formatters (formats are
  * a presentation concern, not an engine one).
  */
-export const LAYER_UI: Record<LayerType, LayerUi> = {
-  exposure: {
-    label: 'Exposure',
-    icon: Sun,
+export const LAYER_UI = {
+  chromaticAberration: {
+    description: 'Splits red and blue at the edges, like an old lens.',
+    fields: { amount: { format: formatSigned, label: 'CHROMATIC ABERRATION' } },
+    formatValue: (l) => formatSigned(numField(l, FieldKey('amount'))),
+    icon: CircleDot,
+    label: 'Chromatic Aberration',
     toggled: false,
-    fields: { stops: { label: 'EXPOSURE', format: formatEV } },
-    formatValue: (l) => formatEV(num(l, FieldKey('stops'))),
-    description: 'Brightens or darkens the whole photo.',
-    when: "Fix a photo that's too dark or too bright.",
+    when: 'Add a touch of analog imperfection.',
   },
-  contrast: {
-    label: 'Contrast',
-    icon: Contrast,
+  clarity: {
+    description: 'Adds punch to textures and fine detail.',
+    fields: { amount: { format: formatSigned, label: 'CLARITY' } },
+    formatValue: (l) => formatSigned(numField(l, FieldKey('amount'))),
+    icon: Flame,
+    label: 'Clarity',
     toggled: false,
-    fields: { amount: { label: 'CONTRAST', format: formatSigned } },
-    formatValue: (l) => formatSigned(num(l, FieldKey('amount'))),
-    description: 'Deepens shadows and lifts highlights.',
-    when: 'Make a flat photo punchier, or soften it.',
-  },
-  shadows: {
-    label: 'Shadows',
-    icon: Eclipse,
-    toggled: false,
-    fields: { amount: { label: 'SHADOWS', format: formatSigned } },
-    formatValue: (l) => formatSigned(num(l, FieldKey('amount'))),
-    description: 'Lightens or darkens the darkest areas.',
-    when: 'Pull detail out of underexposed shadows.',
-  },
-  highlights: {
-    label: 'Highlights',
-    icon: Sparkles,
-    toggled: false,
-    fields: { amount: { label: 'HIGHLIGHTS', format: formatSigned } },
-    formatValue: (l) => formatSigned(num(l, FieldKey('amount'))),
-    description: 'Lightens or darkens the brightest areas.',
-    when: 'Recover blown-out skies and bright spots.',
-  },
-  toneCurve: {
-    label: 'Tone Curve',
-    icon: Activity,
-    toggled: false,
-    // The 10 point fields have no ruler sliders — the drawer renders the
-    // curve widget instead (layer-drawer.ts branches on 'toneCurve'); these
-    // labels exist for the record and for any generic fallback.
-    fields: Object.fromEntries(
-      Array.from({ length: 5 }, (_, i) => [
-        [`p${i}x`, { label: `POINT ${i} X`, format: formatPercent }],
-        [`p${i}y`, { label: `POINT ${i} Y`, format: formatPercent }],
-      ]).flat(),
-    ),
-    // The drawer summary: the curve is either the identity or a custom
-    // shape — the reset button's visibility uses the same test.
-    formatValue: (l) => (isCurveNeutral(l) ? 'Neutral' : 'Custom'),
-    description: 'Shapes brightness across the whole range with a draggable curve.',
-    when: 'Bend the tones — an S-curve, lifted blacks, or a custom grade.',
-  },
-  whiteBalance: {
-    label: 'White Balance',
-    icon: Eye,
-    toggled: true,
-    fields: {
-      temp: { label: 'TEMPERATURE', format: formatTemp },
-      tint: { label: 'TINT', format: formatSigned },
-    },
-    formatValue: (l) =>
-      `${wbK(num(l, FieldKey('temp')))} K · ${formatSigned(num(l, FieldKey('tint')))}`,
-    description: 'Shifts the color cast: warm or cool, green or magenta.',
-    when: 'Use it to fix an odd cast or set a mood.',
-  },
-  saturation: {
-    label: 'Saturation',
-    icon: Palette,
-    toggled: false,
-    fields: { amount: { label: 'SATURATION', format: formatSigned } },
-    formatValue: (l) => formatSigned(num(l, FieldKey('amount'))),
-    description: 'Controls how vivid the colors are.',
-    when: 'Make colors pop, or pull back for a faded look.',
+    when: 'Make surfaces pop, or go softer and dreamy.',
   },
   colorMixer: {
     label: 'Color Mixer',
@@ -241,8 +174,8 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
         MIXER_CHANNELS.map((channel) => [
           `${color.key}${channel}`,
           {
-            label: channel.toUpperCase(),
             format: channel === 'Hue' ? formatHue : formatPercentSigned,
+            label: channel.toUpperCase(),
           },
         ]),
       ),
@@ -254,7 +187,9 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
       let moved = 0
       for (const color of MIXER_COLORS) {
         for (const channel of MIXER_CHANNELS) {
-          if (num(l, FieldKey(`${color.key}${channel}`)) !== 0) moved++
+          if (numField(l, FieldKey(`${color.key}${channel}`)) !== 0) {
+            moved++
+          }
         }
       }
       return moved === 0 ? 'No adjustments' : `${moved} slider${moved === 1 ? '' : 's'} moved`
@@ -262,78 +197,139 @@ export const LAYER_UI: Record<LayerType, LayerUi> = {
     description: 'Adjusts hue, saturation, and brightness of one color range at a time.',
     when: 'Recolor a single tone — sky, skin, grass — and leave the rest.',
   },
-  grain: {
-    label: 'Grain',
-    icon: Shirt,
+  contrast: {
+    description: 'Deepens shadows and lifts highlights.',
+    fields: { amount: { format: formatSigned, label: 'CONTRAST' } },
+    formatValue: (l) => formatSigned(numField(l, FieldKey('amount'))),
+    icon: Contrast,
+    label: 'Contrast',
     toggled: false,
+    when: 'Make a flat photo punchier, or soften it.',
+  },
+  exposure: {
+    description: 'Brightens or darkens the whole photo.',
+    fields: { stops: { format: formatEV, label: 'EXPOSURE' } },
+    formatValue: (l) => formatEV(numField(l, FieldKey('stops'))),
+    icon: Sun,
+    label: 'Exposure',
+    toggled: false,
+    when: "Fix a photo that's too dark or too bright.",
+  },
+  grain: {
+    description: 'Adds animated film grain for an analog feel.',
     fields: {
-      texture: { label: 'TEXTURE', format: formatPercent },
-      size: { label: 'SIZE', format: formatPercent },
-      blur: { label: 'BLUR', format: formatPercent },
+      blur: { format: formatPercent, label: 'BLUR' },
+      size: { format: formatPercent, label: 'SIZE' },
+      texture: { format: formatPercent, label: 'TEXTURE' },
     },
     formatValue: (l) =>
-      `T ${formatPercent(num(l, FieldKey('texture')))} · S ${formatPercent(num(l, FieldKey('size')))} · B ${formatPercent(num(l, FieldKey('blur')))}`,
-    description: 'Adds animated film grain for an analog feel.',
+      `T ${formatPercent(numField(l, FieldKey('texture')))} · S ${formatPercent(numField(l, FieldKey('size')))} · B ${formatPercent(numField(l, FieldKey('blur')))}`,
+    icon: Shirt,
+    label: 'Grain',
+    toggled: false,
     when: 'Give the photo texture, like classic film.',
   },
-  vignette: {
-    label: 'Vignette',
-    icon: Aperture,
-    toggled: true,
-    fields: {
-      amount: { label: 'VIGNETTE', format: formatSigned },
-      size: { label: 'SIZE', format: formatPercent },
-    },
-    formatValue: (l) =>
-      `A ${formatSigned(num(l, FieldKey('amount')))} · ${formatPercent(num(l, FieldKey('size')))}`,
-    description: "Darkens or brightens the photo's edges.",
-    when: 'Focus the center, or add a vintage frame.',
-  },
-  chromaticAberration: {
-    label: 'Chromatic Aberration',
-    icon: CircleDot,
+  highlights: {
+    description: 'Lightens or darkens the brightest areas.',
+    fields: { amount: { format: formatSigned, label: 'HIGHLIGHTS' } },
+    formatValue: (l) => formatSigned(numField(l, FieldKey('amount'))),
+    icon: Sparkles,
+    label: 'Highlights',
     toggled: false,
-    fields: { amount: { label: 'CHROMATIC ABERRATION', format: formatSigned } },
-    formatValue: (l) => formatSigned(num(l, FieldKey('amount'))),
-    description: 'Splits red and blue at the edges, like an old lens.',
-    when: 'Add a touch of analog imperfection.',
-  },
-  clarity: {
-    label: 'Clarity',
-    icon: Flame,
-    toggled: false,
-    fields: { amount: { label: 'CLARITY', format: formatSigned } },
-    formatValue: (l) => formatSigned(num(l, FieldKey('amount'))),
-    description: 'Adds punch to textures and fine detail.',
-    when: 'Make surfaces pop, or go softer and dreamy.',
+    when: 'Recover blown-out skies and bright spots.',
   },
   lut: {
     label: 'LUT',
     icon: Boxes,
     toggled: false,
-    fields: { amount: { label: 'STRENGTH', format: formatPercent } },
+    fields: { amount: { format: formatPercent, label: 'STRENGTH' } },
     // The drawer renders the picker + "Name · %" summary for LUT layers;
     // the catalog lookup lives there (the model holds the catalog).
-    formatValue: (l) => formatPercent(num(l, FieldKey('amount'))),
+    formatValue: (l) => formatPercent(numField(l, FieldKey('amount'))),
     description: 'Applies the look of a classic film stock.',
     when: 'Give your photo instant analog character.',
   },
-}
+  saturation: {
+    description: 'Controls how vivid the colors are.',
+    fields: { amount: { format: formatSigned, label: 'SATURATION' } },
+    formatValue: (l) => formatSigned(numField(l, FieldKey('amount'))),
+    icon: Palette,
+    label: 'Saturation',
+    toggled: false,
+    when: 'Make colors pop, or pull back for a faded look.',
+  },
+  shadows: {
+    description: 'Lightens or darkens the darkest areas.',
+    fields: { amount: { format: formatSigned, label: 'SHADOWS' } },
+    formatValue: (l) => formatSigned(numField(l, FieldKey('amount'))),
+    icon: Eclipse,
+    label: 'Shadows',
+    toggled: false,
+    when: 'Pull detail out of underexposed shadows.',
+  },
+  toneCurve: {
+    label: 'Tone Curve',
+    icon: Activity,
+    toggled: false,
+    // The 10 point fields have no ruler sliders — the drawer renders the
+    // curve widget instead (layer-drawer.ts branches on 'toneCurve'); these
+    // labels exist for the record and for any generic fallback.
+    fields: Object.fromEntries(
+      Array.from({ length: 5 }, (_, i) => [
+        [`p${i}x`, { format: formatPercent, label: `POINT ${i} X` }],
+        [`p${i}y`, { format: formatPercent, label: `POINT ${i} Y` }],
+      ]).flat(),
+    ),
+    // The drawer summary: the curve is either the identity or a custom
+    // shape — the reset button's visibility uses the same test.
+    formatValue: (l) => (isCurveNeutral(l) ? 'Neutral' : 'Custom'),
+    description: 'Shapes brightness across the whole range with a draggable curve.',
+    when: 'Bend the tones — an S-curve, lifted blacks, or a custom grade.',
+  },
+  vignette: {
+    description: "Darkens or brightens the photo's edges.",
+    fields: {
+      amount: { format: formatSigned, label: 'VIGNETTE' },
+      size: { format: formatPercent, label: 'SIZE' },
+    },
+    formatValue: (l) =>
+      `A ${formatSigned(numField(l, FieldKey('amount')))} · ${formatPercent(numField(l, FieldKey('size')))}`,
+    icon: Aperture,
+    label: 'Vignette',
+    toggled: true,
+    when: 'Focus the center, or add a vintage frame.',
+  },
+  whiteBalance: {
+    description: 'Shifts the color cast: warm or cool, green or magenta.',
+    fields: {
+      temp: { format: formatTemp, label: 'TEMPERATURE' },
+      tint: { format: formatSigned, label: 'TINT' },
+    },
+    formatValue: (l) =>
+      `${wbK(numField(l, FieldKey('temp')))} K · ${formatSigned(numField(l, FieldKey('tint')))}`,
+    icon: Eye,
+    label: 'White Balance',
+    toggled: true,
+    when: 'Use it to fix an odd cast or set a mood.',
+  },
+} satisfies Record<LayerType, LayerUi>
 
 /**
  * Human name for a lutId from the catalog, falling back to the bare file
  * name when the catalog is missing the entry (e.g. a stale reference).
  */
 export const lutName = (
-  catalog: ReadonlyArray<{ readonly lut_file: LutId; readonly name: string }> | null,
+  catalog: readonly { readonly lut_file: LutId; readonly name: string }[] | null,
   lutId: LutId,
 ) => {
   const entry = catalog?.find((e) => e.lut_file === lutId)
-  if (entry) return entry.name
+  if (entry) {
+    return entry.name
+  }
   return lutId.split('/').pop() ?? lutId
 }
 
-export const LAYER_TYPES_ORDER: ReadonlyArray<LayerType> = [
+export const LAYER_TYPES_ORDER: readonly LayerType[] = [
   // The app's signature feature leads the picker (docs/adr/0016-tool-panel-cards D5): the
   // novice's most likely intent is "make my photo look like film", and the
   // LUT library is the fast path to it. Deliberate deviation from the

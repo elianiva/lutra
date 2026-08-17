@@ -26,6 +26,9 @@ export {
   moveCurvePoint,
   resetCurve,
   UnknownLayerTypeError,
+  readField,
+  numField,
+  strField,
 } from './layers'
 export type {
   FieldMeta,
@@ -34,6 +37,7 @@ export type {
   RegistryInput,
   LayerType,
   CurvePoint,
+  LayerFieldValue,
 } from './layers'
 
 // Chain operations
@@ -117,5 +121,5 @@ export type {
   ExportQuality as ExportQualityType,
   ExportScale as ExportScaleType,
   ExportSettings as ExportSettingsType,
-  ImageEncoderShape,
+  ImageEncoderContract,
 } from './encode'

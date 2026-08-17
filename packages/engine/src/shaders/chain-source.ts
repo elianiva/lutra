@@ -16,8 +16,8 @@ import type { LayerType } from '../layers/schemas'
 export class MissingLutReferenceError extends Schema.TaggedErrorClass<MissingLutReferenceError>()(
   'MissingLutReferenceError',
   {
-    message: Schema.String,
     cause: Schema.optional(Schema.Unknown),
+    message: Schema.String,
   },
 ) {}
 
@@ -34,7 +34,7 @@ export const WORKGROUP_SIZE = 16
 export interface ChainLayerInfo {
   readonly type: LayerType
   readonly body: BodyRenderer
-  readonly fieldKeys: ReadonlyArray<FieldKey>
+  readonly fieldKeys: readonly FieldKey[]
   /**
    * LUT layers only: the cube reference. The id flows through to the
    * pass so the frontend binds the right texture; the size is baked into
@@ -52,7 +52,7 @@ export interface ChainPass {
    * order they appear in the pass's uniform buffer. The frontend uses
    * this to know which float slots to write when a parameter changes.
    */
-  readonly uniforms: ReadonlyArray<UniformSlot>
+  readonly uniforms: readonly UniformSlot[]
   /**
    * Whether this pass reads the frame counter (`u_frame`). With
    * `layout: 'auto'` the pipeline only exposes bindings the shader
@@ -80,7 +80,7 @@ export interface ChainShader {
    * later pass reads the previous pass's output (linear light); the last
    * pass encodes back to sRGB and writes the display texture.
    */
-  readonly passes: ReadonlyArray<ChainPass>
+  readonly passes: readonly ChainPass[]
   /**
    * Whether any pass reads the frame counter (`u_frame`). The frontend
    * writes the frame buffer once per render when this is true; only
@@ -106,7 +106,7 @@ export interface UniformSlot {
  * struct form so the assembler can place helpers at module scope.
  */
 function normalizeBody(render: string | BodySource): BodySource {
-  return typeof render === 'string' ? { stmts: render } : render
+  return Schema.is(Schema.String)(render) ? { stmts: render } : render
 }
 
 /** Pure copy: reads the sRGB source texture and writes it unchanged. */
@@ -161,7 +161,7 @@ interface LayerPassOptions {
   readonly body: string
   /** Module-scope WGSL (functions) emitted ahead of the entry point. */
   readonly helpers: string
-  readonly uniforms: ReadonlyArray<UniformSlot>
+  readonly uniforms: readonly UniformSlot[]
   /** Decode the pass input from sRGB (first layer, when nothing pre-linearized). */
   readonly linearize: boolean
   /** Encode the pass output to sRGB (last layer, writing the display texture). */
@@ -252,7 +252,7 @@ interface LutPassOptions {
   readonly body: string
   /** Module-scope WGSL (functions) emitted ahead of the entry point. */
   readonly helpers: string
-  readonly uniforms: ReadonlyArray<UniformSlot>
+  readonly uniforms: readonly UniformSlot[]
   /** The cube id (frontend binds the matching 3D texture). */
   readonly lutId: LutId
   /** Cube dimension; baked into the sampling coordinate scale. */
@@ -345,7 +345,7 @@ ${body}
 }
 `
 
-  return { source, uniforms, usesFrame, usesSampler: false, lutId }
+  return { lutId, source, uniforms, usesFrame, usesSampler: false }
 }
 
 // ---- assembler ----
@@ -361,7 +361,7 @@ ${body}
  * When the first layer samples its input, a dedicated linearize pass is
  * inserted ahead of it so sampled texels are always linear light.
  */
-export function generateChainSource(layers: ReadonlyArray<ChainLayerInfo>): ChainShader {
+export function generateChainSource(layers: readonly ChainLayerInfo[]): ChainShader {
   if (layers.length === 0) {
     return { passes: [passthroughPass()], usesFrame: false }
   }
@@ -385,7 +385,7 @@ export function generateChainSource(layers: ReadonlyArray<ChainLayerInfo>): Chai
     const uniforms: UniformSlot[] = []
     let off = 0
     for (const key of layer.fieldKeys) {
-      uniforms.push({ layerIndex: li, field: key, offset: off })
+      uniforms.push({ field: key, layerIndex: li, offset: off })
       off++
     }
     const isLast = li === layers.length - 1
@@ -393,7 +393,7 @@ export function generateChainSource(layers: ReadonlyArray<ChainLayerInfo>): Chai
       // LUT passes invert the color-space boundaries: the body operates
       // on sRGB-encoded values, so decode on the way in and re-encode on
       // the way out, skipping either end when it is already sRGB.
-      const lut = layer.lut
+      const { lut } = layer
       if (!lut) {
         throw new MissingLutReferenceError({
           message: `LUT layer at index ${li} is missing its cube reference`,
@@ -402,26 +402,26 @@ export function generateChainSource(layers: ReadonlyArray<ChainLayerInfo>): Chai
       passes.push(
         lutPass({
           body: body.stmts,
+          dstFormat: isLast ? 'rgba8unorm' : 'rgba16float',
           helpers: body.helpers ?? '',
-          uniforms,
+          inputIsSrgb: li === 0 && !firstBodySamplesSource,
           lutId: lut.id,
           lutSize: lut.size,
-          inputIsSrgb: li === 0 && !firstBodySamplesSource,
           outputIsSrgb: isLast,
-          dstFormat: isLast ? 'rgba8unorm' : 'rgba16float',
+          uniforms,
         }),
       )
     } else {
       passes.push(
         layerPass({
           body: body.stmts,
-          helpers: body.helpers ?? '',
-          uniforms,
-          samplesInput: body.samplesInput === true,
-          needsSampler: body.usesSampler === true,
-          linearize: li === 0 && !firstBodySamplesSource,
-          encode: isLast,
           dstFormat: isLast ? 'rgba8unorm' : 'rgba16float',
+          encode: isLast,
+          helpers: body.helpers ?? '',
+          linearize: li === 0 && !firstBodySamplesSource,
+          needsSampler: body.usesSampler === true,
+          samplesInput: body.samplesInput === true,
+          uniforms,
         }),
       )
     }

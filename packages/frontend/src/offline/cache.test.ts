@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import fc from 'fast-check'
+import * as fc from 'fast-check'
 import { toLibraryPath } from './cache'
 
 // The browser's Cache Storage resolves the fill's relative put() keys to
@@ -48,7 +48,7 @@ describe('toLibraryPath', () => {
   it('is total on any input (it never throws)', () => {
     fc.assert(
       fc.property(fc.string(), (key) => {
-        expect(typeof toLibraryPath(key)).toBe('string')
+        expect(toLibraryPath(key)).toEqual(expect.any(String))
       }),
     )
   })

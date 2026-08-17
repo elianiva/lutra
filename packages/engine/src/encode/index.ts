@@ -17,6 +17,6 @@ export type {
   ExportSettings as ExportSettingsType,
 } from './settings'
 export { EncodeError, ImageEncoder } from './service'
-export type { ImageEncoderShape } from './service'
+export type { ImageEncoderContract } from './service'
 export { ImageEncoderLive } from './layer'
 export { encodeImage } from './jsquash'

@@ -32,21 +32,11 @@ export const OfflinePhase = S.Union([Idle, Filling, Paused, Ready, QuotaError])
 export type OfflinePhase = typeof OfflinePhase.Type
 
 export const offlineMachine = Machine.define({
-  state: OfflinePhase,
   message: RootMessage,
+  state: OfflinePhase,
 })({
   initial: Idle(),
   states: {
-    Idle: {
-      on: {
-        // A run began: the loop diffed the catalog and is fetching. Also the
-        // edge that leaves QuotaError — the persist-retry restarts the run.
-        // (The manual start button's OfflineFillRequested does NOT
-        // transition: the run announces itself with Started, and the machine
-        // never races the loop.)
-        OfflineFillStarted: to('Filling', () => Filling()),
-      },
-    },
     Filling: {
       on: {
         // The network dropped (or the loop noticed mid-run): paused. The
@@ -66,19 +56,29 @@ export const offlineMachine = Machine.define({
         OfflineFillComplete: to('Ready', () => Ready()),
       },
     },
+    Idle: {
+      on: {
+        // A run began: the loop diffed the catalog and is fetching. Also the
+        // edge that leaves QuotaError — the persist-retry restarts the run.
+        // (The manual start button's OfflineFillRequested does NOT
+        // transition: the run announces itself with Started, and the machine
+        // never races the loop.)
+        OfflineFillStarted: to('Filling', () => Filling()),
+      },
+    },
     Paused: {
       on: {
         OfflineFillResumed: to('Filling', () => Filling()),
         OfflineQuotaError: to('QuotaError', () => QuotaError()),
       },
     },
-    Ready: {
-      on: {},
-    },
     QuotaError: {
       on: {
         OfflineFillStarted: to('Filling', () => Filling()),
       },
+    },
+    Ready: {
+      on: {},
     },
   },
 })

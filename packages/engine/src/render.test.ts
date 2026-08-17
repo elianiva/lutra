@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import fc from 'fast-check'
-import { Effect } from 'effect'
+import * as fc from 'fast-check'
+import { Effect, Schema } from 'effect'
 import { createRenderRequest } from './render'
 import { createLayer, makeRegistry, LAYER_TYPES } from './layers'
 import type { Layer, LayerType } from './layers'
@@ -25,19 +25,19 @@ import type { LutCube } from './luts/cube'
 // ---- helpers ----
 
 const registry = makeRegistry({
-  exposure: renderExposure,
-  contrast: renderContrast,
-  shadows: renderShadows,
-  highlights: renderHighlights,
-  toneCurve: renderToneCurve,
-  whiteBalance: renderWhiteBalance,
-  saturation: renderSaturation,
-  colorMixer: renderColorMixer,
-  grain: renderGrain,
-  vignette: renderVignette,
   chromaticAberration: renderChromaticAberration,
   clarity: renderClarity,
+  colorMixer: renderColorMixer,
+  contrast: renderContrast,
+  exposure: renderExposure,
+  grain: renderGrain,
+  highlights: renderHighlights,
   lut: renderLut,
+  saturation: renderSaturation,
+  shadows: renderShadows,
+  toneCurve: renderToneCurve,
+  vignette: renderVignette,
+  whiteBalance: renderWhiteBalance,
 })
 
 // createRenderRequest never touches the bitmap (the GPU backend does); the
@@ -59,8 +59,8 @@ const lutIdArb = fc.constantFrom(
 )
 
 const cubeOfSize = (size: number): LutCube => ({
-  size,
   data: new Float32Array(size * size * size * 3),
+  size,
 })
 
 /**
@@ -70,15 +70,15 @@ const cubeOfSize = (size: number): LutCube => ({
  */
 const sceneArb = fc
   .tuple(
-    fc.array(fc.constantFrom(...LAYER_TYPES), { minLength: 0, maxLength: 8 }),
-    fc.array(fc.boolean(), { minLength: 0, maxLength: 8 }),
-    fc.array(fc.double({ min: -3, max: 3, noNaN: true, noDefaultInfinity: true }), {
-      minLength: 0,
+    fc.array(fc.constantFrom(...LAYER_TYPES), { maxLength: 8, minLength: 0 }),
+    fc.array(fc.boolean(), { maxLength: 8, minLength: 0 }),
+    fc.array(fc.double({ max: 3, min: -3, noDefaultInfinity: true, noNaN: true }), {
       maxLength: 64,
+      minLength: 0,
     }),
-    fc.array(fc.boolean(), { minLength: 0, maxLength: 8 }),
-    fc.array(lutIdArb, { minLength: 1, maxLength: 8 }),
-    fc.integer({ min: 2, max: 16 }),
+    fc.array(fc.boolean(), { maxLength: 8, minLength: 0 }),
+    fc.array(lutIdArb, { maxLength: 8, minLength: 1 }),
+    fc.integer({ max: 16, min: 2 }),
   )
   .map(([types, visibility, values, present, lutIds, cubeSize]) => {
     const chain: Layer[] = []
@@ -86,7 +86,7 @@ const sceneArb = fc
     const usedLutIds: string[] = []
     for (let i = 0; i < types.length; i++) {
       const layer = createLayer(types[i]!, registry)
-      const record: Record<string, unknown> = layer
+      const record: Record<string, number | string | boolean> = layer
       record.visible = visibility[i] ?? true
       for (const key of fieldKeysOf(types[i]!)) {
         record[key] = values[valueIdx++] ?? 0
@@ -104,28 +104,24 @@ const sceneArb = fc
         luts.set(LutId(id), cubeOfSize(cubeSize))
       }
     }
-    return { chain, luts, cubeSize }
+    return { chain, cubeSize, luts }
   })
 
+import { numField, strField } from './layers/fields'
+
 /** A layer's numeric field values, in the registry's key order. */
-const fieldValues = (layer: Layer): ReadonlyArray<number> => {
-  const record: Record<string, unknown> = layer
-  return fieldKeysOf(layer.type).map((k) => (typeof record[k] === 'number' ? record[k] : NaN))
-}
+const fieldValues = (layer: Layer): readonly number[] =>
+  fieldKeysOf(layer.type).map((k) => numField(layer, FieldKey(k)))
 
 const isMissingLut = (layer: Layer, luts: ReadonlyMap<LutId, LutCube>): boolean => {
-  const record: Record<string, unknown> = layer
-  const id = String(record.lutId)
-  return !luts.has(LutId(id))
+  const id = strField(layer, FieldKey('lutId'))
+  return id === '' || !luts.has(LutId(id))
 }
 
-const lutIdOf = (layer: Layer): string => {
-  const record: Record<string, unknown> = layer
-  return String(record.lutId)
-}
+const lutIdOf = (layer: Layer): string => strField(layer, FieldKey('lutId'))
 
 const hasUnknownVisibleLut = (
-  chain: ReadonlyArray<Layer>,
+  chain: readonly Layer[],
   luts: ReadonlyMap<LutId, LutCube>,
 ): boolean => chain.some((l) => l.visible && l.type === 'lut' && isMissingLut(l, luts))
 
@@ -148,7 +144,7 @@ describe('createRenderRequest', () => {
           visible.length > 0 &&
           (() => {
             const body = registry[visible[0]!.type].body(0)
-            return typeof body === 'object' && body.samplesInput === true
+            return !Schema.is(Schema.String)(body) && body.samplesInput === true
           })()
         const base = firstSamples ? 1 : 0
 
@@ -177,7 +173,7 @@ describe('createRenderRequest', () => {
           const keys = fieldKeysOf(layer.type)
           // Each pass exposes one uniform slot per field, in order.
           expect(pass.uniforms).toEqual(
-            keys.map((key, offset) => ({ layerIndex: li, field: FieldKey(key), offset })),
+            keys.map((key, offset) => ({ field: FieldKey(key), layerIndex: li, offset })),
           )
           // The packed uniform buffer matches the layer's field values.
           const packed = result.uniforms[base + li]!
@@ -204,10 +200,10 @@ describe('createRenderRequest', () => {
 
         const message = Effect.runSync(
           Effect.match(createRenderRequest(chain, registry, fakeBitmap(), 0, luts), {
+            onFailure: (error) => error.message,
             onSuccess: () => {
               throw new Error('expected a GpuError for an unknown LUT id')
             },
-            onFailure: (error) => error.message,
           }),
         )
         expect(message).toContain('Unknown LUT:')
@@ -218,7 +214,7 @@ describe('createRenderRequest', () => {
   it('an empty chain assembles a single passthrough pass', () => {
     fc.assert(
       fc.property(
-        fc.record({ luts: fc.constant(new Map<LutId, LutCube>()), frame: fc.nat() }),
+        fc.record({ frame: fc.nat(), luts: fc.constant(new Map<LutId, LutCube>()) }),
         ({ luts, frame }) => {
           const request = Effect.runSync(
             createRenderRequest([], registry, fakeBitmap(), frame, luts),

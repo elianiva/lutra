@@ -3,7 +3,8 @@ import { Mount } from 'foldkit'
 import type { HtmlBuilder } from 'foldkit/html'
 import { RotateCcw } from 'lucide'
 import { icon } from '../components/icon'
-import { curvePointsOf, isCurveNeutral, type Layer } from '@lutra/engine'
+import { curvePointsOf, isCurveNeutral } from '@lutra/engine'
+import type { Layer } from '@lutra/engine'
 import { CurvePointDragged, CurveReset } from './message'
 import type { EditorMessage } from './message'
 
@@ -48,7 +49,7 @@ export const CurveWidget = Mount.defineStream(
   CurvePointDragged,
 )((element) =>
   Stream.callback<typeof CurvePointDragged.Type>((queue) =>
-    Effect.gen(function* () {
+    Effect.gen(function* CurveWidget() {
       // Narrow to the SVG element (the mount target is always the widget's
       // svg) so the listeners get typed PointerEvents, like the canvas
       // stage's HTMLElement narrowing.
@@ -75,7 +76,9 @@ export const CurveWidget = Mount.defineStream(
        *  GRAB_THRESHOLD client px of it. */
       const hitTest = (e: PointerEvent): number => {
         const rect = svg.getBoundingClientRect()
-        if (rect.width === 0 || rect.height === 0) return -1
+        if (rect.width === 0 || rect.height === 0) {
+          return -1
+        }
         let best = -1
         let bestDist = GRAB_THRESHOLD
         svg.querySelectorAll('[data-curve-handle]').forEach((el, index) => {
@@ -93,9 +96,13 @@ export const CurveWidget = Mount.defineStream(
       }
 
       const onDown = (e: PointerEvent) => {
-        if (e.button !== 0) return
+        if (e.button !== 0) {
+          return
+        }
         const index = hitTest(e)
-        if (index < 0) return
+        if (index < 0) {
+          return
+        }
         dragging = index
         svg.setPointerCapture(e.pointerId)
         // Grab-and-jump: the point follows the pointer from the moment the
@@ -104,12 +111,16 @@ export const CurveWidget = Mount.defineStream(
         emit(index, x, y)
       }
       const onMove = (e: PointerEvent) => {
-        if (dragging < 0) return
+        if (dragging < 0) {
+          return
+        }
         const { x, y } = unitCoords(e)
         emit(dragging, x, y)
       }
       const onUp = (e: PointerEvent) => {
-        if (dragging < 0) return
+        if (dragging < 0) {
+          return
+        }
         dragging = -1
         svg.releasePointerCapture(e.pointerId)
       }
@@ -156,7 +167,9 @@ const gridLines = (h: HtmlBuilder<EditorMessage>) =>
  * 'toneCurve', like the Color Mixer's swatch row).
  */
 export const toneCurveWidget = (h: HtmlBuilder<EditorMessage>, layer: Layer) => {
-  if (layer.type !== 'toneCurve') return null
+  if (layer.type !== 'toneCurve') {
+    return null
+  }
   const points = curvePointsOf(layer)
   const neutral = isCurveNeutral(layer)
   // The curve polyline: the exact piecewise-linear function the shader

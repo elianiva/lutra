@@ -1,7 +1,8 @@
-import { Command } from 'foldkit'
-import { EditStore } from '@lutra/store'
+import type { Command } from 'foldkit'
+import type { EditStore } from '@lutra/store'
 import type { AppRoute } from '../route'
-import { initialModel, type Model } from './model'
+import { initialModel } from './model'
+import type { Model } from './model'
 import type { GalleryMessage } from './message'
 import { ListEdits } from './command'
 
@@ -16,7 +17,7 @@ import { ListEdits } from './command'
  */
 export type InitReturn = readonly [
   Model,
-  ReadonlyArray<Command.Command<GalleryMessage, never, EditStore>>,
+  readonly Command.Command<GalleryMessage, never, EditStore>[],
 ]
 export const init = (route: AppRoute): InitReturn => {
   const commands = route._tag === 'Gallery' ? [ListEdits()] : []

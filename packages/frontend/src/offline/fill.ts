@@ -1,8 +1,9 @@
 import { Context, Duration, Effect, Layer, PubSub, Ref, Schedule, Stream } from 'effect'
-import { LutStore, LutStoreLive, type LutCatalogEntry } from '../luts/store'
-import { LutCache, LutCacheLive, type LutCacheShape } from './cache'
+import { LutStore, LutStoreLive } from '../luts/store'
+import type { LutCatalogEntry } from '../luts/store'
+import { LutCache, LutCacheLive } from './cache'
+import type { LutCacheContract } from './cache'
 import type { FillEvent, FillFile } from './messages'
-import type { LutId } from '@lutra/engine'
 
 // The offline fill (CONTEXT.md "Offline fill"): the background process that
 // mirrors the vendored LUT library into Cache Storage so the app works
@@ -21,19 +22,19 @@ import type { LutId } from '@lutra/engine'
  *  loader `/luts/${entry.lut_file}`), so a mirrored file is byte-identical
  *  to what the app requests — the SW's cache-first read is a straight hit.
  */
-export const libraryFiles = (catalog: ReadonlyArray<LutCatalogEntry>): ReadonlyArray<FillFile> => [
-  { path: '/luts/film_luts.json', lutId: null },
+export const libraryFiles = (catalog: readonly LutCatalogEntry[]): readonly FillFile[] => [
+  { lutId: null, path: '/luts/film_luts.json' },
   ...catalog.flatMap((entry) => [
     // oxlint-disable-next-line consistent-type-assertions
-    { path: `/luts/${entry.lut_file}`, lutId: entry.lut_file as LutId },
-    { path: `/luts/${entry.thumbnail}`, lutId: null },
+    { lutId: entry.lut_file, path: `/luts/${entry.lut_file}` },
+    { lutId: null, path: `/luts/${entry.thumbnail}` },
   ]),
 ]
 
 // ---- the loop ----
 
 export interface FillOptions {
-  readonly cache: LutCacheShape
+  readonly cache: LutCacheContract
   /** Network fetch; injectable so tests stub it. Defaults to `fetch`. */
   readonly fetchImpl: (path: string) => Promise<Response>
   /** Files fetched before the loop rests (the throttle that keeps the fill
@@ -47,14 +48,16 @@ export interface FillOptions {
   readonly backoff: (attempt: number) => Duration.Duration
 }
 
-const isOnline = (): boolean => typeof navigator === 'undefined' || navigator.onLine
+const isOnline = (): boolean => globalThis.navigator === undefined || navigator.onLine
 
 /** Blocks while the device is offline, polling `pollInterval`. Returns true
  *  when it actually had to wait (the caller announces Paused/Resumed). */
 const waitIfOffline = (opts: FillOptions): Effect.Effect<boolean> =>
-  Effect.gen(function* () {
+  Effect.gen(function* waitIfOffline() {
     let online = yield* Effect.sync(isOnline)
-    if (online) return false
+    if (online) {
+      return false
+    }
     while (!online) {
       yield* Effect.sleep(opts.pollInterval)
       online = yield* Effect.sync(isOnline)
@@ -74,10 +77,10 @@ const fetchAndPut = (file: FillFile, opts: FillOptions): Effect.Effect<boolean, 
   const attempt = (n: number): Effect.Effect<boolean, string> =>
     Effect.gen(function* () {
       yield* waitIfOffline(opts)
-      const outcome = yield* Effect.gen(function* () {
+      const outcome = yield* Effect.gen(function* outcome() {
         const res = yield* Effect.tryPromise({
-          try: () => opts.fetchImpl(file.path),
           catch: (cause) => ({ _tag: 'transient' as const, cause }),
+          try: async () => await opts.fetchImpl(file.path),
         })
         if (!res.ok) {
           return yield* Effect.fail({
@@ -86,20 +89,25 @@ const fetchAndPut = (file: FillFile, opts: FillOptions): Effect.Effect<boolean, 
           })
         }
         yield* opts.cache.put(file.path, res).pipe(
-          Effect.mapError(
-            (error): Failure =>
-              error.kind === 'quota'
-                ? { _tag: 'quota', message: error.message }
-                : // Storage unavailable mid-run (has/keys worked at the start
-                  // gate, so this is exotic): retry like a transient failure.
-                  { _tag: 'transient', cause: error },
+          Effect.mapError((error): Failure =>
+            error.kind === 'quota'
+              ? { _tag: 'quota', message: error.message }
+              : // Storage unavailable mid-run (has/keys worked at the start
+                // gate, so this is exotic): retry like a transient failure.
+                { _tag: 'transient', cause: error },
           ),
         )
         return true
       }).pipe(Effect.result)
-      if (outcome._tag === 'Success') return true
-      if (outcome.failure._tag === 'quota') return yield* Effect.fail(outcome.failure.message)
-      if (n >= opts.maxAttempts) return false
+      if (outcome._tag === 'Success') {
+        return true
+      }
+      if (outcome.failure._tag === 'quota') {
+        return yield* Effect.fail(outcome.failure.message)
+      }
+      if (n >= opts.maxAttempts) {
+        return false
+      }
       yield* Effect.sleep(opts.backoff(n))
       return yield* attempt(n + 1)
     })
@@ -110,10 +118,7 @@ const fetchAndPut = (file: FillFile, opts: FillOptions): Effect.Effect<boolean, 
  *  deploy removed a LUT from the catalog): the offline cache would otherwise
  *  grow forever. Housekeeping — a failure is ignored, the next run retries.
  *  Emits nothing: a run's event stream is untouched. */
-const pruneOrphans = (
-  files: ReadonlyArray<FillFile>,
-  opts: FillOptions,
-): Effect.Effect<void, never> => {
+const pruneOrphans = (files: readonly FillFile[], opts: FillOptions): Effect.Effect<void> => {
   const allowed = new Set(files.map((file) => file.path))
   return opts.cache.keys().pipe(
     Effect.flatMap((keys) =>
@@ -139,11 +144,11 @@ const pruneOrphans = (
  * transition, and a full cache never transitions).
  */
 export const fillFiles = (
-  catalog: ReadonlyArray<LutCatalogEntry>,
+  catalog: readonly LutCatalogEntry[],
   opts: FillOptions,
   emit: (event: FillEvent) => Effect.Effect<void>,
-): Effect.Effect<void, never> =>
-  Effect.gen(function* () {
+): Effect.Effect<void> =>
+  Effect.gen(function* fillFiles() {
     const files = libraryFiles(catalog)
     // The start gate: an unavailable cache (the Cache API threw) means the
     // offline library cannot work at all — the fill stays silent and the
@@ -153,11 +158,13 @@ export const fillFiles = (
       Effect.result,
       Effect.map((result) => (result._tag === 'Success' ? result.success : null)),
     )
-    if (cached === null) return
+    if (cached === null) {
+      return
+    }
     const cachedSet = new Set(cached)
     const missing = files.filter((file) => !cachedSet.has(file.path))
     if (missing.length > 0) {
-      yield* emit({ _tag: 'FillStarted', total: files.length, done: files.length - missing.length })
+      yield* emit({ _tag: 'FillStarted', done: files.length - missing.length, total: files.length })
       for (let i = 0; i < missing.length; i++) {
         const file = missing[i]!
         const wasOffline = yield* waitIfOffline(opts)
@@ -176,7 +183,9 @@ export const fillFiles = (
         yield* emit(
           outcome.success ? { _tag: 'FillFileCompleted', file } : { _tag: 'FillFileFailed', file },
         )
-        if ((i + 1) % opts.batchSize === 0) yield* Effect.sleep(opts.batchDelay)
+        if ((i + 1) % opts.batchSize === 0) {
+          yield* Effect.sleep(opts.batchDelay)
+        }
       }
       yield* emit({ _tag: 'FillComplete' })
     }
@@ -187,7 +196,7 @@ export const fillFiles = (
 
 // ---- service ----
 
-export interface OfflineFillShape {
+export interface OfflineFillContract {
   /** Per-file fill events; the root subscription bridges this into the
    *  message loop. Unbounded, so events published before the subscription
    *  attaches (boot order) are buffered, not lost. */
@@ -197,11 +206,13 @@ export interface OfflineFillShape {
   readonly start: () => Effect.Effect<void>
 }
 
-export class OfflineFill extends Context.Service<OfflineFill, OfflineFillShape>()('OfflineFill') {}
+export class OfflineFill extends Context.Service<OfflineFill, OfflineFillContract>()(
+  'OfflineFill',
+) {}
 
 export const OfflineFillLive = Layer.effect(
   OfflineFill,
-  Effect.gen(function* () {
+  Effect.gen(function* OfflineFillLive() {
     const events = yield* PubSub.unbounded<FillEvent>()
     // Start signals: `start()` publishes; a supervisor fiber owned by the
     // layer's scope (killed with the app) runs one fill loop per signal.
@@ -211,17 +222,17 @@ export const OfflineFillLive = Layer.effect(
     const store = yield* LutStore
 
     const opts: FillOptions = {
-      cache,
-      fetchImpl: (path) => fetch(path),
-      batchSize: 6,
-      batchDelay: Duration.millis(400),
-      pollInterval: Duration.millis(300),
-      maxAttempts: 3,
       backoff: (n) => Duration.millis(300 * n),
+      batchDelay: Duration.millis(400),
+      batchSize: 6,
+      cache,
+      fetchImpl: async (path) => await fetch(path),
+      maxAttempts: 3,
+      pollInterval: Duration.millis(300),
     }
 
     const publish = (event: FillEvent): Effect.Effect<void> =>
-      Effect.gen(function* () {
+      Effect.gen(function* publish() {
         // A quota stop re-arms the fill so the persist-retry can start a
         // fresh run (the machine's QuotaError → OfflineFillStarted edge).
         if (event._tag === 'FillQuotaError') {
@@ -230,14 +241,14 @@ export const OfflineFillLive = Layer.effect(
         yield* PubSub.publish(events, event)
       })
 
-    const run = Effect.gen(function* () {
+    const run = Effect.gen(function* run() {
       // The catalog must land before the diff. Served by the SW from the
       // first visit on; a first-visit failure is a network-less session,
       // where a fill is pointless anyway. After the retries the run gives
       // up and re-arms (a later manual start can retry).
       const catalog = yield* store
         .getCatalog()
-        .pipe(Effect.retry({ times: 5, schedule: Schedule.exponential(Duration.millis(500), 2) }))
+        .pipe(Effect.retry({ schedule: Schedule.exponential(Duration.millis(500), 2), times: 5 }))
       yield* fillFiles(catalog, opts, publish)
     })
 
@@ -253,8 +264,10 @@ export const OfflineFillLive = Layer.effect(
     return OfflineFill.of({
       events,
       start: () =>
-        Effect.gen(function* () {
-          if (yield* Ref.get(startedRef)) return
+        Effect.gen(function* start() {
+          if (yield* Ref.get(startedRef)) {
+            return
+          }
           yield* Ref.set(startedRef, true)
           yield* PubSub.publish(startSignal, void 0)
         }),

@@ -23,24 +23,23 @@ import { OfflineReadyDismissed, StoragePersisted } from '../offline/messages'
  */
 export const StartOfflineFill = Command.define('StartOfflineFill', {
   args: { requirePersist: S.Boolean },
-  messages: [StoragePersisted],
   execute: ({ requirePersist }) =>
-    Effect.gen(function* () {
+    Effect.gen(function* execute() {
       const fill = yield* OfflineFill
-      const persisted = yield* Effect.tryPromise(() => navigator.storage.persist()).pipe(
-        Effect.option,
-        Effect.map(Option.getOrElse(() => false)),
-      )
+      const persisted = yield* Effect.tryPromise(
+        async () => await navigator.storage.persist(),
+      ).pipe(Effect.option, Effect.map(Option.getOrElse(() => false)))
       if (!requirePersist || persisted) {
         yield* fill.start()
       }
       return StoragePersisted({ persisted })
     }),
+  messages: [StoragePersisted],
 })
 
 /** Auto-dismiss the "Offline ready" toast: dispatch OfflineReadyDismissed
  *  after the toast's lifetime (a click dismisses it earlier). */
 export const DismissOfflineToast = Command.define('DismissOfflineToast', {
-  messages: [OfflineReadyDismissed],
   execute: Effect.sleep(Duration.seconds(8)).pipe(Effect.as(OfflineReadyDismissed())),
+  messages: [OfflineReadyDismissed],
 })

@@ -11,9 +11,13 @@ import type { EncodeRequest, EncodeResponse } from './worker'
  */
 export const ImageEncoderWorkerLive = Layer.effect(
   ImageEncoder,
-  Effect.gen(function* () {
-    const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
-    yield* Effect.addFinalizer(() => Effect.sync(() => worker.terminate()))
+  Effect.gen(function* ImageEncoderWorkerLive() {
+    const worker = new Worker(new URL('worker.ts', import.meta.url), { type: 'module' })
+    yield* Effect.addFinalizer(() =>
+      Effect.sync(() => {
+        worker.terminate()
+      }),
+    )
 
     const pendingRef = yield* Ref.make<
       ReadonlyMap<number, Deferred.Deferred<Uint8Array, EncodeError>>
@@ -44,8 +48,12 @@ export const ImageEncoderWorkerLive = Layer.effect(
         }).pipe(
           Effect.flatMap((pending) => {
             const deferred = pending.get(id)
-            if (!deferred) return Effect.void
-            if (bytes) return Deferred.succeed(deferred, bytes)
+            if (!deferred) {
+              return Effect.void
+            }
+            if (bytes) {
+              return Deferred.succeed(deferred, bytes)
+            }
             return Deferred.fail(deferred, new EncodeError({ message: error ?? 'Encode failed' }))
           }),
         ),
@@ -57,7 +65,7 @@ export const ImageEncoderWorkerLive = Layer.effect(
 
     return ImageEncoder.of({
       encode: ({ image, settings }) =>
-        Effect.gen(function* () {
+        Effect.gen(function* encode() {
           const id = yield* Ref.getAndUpdate(nextIdRef, (n) => n + 1)
           const deferred = yield* Deferred.make<Uint8Array, EncodeError>()
           yield* Ref.update(pendingRef, (pending) => new Map(pending).set(id, deferred))

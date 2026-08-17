@@ -15,10 +15,10 @@ import { Edit } from './edit'
  *   (chain + source bytes + thumbnail) commits as one row.
  */
 export const EditTable = IndexedDbTable.make({
-  name: 'edits',
-  schema: Edit,
-  keyPath: 'id',
   indexes: {
     saved_at: 'savedAt',
   },
+  keyPath: 'id',
+  name: 'edits',
+  schema: Edit,
 } as const)

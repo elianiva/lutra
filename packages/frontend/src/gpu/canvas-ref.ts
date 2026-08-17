@@ -1,4 +1,5 @@
-import { Context, Effect, Layer, Option, Ref, Scope } from 'effect'
+import type { Scope } from 'effect'
+import { Context, Effect, Layer, Option, Ref } from 'effect'
 
 /**
  * The live render canvas, registered by the canvas mount and read by render

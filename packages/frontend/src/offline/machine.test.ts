@@ -1,13 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import {
-  Idle,
-  Filling,
-  Paused,
-  Ready,
-  QuotaError,
-  offlineMachine,
-  type OfflinePhase,
-} from './machine'
+import { Idle, Filling, Paused, Ready, QuotaError, offlineMachine } from './machine'
+import type { OfflinePhase } from './machine'
 import type { RootMessage } from '../root/message'
 import {
   OfflineFillStarted,
@@ -32,7 +25,7 @@ describe('offline machine', () => {
   })
 
   it('a run beginning leaves Idle for Filling', () => {
-    const result = step(Idle(), OfflineFillStarted({ total: 593, done: 0 }))
+    const result = step(Idle(), OfflineFillStarted({ done: 0, total: 593 }))
     expect(result._tag).toBe('Transitioned')
     expect(result.state).toEqual(Filling())
   })
@@ -73,7 +66,7 @@ describe('offline machine', () => {
   })
 
   it('a persist-retry run leaves QuotaError via Started', () => {
-    const result = step(QuotaError(), OfflineFillStarted({ total: 593, done: 0 }))
+    const result = step(QuotaError(), OfflineFillStarted({ done: 0, total: 593 }))
     expect(result.state).toEqual(Filling())
   })
 

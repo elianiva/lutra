@@ -1,6 +1,7 @@
 import { Effect, Option } from 'effect'
 import { Command, File as FoldkitFile } from 'foldkit'
-import { EditStore, EditIdSchema, Edit, newEditId, StoreError } from '@lutra/store'
+import type { StoreError } from '@lutra/store'
+import { EditStore, EditIdSchema, Edit, newEditId } from '@lutra/store'
 import { ImageDecodeError, ThumbnailEncodeError } from '../errors'
 import {
   EditsListed,
@@ -18,14 +19,14 @@ import {
  * an error state.
  */
 export const ListEdits = Command.define('ListEdits', {
-  messages: [EditsListed, ListFailed],
-  execute: Effect.gen(function* () {
+  execute: Effect.gen(function* execute() {
     const store = yield* EditStore
     const summaries = yield* store.list()
     return EditsListed({ summaries })
   }).pipe(
     Effect.catchTag('StoreError', (err: StoreError) => Effect.succeed(ListFailed({ error: err }))),
   ),
+  messages: [EditsListed, ListFailed],
 })
 
 /**
@@ -35,9 +36,8 @@ export const ListEdits = Command.define('ListEdits', {
  */
 export const DeleteEdit = Command.define('DeleteEdit', {
   args: { id: EditIdSchema },
-  messages: [EditDeleted, DeleteFailed],
   execute: ({ id }) =>
-    Effect.gen(function* () {
+    Effect.gen(function* execute() {
       const store = yield* EditStore
       yield* store.delete(id)
       return EditDeleted()
@@ -46,6 +46,7 @@ export const DeleteEdit = Command.define('DeleteEdit', {
         Effect.succeed(DeleteFailed({ error: err })),
       ),
     ),
+  messages: [EditDeleted, DeleteFailed],
 })
 
 // ---- open a photo (new edit) ----
@@ -56,12 +57,12 @@ const IMAGE_TYPES = ['image/*', '.jpg', '.jpeg', '.png', '.webp', '.avif']
 /** The picked file's bytes — the Edit's source image, stored verbatim. */
 const readBytes = (file: File): Effect.Effect<Uint8Array, ImageDecodeError> =>
   Effect.tryPromise({
-    try: () => file.arrayBuffer(),
     catch: (cause) =>
       new ImageDecodeError({
-        message: `failed to read the picked photo: ${String(cause)}`,
         cause,
+        message: `failed to read the picked photo: ${String(cause)}`,
       }),
+    try: async () => await file.arrayBuffer(),
   }).pipe(Effect.map((buffer) => new Uint8Array(buffer)))
 
 /**
@@ -73,14 +74,14 @@ const thumbnailBytes = (
   file: File,
   maxDim = 320,
 ): Effect.Effect<Uint8Array, ImageDecodeError | ThumbnailEncodeError> =>
-  Effect.gen(function* () {
+  Effect.gen(function* thumbnailBytes() {
     const bitmap = yield* Effect.tryPromise({
-      try: () => createImageBitmap(file),
       catch: (cause) =>
         new ImageDecodeError({
-          message: `failed to decode the picked photo: ${String(cause)}`,
           cause,
+          message: `failed to decode the picked photo: ${String(cause)}`,
         }),
+      try: async () => await createImageBitmap(file),
     })
     try {
       const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height))
@@ -88,23 +89,25 @@ const thumbnailBytes = (
       const height = Math.max(1, Math.round(bitmap.height * scale))
       const canvas = new OffscreenCanvas(width, height)
       const ctx = canvas.getContext('2d')
-      if (!ctx) return new Uint8Array(0)
+      if (!ctx) {
+        return new Uint8Array(0)
+      }
       ctx.drawImage(bitmap, 0, 0, width, height)
       const blob = yield* Effect.tryPromise({
-        try: () => canvas.convertToBlob({ type: 'image/jpeg', quality: 0.85 }),
         catch: (cause) =>
           new ThumbnailEncodeError({
-            message: `failed to encode the thumbnail: ${String(cause)}`,
             cause,
+            message: `failed to encode the thumbnail: ${String(cause)}`,
           }),
+        try: async () => await canvas.convertToBlob({ quality: 0.85, type: 'image/jpeg' }),
       })
       const buffer = yield* Effect.tryPromise({
-        try: () => blob.arrayBuffer(),
         catch: (cause) =>
           new ThumbnailEncodeError({
-            message: `failed to encode the thumbnail: ${String(cause)}`,
             cause,
+            message: `failed to encode the thumbnail: ${String(cause)}`,
           }),
+        try: async () => await blob.arrayBuffer(),
       })
       return new Uint8Array(buffer)
     } finally {
@@ -122,10 +125,11 @@ const thumbnailBytes = (
  * dropping the photo.
  */
 export const OpenPhoto = Command.define('OpenPhoto', {
-  messages: [PhotoCreated, PhotoPickCancelled, PhotoCreateFailed],
-  execute: Effect.gen(function* () {
+  execute: Effect.gen(function* execute() {
     const picked = yield* FoldkitFile.select(IMAGE_TYPES)
-    if (Option.isNone(picked)) return PhotoPickCancelled()
+    if (Option.isNone(picked)) {
+      return PhotoPickCancelled()
+    }
     const file = picked.value
 
     const source = yield* readBytes(file)
@@ -135,11 +139,11 @@ export const OpenPhoto = Command.define('OpenPhoto', {
     const id = newEditId()
     yield* store.save(
       Edit.make({
-        id,
         chain: [],
+        id,
+        savedAt: Date.now(),
         source,
         thumbnail,
-        savedAt: Date.now(),
       }),
     )
     return PhotoCreated({ id })
@@ -154,4 +158,5 @@ export const OpenPhoto = Command.define('OpenPhoto', {
       Effect.succeed(PhotoCreateFailed({ error: err })),
     ),
   ),
+  messages: [PhotoCreated, PhotoPickCancelled, PhotoCreateFailed],
 })

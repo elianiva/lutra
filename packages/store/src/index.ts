@@ -14,7 +14,7 @@ export type { StoreError as StoreErrorType } from './edit/store-error'
 
 // The contract + backends
 export { EditStore } from './edit/edit-store'
-export type { EditStore as EditStoreShape } from './edit/edit-store'
+export type { EditStore as EditStoreContract } from './edit/edit-store'
 export { EditTable } from './edit/edit-table'
 export { EditDbSchema } from './edit/edit-db'
 export { EditStoreIndexedDb, EditStoreLive } from './edit/edit-store-indexeddb'

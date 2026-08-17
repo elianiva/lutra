@@ -26,13 +26,11 @@ import {
 import type { EditorMessage } from './message'
 import type { Model } from './model'
 import { toneCurveWidget } from './tone-curve'
-import { FieldKey, type Layer, type LayerId, type LayerType } from '@lutra/engine'
+import { FieldKey, numField } from '@lutra/engine'
+import type { Layer, LayerId, LayerType } from '@lutra/engine'
 
-const num = (layer: Layer, key: FieldKey) => {
-  const record: Record<string, unknown> = layer
-  const value = record[key]
-  return typeof value === 'number' ? value : NaN
-}
+/** Read a numeric field off a heterogeneous layer. */
+const num = (layer: Layer, key: FieldKey): number => numField(layer, key)
 
 /** One-line drawer summary: "Fuji Velvia 50 · 65%" for LUT layers. */
 const summary = (model: Model, layer: Layer, ui: (typeof LAYER_UI)[LayerType]) =>
@@ -53,15 +51,17 @@ const activeMixerColor = (model: Model, layerId: LayerId) =>
  */
 const mixerSummary = (model: Model, layer: Layer) => {
   const color = MIXER_COLORS[activeMixerColor(model, layer.id)]!
-  const record: Record<string, unknown> = layer
-  const value = (suffix: string) => {
-    const v = record[`${color.key}${suffix}`]
-    return typeof v === 'number' ? v : 0
-  }
+  const value = (suffix: string) => numField(layer, FieldKey(`${color.key}${suffix}`))
   const parts: string[] = [color.name]
-  if (value('Hue') !== 0) parts.push(formatHue(value('Hue')))
-  if (value('Saturation') !== 0) parts.push(formatPercentSigned(value('Saturation')))
-  if (value('Luminance') !== 0) parts.push(formatPercentSigned(value('Luminance')))
+  if (value('Hue') !== 0) {
+    parts.push(formatHue(value('Hue')))
+  }
+  if (value('Saturation') !== 0) {
+    parts.push(formatPercentSigned(value('Saturation')))
+  }
+  if (value('Luminance') !== 0) {
+    parts.push(formatPercentSigned(value('Luminance')))
+  }
   return parts.join(' ')
 }
 
@@ -77,24 +77,22 @@ const mixerSwatches = (
 ) =>
   h.div(
     [h.Class('flex items-center gap-1.5'), h.AriaLabel('Color ranges')],
-    [
-      ...MIXER_COLORS.map((color, index) =>
-        h.button(
-          [
-            h.OnClick(onSelect(index)),
-            h.AriaLabel(`Select ${color.name}`),
-            h.AriaPressed(String(index === active)),
-            h.Class(
-              `size-5 shrink-0 rounded-full border ${
-                index === active ? 'border-ink ring-1 ring-ink' : 'border-border hover:border-muted'
-              }`,
-            ),
-            h.Style({ background: `hsl(${color.hue} 100% 50%)` }),
-          ],
-          [],
-        ),
+    MIXER_COLORS.map((color, index) =>
+      h.button(
+        [
+          h.OnClick(onSelect(index)),
+          h.AriaLabel(`Select ${color.name}`),
+          h.AriaPressed(String(index === active)),
+          h.Class(
+            `size-5 shrink-0 rounded-full border ${
+              index === active ? 'border-ink ring-1 ring-ink' : 'border-border hover:border-muted'
+            }`,
+          ),
+          h.Style({ background: `hsl(${color.hue} 100% 50%)` }),
+        ],
+        [],
       ),
-    ],
+    ),
   )
 
 /**
@@ -134,11 +132,11 @@ const layerSliders = (
   if (layer.type === 'colorMixer') {
     const color = activeMixerColor(model, layer.id)
     return [
-      mixerSwatches(h, color, (index) => SelectedMixerColor({ id: layer.id, color: index })),
+      mixerSwatches(h, color, (index) => SelectedMixerColor({ color: index, id: layer.id })),
       ...mixerSliders(h, layer, ui, color, (field, value) =>
         kind === 'draft'
           ? UpdatedDraftParam({ field, value })
-          : UpdatedLayerParam({ id: layer.id, field, value }),
+          : UpdatedLayerParam({ field, id: layer.id, value }),
       ),
     ]
   }
@@ -340,7 +338,9 @@ const chainSlider = (
   if (ui.toggled) {
     const keys = Object.keys(ui.fields)
     const activeIndex = model.activeFieldIndex[layer.id] ?? 0
-    if (keys[activeIndex] !== field) return null
+    if (keys[activeIndex] !== field) {
+      return null
+    }
     return sliderControl(
       h,
       fieldUi.label,
@@ -348,13 +348,13 @@ const chainSlider = (
       min,
       max,
       value,
-      (v) => UpdatedLayerParam({ id: layer.id, field, value: v }),
+      (v) => UpdatedLayerParam({ field, id: layer.id, value: v }),
       ui.toggled,
       () => CycledToggledField({ id: layer.id }),
     )
   }
   return sliderControl(h, fieldUi.label, fieldUi.format(value), min, max, value, (v) =>
-    UpdatedLayerParam({ id: layer.id, field, value: v }),
+    UpdatedLayerParam({ field, id: layer.id, value: v }),
   )
 }
 

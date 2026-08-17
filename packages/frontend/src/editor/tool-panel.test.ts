@@ -37,31 +37,30 @@ import type { Model } from './model'
 
 const catalog: Catalog = [
   {
-    name: 'Kodak 2393 Cuspclip',
-    lut_file: LutId('luts/print/kodak_2393_cuspclip.cube'),
     category: 'Print',
+    lut_file: LutId('luts/print/kodak_2393_cuspclip.cube'),
+    name: 'Kodak 2393 Cuspclip',
     thumbnail: 'thumbnails/print/kodak_2393_cuspclip.jpg',
   },
 ]
 
-/** A stub handle — the tests never execute GPU work, so only its type flows
- *  through the model (same pattern as lut-flow.test.ts). */
+// SAFETY: fabricated GPU handle stub — tests never execute GPU work, so only its type flows through the model; the buffer has no backing storage and is never read.
 const stubHandle = () =>
-  // oxlint-disable-next-line consistent-type-assertions
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
   new RenderHandle({} as GPUTexture, 200, 150, { buffer: {} as GPUBuffer, map: null })
 
 /** A model in the Idle phase with a loaded image and the catalog. */
 const loaded = () => ({
   ...initialModel(),
-  phase: Idle(),
   catalog,
-  source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
+  phase: Idle(),
+  source: { bitmap: new MockImageBitmap(200, 150), error: null, height: 150, width: 200 },
 })
 
 /** Settle the in-flight render the way RenderedFrame does, so the next
  *  renderNow dispatches a fresh RenderChain (assertable in tests). */
 const settled = (model: Model): Model =>
-  update(model, RenderedFrame({ stamp: model.revision, handle: stubHandle() }))[0]
+  update(model, RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
 
 /** An edit with two committed Exposure layers (the ×2 badge fixture). */
 const twoExposureLayers = () => {
@@ -80,12 +79,12 @@ const lutDraft = () => settled(update(loaded(), SelectedTool({ type: 'lut' }))[0
 const sceneConfig = { update, view } as const
 
 const stageMounts = [
-  Mount.resolve(PanZoom, ScaledCanvas({ scale: 1, offsetX: 0, offsetY: 0 })),
+  Mount.resolve(PanZoom, ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
   Mount.resolve(RegisterCanvas, CanvasRegistered()),
 ]
 
 const resolveRender = () => [
-  Command.resolve(RenderChain, RenderedFrame({ stamp: 999, handle: stubHandle() })),
+  Command.resolve(RenderChain, RenderedFrame({ handle: stubHandle(), stamp: 999 })),
   Command.resolve(ReadHistogram, HistogramComputed({ bins: new Uint32Array(256), stamp: 999 })),
 ]
 

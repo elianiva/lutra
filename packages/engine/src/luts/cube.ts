@@ -45,7 +45,9 @@ export function parseCube(text: string): LutCube {
   const lines = text.split(/\r?\n/)
   for (const raw of lines) {
     const line = raw.trim()
-    if (line === '' || line.startsWith('#')) continue
+    if (line === '' || line.startsWith('#')) {
+      continue
+    }
 
     const sizeMatch = SIZE_RE.exec(line)
     if (sizeMatch) {
@@ -56,7 +58,9 @@ export function parseCube(text: string): LutCube {
       continue
     }
 
-    if (line.startsWith('TITLE') || line.startsWith('DOMAIN')) continue
+    if (line.startsWith('TITLE') || line.startsWith('DOMAIN')) {
+      continue
+    }
 
     // Data line: at least three floats (extra columns are tolerated and
     // ignored, e.g. an alpha column in some exporters' output).
@@ -67,7 +71,9 @@ export function parseCube(text: string): LutCube {
     values.push(parts[0]!, parts[1]!, parts[2]!)
   }
 
-  if (size === 0) throw new LutParseError({ message: 'Missing LUT_3D_SIZE header' })
+  if (size === 0) {
+    throw new LutParseError({ message: 'Missing LUT_3D_SIZE header' })
+  }
   const expected = size * size * size
   if (values.length !== expected * 3) {
     throw new LutParseError({
@@ -75,5 +81,5 @@ export function parseCube(text: string): LutCube {
     })
   }
 
-  return { size, data: new Float32Array(values) }
+  return { data: new Float32Array(values), size }
 }

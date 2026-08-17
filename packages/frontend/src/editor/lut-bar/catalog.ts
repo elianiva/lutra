@@ -6,7 +6,7 @@ import type { LutCatalogEntry } from '../../luts/store'
  *  column and the filmstrip content share this grouping. Array.groupBy
  *  buckets into a plain record, whose string-key insertion order IS
  *  first-seen order; Record.toEntries walks it in that order. */
-export const groupByCategory = (catalog: ReadonlyArray<LutCatalogEntry>) =>
+export const groupByCategory = (catalog: readonly LutCatalogEntry[]) =>
   pipe(
     catalog,
     Array.groupBy((entry) => entry.category),
@@ -14,7 +14,7 @@ export const groupByCategory = (catalog: ReadonlyArray<LutCatalogEntry>) =>
     Array.map(([category, luts]) => ({ category, luts })),
   )
 
-export const lookup = (catalog: ReadonlyArray<LutCatalogEntry>, lutId: LutId) =>
+export const lookup = (catalog: readonly LutCatalogEntry[], lutId: LutId) =>
   Array.findFirst(catalog, (entry) => entry.lut_file === lutId)
 
 /** The bar's effective tab: 'recents' falls back to the first catalog
@@ -22,9 +22,9 @@ export const lookup = (catalog: ReadonlyArray<LutCatalogEntry>, lutId: LutId) =>
  *  in that case). An empty catalog keeps the stale tab (the bar degrades to
  *  an empty strip instead of crashing on a missing "first" category). */
 export const effectiveTab = (
-  catalog: ReadonlyArray<LutCatalogEntry>,
+  catalog: readonly LutCatalogEntry[],
   lutTab: string,
-  recents: ReadonlyArray<LutId>,
+  recents: readonly LutId[],
 ): string => {
   if (lutTab === 'recents' && recents.length === 0) {
     return pipe(
@@ -43,11 +43,13 @@ export const effectiveTab = (
  *  trigger derives its target set from this (docs/adr/0013), so generation
  *  and render always agree on what is visible. */
 export const visibleEntries = (
-  catalog: ReadonlyArray<LutCatalogEntry>,
+  catalog: readonly LutCatalogEntry[],
   lutTab: string,
-  recents: ReadonlyArray<LutId>,
-): ReadonlyArray<LutCatalogEntry> => {
-  if (lutTab === 'recents' && recents.length > 0) return recentsEntries(catalog, recents)
+  recents: readonly LutId[],
+): readonly LutCatalogEntry[] => {
+  if (lutTab === 'recents' && recents.length > 0) {
+    return recentsEntries(catalog, recents)
+  }
   const tab = effectiveTab(catalog, lutTab, recents)
   return pipe(
     catalog,
@@ -62,9 +64,9 @@ export const visibleEntries = (
  *  catalog — entries whose lutId vanished from the catalog are dropped at
  *  render (a stale reference must never render a dead thumbnail). */
 export const recentsEntries = (
-  catalog: ReadonlyArray<LutCatalogEntry>,
-  recents: ReadonlyArray<LutId>,
-): ReadonlyArray<LutCatalogEntry> =>
+  catalog: readonly LutCatalogEntry[],
+  recents: readonly LutId[],
+): readonly LutCatalogEntry[] =>
   pipe(
     recents,
     Array.map((lutId) => lookup(catalog, lutId)),

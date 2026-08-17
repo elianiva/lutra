@@ -15,10 +15,10 @@ import { renderLut } from '../shaders/bodies/lut'
 
 /** A 13³ LUT layer as the assembler receives it from the render request. */
 const lutLayer = (over: Partial<ChainLayerInfo> = {}): ChainLayerInfo => ({
-  type: 'lut',
   body: renderLut,
   fieldKeys: [FieldKey('amount')],
   lut: { id: LutId('luts/colorslide/fuji_velvia_50.cube'), size: 13 },
+  type: 'lut',
   ...over,
 })
 
@@ -41,7 +41,7 @@ describe('generateChainSource', () => {
 
   it('merges linearize+encode into the single pass of a one-layer chain', () => {
     const layers: ChainLayerInfo[] = [
-      { type: 'exposure', body: renderExposure, fieldKeys: [FieldKey('stops')] },
+      { body: renderExposure, fieldKeys: [FieldKey('stops')], type: 'exposure' },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(1)
@@ -64,26 +64,26 @@ describe('generateChainSource', () => {
 
   it('assigns uniform slots per pass', () => {
     const layers: ChainLayerInfo[] = [
-      { type: 'exposure', body: renderExposure, fieldKeys: [FieldKey('stops')] },
-      { type: 'contrast', body: renderContrast, fieldKeys: [FieldKey('amount')] },
-      { type: 'saturation', body: renderSaturation, fieldKeys: [FieldKey('amount')] },
+      { body: renderExposure, fieldKeys: [FieldKey('stops')], type: 'exposure' },
+      { body: renderContrast, fieldKeys: [FieldKey('amount')], type: 'contrast' },
+      { body: renderSaturation, fieldKeys: [FieldKey('amount')], type: 'saturation' },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(3)
-    expect(result.passes[0]!.uniforms).toEqual([{ layerIndex: 0, field: 'stops', offset: 0 }])
-    expect(result.passes[1]!.uniforms).toEqual([{ layerIndex: 1, field: 'amount', offset: 0 }])
-    expect(result.passes[2]!.uniforms).toEqual([{ layerIndex: 2, field: 'amount', offset: 0 }])
+    expect(result.passes[0]!.uniforms).toEqual([{ field: 'stops', layerIndex: 0, offset: 0 }])
+    expect(result.passes[1]!.uniforms).toEqual([{ field: 'amount', layerIndex: 1, offset: 0 }])
+    expect(result.passes[2]!.uniforms).toEqual([{ field: 'amount', layerIndex: 2, offset: 0 }])
   })
 
   it('keeps multi-field layers in one pass', () => {
     const layers: ChainLayerInfo[] = [
-      { type: 'vignette', body: renderVignette, fieldKeys: [FieldKey('amount'), FieldKey('size')] },
+      { body: renderVignette, fieldKeys: [FieldKey('amount'), FieldKey('size')], type: 'vignette' },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(1)
     expect(result.passes[0]!.uniforms).toEqual([
-      { layerIndex: 0, field: 'amount', offset: 0 },
-      { layerIndex: 0, field: 'size', offset: 1 },
+      { field: 'amount', layerIndex: 0, offset: 0 },
+      { field: 'size', layerIndex: 0, offset: 1 },
     ])
     expect(result.passes[0]!.source).toContain('l0_amount: f32')
     expect(result.passes[0]!.source).toContain('l0_size: f32')
@@ -91,8 +91,8 @@ describe('generateChainSource', () => {
 
   it('uses rgba16float intermediates between passes and sRGB only for the last', () => {
     const layers: ChainLayerInfo[] = [
-      { type: 'exposure', body: renderExposure, fieldKeys: [FieldKey('stops')] },
-      { type: 'saturation', body: renderSaturation, fieldKeys: [FieldKey('amount')] },
+      { body: renderExposure, fieldKeys: [FieldKey('stops')], type: 'exposure' },
+      { body: renderSaturation, fieldKeys: [FieldKey('amount')], type: 'saturation' },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(2)
@@ -109,9 +109,9 @@ describe('generateChainSource', () => {
   it('inserts a linearize pass when the first layer samples the source', () => {
     const layers: ChainLayerInfo[] = [
       {
-        type: 'chromaticAberration',
         body: renderChromaticAberration,
         fieldKeys: [FieldKey('amount')],
+        type: 'chromaticAberration',
       },
     ]
     const result = generateChainSource(layers)
@@ -137,11 +137,11 @@ describe('generateChainSource', () => {
 
   it('does not double-linearize when a sampling layer is not first', () => {
     const layers: ChainLayerInfo[] = [
-      { type: 'exposure', body: renderExposure, fieldKeys: [FieldKey('stops')] },
+      { body: renderExposure, fieldKeys: [FieldKey('stops')], type: 'exposure' },
       {
-        type: 'chromaticAberration',
         body: renderChromaticAberration,
         fieldKeys: [FieldKey('amount')],
+        type: 'chromaticAberration',
       },
     ]
     const result = generateChainSource(layers)
@@ -155,7 +155,7 @@ describe('generateChainSource', () => {
     // must read linear light, so a linearize pass precedes it and its own
     // pass carries the binding-5 sampler.
     const layers: ChainLayerInfo[] = [
-      { type: 'clarity', body: renderClarity, fieldKeys: [FieldKey('amount')] },
+      { body: renderClarity, fieldKeys: [FieldKey('amount')], type: 'clarity' },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(2)
@@ -200,16 +200,16 @@ describe('generateChainSource', () => {
       'magentaLuminance',
     ].map(FieldKey)
     const layers: ChainLayerInfo[] = [
-      { type: 'colorMixer', body: renderColorMixer, fieldKeys: mixerKeys },
+      { body: renderColorMixer, fieldKeys: mixerKeys, type: 'colorMixer' },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(1)
     const pass = result.passes[0]!
     // 24 uniform slots, in registry field order.
     expect(pass.uniforms).toEqual(
-      mixerKeys.map((key, offset) => ({ layerIndex: 0, field: key, offset })),
+      mixerKeys.map((key, offset) => ({ field: key, layerIndex: 0, offset })),
     )
-    const source = pass.source
+    const { source } = pass
     // The self-contained sRGB + HSL helpers are emitted at module scope
     // (prefixed so they never collide with the pass template's own
     // srgbToLinear/linearToSrgb at chain ends).
@@ -246,14 +246,14 @@ describe('generateChainSource', () => {
   it('emits module-scope helpers ahead of the entry point', () => {
     const layers: ChainLayerInfo[] = [
       {
-        type: 'grain',
         body: renderGrain,
         fieldKeys: [FieldKey('texture'), FieldKey('size'), FieldKey('blur')],
+        type: 'grain',
       },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(1)
-    const source = result.passes[0]!.source
+    const { source } = result.passes[0]!
     const helperIdx = source.indexOf('fn grainNoise')
     expect(helperIdx).toBeGreaterThanOrEqual(0)
     expect(helperIdx).toBeLessThan(source.indexOf('@compute'))
@@ -261,7 +261,7 @@ describe('generateChainSource', () => {
 
   it('flags usesFrame per pass and on the shader', () => {
     const exposure: ChainLayerInfo[] = [
-      { type: 'exposure', body: renderExposure, fieldKeys: [FieldKey('stops')] },
+      { body: renderExposure, fieldKeys: [FieldKey('stops')], type: 'exposure' },
     ]
     const result = generateChainSource(exposure)
     expect(result.usesFrame).toBe(false)
@@ -269,11 +269,11 @@ describe('generateChainSource', () => {
     expect(result.passes[0]!.source).not.toContain('u_frame')
 
     const withGrain: ChainLayerInfo[] = [
-      { type: 'exposure', body: renderExposure, fieldKeys: [FieldKey('stops')] },
+      { body: renderExposure, fieldKeys: [FieldKey('stops')], type: 'exposure' },
       {
-        type: 'grain',
         body: renderGrain,
         fieldKeys: [FieldKey('texture'), FieldKey('size'), FieldKey('blur')],
+        type: 'grain',
       },
     ]
     const grainResult = generateChainSource(withGrain)
@@ -289,7 +289,7 @@ describe('generateChainSource', () => {
     const pass = result.passes[0]!
     // The pass carries the cube id for the frontend's texture binding
     expect(pass.lutId).toBe('luts/colorslide/fuji_velvia_50.cube')
-    expect(pass.uniforms).toEqual([{ layerIndex: 0, field: 'amount', offset: 0 }])
+    expect(pass.uniforms).toEqual([{ field: 'amount', layerIndex: 0, offset: 0 }])
     // 3D LUT texture binding (no sampler: the body reads via textureLoad)
     expect(pass.source).not.toContain('@group(0) @binding(5) var samp: sampler')
     expect(pass.source).toContain('@group(0) @binding(6) var lutTex: texture_3d<f32>')
@@ -314,9 +314,9 @@ describe('generateChainSource', () => {
 
   it('round-trips a middle LUT pass through sRGB', () => {
     const layers: ChainLayerInfo[] = [
-      { type: 'exposure', body: renderExposure, fieldKeys: [FieldKey('stops')] },
+      { body: renderExposure, fieldKeys: [FieldKey('stops')], type: 'exposure' },
       lutLayer(),
-      { type: 'saturation', body: renderSaturation, fieldKeys: [FieldKey('amount')] },
+      { body: renderSaturation, fieldKeys: [FieldKey('amount')], type: 'saturation' },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(3)
@@ -339,7 +339,7 @@ describe('generateChainSource', () => {
   it('skips the input decode when the LUT layer is first', () => {
     const layers: ChainLayerInfo[] = [
       lutLayer(),
-      { type: 'exposure', body: renderExposure, fieldKeys: [FieldKey('stops')] },
+      { body: renderExposure, fieldKeys: [FieldKey('stops')], type: 'exposure' },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(2)
@@ -360,7 +360,7 @@ describe('generateChainSource', () => {
     // extra linearize pass is needed.
     const layers: ChainLayerInfo[] = [
       lutLayer(),
-      { type: 'clarity', body: renderClarity, fieldKeys: [FieldKey('amount')] },
+      { body: renderClarity, fieldKeys: [FieldKey('amount')], type: 'clarity' },
     ]
     const result = generateChainSource(layers)
     expect(result.passes).toHaveLength(2)
@@ -373,7 +373,7 @@ describe('generateChainSource', () => {
     // Clarity first: the assembler inserts a linearize pass, so the LUT
     // pass's input is a linear intermediate and needs the sRGB decode.
     const layers: ChainLayerInfo[] = [
-      { type: 'clarity', body: renderClarity, fieldKeys: [FieldKey('amount')] },
+      { body: renderClarity, fieldKeys: [FieldKey('amount')], type: 'clarity' },
       lutLayer(),
     ]
     const result = generateChainSource(layers)
@@ -390,7 +390,7 @@ describe('generateChainSource', () => {
 
   it('throws when a LUT body has no cube reference', () => {
     const layers: ChainLayerInfo[] = [
-      { type: 'lut', body: renderLut, fieldKeys: [FieldKey('amount')] },
+      { body: renderLut, fieldKeys: [FieldKey('amount')], type: 'lut' },
     ]
     expect(() => generateChainSource(layers)).toThrow(/missing its cube reference/)
   })
@@ -402,19 +402,19 @@ describe('generateChainSource', () => {
     // the shader fails to compile (unknown identifier), which surfaces in the
     // browser as an invalid BindGroupLayout/pipeline error cascade.
     const layers: ChainLayerInfo[] = [
-      { type: 'exposure', body: renderExposure, fieldKeys: [FieldKey('stops')] },
-      { type: 'contrast', body: renderContrast, fieldKeys: [FieldKey('amount')] },
+      { body: renderExposure, fieldKeys: [FieldKey('stops')], type: 'exposure' },
+      { body: renderContrast, fieldKeys: [FieldKey('amount')], type: 'contrast' },
       {
-        type: 'whiteBalance',
         body: renderWhiteBalance,
         fieldKeys: [FieldKey('temp'), FieldKey('tint')],
+        type: 'whiteBalance',
       },
-      { type: 'saturation', body: renderSaturation, fieldKeys: [FieldKey('amount')] },
-      { type: 'vignette', body: renderVignette, fieldKeys: [FieldKey('amount'), FieldKey('size')] },
+      { body: renderSaturation, fieldKeys: [FieldKey('amount')], type: 'saturation' },
+      { body: renderVignette, fieldKeys: [FieldKey('amount'), FieldKey('size')], type: 'vignette' },
       {
-        type: 'chromaticAberration',
         body: renderChromaticAberration,
         fieldKeys: [FieldKey('amount')],
+        type: 'chromaticAberration',
       },
     ]
     const result = generateChainSource(layers)
@@ -423,7 +423,9 @@ describe('generateChainSource', () => {
       const tokens = pass.source.match(/l\d+_\w+/g) ?? []
       const unique: string[] = []
       for (const token of tokens) {
-        if (!unique.includes(token)) unique.push(token)
+        if (!unique.includes(token)) {
+          unique.push(token)
+        }
       }
       for (const token of unique) {
         expect(pass.source).toContain(`let ${token} = u_params.${token};`)

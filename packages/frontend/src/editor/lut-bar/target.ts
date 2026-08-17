@@ -1,5 +1,6 @@
 import { Array, Match, Option, pipe, Schema as S } from 'effect'
-import { LutLayer, type LayerId, type LutId } from '@lutra/engine'
+import { LutLayer } from '@lutra/engine'
+import type { LayerId, LutId } from '@lutra/engine'
 import type { Model } from '../model'
 import { Drafting, Selected } from '../phase'
 
@@ -26,7 +27,7 @@ export const lutTarget = (model: Model) =>
         model.chain,
         Array.findFirst((layer) => layer.id === phase.layerId),
         Option.filter(S.is(LutLayer)),
-        Option.map((layer) => ({ kind: 'layer', id: layer.id })),
+        Option.map((layer) => ({ id: layer.id, kind: 'layer' })),
       ),
     ),
     Match.orElse(() => Option.none()),

@@ -14,11 +14,11 @@ import { EditIdSchema } from './edit-id'
  * and the render contract is unchanged (docs/adr/0007).
  */
 export const EditSummary = S.Struct({
-  id: EditIdSchema,
-  chain: S.Array(Layer),
-  thumbnail: S.Uint8Array,
   /** Encoded thumbnail size in bytes (per-edit storage metering). */
   byteLength: S.Number,
+  chain: S.Array(Layer),
+  id: EditIdSchema,
   savedAt: S.Number,
+  thumbnail: S.Uint8Array,
 })
 export type EditSummary = typeof EditSummary.Type

@@ -5,7 +5,7 @@ import type { LutStore } from '../luts/store'
 import type { LutThumbnailer } from '../thumbs/worker-layer'
 import type { ImageEncoder } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
-import { EditStore } from '@lutra/store'
+import type { EditStore } from '@lutra/store'
 import type { EditorMessage } from './message'
 import type { Model } from './model'
 import type { AppRoute } from '../route'
@@ -35,7 +35,7 @@ type Resource =
  */
 export type RouteChangedReturn = readonly [
   Model,
-  ReadonlyArray<Command.Command<EditorMessage, never, Resource>>,
+  readonly Command.Command<EditorMessage, never, Resource>[],
 ]
 export const informRouteChanged = (model: Model, route: AppRoute): RouteChangedReturn => {
   const boot = [LoadCatalog(), LoadExportSettings(), LoadLutRecents()]

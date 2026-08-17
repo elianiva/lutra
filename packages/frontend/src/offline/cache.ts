@@ -21,12 +21,12 @@ export const LUT_CACHE_NAME = 'lutra-luts'
  * quota: quota is transient and retryable, unavailability is not.
  */
 export class LutCacheError extends Schema.TaggedErrorClass<LutCacheError>()('LutCacheError', {
+  cause: Schema.optional(Schema.Unknown),
   /** 'quota' — the origin's storage is full (retryable after a persist()
    *  grant or user action). 'unavailable' — the Cache API itself threw
    *  (environment failure; the fill degrades to a no-op). */
   kind: Schema.Literals(['unavailable', 'quota']),
   message: Schema.String,
-  cause: Schema.optional(Schema.Unknown),
 }) {}
 
 /** Normalize a Cache Storage key to a library path. The browser stores
@@ -47,42 +47,43 @@ export const toLibraryPath = (key: string): string => {
   }
 }
 
-export interface LutCacheShape {
+export interface LutCacheContract {
   /** True when a path is already mirrored into the offline library. */
   readonly has: (path: string) => Effect.Effect<boolean, LutCacheError>
   /** Mirror a fetched response into the offline library, keyed by path. */
   readonly put: (path: string, response: Response) => Effect.Effect<void, LutCacheError>
   /** Every path currently mirrored (origin stripped — see toLibraryPath).
    *  The diff input of each offline fill run. */
-  readonly keys: () => Effect.Effect<ReadonlyArray<string>, LutCacheError>
+  readonly keys: () => Effect.Effect<readonly string[], LutCacheError>
   /** Drop a path from the offline library (the orphan sweep removes files
    *  the current catalog no longer references). */
   readonly delete: (path: string) => Effect.Effect<void, LutCacheError>
 }
 
-export class LutCache extends Context.Service<LutCache, LutCacheShape>()('LutCache') {}
+export class LutCache extends Context.Service<LutCache, LutCacheContract>()('LutCache') {}
 
 const withCache = <A>(f: (cache: Cache) => Promise<A>): Effect.Effect<A, LutCacheError> =>
   Effect.tryPromise({
-    try: async () => {
-      const cache = await caches.open(LUT_CACHE_NAME)
-      return await f(cache)
-    },
     catch: (cause) =>
       new LutCacheError({
+        cause,
         kind:
           cause instanceof DOMException && cause.name === 'QuotaExceededError'
             ? 'quota'
             : 'unavailable',
         message: `Offline library storage: ${cause instanceof Error ? cause.message : String(cause)}`,
-        cause,
       }),
+    try: async () => {
+      const cache = await caches.open(LUT_CACHE_NAME)
+      return await f(cache)
+    },
   })
 
 export const LutCacheLive = Layer.succeed(
   LutCache,
   LutCache.of({
-    has: (path) => withCache((cache) => cache.match(path).then((hit) => hit !== undefined)),
+    has: (path) =>
+      withCache(async (cache) => await cache.match(path).then((hit) => hit !== undefined)),
     put: (path, response) =>
       withCache(async (cache) => {
         await cache.put(path, response)

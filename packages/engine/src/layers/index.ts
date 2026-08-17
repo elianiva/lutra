@@ -1,4 +1,6 @@
 export { createLayer, UnknownLayerTypeError } from './defaults'
+export { readField, numField, strField, isFieldNumber, isFieldString } from './fields'
+export type { LayerFieldValue } from './fields'
 export { nextLayerId } from './id'
 export { makeRegistry } from './registry'
 export {

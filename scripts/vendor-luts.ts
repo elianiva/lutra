@@ -27,7 +27,7 @@ const fail = (message: string): never => {
 
 const main = async (): Promise<void> => {
   const cwd = process.cwd()
-  const exists = (path: string): Promise<void> => access(join(cwd, path))
+  const exists = async (path: string): Promise<void> => await access(join(cwd, path))
   try {
     await exists('package.json')
     await exists('packages/frontend')
@@ -42,7 +42,9 @@ const main = async (): Promise<void> => {
   try {
     process.stdout.write(`[vendor-luts] fetching ${REPO} @ ${PINNED_COMMIT.slice(0, 12)}\n`)
     const res = await fetch(TARBALL)
-    if (!res.ok) fail(`tarball fetch failed: ${res.status} ${res.statusText}`)
+    if (!res.ok) {
+      fail(`tarball fetch failed: ${res.status} ${res.statusText}`)
+    }
     await Bun.write(tarballPath, res)
 
     process.stdout.write('[vendor-luts] extracting\n')
@@ -65,7 +67,7 @@ const main = async (): Promise<void> => {
     }
 
     process.stdout.write(`[vendor-luts] copying into ${OUT}/\n`)
-    await rm(OUT, { recursive: true, force: true })
+    await rm(OUT, { force: true, recursive: true })
     await mkdir(OUT, { recursive: true })
     await cp(join(src, 'luts'), join(OUT, 'luts'), { recursive: true })
     await cp(join(src, 'thumbnails'), join(OUT, 'thumbnails'), { recursive: true })
@@ -108,7 +110,7 @@ See the upstream LICENSE file for the mirror's terms.
 
     // ---- verify: every catalog entry resolves ----
     const catalog: {
-      filmLUTs: Array<{ name: string; lut_file: string; thumbnail: string }>
+      filmLUTs: { name: string; lut_file: string; thumbnail: string }[]
     } = await Bun.file(join(OUT, 'film_luts.json')).json()
     const luts = catalog.filmLUTs
     let missing = 0
@@ -120,14 +122,16 @@ See the upstream LICENSE file for the mirror's terms.
         missing++
       }
     }
-    if (missing > 0) fail(`${missing} catalog entries unresolvable`)
+    if (missing > 0) {
+      fail(`${missing} catalog entries unresolvable`)
+    }
 
     const size = (await $`du -sh ${OUT}`.quiet().text()).trim()
     process.stdout.write(
       `[vendor-luts] vendored ${luts.length} LUTs into ${OUT}/ (${size}) — done\n`,
     )
   } finally {
-    await rm(tmpDir, { recursive: true, force: true })
+    await rm(tmpDir, { force: true, recursive: true })
   }
 }
 

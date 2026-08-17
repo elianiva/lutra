@@ -16,12 +16,12 @@ declare const self: ServiceWorkerGlobalScope
 
 // Injected by scripts/build-sw.ts (see the file header).
 declare const __LUT_CACHE_NAME__: string
-declare const __PRECACHE_MANIFEST__: ReadonlyArray<string>
+declare const __PRECACHE_MANIFEST__: readonly string[]
 declare const __SHELL_CACHE_NAME__: string
 
 const SHELL_CACHE = __SHELL_CACHE_NAME__
 const LUT_CACHE = __LUT_CACHE_NAME__
-const PRECACHE: ReadonlyArray<string> = __PRECACHE_MANIFEST__
+const PRECACHE: readonly string[] = __PRECACHE_MANIFEST__
 
 // Precache the app shell. The deploy-unique name means a deploy installs
 // the new shell alongside the old; activate purges the previous version
@@ -30,8 +30,8 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(SHELL_CACHE)
-      .then((cache) => cache.addAll(PRECACHE))
-      .then(() => self.skipWaiting()),
+      .then(async (cache) => await cache.addAll(PRECACHE))
+      .then(async () => await self.skipWaiting()),
   )
 })
 
@@ -42,21 +42,24 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) =>
-        Promise.all(
-          keys
-            .filter((key) => key.startsWith('lutra-shell-') && key !== SHELL_CACHE)
-            .map((key) => caches.delete(key)),
-        ),
+      .then(
+        async (keys) =>
+          await Promise.all(
+            keys
+              .filter((key) => key.startsWith('lutra-shell-') && key !== SHELL_CACHE)
+              .map(async (key) => await caches.delete(key)),
+          ),
       )
-      .then(() => self.clients.claim()),
+      .then(async () => await self.clients.claim()),
   )
 })
 
 self.addEventListener('fetch', (event) => {
-  const request = event.request
+  const { request } = event
   const url = new URL(request.url)
-  if (request.method !== 'GET' || url.origin !== self.location.origin) return
+  if (request.method !== 'GET' || url.origin !== self.location.origin) {
+    return
+  }
 
   // Navigations: network-first so a deploy's fresh index.html (with its new
   // hashed asset references) lands on the next visit; offline reloads fall
@@ -65,8 +68,8 @@ self.addEventListener('fetch', (event) => {
   // serve a torn shell (new index, old assets purged).
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() =>
-        caches.match('/index.html').then((hit) => hit ?? Response.error()),
+      fetch(request).catch(
+        async () => await caches.match('/index.html').then((hit) => hit ?? Response.error()),
       ),
     )
     return
@@ -77,15 +80,18 @@ self.addEventListener('fetch', (event) => {
   // immediately, ahead of the fill's queue position.
   if (url.pathname.startsWith('/luts/')) {
     event.respondWith(
-      caches.open(LUT_CACHE).then((cache) =>
-        cache.match(request).then(
-          (hit) =>
-            hit ??
-            fetch(request).then((response) => {
-              if (response.ok) void cache.put(request, response.clone())
-              return response
-            }),
-        ),
+      caches.open(LUT_CACHE).then(
+        async (cache) =>
+          await cache.match(request).then(
+            (hit) =>
+              hit ??
+              fetch(request).then((response) => {
+                if (response.ok) {
+                  void cache.put(request, response.clone())
+                }
+                return response
+              }),
+          ),
       ),
     )
     return
@@ -95,15 +101,18 @@ self.addEventListener('fetch', (event) => {
   // with put-on-miss as a safety net for anything the precache missed (a
   // lazily-loaded chunk the build manifest didn't list).
   event.respondWith(
-    caches.open(SHELL_CACHE).then((cache) =>
-      cache.match(request).then(
-        (hit) =>
-          hit ??
-          fetch(request).then((response) => {
-            if (response.ok) void cache.put(request, response.clone())
-            return response
-          }),
-      ),
+    caches.open(SHELL_CACHE).then(
+      async (cache) =>
+        await cache.match(request).then(
+          (hit) =>
+            hit ??
+            fetch(request).then((response) => {
+              if (response.ok) {
+                void cache.put(request, response.clone())
+              }
+              return response
+            }),
+        ),
     ),
   )
 })

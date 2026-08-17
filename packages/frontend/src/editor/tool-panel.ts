@@ -116,9 +116,9 @@ const toolCard = (
       ),
       h.div(
         [h.Class('text-xs leading-4 text-muted')],
-        catalogStatus !== null
-          ? [catalogStatus]
-          : [h.span([h.Class('block')], [ui.description]), h.span([h.Class('block')], [ui.when])],
+        catalogStatus === null
+          ? [h.span([h.Class('block')], [ui.description]), h.span([h.Class('block')], [ui.when])]
+          : [catalogStatus],
       ),
     ],
   )

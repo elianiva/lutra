@@ -16,15 +16,16 @@ import type { Layer, LayerType } from './schemas'
 export class UnknownLayerTypeError extends Schema.TaggedErrorClass<UnknownLayerTypeError>()(
   'UnknownLayerTypeError',
   {
-    message: Schema.String,
     cause: Schema.optional(Schema.Unknown),
+    message: Schema.String,
   },
 ) {}
 
 export function createLayer<K extends LayerType>(
   type: K,
   registry: Record<LayerType, LayerEntry>,
-): Extract<Layer, { type: K }> {
+): Extract<Layer, { type: K }>
+export function createLayer(type: LayerType, registry: Record<LayerType, LayerEntry>): Layer {
   const entry = registry[type]
   if (!entry) {
     throw new UnknownLayerTypeError({ message: `Unknown layer type: ${type}` })
@@ -42,20 +43,21 @@ export function createLayer<K extends LayerType>(
   // defaults; the frontend overrides them with catalog data when it knows
   // the catalog (the engine doesn't).
   const stringFields: Record<string, string> = {}
-  for (const [key, value] of Object.entries(entry.stringFields ?? {})) {
-    stringFields[key] = value
+  for (const key of Object.keys(entry.stringFields ?? {})) {
+    const value = entry.stringFields?.[key]
+    if (value !== undefined) {
+      stringFields[key] = value
+    }
   }
 
-  // The spread fields are dynamic (Record<string, number|string>), so TS
-  // cannot match the literal against the `Layer` union — the cast is the
-  // deliberate escape hatch, and the schema decode at persistence
-  // boundaries re-validates the result.
-  // oxlint-disable-next-line consistent-type-assertions
-  return {
+  // Decode the assembled representation with the entry's owner schema before
+  // returning it. This keeps the dynamic field assembly at the boundary and
+  // gives the returned layer the same contract as persisted layers.
+  return Schema.decodeUnknownSync(entry.schema)({
     id: nextLayerId(),
-    visible: true,
     type,
+    visible: true,
     ...fields,
     ...stringFields,
-  } as unknown as Extract<Layer, { type: K }>
+  })
 }

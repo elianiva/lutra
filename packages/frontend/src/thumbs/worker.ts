@@ -1,4 +1,5 @@
-import { applyLutCpu, encodeImage, type LutCube } from '@lutra/engine'
+import { applyLutCpu, encodeImage } from '@lutra/engine'
+import type { LutCube } from '@lutra/engine'
 
 // The LUT-thumbnail worker. The main thread posts `{ id, image, cube }`; the
 // worker applies the cube to the (already downscaled) photo with the engine's
@@ -25,8 +26,9 @@ export interface LutThumbResponse {
 
 // The DOM lib types `self.postMessage` for windows (targetOrigin arg); a
 // worker's postMessage takes a transfer list. Narrow the global here.
-// oxlint-disable-next-line consistent-type-assertions
-const ctx = self as unknown as {
+// SAFETY: this file only runs inside a dedicated worker, where postMessage accepts a transfer list.
+// oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
+const ctx = self as {
   postMessage(message: LutThumbResponse, transfer?: Transferable[]): void
 }
 
@@ -36,19 +38,21 @@ self.onmessage = (event: MessageEvent<LutThumbRequest>) => {
   let graded: ImageData
   try {
     graded = applyLutCpu(image, cube, 1)
-  } catch (cause) {
+  } catch (error) {
     ctx.postMessage({
+      error: error instanceof Error ? error.message : String(error),
       id,
-      error: cause instanceof Error ? cause.message : String(cause),
     })
     return
   }
   encodeImage(graded, { format: 'jpeg', quality: 85, scale: 1 })
-    .then((bytes) => ctx.postMessage({ id, bytes }, [bytes.buffer]))
-    .catch((cause) =>
+    .then((bytes) => {
+      ctx.postMessage({ bytes, id }, [bytes.buffer])
+    })
+    .catch((error) => {
       ctx.postMessage({
+        error: error instanceof Error ? error.message : String(error),
         id,
-        error: cause instanceof Error ? cause.message : String(cause),
-      }),
-    )
+      })
+    })
 }

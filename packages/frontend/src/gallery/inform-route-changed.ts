@@ -1,5 +1,5 @@
-import { Command } from 'foldkit'
-import { EditStore } from '@lutra/store'
+import type { Command } from 'foldkit'
+import type { EditStore } from '@lutra/store'
 import type { AppRoute } from '../route'
 import type { Model } from './model'
 import type { GalleryMessage } from './message'
@@ -14,7 +14,7 @@ import { ListEdits } from './command'
  */
 export type RouteChangedReturn = readonly [
   Model,
-  ReadonlyArray<Command.Command<GalleryMessage, never, EditStore>>,
+  readonly Command.Command<GalleryMessage, never, EditStore>[],
 ]
 export const informRouteChanged = (model: Model, _route: AppRoute): RouteChangedReturn => [
   model,

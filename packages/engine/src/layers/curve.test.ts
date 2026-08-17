@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import fc from 'fast-check'
+import * as fc from 'fast-check'
+import { Schema } from 'effect'
 import { createLayer, makeRegistry, CURVE_POINT_COUNT, CURVE_X_EPS } from '../layers'
 import type { Layer } from '../layers'
+import type { BodySource } from '../shaders'
 import {
   renderExposure,
   renderContrast,
@@ -22,19 +24,19 @@ import { curvePointsOf, isCurveNeutral, moveCurvePoint, resetCurve } from './cur
 // ---- helpers ----
 
 const registry = makeRegistry({
-  exposure: renderExposure,
-  contrast: renderContrast,
-  shadows: renderShadows,
-  highlights: renderHighlights,
-  toneCurve: renderToneCurve,
-  whiteBalance: renderWhiteBalance,
-  saturation: renderSaturation,
-  colorMixer: renderColorMixer,
-  grain: renderGrain,
-  vignette: renderVignette,
   chromaticAberration: renderChromaticAberration,
   clarity: renderClarity,
+  colorMixer: renderColorMixer,
+  contrast: renderContrast,
+  exposure: renderExposure,
+  grain: renderGrain,
+  highlights: renderHighlights,
   lut: renderLut,
+  saturation: renderSaturation,
+  shadows: renderShadows,
+  toneCurve: renderToneCurve,
+  vignette: renderVignette,
+  whiteBalance: renderWhiteBalance,
 })
 
 const curveLayer = () => createLayer('toneCurve', registry)
@@ -63,7 +65,7 @@ describe('tone curve layer defaults', () => {
   it('every point field sits in [0, 1]', () => {
     fc.assert(
       fc.property(
-        fc.array(fc.double({ min: -2, max: 2, noNaN: true }), { minLength: 0, maxLength: 32 }),
+        fc.array(fc.double({ max: 2, min: -2, noNaN: true }), { maxLength: 32, minLength: 0 }),
         (values) => {
           // Move every point to arbitrary (possibly out-of-range) targets;
           // the invariants must hold no matter the drag path.
@@ -172,10 +174,13 @@ describe('resetCurve', () => {
 })
 
 describe('curve body renderer', () => {
+  const bodySourceOf = (source: string | BodySource): BodySource =>
+    Schema.is(Schema.String)(source) ? { stmts: source } : source
+
   it('emits the piecewise-linear evaluator and per-channel application', () => {
-    const source = renderToneCurve(0)
-    const stmts = typeof source === 'string' ? source : source.stmts
-    const helpers = typeof source === 'string' ? '' : (source.helpers ?? '')
+    const source = bodySourceOf(renderToneCurve(0))
+    const stmts = source.stmts
+    const helpers = source.helpers ?? ''
     expect(stmts).toContain(
       'curveEval(srgb.r, l0_p0x, l0_p0y, l0_p1x, l0_p1y, l0_p2x, l0_p2y, l0_p3x, l0_p3y, l0_p4x, l0_p4y)',
     )
@@ -191,8 +196,8 @@ describe('curve body renderer', () => {
   })
 
   it('a second layer at index 2 namespaces its uniforms with l2_', () => {
-    const source = renderToneCurve(2)
-    const stmts = typeof source === 'string' ? source : source.stmts
+    const source = bodySourceOf(renderToneCurve(2))
+    const stmts = source.stmts
     expect(stmts).toContain('l2_p0x')
     expect(stmts).not.toContain('l0_p0x')
   })

@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { generateSwSource, shellCacheName } from '../../../../scripts/build-sw'
 import { LUT_CACHE_NAME } from './cache'
 
@@ -12,8 +11,8 @@ import { LUT_CACHE_NAME } from './cache'
 // across releases). The build script injects the tokens at build time; these
 // tests pin the coupling so a rename on either side fails loudly.
 
-const here = path.dirname(fileURLToPath(import.meta.url))
-const swSource = readFileSync(path.resolve(here, '../../sw/sw.ts'), 'utf8')
+const here = import.meta.dirname
+const swSource = readFileSync(path.resolve(here, '../../sw/sw.ts'), 'utf-8')
 
 describe('service worker / page coupling', () => {
   it('the SW source keeps the cache-name tokens (scripts/build-sw.ts injects them)', () => {

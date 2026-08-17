@@ -19,8 +19,8 @@ import { Schema } from 'effect'
 export class ImageDecodeError extends Schema.TaggedErrorClass<ImageDecodeError>()(
   'ImageDecodeError',
   {
-    message: Schema.String,
     cause: Schema.optional(Schema.Unknown),
+    message: Schema.String,
   },
 ) {}
 
@@ -34,8 +34,8 @@ export class ImageDecodeError extends Schema.TaggedErrorClass<ImageDecodeError>(
 export class ThumbnailEncodeError extends Schema.TaggedErrorClass<ThumbnailEncodeError>()(
   'ThumbnailEncodeError',
   {
-    message: Schema.String,
     cause: Schema.optional(Schema.Unknown),
+    message: Schema.String,
   },
 ) {}
 
@@ -48,8 +48,8 @@ export class ThumbnailEncodeError extends Schema.TaggedErrorClass<ThumbnailEncod
 export class MountElementError extends Schema.TaggedErrorClass<MountElementError>()(
   'MountElementError',
   {
-    message: Schema.String,
     cause: Schema.optional(Schema.Unknown),
+    message: Schema.String,
   },
 ) {}
 
@@ -62,8 +62,8 @@ export class MountElementError extends Schema.TaggedErrorClass<MountElementError
 export class CanvasUnavailableError extends Schema.TaggedErrorClass<CanvasUnavailableError>()(
   'CanvasUnavailableError',
   {
-    message: Schema.String,
     cause: Schema.optional(Schema.Unknown),
+    message: Schema.String,
   },
 ) {}
 
@@ -76,8 +76,8 @@ export class CanvasUnavailableError extends Schema.TaggedErrorClass<CanvasUnavai
 export class EditNotFoundError extends Schema.TaggedErrorClass<EditNotFoundError>()(
   'EditNotFoundError',
   {
-    message: Schema.String,
     cause: Schema.optional(Schema.Unknown),
+    message: Schema.String,
   },
 ) {}
 
@@ -89,7 +89,7 @@ export class EditNotFoundError extends Schema.TaggedErrorClass<EditNotFoundError
 export class UnknownFieldError extends Schema.TaggedErrorClass<UnknownFieldError>()(
   'UnknownFieldError',
   {
-    message: Schema.String,
     cause: Schema.optional(Schema.Unknown),
+    message: Schema.String,
   },
 ) {}

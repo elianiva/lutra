@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import fc from 'fast-check'
+import * as fc from 'fast-check'
 import { createLayer, nextLayerId, makeRegistry, LAYER_TYPES } from './layers'
 import type { Layer, LayerType } from './layers'
 import { FieldKey } from './brands'
+import { numField, strField } from './layers/fields'
+import type { LayerFieldValue } from './layers/fields'
 import type { LayerId } from './brands'
 import {
   addLayer,
@@ -31,34 +33,27 @@ import {
 // ---- helpers ----
 
 const registry = makeRegistry({
-  exposure: renderExposure,
-  contrast: renderContrast,
-  shadows: renderShadows,
-  highlights: renderHighlights,
-  toneCurve: renderToneCurve,
-  whiteBalance: renderWhiteBalance,
-  saturation: renderSaturation,
-  colorMixer: renderColorMixer,
-  grain: renderGrain,
-  vignette: renderVignette,
   chromaticAberration: renderChromaticAberration,
   clarity: renderClarity,
+  colorMixer: renderColorMixer,
+  contrast: renderContrast,
+  exposure: renderExposure,
+  grain: renderGrain,
+  highlights: renderHighlights,
   lut: renderLut,
+  saturation: renderSaturation,
+  shadows: renderShadows,
+  toneCurve: renderToneCurve,
+  vignette: renderVignette,
+  whiteBalance: renderWhiteBalance,
 })
-
-/** Read a numeric field from a layer, typed as unknown→number. */
-function field(layer: Layer, key: FieldKey): number {
-  const record: Record<string, unknown> = layer
-  const value = record[key]
-  return typeof value === 'number' ? value : NaN
-}
 
 /**
  * The documented per-type defaults — a product contract pinned
  * independently of the registry (a default drifting in the registry
  * fails the differential check).
  */
-const DEFAULTS: Record<LayerType, Record<string, number>> = {
+const DEFAULTS = {
   exposure: { stops: 0 },
   contrast: { amount: 0 },
   shadows: { amount: 0 },
@@ -80,37 +75,37 @@ const DEFAULTS: Record<LayerType, Record<string, number>> = {
   saturation: { amount: 0 },
   // The Color Mixer: 24 fields, all zeroed (identity).
   colorMixer: {
-    redHue: 0,
-    redSaturation: 0,
-    redLuminance: 0,
-    orangeHue: 0,
-    orangeSaturation: 0,
-    orangeLuminance: 0,
-    yellowHue: 0,
-    yellowSaturation: 0,
-    yellowLuminance: 0,
-    greenHue: 0,
-    greenSaturation: 0,
-    greenLuminance: 0,
     aquaHue: 0,
-    aquaSaturation: 0,
     aquaLuminance: 0,
+    aquaSaturation: 0,
     blueHue: 0,
-    blueSaturation: 0,
     blueLuminance: 0,
-    purpleHue: 0,
-    purpleSaturation: 0,
-    purpleLuminance: 0,
+    blueSaturation: 0,
+    greenHue: 0,
+    greenLuminance: 0,
+    greenSaturation: 0,
     magentaHue: 0,
-    magentaSaturation: 0,
     magentaLuminance: 0,
+    magentaSaturation: 0,
+    orangeHue: 0,
+    orangeLuminance: 0,
+    orangeSaturation: 0,
+    purpleHue: 0,
+    purpleLuminance: 0,
+    purpleSaturation: 0,
+    redHue: 0,
+    redLuminance: 0,
+    redSaturation: 0,
+    yellowHue: 0,
+    yellowLuminance: 0,
+    yellowSaturation: 0,
   },
-  grain: { texture: 0, size: 0, blur: 0 },
+  grain: { blur: 0, size: 0, texture: 0 },
   vignette: { amount: 0, size: 0.6 },
   chromaticAberration: { amount: 0 },
   clarity: { amount: 0 },
   lut: { amount: 1 },
-}
+} satisfies Record<LayerType, Record<string, number>>
 
 const typeArb = fc.constantFrom(...LAYER_TYPES)
 
@@ -139,13 +134,12 @@ const toModelLayer = (layer: Layer): ModelLayer => {
   const params: Record<string, number> = {}
   const strings: Record<string, string> = {}
   for (const key of Object.keys(registry[layer.type].fields)) {
-    params[key] = field(layer, FieldKey(key))
+    params[key] = numField(layer, FieldKey(key))
   }
   for (const key of Object.keys(registry[layer.type].stringFields ?? {})) {
-    const record: Record<string, unknown> = layer
-    strings[key] = String(record[key])
+    strings[key] = strField(layer, FieldKey(key))
   }
-  return { id: layer.id, type: layer.type, visible: layer.visible, params, strings }
+  return { id: layer.id, params, strings, type: layer.type, visible: layer.visible }
 }
 
 /** The differential invariant: model and real chains agree on every step. */
@@ -158,24 +152,23 @@ const expectModelMatches = (model: ChainModel, real: ChainReal): void => {
     expect(r.type).toBe(m.type)
     expect(r.visible).toBe(m.visible)
     for (const [key, value] of Object.entries(m.params)) {
-      expect(field(r, FieldKey(key)), `param ${key} of ${m.type}`).toBe(value)
+      expect(numField(r, FieldKey(key)), `param ${key} of ${m.type}`).toBe(value)
     }
     for (const [key, value] of Object.entries(m.strings)) {
-      const record: Record<string, unknown> = r
-      expect(record[key]).toBe(value)
+      expect(strField(r, FieldKey(key))).toBe(value)
     }
   }
 }
 
 /** Snapshot the observable state of a chain (for the immutability checks). */
-const snapshot = (chain: ReadonlyArray<Layer>) =>
+const snapshot = (chain: readonly Layer[]) =>
   chain.map((l) => {
-    const record: Record<string, unknown> = l
+    const record: Record<string, LayerFieldValue> = l
     return {
+      fields: Object.entries(record),
       id: l.id,
       type: l.type,
       visible: l.visible,
-      fields: Object.entries(record),
     }
   })
 
@@ -189,12 +182,12 @@ class AddLayer implements fc.Command<ChainModel, ChainReal> {
     const result = addLayer(real.chain, this.type, registry)
     // The op is pure: the input chain is untouched.
     expect(snapshot(real.chain)).toEqual(before)
-    const created = result[result.length - 1]!
+    const created = result.at(-1)!
     // The new layer pins the documented defaults.
     expect(created.type).toBe(this.type)
     expect(created.visible).toBe(true)
     for (const [key, expected] of Object.entries(DEFAULTS[this.type])) {
-      expect(field(created, FieldKey(key))).toBe(expected)
+      expect(numField(created, FieldKey(key))).toBe(expected)
     }
     real.chain = result
     model.chain = [...model.chain, toModelLayer(created)]
@@ -210,7 +203,9 @@ const targetArb: fc.Arbitrary<Target> = fc.constantFrom('first', 'middle', 'last
 
 /** Pick the target id deterministically from the current model chain. */
 const pickId = (model: ChainModel, target: Target): LayerId => {
-  if (model.chain.length === 0 || target === 'missing') return nextLayerId()
+  if (model.chain.length === 0 || target === 'missing') {
+    return nextLayerId()
+  }
   const idx =
     target === 'first'
       ? 0
@@ -305,9 +300,10 @@ class UpdateParam implements fc.Command<ChainModel, ChainReal> {
   run(model: ChainModel, real: ChainReal): void {
     const input = real.chain
     const before = snapshot(input)
+    // SAFETY: the patch value is a free-form JSON field of the layer params; `never` bypasses the union exhaustiveness check a literal cannot satisfy.
     real.chain = updateLayerParam(input, {
       type: this.type,
-      // oxlint-disable-next-line consistent-type-assertions
+      // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, no-chained-type-assertions
       patch: { [this.key]: this.value } as never,
     })
     // The op is pure: the input chain is untouched.
@@ -332,7 +328,7 @@ class UpdateParam implements fc.Command<ChainModel, ChainReal> {
 
 /** One command per layer type, with a random field key and value. */
 const updateParamArb = fc
-  .tuple(typeArb, fc.nat(2), fc.double({ min: -2, max: 2, noNaN: true, noDefaultInfinity: true }))
+  .tuple(typeArb, fc.nat(2), fc.double({ max: 2, min: -2, noDefaultInfinity: true, noNaN: true }))
   .map(([type, keyIdx, value]) => {
     const keys = Object.keys(registry[type].fields)
     return new UpdateParam(type, keys[Math.min(keyIdx, keys.length - 1)]!, value)
@@ -343,7 +339,7 @@ const allCommands = fc.commands(
     typeArb.map((type) => new AddLayer(type)),
     targetArb.map((target) => new RemoveLayer(target)),
     fc
-      .tuple(targetArb, fc.integer({ min: -3, max: 10 }))
+      .tuple(targetArb, fc.integer({ max: 10, min: -3 }))
       .map(([target, i]) => new ReorderLayer(target, i)),
     targetArb.map((target) => new ToggleVisibility(target)),
     updateParamArb,
@@ -363,12 +359,11 @@ describe('createLayer', () => {
         expect(layer.type).toBe(type)
         expect(layer.visible).toBe(true)
         for (const [key, expected] of Object.entries(DEFAULTS[type])) {
-          expect(field(layer, FieldKey(key))).toBe(expected)
+          expect(numField(layer, FieldKey(key))).toBe(expected)
         }
         // String-typed fields get their registry defaults (LUT id empty).
         for (const [key, expected] of Object.entries(registry[type].stringFields ?? {})) {
-          const record: Record<string, unknown> = layer
-          expect(record[key]).toBe(expected)
+          expect(strField(layer, FieldKey(key))).toBe(expected)
         }
       }),
     )
@@ -376,7 +371,7 @@ describe('createLayer', () => {
 
   it('assigns a unique id to every layer in any sequence of creates', () => {
     fc.assert(
-      fc.property(fc.array(typeArb, { minLength: 2, maxLength: 20 }), (types) => {
+      fc.property(fc.array(typeArb, { maxLength: 20, minLength: 2 }), (types) => {
         const ids = types.map((t) => createLayer(t, registry).id)
         expect(new Set(ids).size).toBe(ids.length)
       }),
@@ -391,7 +386,8 @@ describe('createLayer', () => {
       fc.property(
         fc.string({ minLength: 1 }).filter((s) => !layerTypeNames.includes(s)),
         (type) => {
-          // oxlint-disable-next-line consistent-type-assertions -- a string that the filter proved is not a LayerType
+          // SAFETY: the fast-check filter proved the string is not a LayerType name, so createLayer must reject it.
+          // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
           expect(() => createLayer(type as LayerType, registry)).toThrow()
         },
       ),
@@ -418,7 +414,7 @@ describe('chain operations (model-based)', () => {
     fc.assert(
       fc.property(
         fc
-          .array(typeArb, { minLength: 0, maxLength: 8 })
+          .array(typeArb, { maxLength: 8, minLength: 0 })
           .map((types) => types.map((t) => createLayer(t, registry))),
         (layers) => {
           const result = replaceChain([], layers)

@@ -32,44 +32,44 @@ const LayerCommon = Schema.Struct({
 
 export const ExposureLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal('exposure'),
   stops: Schema.Number,
+  type: Schema.Literal('exposure'),
 })
 export type ExposureLayer = typeof ExposureLayer.Type
 
 export const ContrastLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal('contrast'),
   amount: Schema.Number,
+  type: Schema.Literal('contrast'),
 })
 export type ContrastLayer = typeof ContrastLayer.Type
 
 export const ShadowsLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal('shadows'),
   amount: Schema.Number,
+  type: Schema.Literal('shadows'),
 })
 export type ShadowsLayer = typeof ShadowsLayer.Type
 
 export const HighlightsLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal('highlights'),
   amount: Schema.Number,
+  type: Schema.Literal('highlights'),
 })
 export type HighlightsLayer = typeof HighlightsLayer.Type
 
 export const WhiteBalanceLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal('whiteBalance'),
   temp: Schema.Number,
   tint: Schema.Number,
+  type: Schema.Literal('whiteBalance'),
 })
 export type WhiteBalanceLayer = typeof WhiteBalanceLayer.Type
 
 export const SaturationLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal('saturation'),
   amount: Schema.Number,
+  type: Schema.Literal('saturation'),
 })
 export type SaturationLayer = typeof SaturationLayer.Type
 
@@ -80,30 +80,30 @@ export type SaturationLayer = typeof SaturationLayer.Type
 // redSaturation, redLuminance, ...
 
 const MixerChannelFields = {
-  redHue: Schema.Number,
-  redSaturation: Schema.Number,
-  redLuminance: Schema.Number,
-  orangeHue: Schema.Number,
-  orangeSaturation: Schema.Number,
-  orangeLuminance: Schema.Number,
-  yellowHue: Schema.Number,
-  yellowSaturation: Schema.Number,
-  yellowLuminance: Schema.Number,
-  greenHue: Schema.Number,
-  greenSaturation: Schema.Number,
-  greenLuminance: Schema.Number,
   aquaHue: Schema.Number,
-  aquaSaturation: Schema.Number,
   aquaLuminance: Schema.Number,
+  aquaSaturation: Schema.Number,
   blueHue: Schema.Number,
-  blueSaturation: Schema.Number,
   blueLuminance: Schema.Number,
-  purpleHue: Schema.Number,
-  purpleSaturation: Schema.Number,
-  purpleLuminance: Schema.Number,
+  blueSaturation: Schema.Number,
+  greenHue: Schema.Number,
+  greenLuminance: Schema.Number,
+  greenSaturation: Schema.Number,
   magentaHue: Schema.Number,
-  magentaSaturation: Schema.Number,
   magentaLuminance: Schema.Number,
+  magentaSaturation: Schema.Number,
+  orangeHue: Schema.Number,
+  orangeLuminance: Schema.Number,
+  orangeSaturation: Schema.Number,
+  purpleHue: Schema.Number,
+  purpleLuminance: Schema.Number,
+  purpleSaturation: Schema.Number,
+  redHue: Schema.Number,
+  redLuminance: Schema.Number,
+  redSaturation: Schema.Number,
+  yellowHue: Schema.Number,
+  yellowLuminance: Schema.Number,
+  yellowSaturation: Schema.Number,
 } as const
 
 export const ColorMixerLayer = Schema.Struct({
@@ -126,23 +126,23 @@ export type GrainLayer = typeof GrainLayer.Type
 
 export const VignetteLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal('vignette'),
   amount: Schema.Number,
   size: Schema.Number,
+  type: Schema.Literal('vignette'),
 })
 export type VignetteLayer = typeof VignetteLayer.Type
 
 export const ChromaticAberrationLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal('chromaticAberration'),
   amount: Schema.Number,
+  type: Schema.Literal('chromaticAberration'),
 })
 export type ChromaticAberrationLayer = typeof ChromaticAberrationLayer.Type
 
 export const ClarityLayer = Schema.Struct({
   ...LayerCommon.fields,
-  type: Schema.Literal('clarity'),
   amount: Schema.Number,
+  type: Schema.Literal('clarity'),
 })
 export type ClarityLayer = typeof ClarityLayer.Type
 
@@ -227,9 +227,9 @@ export const ColorMixerParams = Schema.Struct(MixerChannelFields)
 export type ColorMixerParams = typeof ColorMixerParams.Type
 
 export const GrainParams = Schema.Struct({
-  texture: Schema.Number,
-  size: Schema.Number,
   blur: Schema.Number,
+  size: Schema.Number,
+  texture: Schema.Number,
 })
 export type GrainParams = typeof GrainParams.Type
 
@@ -246,26 +246,26 @@ export const ToneCurveParams = Schema.Struct(CurvePointFields)
 export type ToneCurveParams = typeof ToneCurveParams.Type
 
 export const LutParams = Schema.Struct({
-  lutId: LutIdSchema,
   amount: Schema.Number,
+  lutId: LutIdSchema,
 })
 export type LutParams = typeof LutParams.Type
 
 // ---- patch discriminated union ----
 
 export const LayerPatch = Schema.Union([
-  Schema.Struct({ type: Schema.Literal('exposure'), patch: ExposureParams }),
-  Schema.Struct({ type: Schema.Literal('contrast'), patch: ContrastParams }),
-  Schema.Struct({ type: Schema.Literal('shadows'), patch: ShadowsParams }),
-  Schema.Struct({ type: Schema.Literal('highlights'), patch: HighlightsParams }),
-  Schema.Struct({ type: Schema.Literal('whiteBalance'), patch: WhiteBalanceParams }),
-  Schema.Struct({ type: Schema.Literal('saturation'), patch: SaturationParams }),
-  Schema.Struct({ type: Schema.Literal('colorMixer'), patch: ColorMixerParams }),
-  Schema.Struct({ type: Schema.Literal('grain'), patch: GrainParams }),
-  Schema.Struct({ type: Schema.Literal('vignette'), patch: VignetteParams }),
-  Schema.Struct({ type: Schema.Literal('chromaticAberration'), patch: ChromaticAberrationParams }),
-  Schema.Struct({ type: Schema.Literal('clarity'), patch: ClarityParams }),
-  Schema.Struct({ type: Schema.Literal('toneCurve'), patch: ToneCurveParams }),
-  Schema.Struct({ type: Schema.Literal('lut'), patch: LutParams }),
+  Schema.Struct({ patch: ExposureParams, type: Schema.Literal('exposure') }),
+  Schema.Struct({ patch: ContrastParams, type: Schema.Literal('contrast') }),
+  Schema.Struct({ patch: ShadowsParams, type: Schema.Literal('shadows') }),
+  Schema.Struct({ patch: HighlightsParams, type: Schema.Literal('highlights') }),
+  Schema.Struct({ patch: WhiteBalanceParams, type: Schema.Literal('whiteBalance') }),
+  Schema.Struct({ patch: SaturationParams, type: Schema.Literal('saturation') }),
+  Schema.Struct({ patch: ColorMixerParams, type: Schema.Literal('colorMixer') }),
+  Schema.Struct({ patch: GrainParams, type: Schema.Literal('grain') }),
+  Schema.Struct({ patch: VignetteParams, type: Schema.Literal('vignette') }),
+  Schema.Struct({ patch: ChromaticAberrationParams, type: Schema.Literal('chromaticAberration') }),
+  Schema.Struct({ patch: ClarityParams, type: Schema.Literal('clarity') }),
+  Schema.Struct({ patch: ToneCurveParams, type: Schema.Literal('toneCurve') }),
+  Schema.Struct({ patch: LutParams, type: Schema.Literal('lut') }),
 ])
 export type LayerPatch = typeof LayerPatch.Type

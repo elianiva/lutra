@@ -63,9 +63,9 @@ export type ExportError = typeof ExportError.Type
 // (./phase.ts), not model data — the source only carries the payload.
 export const SourceImage = S.Struct({
   bitmap: S.NullOr(S.instanceOf(ImageBitmap)),
-  width: S.Number,
-  height: S.Number,
   error: S.NullOr(SourceError),
+  height: S.Number,
+  width: S.Number,
 })
 export type SourceImage = typeof SourceImage.Type
 
@@ -119,9 +119,9 @@ export const EditLoadFailed = Message.m('EditLoadFailed', {
 // boundary as a validated value). lut_file is the LUT library reference —
 // the lutId brand rides it through the message boundary.
 const CatalogEntry = S.Struct({
-  name: S.String,
-  lut_file: LutIdSchema,
   category: S.String,
+  lut_file: LutIdSchema,
+  name: S.String,
   thumbnail: S.String,
 })
 export const Catalog = S.Array(CatalogEntry)
@@ -202,8 +202,8 @@ export const ToggledLayerVisibility = Message.m('ToggledLayerVisibility', {
   id: LayerIdSchema,
 })
 export const UpdatedLayerParam = Message.m('UpdatedLayerParam', {
-  id: LayerIdSchema,
   field: FieldKeySchema,
+  id: LayerIdSchema,
   value: S.Number,
 })
 export const ChangedLayerLut = Message.m('ChangedLayerLut', {
@@ -241,9 +241,9 @@ export const LutRecentsSaved = Message.m('LutRecentsSaved')
 // after a new image loaded is revoked and dropped (the model's map only
 // ever holds the current photo's thumbs).
 export const LutThumbGenerated = Message.m('LutThumbGenerated', {
+  bitmap: S.instanceOf(ImageBitmap),
   lutId: LutIdSchema,
   url: S.String,
-  bitmap: S.instanceOf(ImageBitmap),
 })
 // A per-photo LUT thumbnail failed (cube fetch, downscale, worker render, or
 // encode). The bar silently keeps the vendored generic jpg — previews are
@@ -303,8 +303,8 @@ export type CompareMode = typeof CompareMode.Type
 // position in image space (0..1), and which side Toggle currently shows.
 export const PresentState = S.Struct({
   mode: CompareMode,
-  splitAt: S.Number,
   showBefore: S.Boolean,
+  splitAt: S.Number,
 })
 export type PresentState = typeof PresentState.Type
 
@@ -329,8 +329,8 @@ export const FramePresented = Message.m('FramePresented')
 // data flow explicit: `snapshot` reads the frame the app handed it, never an
 // implicit "last session".
 export const RenderedFrame = Message.m('RenderedFrame', {
-  stamp: S.Number,
   handle: S.instanceOf(RenderHandle),
+  stamp: S.Number,
 })
 export const RenderFailed = Message.m('RenderFailed', {
   error: S.Union([CanvasUnavailableError, GpuError, LutLoadError, LutParseError]),

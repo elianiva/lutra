@@ -17,10 +17,9 @@ import { RenderHandle } from '../gpu/backend'
 
 // ---- helpers ----
 
-/** A stub handle — the scene never executes GPU work, so only its type and
- *  the bins buffer identity flow through the model. */
+// SAFETY: fabricated GPU handle stub — the scene never executes GPU work, so only its type and the bins buffer identity flow through the model; the buffer has no backing storage.
 const stubHandle = () =>
-  // oxlint-disable-next-line consistent-type-assertions
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
   new RenderHandle({} as GPUTexture, 200, 150, { buffer: {} as GPUBuffer, map: null })
 
 // A model in the Idle phase (image loaded) so RenderedFrame lands.
@@ -32,7 +31,7 @@ describe('histogram flow', () => {
   it('dispatches ReadHistogram for a rendered frame and stores the handle', () => {
     const [model, commands] = update(
       loadedModel(),
-      RenderedFrame({ stamp: 1, handle: stubHandle() }),
+      RenderedFrame({ handle: stubHandle(), stamp: 1 }),
     )
     expect(model.renderedStamp).toBe(1)
     expect(model.lastRender).not.toBeNull()
@@ -42,7 +41,7 @@ describe('histogram flow', () => {
   })
 
   it('stores bins when the readback lands fresh', () => {
-    const [withFrame] = update(loadedModel(), RenderedFrame({ stamp: 1, handle: stubHandle() }))
+    const [withFrame] = update(loadedModel(), RenderedFrame({ handle: stubHandle(), stamp: 1 }))
     const bins = new Uint32Array(256)
     bins[128] = 42
     const [model] = update(withFrame, HistogramComputed({ bins, stamp: 1 }))
@@ -50,7 +49,7 @@ describe('histogram flow', () => {
   })
 
   it('drops bins that landed after a newer mutation', () => {
-    const [withFrame] = update(loadedModel(), RenderedFrame({ stamp: 1, handle: stubHandle() }))
+    const [withFrame] = update(loadedModel(), RenderedFrame({ handle: stubHandle(), stamp: 1 }))
     // A mutation bumped the revision to 2 while the readback was in flight.
     const newer = { ...withFrame, revision: 2 }
     const [model, commands] = update(
@@ -69,9 +68,9 @@ describe('histogram flow', () => {
     const model = {
       ...loadedModel(),
       revision: 2,
-      source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
+      source: { bitmap: new MockImageBitmap(200, 150), error: null, height: 150, width: 200 },
     }
-    const [next, commands] = update(model, RenderedFrame({ stamp: 1, handle: stubHandle() }))
+    const [next, commands] = update(model, RenderedFrame({ handle: stubHandle(), stamp: 1 }))
     expect(next.lastRender).toBeNull()
     expect(next.renderPending).toBe(true)
     expect(commands.some((c) => c.name === 'RenderChain')).toBe(true)
@@ -80,7 +79,7 @@ describe('histogram flow', () => {
   })
 
   it('resets bins when the image is cleared', () => {
-    const [withFrame] = update(loadedModel(), RenderedFrame({ stamp: 1, handle: stubHandle() }))
+    const [withFrame] = update(loadedModel(), RenderedFrame({ handle: stubHandle(), stamp: 1 }))
     const [withBins] = update(
       withFrame,
       HistogramComputed({ bins: new Uint32Array(256), stamp: 1 }),
@@ -96,7 +95,7 @@ describe('histogram flow', () => {
 const sceneConfig = { update, view } as const
 
 const loadedStageMounts = [
-  Mount.resolve(PanZoom, ScaledCanvas({ scale: 1, offsetX: 0, offsetY: 0 })),
+  Mount.resolve(PanZoom, ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
   Mount.resolve(RegisterCanvas, CanvasRegistered()),
 ]
 
@@ -109,9 +108,9 @@ describe('histogram overlay view', () => {
       sceneConfig,
       given({
         ...initialModel(),
-        phase: Idle(),
-        source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
         bins,
+        phase: Idle(),
+        source: { bitmap: new MockImageBitmap(200, 150), error: null, height: 150, width: 200 },
       }),
       ...loadedStageMounts,
       sceneExpect(selector('svg polygon')).toExist(),

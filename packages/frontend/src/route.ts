@@ -1,6 +1,5 @@
-import { Schema } from 'effect'
+import { Schema, pipe } from 'effect'
 import { Route } from 'foldkit'
-import { pipe } from 'effect'
 import { EditIdSchema } from '@lutra/store'
 
 // The app is two screens behind two route arms, each owned by a Submodel

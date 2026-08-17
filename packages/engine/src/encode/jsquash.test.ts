@@ -1,16 +1,17 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import fc from 'fast-check'
+import * as fc from 'fast-check'
 import { createRequire } from 'node:module'
 import { readFile } from 'node:fs/promises'
 import * as Webp from '@jsquash/webp/encode.js'
 import * as Avif from '@jsquash/avif/encode.js'
 import { encodeImage } from './jsquash'
-import { EXPORT_SCALES, type ExportSettings } from './settings'
+import { EXPORT_SCALES } from './settings'
+import type { ExportSettings } from './settings'
 
 const require = createRequire(import.meta.url)
 
 const compileWasm = async (pkg: string, rel: string): Promise<WebAssembly.Module> =>
-  WebAssembly.compile(await readFile(require.resolve(`${pkg}/${rel}`)))
+  await WebAssembly.compile(await readFile(require.resolve(`${pkg}/${rel}`)))
 
 /**
  * Pre-init the emscripten codecs (webp/avif): their node branch cannot
@@ -50,7 +51,7 @@ const settings = (
   // The spread of Partial overrides widens the literal; the cast is the
   // deliberate escape hatch for the test's convenience.
   // oxlint-disable-next-line consistent-type-assertions
-  ({ format, quality: 75, scale: 1, ...overrides }) as ExportSettings
+  ({ format, quality: 75, scale: 1, ...overrides })
 
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
 
@@ -85,8 +86,8 @@ describe('encodeImage', () => {
     // (max(1, round(dim × scale))) must be what the encoder sees.
     await fc.assert(
       fc.asyncProperty(
-        fc.integer({ min: 1, max: 192 }),
-        fc.integer({ min: 1, max: 192 }),
+        fc.integer({ max: 192, min: 1 }),
+        fc.integer({ max: 192, min: 1 }),
         fc.constantFrom(...EXPORT_SCALES),
         async (width, height, scale) => {
           const bytes = await encodeImage(

@@ -18,7 +18,6 @@ import type { BodyRenderer } from '../types'
 // request a level.
 export const renderClarity: BodyRenderer = (i) => ({
   samplesInput: true,
-  usesSampler: true,
   stmts: `
 // clarity (local contrast)
 {
@@ -38,4 +37,5 @@ export const renderClarity: BodyRenderer = (i) => ({
   color += l${i}_amount * mask * (color - avg) * 0.5;
 }
 `,
+  usesSampler: true,
 })

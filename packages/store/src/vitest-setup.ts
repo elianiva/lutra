@@ -7,6 +7,6 @@ import 'fake-indexeddb/auto'
 // environment there is no `window`, so alias it to `globalThis` (which
 // fake-indexeddb/auto populated).
 Object.defineProperty(globalThis, 'window', {
-  value: globalThis,
   configurable: true,
+  value: globalThis,
 })

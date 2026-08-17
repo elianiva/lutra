@@ -1,11 +1,12 @@
-import { Command, Url } from 'foldkit'
+import type { Url } from 'foldkit'
+import { Command } from 'foldkit'
 import { Match, Schema as S } from 'effect'
-import { GpuBackend } from '../gpu/backend'
-import { CanvasRef } from '../gpu/canvas-ref'
-import { LutStore } from '../luts/store'
-import { ImageEncoder } from '@lutra/engine'
+import type { GpuBackend } from '../gpu/backend'
+import type { CanvasRef } from '../gpu/canvas-ref'
+import type { LutStore } from '../luts/store'
+import type { ImageEncoder } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
-import { EditStore } from '@lutra/store'
+import type { EditStore } from '@lutra/store'
 import type { RootMessage } from './message'
 import { GotGalleryMessage, GotEditorMessage } from './message'
 import type { Model } from './model'
@@ -27,10 +28,7 @@ type Resource =
   | LutThumbnailer
   | OfflineFill
 
-export type InitReturn = readonly [
-  Model,
-  ReadonlyArray<Command.Command<RootMessage, never, Resource>>,
-]
+export type InitReturn = readonly [Model, readonly Command.Command<RootMessage, never, Resource>[]]
 
 /**
  * The root's cold-load `init` (docs/adr/0009, routing-and-navigation). Parses
@@ -50,7 +48,7 @@ export const init = (url: Url.Url): InitReturn => {
   const offline = initialOffline()
 
   const commands = Match.value(route).pipe(
-    Match.withReturnType<ReadonlyArray<Command.Command<RootMessage, never, Resource>>>(),
+    Match.withReturnType<readonly Command.Command<RootMessage, never, Resource>[]>(),
     Match.when(S.is(GalleryRoute), () =>
       Command.mapMessages(galleryCommands, (message) => GotGalleryMessage({ message })),
     ),
@@ -62,10 +60,10 @@ export const init = (url: Url.Url): InitReturn => {
 
   return [
     {
-      route,
-      gallery,
       editor,
+      gallery,
       offline,
+      route,
     },
     // The offline fill's boot auto-start (docs/adr/0015): unless the device
     // asked for reduced data usage — then the card's manual start button

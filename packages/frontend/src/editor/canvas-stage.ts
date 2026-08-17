@@ -1,8 +1,8 @@
 import { Effect, Match, Schema as S, Stream, Queue } from 'effect'
 import { Mount } from 'foldkit'
 import type { Html, HtmlBuilder } from 'foldkit/html'
-import { Eye, EyeOff, SquareSplitHorizontal, Columns2, type IconNode } from 'lucide'
-import type { EditorMessage } from './message'
+import { Eye, EyeOff, SquareSplitHorizontal, Columns2 } from 'lucide'
+import type { IconNode } from 'lucide'
 import {
   FilePickRequested,
   ScaledCanvas,
@@ -10,8 +10,8 @@ import {
   CanvasRegistered,
   ChangedCompareMode,
   ChangedSplitPosition,
-  type CompareMode,
 } from './message'
+import type { EditorMessage, CompareMode } from './message'
 import { Empty, ErrorState, hasImage, Loading } from './phase'
 import { canvasRef, registerCanvas } from '../gpu/canvas-ref'
 import { MountElementError } from '../errors'
@@ -25,7 +25,9 @@ const ZOOM_SPEED = 0.01
  *  assertion so the linter's assertion ban stays satisfied. Shared with the
  *  LUT bar's wheel mount (lut-bar.ts). */
 export const asHtmlElement = (element: Element): HTMLElement => {
-  if (element instanceof HTMLElement) return element
+  if (element instanceof HTMLElement) {
+    return element
+  }
   throw new MountElementError({ message: 'PanZoom stage must be an HTMLElement' })
 }
 
@@ -41,13 +43,13 @@ export const asHtmlElement = (element: Element): HTMLElement => {
  */
 export const PanZoom = Mount.defineStream(
   'PanZoom',
-  { imageWidth: S.Number, imageHeight: S.Number },
+  { imageHeight: S.Number, imageWidth: S.Number },
   ScaledCanvas,
 )(
   ({ imageWidth, imageHeight }) =>
     (element) =>
       Stream.callback<typeof ScaledCanvas.Type>((queue) =>
-        Effect.gen(function* () {
+        Effect.gen(function* PanZoom() {
           const stage = asHtmlElement(element)
           const state = {
             scale: 1,
@@ -76,19 +78,23 @@ export const PanZoom = Mount.defineStream(
           // Last single tap (time + position), for double-tap detection.
           let lastTap = { at: 0, x: 0, y: 0 }
           const emit = (scale: number, offsetX: number, offsetY: number) =>
-            Queue.offerUnsafe(queue, ScaledCanvas({ scale, offsetX, offsetY }))
+            Queue.offerUnsafe(queue, ScaledCanvas({ offsetX, offsetY, scale }))
 
           /** Scale + offsets that center the content in the stage. */
           const fitToStage = () => {
             const rect = stage.getBoundingClientRect()
-            if (rect.width === 0 || rect.height === 0) return null
-            const content = contentSize() ?? { width: imageWidth, height: imageHeight }
-            if (content.width === 0 || content.height === 0) return null
+            if (rect.width === 0 || rect.height === 0) {
+              return null
+            }
+            const content = contentSize() ?? { height: imageHeight, width: imageWidth }
+            if (content.width === 0 || content.height === 0) {
+              return null
+            }
             const scale = Math.min(rect.width / content.width, rect.height / content.height, 1)
             return {
-              scale,
               offsetX: (rect.width - content.width * scale) / 2,
               offsetY: (rect.height - content.height * scale) / 2,
+              scale,
             }
           }
 
@@ -103,18 +109,26 @@ export const PanZoom = Mount.defineStream(
            */
           const contentSize = () => {
             const container = stage.firstElementChild
-            if (!container) return null
+            if (!container) {
+              return null
+            }
             const width = container.clientWidth
             const height = container.clientHeight
-            if (width === 0 || height === 0) return null
-            return { width, height }
+            if (width === 0 || height === 0) {
+              return null
+            }
+            return { height, width }
           }
 
           /** Re-fit the view, unless the user has taken over (zoomed/panned). */
           const refit = () => {
-            if (state.touched) return
+            if (state.touched) {
+              return
+            }
             const fit = fitToStage()
-            if (!fit) return
+            if (!fit) {
+              return
+            }
             state.scale = fit.scale
             state.offsetX = fit.offsetX
             state.offsetY = fit.offsetY
@@ -160,7 +174,9 @@ export const PanZoom = Mount.defineStream(
           const toggleZoom = () => {
             if (state.scale > 1.02) {
               const fit = fitToStage()
-              if (!fit) return
+              if (!fit) {
+                return
+              }
               state.touched = false
               state.scale = fit.scale
               state.offsetX = fit.offsetX
@@ -173,7 +189,9 @@ export const PanZoom = Mount.defineStream(
             }
           }
           const onDown = (e: PointerEvent) => {
-            if (e.button !== 0) return
+            if (e.button !== 0) {
+              return
+            }
             state.touched = true
             pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
             if (pointers.size === 1) {
@@ -204,16 +222,18 @@ export const PanZoom = Mount.defineStream(
               const rect = stage.getBoundingClientRect()
               pinch = {
                 startDist: Math.max(1, Math.hypot(a!.x - b!.x, a!.y - b!.y)),
-                startScale: state.scale,
-                startOffsetX: state.offsetX,
-                startOffsetY: state.offsetY,
                 startMidX: (a!.x + b!.x) / 2 - rect.left,
                 startMidY: (a!.y + b!.y) / 2 - rect.top,
+                startOffsetX: state.offsetX,
+                startOffsetY: state.offsetY,
+                startScale: state.scale,
               }
             }
           }
           const onMove = (e: PointerEvent) => {
-            if (!pointers.has(e.pointerId)) return
+            if (!pointers.has(e.pointerId)) {
+              return
+            }
             pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
             if (pinch && pointers.size === 2) {
               // Pinch: the content under the start midpoint stays under the
@@ -231,7 +251,9 @@ export const PanZoom = Mount.defineStream(
               emit(state.scale, state.offsetX, state.offsetY)
               return
             }
-            if (!state.dragging) return
+            if (!state.dragging) {
+              return
+            }
             state.offsetX += e.clientX - state.lastX
             state.offsetY += e.clientY - state.lastY
             state.lastX = e.clientX
@@ -266,7 +288,9 @@ export const PanZoom = Mount.defineStream(
           // a no-op (same values).
           const container = stage.firstElementChild
           const contentObserver = container ? new ResizeObserver(refit) : null
-          if (contentObserver && container) contentObserver.observe(container)
+          if (contentObserver && container) {
+            contentObserver.observe(container)
+          }
 
           yield* Effect.acquireRelease(
             Effect.sync(() => {
@@ -278,7 +302,7 @@ export const PanZoom = Mount.defineStream(
               // Mouse double-click zooms too (touch double-tap is handled in
               // onDown — browsers don't fire dblclick for touch reliably).
               stage.addEventListener('dblclick', toggleZoom)
-              return { onWheel, onDown, onMove, onUp, resizeObserver, contentObserver }
+              return { contentObserver, onDown, onMove, onUp, onWheel, resizeObserver }
             }),
             ({ onWheel, onDown, onMove, onUp, resizeObserver, contentObserver }) =>
               Effect.sync(() => {
@@ -316,7 +340,7 @@ export const RegisterCanvas = Mount.define(
   'RegisterCanvas',
   CanvasRegistered,
 )((element) =>
-  Effect.gen(function* () {
+  Effect.gen(function* RegisterCanvas() {
     if (element instanceof HTMLCanvasElement) {
       yield* registerCanvas(canvasRef, element)
     }
@@ -339,7 +363,7 @@ export const CompareDivider = Mount.defineStream(
   ChangedSplitPosition,
 )((element) =>
   Stream.callback<typeof ChangedSplitPosition.Type>((queue) =>
-    Effect.gen(function* () {
+    Effect.gen(function* CompareDivider() {
       const divider = asHtmlElement(element)
       const container = divider.parentElement
       const emit = (position: number) =>
@@ -348,7 +372,9 @@ export const CompareDivider = Mount.defineStream(
       let dragging = false
 
       const onDown = (e: PointerEvent) => {
-        if (e.button !== 0) return
+        if (e.button !== 0) {
+          return
+        }
         // The stage's pan/zoom mount listens on the stage element; stopping
         // the event here keeps a divider grab from becoming a pan.
         e.stopPropagation()
@@ -356,9 +382,13 @@ export const CompareDivider = Mount.defineStream(
         divider.setPointerCapture(e.pointerId)
       }
       const onMove = (e: PointerEvent) => {
-        if (!dragging || !container) return
+        if (!dragging || !container) {
+          return
+        }
         const rect = container.getBoundingClientRect()
-        if (rect.width === 0) return
+        if (rect.width === 0) {
+          return
+        }
         emit((e.clientX - rect.left) / rect.width)
       }
       const onUp = (e: PointerEvent) => {
@@ -373,7 +403,7 @@ export const CompareDivider = Mount.defineStream(
           divider.addEventListener('pointermove', onMove)
           divider.addEventListener('pointerup', onUp)
           divider.addEventListener('dblclick', onDblClick)
-          return { onDown, onMove, onUp, onDblClick }
+          return { onDblClick, onDown, onMove, onUp }
         }),
         ({ onDown, onMove, onUp, onDblClick }) =>
           Effect.sync(() => {
@@ -423,22 +453,22 @@ const splitDivider = (h: HtmlBuilder<EditorMessage>, model: Model) =>
           h.Class(
             'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 border border-ink bg-panel',
           ),
-          h.Style({ width: `${12 / model.scale}px`, height: `${12 / model.scale}px` }),
+          h.Style({ height: `${12 / model.scale}px`, width: `${12 / model.scale}px` }),
         ],
         [],
       ),
     ],
   )
 
-const COMPARE_MODES: ReadonlyArray<{
+const COMPARE_MODES: readonly {
   readonly mode: CompareMode
   readonly label: string
   readonly icon: IconNode
-}> = [
-  { mode: 'off', label: 'Off', icon: EyeOff },
-  { mode: 'toggle', label: 'Toggle', icon: Eye },
-  { mode: 'split', label: 'Split', icon: SquareSplitHorizontal },
-  { mode: 'side-by-side', label: 'Side by side', icon: Columns2 },
+}[] = [
+  { icon: EyeOff, label: 'Off', mode: 'off' },
+  { icon: Eye, label: 'Toggle', mode: 'toggle' },
+  { icon: SquareSplitHorizontal, label: 'Split', mode: 'split' },
+  { icon: Columns2, label: 'Side by side', mode: 'side-by-side' },
 ]
 
 /**
@@ -540,11 +570,15 @@ const HISTOGRAM_HEIGHT = 110
  * model's bins, like every other piece of UI.
  */
 const histogramOverlay = (h: HtmlBuilder<EditorMessage>, bins: Uint32Array | null) => {
-  if (!bins) return null
+  if (!bins) {
+    return null
+  }
 
   let max = 0
   for (let i = 0; i < 256; i++) {
-    if (bins[i]! > max) max = bins[i]!
+    if (bins[i]! > max) {
+      max = bins[i]!
+    }
   }
 
   // Area polygon: the bin curve left→right, then the bottom edge back to
@@ -611,7 +645,7 @@ const loadedStage = (h: HtmlBuilder<EditorMessage>, model: Model) => {
       // touch-none: the browser must not hijack touch gestures into
       // scroll/zoom — pointer pan and pinch own the stage (docs/adr/0024-mobile-ui).
       h.Class('absolute inset-0 touch-none'),
-      h.OnMount(PanZoom({ imageWidth: contentWidth, imageHeight: src.height })),
+      h.OnMount(PanZoom({ imageHeight: src.height, imageWidth: contentWidth })),
     ],
     [
       h.div(

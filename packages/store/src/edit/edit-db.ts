@@ -13,7 +13,7 @@ import { EditTable } from './edit-table'
  * store; later schema changes append versions via `.add`.
  */
 export const EditDbSchema = IndexedDbDatabase.make(IndexedDbVersion.make(EditTable), (toQuery) =>
-  Effect.gen(function* () {
+  Effect.gen(function* EditDbSchema() {
     yield* toQuery.createObjectStore(EditTable.tableName)
     yield* toQuery.createIndex(EditTable.tableName, 'saved_at')
   }),

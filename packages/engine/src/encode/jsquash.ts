@@ -1,3 +1,4 @@
+import { Match } from 'effect'
 import type { ExportSettings } from './settings'
 
 /**
@@ -15,32 +16,34 @@ export const encodeImage = async (
     // oxlint-disable-next-line ts-no-dynamic-import
     const { default: resize } = await import('@jsquash/resize')
     source = await resize(image, {
-      width: Math.max(1, Math.round(image.width * settings.scale)),
       height: Math.max(1, Math.round(image.height * settings.scale)),
       method: 'lanczos3',
+      width: Math.max(1, Math.round(image.width * settings.scale)),
     })
   }
   const quality = settings.quality ?? 75
-  switch (settings.format) {
-    case 'png': {
+
+  return await Match.value(settings.format).pipe(
+    Match.when('png', async () => {
       // oxlint-disable-next-line ts-no-dynamic-import -- lazy codec load
       const { encode } = await import('@jsquash/png')
       return new Uint8Array(await encode(source))
-    }
-    case 'jpeg': {
+    }),
+    Match.when('jpeg', async () => {
       // oxlint-disable-next-line ts-no-dynamic-import -- lazy codec load
       const { encode } = await import('@jsquash/jpeg')
       return new Uint8Array(await encode(source, { quality }))
-    }
-    case 'webp': {
+    }),
+    Match.when('webp', async () => {
       // oxlint-disable-next-line ts-no-dynamic-import -- lazy codec load
       const { encode } = await import('@jsquash/webp')
       return new Uint8Array(await encode(source, { quality }))
-    }
-    case 'avif': {
+    }),
+    Match.when('avif', async () => {
       // oxlint-disable-next-line ts-no-dynamic-import -- lazy codec load
       const { encode } = await import('@jsquash/avif')
       return new Uint8Array(await encode(source, { quality }))
-    }
-  }
+    }),
+    Match.exhaustive,
+  )
 }

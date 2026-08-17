@@ -142,9 +142,9 @@ describe('Error state', () => {
       phase: ErrorState(),
       source: {
         bitmap: null,
-        width: 0,
-        height: 0,
         error: new ImageDecodeError({ message: 'Failed to decode image' }),
+        height: 0,
+        width: 0,
       },
     }
     scene(
@@ -162,9 +162,9 @@ describe('Error state', () => {
       phase: ErrorState(),
       source: {
         bitmap: null,
-        width: 0,
-        height: 0,
         error: new ImageDecodeError({ message: 'Something went wrong' }),
+        height: 0,
+        width: 0,
       },
     }
     scene(
@@ -201,6 +201,7 @@ describe('Image decode flow', () => {
   it('decodes a selected file and transitions to loaded state', () => {
     const bitmap = new MockImageBitmap(200, 150)
 
+    // SAFETY: handle/buffer are fabricated stubs — the scene never executes GPU work, so only their types flow through the model.
     scene(
       config,
       given(initialModel()),
@@ -210,7 +211,7 @@ describe('Image decode flow', () => {
 
       Command.resolve(
         DecodeImage,
-        ImageDecoded({ bitmap, width: 200, height: 150, source: new Uint8Array([1]) }),
+        ImageDecoded({ bitmap, height: 150, source: new Uint8Array([1]), width: 200 }),
       ),
 
       // Empty chain → the passthrough render presents the source on the
@@ -223,15 +224,15 @@ describe('Image decode flow', () => {
         RenderChain,
         RenderedFrame({
           stamp: 1,
-          // oxlint-disable-next-line consistent-type-assertions
+          // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
           handle: new RenderHandle({} as GPUTexture, 200, 150, {
-            // oxlint-disable-next-line consistent-type-assertions
+            // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
             buffer: {} as GPUBuffer,
             map: null,
           }),
         }),
       ),
-      Mount.resolve(PanZoom, ScaledCanvas({ scale: 1, offsetX: 0, offsetY: 0 })),
+      Mount.resolve(PanZoom, ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
       Mount.resolve(RegisterCanvas, CanvasRegistered()),
       // The RenderedFrame handler dispatches ReadHistogram for the frame;
       // the scene resolves it so the session ends cleanly.

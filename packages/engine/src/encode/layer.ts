@@ -14,8 +14,8 @@ export const ImageEncoderLive = Layer.succeed(
   ImageEncoder.of({
     encode: ({ image, settings }) =>
       Effect.tryPromise({
-        try: () => encodeImage(image, settings),
-        catch: (cause) => new EncodeError({ message: errMsg(cause), cause }),
+        catch: (cause) => new EncodeError({ cause, message: errMsg(cause) }),
+        try: async () => await encodeImage(image, settings),
       }),
   }),
 )

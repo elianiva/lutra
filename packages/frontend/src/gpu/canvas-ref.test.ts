@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { Effect, Fiber, Option, Ref, Scope, Stream } from 'effect'
+import type { Scope } from 'effect'
+import { Effect, Fiber, Option, Ref, Stream } from 'effect'
 import { CanvasRegistered } from '../editor/message'
 import { RegisterCanvas } from '../editor/canvas-stage'
 import { canvasRef } from './canvas-ref'
@@ -12,10 +13,8 @@ import { canvasRef } from './canvas-ref'
 
 /** Fork the mount's stream like the runtime's insert hook and wait until the
  *  registration has landed in the shared ref. */
-const mountCanvas = (
-  element: Element,
-): Effect.Effect<Fiber.Fiber<void, never>, never, Scope.Scope> =>
-  Effect.gen(function* () {
+const mountCanvas = (element: Element): Effect.Effect<Fiber.Fiber<void>, never, Scope.Scope> =>
+  Effect.gen(function* mountCanvas() {
     const fiber = yield* Effect.forkScoped(
       Stream.runForEach(RegisterCanvas().f(element), () => Effect.void),
     )
@@ -23,7 +22,9 @@ const mountCanvas = (
     for (let i = 0; i < 100; i++) {
       yield* Effect.yieldNow
       current = yield* Ref.get(canvasRef)
-      if (Option.isSome(current) && current.value === element) break
+      if (Option.isSome(current) && current.value === element) {
+        break
+      }
     }
     return fiber
   })
@@ -34,7 +35,7 @@ describe('RegisterCanvas mount', () => {
 
     const registered = await Effect.runPromise(
       Effect.scoped(
-        Effect.gen(function* () {
+        Effect.gen(function* registered() {
           yield* mountCanvas(el)
           return yield* Ref.get(canvasRef)
         }),
@@ -54,7 +55,7 @@ describe('RegisterCanvas mount', () => {
     const messages = await Effect.runPromise(
       Effect.scoped(
         Stream.runCollect(Stream.take(RegisterCanvas().f(el), 1)).pipe(
-          Effect.map((chunk) => Array.from(chunk)),
+          Effect.map((chunk) => [...chunk]),
         ),
       ),
     )
@@ -67,7 +68,7 @@ describe('RegisterCanvas mount', () => {
 
     const afterUnmount = await Effect.runPromise(
       Effect.scoped(
-        Effect.gen(function* () {
+        Effect.gen(function* afterUnmount() {
           const fiber = yield* mountCanvas(el)
           // Unmount: the runtime interrupts the mount's fiber, which closes
           // the mount scope and runs the registration's release finalizer.
@@ -86,7 +87,7 @@ describe('RegisterCanvas mount', () => {
 
     const afterFirstUnmount = await Effect.runPromise(
       Effect.scoped(
-        Effect.gen(function* () {
+        Effect.gen(function* afterFirstUnmount() {
           const firstFiber = yield* mountCanvas(first)
           // A newer canvas mounts and replaces the ref.
           const secondFiber = yield* mountCanvas(second)

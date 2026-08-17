@@ -31,7 +31,7 @@ export const thumb = (
   online: boolean,
   onPick: () => EditorMessage,
 ) => {
-  const unavailable = online === false && downloadState !== 'downloaded'
+  const unavailable = !online && downloadState !== 'downloaded'
   return h.button(
     [
       h.OnClick(onPick()),

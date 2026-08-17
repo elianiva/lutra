@@ -6,10 +6,9 @@
 // rasterizer; re-run this script when the SVG changes.
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { Resvg } from '@resvg/resvg-js'
 
-const here = path.dirname(fileURLToPath(import.meta.url))
+const here = import.meta.dirname
 const icons = path.resolve(here, '../packages/frontend/public/icons')
 
 // One entry per iOS device family: the physical splash pixels and the media
@@ -105,7 +104,7 @@ export const splashSvg = (svg: string, w: number, h: number): string => {
 }
 
 const run = async (): Promise<void> => {
-  const svg = await readFile(path.join(icons, 'icon.svg'), 'utf8')
+  const svg = await readFile(path.join(icons, 'icon.svg'), 'utf-8')
   const sizes = [
     ['icon-192.png', 192],
     ['icon-512.png', 512],

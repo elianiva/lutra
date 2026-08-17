@@ -2,17 +2,19 @@ import { Effect, Match, Option, Schema as S } from 'effect'
 import { Command } from 'foldkit'
 import { pushUrl } from 'foldkit/navigation'
 import { evo } from 'foldkit/struct'
-import { EditStore, EditIdSchema } from '@lutra/store'
-import { GpuBackend } from '../gpu/backend'
-import { CanvasRef } from '../gpu/canvas-ref'
-import { LutStore } from '../luts/store'
-import { LutThumbnailer } from '../thumbs/worker-layer'
-import { ImageEncoder } from '@lutra/engine'
+import type { EditStore } from '@lutra/store'
+import { EditIdSchema } from '@lutra/store'
+import type { GpuBackend } from '../gpu/backend'
+import type { CanvasRef } from '../gpu/canvas-ref'
+import type { LutStore } from '../luts/store'
+import type { LutThumbnailer } from '../thumbs/worker-layer'
+import type { ImageEncoder } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import type { RootMessage } from './message'
 import { GotGalleryMessage, GotEditorMessage, NavigatedTo } from './message'
 import type { Model } from './model'
-import { GalleryRoute, EditorRoute, type AppRoute } from '../route'
+import { GalleryRoute, EditorRoute } from '../route'
+import type { AppRoute } from '../route'
 import * as Gallery from '../gallery'
 import * as Editor from '../editor'
 import { offlineMachine } from '../offline/machine'
@@ -21,8 +23,8 @@ import {
   OfflineFileFetching,
   OfflineFileDownloaded,
   OfflineConnectivityChanged,
-  type EditorMessage,
 } from '../editor/message'
+import type { EditorMessage } from '../editor/message'
 import { StartOfflineFill, DismissOfflineToast } from './offline-command'
 import type { OfflineFill } from '../offline/fill'
 
@@ -38,7 +40,7 @@ type Resource =
 
 export type UpdateReturn = readonly [
   Model,
-  ReadonlyArray<Command.Command<RootMessage, never, Resource>>,
+  readonly Command.Command<RootMessage, never, Resource>[],
 ]
 
 /** Push the editor URL for an Edit the user opened from the gallery. The URL
@@ -46,8 +48,8 @@ export type UpdateReturn = readonly [
  *  Command is just the side effect that starts it. */
 const NavigateToEdit = Command.define('NavigateToEdit', {
   args: { id: EditIdSchema },
-  messages: [NavigatedTo],
   execute: ({ id }) => pushUrl(`/edit/${id}`).pipe(Effect.as(NavigatedTo())),
+  messages: [NavigatedTo],
 })
 
 const withRoute = (model: Model, route: Model['route']) => evo(model, { route: (_) => route })

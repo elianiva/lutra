@@ -21,7 +21,6 @@ import type { BodyRenderer } from '../types'
 // direction.
 export const renderChromaticAberration: BodyRenderer = (i) => ({
   samplesInput: true,
-  usesSampler: true,
   stmts: `
 // chromatic aberration (radial)
 {
@@ -35,4 +34,5 @@ export const renderChromaticAberration: BodyRenderer = (i) => ({
   color.b = textureSampleLevel(srcTex, samp, uv - dir * shift, 0.0).b;
 }
 `,
+  usesSampler: true,
 })

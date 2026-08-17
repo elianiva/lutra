@@ -15,15 +15,15 @@ import { EditIdSchema } from './edit-id'
  * rendering.
  */
 export const Edit = S.Struct({
-  /** Stable identity; never changes (Save updates in place, Save as forks a new id). */
-  id: EditIdSchema,
   /** The committed adjustment chain (engine's `Layer` schema). */
   chain: S.Array(Layer),
+  /** Stable identity; never changes (Save updates in place, Save as forks a new id). */
+  id: EditIdSchema,
+  /** Timestamp ordering the gallery. */
+  savedAt: S.Number,
   /** Encoded source-image bytes the editor grades. */
   source: S.Uint8Array,
   /** Encoded thumbnail bytes of the graded result (what the gallery tile shows). */
   thumbnail: S.Uint8Array,
-  /** Timestamp ordering the gallery. */
-  savedAt: S.Number,
 })
 export type Edit = typeof Edit.Type

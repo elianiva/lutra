@@ -19,7 +19,7 @@ import type { LutThumbRequest, LutThumbResponse } from './worker'
  * preview in every non-success case, so the failure set has no consumer —
  * the command treats "no thumb" and "thumb" uniformly.
  */
-export interface LutThumbnailerShape {
+export interface LutThumbnailerContract {
   /**
    * Render one 200×200 LUT preview: apply `cube` to the photo in a pool
    * worker and resolve with the JPEG bytes. The photo is downscaled to the
@@ -39,7 +39,7 @@ export interface LutThumbnailerShape {
   ) => Effect.Effect<Option.Option<Uint8Array>>
 }
 
-export class LutThumbnailer extends Context.Service<LutThumbnailer, LutThumbnailerShape>()(
+export class LutThumbnailer extends Context.Service<LutThumbnailer, LutThumbnailerContract>()(
   'LutThumbnailer',
 ) {}
 
@@ -60,6 +60,13 @@ const LUT_THUMB_SIZE = 200
  */
 const thumbImageData = (bitmap: ImageBitmap): Effect.Effect<ImageData, ThumbnailEncodeError> =>
   Effect.tryPromise({
+    catch: (cause) =>
+      cause instanceof ThumbnailEncodeError
+        ? cause
+        : new ThumbnailEncodeError({
+            cause,
+            message: 'Failed to downscale the photo for LUT previews',
+          }),
     try: async () => {
       const w = bitmap.width
       const h = bitmap.height
@@ -68,7 +75,9 @@ const thumbImageData = (bitmap: ImageBitmap): Effect.Effect<ImageData, Thumbnail
       const sh = LUT_THUMB_SIZE / scale
       const canvas = new OffscreenCanvas(LUT_THUMB_SIZE, LUT_THUMB_SIZE)
       const ctx = canvas.getContext('2d')
-      if (!ctx) throw new ThumbnailEncodeError({ message: '2d context unavailable' })
+      if (!ctx) {
+        throw new ThumbnailEncodeError({ message: '2d context unavailable' })
+      }
       ctx.drawImage(
         bitmap,
         (w - sw) / 2,
@@ -82,24 +91,17 @@ const thumbImageData = (bitmap: ImageBitmap): Effect.Effect<ImageData, Thumbnail
       )
       return ctx.getImageData(0, 0, LUT_THUMB_SIZE, LUT_THUMB_SIZE)
     },
-    catch: (cause) =>
-      cause instanceof ThumbnailEncodeError
-        ? cause
-        : new ThumbnailEncodeError({
-            message: 'Failed to downscale the photo for LUT previews',
-            cause,
-          }),
   })
 
 export const LutThumbnailerLive = Layer.effect(
   LutThumbnailer,
-  Effect.gen(function* () {
+  Effect.gen(function* LutThumbnailerLive() {
     // The pool: 4 workers, or the machine's core count, whichever is lower
     // (a single-core machine degrades to the pre-pool one-worker behavior).
     // Each worker lazily instantiates its own jSquash wasm on first use;
     // the browser caches it after the first group.
     const poolSize = Math.min(4, Math.max(1, navigator.hardwareConcurrency ?? 2))
-    const workers: Array<Worker> = []
+    const workers: Worker[] = []
 
     // id -> the Deferred awaiting it plus the worker serving it, so a
     // worker crash fails only its own requests. Cleared by each request's
@@ -124,7 +126,7 @@ export const LutThumbnailerLive = Layer.effect(
     const roundRobinRef = yield* Ref.make(0)
 
     const spawn = (index: number): Worker => {
-      const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
+      const worker = new Worker(new URL('worker.ts', import.meta.url), { type: 'module' })
       worker.onmessage = onMessage
       worker.onerror = onError(index)
       return worker
@@ -143,8 +145,12 @@ export const LutThumbnailerLive = Layer.effect(
         }).pipe(
           Effect.flatMap((pending) => {
             const entry = pending.get(id)
-            if (!entry) return Effect.void
-            if (bytes) return Deferred.succeed(entry.deferred, bytes)
+            if (!entry) {
+              return Effect.void
+            }
+            if (bytes) {
+              return Deferred.succeed(entry.deferred, bytes)
+            }
             return Deferred.fail(entry.deferred, new Error(error ?? 'LUT thumbnail failed'))
           }),
         ),
@@ -161,7 +167,7 @@ export const LutThumbnailerLive = Layer.effect(
       void Effect.runFork(
         Ref.modify(pendingRef, (pending) => {
           const rest = new Map(pending)
-          const failed: Array<Deferred.Deferred<Uint8Array, Error>> = []
+          const failed: Deferred.Deferred<Uint8Array, Error>[] = []
           for (const [id, entry] of pending) {
             if (entry.worker === index) {
               rest.delete(id)
@@ -176,22 +182,30 @@ export const LutThumbnailerLive = Layer.effect(
           ]
         }).pipe(
           Effect.flatten,
-          Effect.tap(() => Effect.sync(() => workers[index]!.terminate())),
+          Effect.tap(() =>
+            Effect.sync(() => {
+              workers[index]!.terminate()
+            }),
+          ),
           Effect.tap(() => Effect.sync(() => (workers[index] = spawn(index)))),
         ),
       )
     }
 
-    for (let i = 0; i < poolSize; i++) workers.push(spawn(i))
+    for (let i = 0; i < poolSize; i++) {
+      workers.push(spawn(i))
+    }
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
-        for (const worker of workers) worker.terminate()
+        for (const worker of workers) {
+          worker.terminate()
+        }
       }),
     )
 
     return LutThumbnailer.of({
       render: (lutId, bitmap, cube) =>
-        Effect.gen(function* () {
+        Effect.gen(function* render() {
           // Downscale once per photo: the slot is keyed by bitmap identity,
           // so a group's concurrent commands share one canvas-2D op. The
           // ImageData is then structured-cloned into each request — one
@@ -202,7 +216,9 @@ export const LutThumbnailerLive = Layer.effect(
             image = cached.value.image
           } else {
             const downscaled = yield* thumbImageData(bitmap).pipe(Effect.option)
-            if (Option.isNone(downscaled)) return Option.none()
+            if (Option.isNone(downscaled)) {
+              return Option.none()
+            }
             image = downscaled.value
             yield* Ref.set(downscaleRef, Option.some({ bitmap, image }))
           }
@@ -213,12 +229,16 @@ export const LutThumbnailerLive = Layer.effect(
           // lutId is not deduped — the stale batch may still be running, but
           // its results are bitmap-guarded away by update.
           const before = yield* Ref.getAndUpdate(inFlightRef, (m) => {
-            if (m.get(lutId) === bitmap) return m
+            if (m.get(lutId) === bitmap) {
+              return m
+            }
             const next = new Map(m)
             next.set(lutId, bitmap)
             return next
           })
-          if (before.get(lutId) === bitmap) return Option.none()
+          if (before.get(lutId) === bitmap) {
+            return Option.none()
+          }
 
           const id = yield* Ref.getAndUpdate(nextIdRef, (n) => n + 1)
           const deferred = yield* Deferred.make<Uint8Array, Error>()
@@ -226,7 +246,7 @@ export const LutThumbnailerLive = Layer.effect(
           yield* Ref.update(pendingRef, (pending) =>
             new Map(pending).set(id, { deferred, worker: index }),
           )
-          const request: LutThumbRequest = { id, image, cube }
+          const request: LutThumbRequest = { cube, id, image }
           workers[index]!.postMessage(request)
 
           const result = yield* Deferred.await(deferred).pipe(Effect.option)
@@ -236,7 +256,9 @@ export const LutThumbnailerLive = Layer.effect(
           // The remove is conditional so a newer batch's registration for
           // the same lutId (a different photo) is never clobbered.
           yield* Ref.update(inFlightRef, (m) => {
-            if (m.get(lutId) !== bitmap) return m
+            if (m.get(lutId) !== bitmap) {
+              return m
+            }
             const next = new Map(m)
             next.delete(lutId)
             return next

@@ -37,13 +37,13 @@ const config = {
   view,
 } as const
 
-/** A model with a rendered frame — the precondition for the export dialog. */
+// SAFETY: model with a fabricated GPU handle stub — only its stamp travels into the dialog UI; buffer has no backing storage.
 const loadedModel = () => ({
   ...initialModel(),
   phase: Idle(),
-  source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
+  source: { bitmap: new MockImageBitmap(200, 150), error: null, height: 150, width: 200 },
   renderedStamp: 1,
-  // oxlint-disable-next-line consistent-type-assertions
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
   lastRender: new RenderHandle({} as GPUTexture, 200, 150, { buffer: {} as GPUBuffer, map: null }),
 })
 
@@ -51,7 +51,7 @@ const loadedModel = () => ({
 const exportImage = new ImageData(200, 150)
 
 const mountLoadedStage = [
-  Mount.resolve(PanZoom, ScaledCanvas({ scale: 1, offsetX: 0, offsetY: 0 })),
+  Mount.resolve(PanZoom, ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
   Mount.resolve(RegisterCanvas, CanvasRegistered()),
 ]
 

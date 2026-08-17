@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import fc from 'fast-check'
+import * as fc from 'fast-check'
 import { Schema } from 'effect'
 import {
   EXPORT_FORMATS,
@@ -15,7 +15,7 @@ import {
 
 const formatArb = fc.constantFrom(...EXPORT_FORMATS)
 const scaleArb = fc.constantFrom(...EXPORT_SCALES)
-const qualityArb = fc.oneof(fc.constant(null), fc.integer({ min: 0, max: 100 }))
+const qualityArb = fc.oneof(fc.constant(null), fc.integer({ max: 100, min: 0 }))
 
 /** Any payload the schema accepts. */
 const validSettingsArb = fc.record({
@@ -50,8 +50,8 @@ describe('ExportSettings', () => {
           format: formatArb,
           // Just outside the [0, 100] window, and a non-number quality.
           quality: fc.oneof(
-            fc.integer({ min: -1000, max: -1 }),
-            fc.integer({ min: 101, max: 1000 }),
+            fc.integer({ max: -1, min: -1000 }),
+            fc.integer({ max: 1000, min: 101 }),
             fc.string(),
           ),
           scale: scaleArb,
@@ -67,7 +67,7 @@ describe('ExportSettings', () => {
     const formatNames: readonly string[] = EXPORT_FORMATS
     fc.assert(
       fc.property(
-        fc.string({ minLength: 1, maxLength: 12 }).filter((s) => !formatNames.includes(s)),
+        fc.string({ maxLength: 12, minLength: 1 }).filter((s) => !formatNames.includes(s)),
         (format) => {
           expect(() =>
             Schema.decodeUnknownSync(ExportSettings)({ format, quality: null, scale: 1 }),

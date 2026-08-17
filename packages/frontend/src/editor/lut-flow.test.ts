@@ -13,7 +13,8 @@ import {
   text,
   expect as sceneExpect,
 } from 'foldkit/scene'
-import { LutId, type LayerType } from '@lutra/engine'
+import { LutId } from '@lutra/engine'
+import type { LayerType } from '@lutra/engine'
 import { EditId } from '@lutra/store'
 import { MockImageBitmap } from '../vitest-setup'
 import { RenderHandle } from '../gpu/backend'
@@ -61,23 +62,22 @@ const lutBw = LutId('luts/bw/agfa_apx_100.cube')
 
 const catalog: Catalog = [
   {
-    name: 'Kodak 2393 Cuspclip',
-    lut_file: lutPrint,
     category: 'Print',
+    lut_file: lutPrint,
+    name: 'Kodak 2393 Cuspclip',
     thumbnail: 'thumbnails/print/kodak_2393_cuspclip.jpg',
   },
   {
-    name: 'Agfa APX 100',
-    lut_file: lutBw,
     category: 'Bw',
+    lut_file: lutBw,
+    name: 'Agfa APX 100',
     thumbnail: 'thumbnails/bw/agfa_apx_100.jpg',
   },
 ]
 
-/** A stub handle — the tests never execute GPU work, so only its type flows
- *  through the model (same pattern as histogram-flow.test.ts). */
+// SAFETY: fabricated GPU handle stub — tests never execute GPU work, so only its type flows through the model; the buffer has no backing storage and is never read.
 const stubHandle = () =>
-  // oxlint-disable-next-line consistent-type-assertions
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
   new RenderHandle({} as GPUTexture, 200, 150, { buffer: {} as GPUBuffer, map: null })
 
 const editId = () => EditId('11111111-1111-4111-8111-111111111111')
@@ -85,15 +85,15 @@ const editId = () => EditId('11111111-1111-4111-8111-111111111111')
 /** A model in the Idle phase with a loaded image and the catalog. */
 const loaded = () => ({
   ...initialModel(),
-  phase: Idle(),
   catalog,
-  source: { bitmap: new MockImageBitmap(200, 150), width: 200, height: 150, error: null },
+  phase: Idle(),
+  source: { bitmap: new MockImageBitmap(200, 150), error: null, height: 150, width: 200 },
 })
 
 /** Settle the in-flight render the way RenderedFrame does, so the next
  *  renderNow dispatches a fresh RenderChain (assertable in tests). */
 const settled = (model: Model): Model =>
-  update(model, RenderedFrame({ stamp: model.revision, handle: stubHandle() }))[0]
+  update(model, RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
 
 /** A LUT draft (Drafting phase, bar open, no render in flight). */
 const lutDraft = () => settled(update(loaded(), SelectedTool({ type: 'lut' }))[0])
@@ -107,7 +107,9 @@ const selectedLutWithExposure = () => {
   const [withExposure] = update(committed, SelectedTool({ type: 'exposure' }))
   const [done] = update(withExposure, ConfirmedDraft())
   const lutLayer = done.chain.find((l) => l.type === 'lut')
-  if (!lutLayer) throw new Error('fixture: expected a lut layer')
+  if (!lutLayer) {
+    throw new Error('fixture: expected a lut layer')
+  }
   return update(done, SelectedLayer({ id: lutLayer.id }))[0]
 }
 
@@ -208,7 +210,7 @@ describe('LUT bar preview (hover)', () => {
 
   it('hover without an image is ignored', () => {
     const [model, commands] = update(
-      { ...initialModel(), phase: Idle(), catalog },
+      { ...initialModel(), catalog, phase: Idle() },
       PreviewedLut({ lutId: lutBw }),
     )
     expect(model.previewLut).toBeNull()
@@ -255,7 +257,7 @@ describe('LUT bar commit + recents', () => {
     )
     expect(model.previewLut).toBeNull()
     expect(model.lutRecents).toEqual([lutBw])
-    expect(model.chain[0]).toMatchObject({ type: 'lut', lutId: lutBw })
+    expect(model.chain[0]).toMatchObject({ lutId: lutBw, type: 'lut' })
     expect(commands.some((c) => c.name === 'SaveLutRecents')).toBe(true)
   })
 
@@ -295,7 +297,7 @@ describe('LUT bar commit + recents', () => {
 })
 
 describe('per-photo LUT thumbnails (lazy generation)', () => {
-  const genIds = (commands: ReadonlyArray<{ name: string; args?: Record<string, unknown> }>) =>
+  const genIds = (commands: readonly { name: string; args?: Readonly<{ lutId?: string }> }[]) =>
     commands.filter((c) => c.name === 'GenerateLutThumb').map((c) => c.args?.lutId)
 
   it('a LUT draft auto-open generates the visible group', () => {
@@ -342,7 +344,7 @@ describe('per-photo LUT thumbnails (lazy generation)', () => {
     const model = lutDraft()
     const [next] = update(
       model,
-      LutThumbGenerated({ lutId: lutBw, url: 'blob:thumb', bitmap: model.source.bitmap! }),
+      LutThumbGenerated({ bitmap: model.source.bitmap!, lutId: lutBw, url: 'blob:thumb' }),
     )
     expect(next.lutThumbs[lutBw]).toBe('blob:thumb')
   })
@@ -351,7 +353,7 @@ describe('per-photo LUT thumbnails (lazy generation)', () => {
     const model = lutDraft()
     const [next, commands] = update(
       model,
-      LutThumbGenerated({ lutId: lutBw, url: 'blob:stale', bitmap: new MockImageBitmap(1, 1) }),
+      LutThumbGenerated({ bitmap: new MockImageBitmap(1, 1), lutId: lutBw, url: 'blob:stale' }),
     )
     expect(next.lutThumbs[lutBw]).toBeUndefined()
     const revoke = commands.find((c) => c.name === 'RevokeLutThumbs')
@@ -363,12 +365,12 @@ describe('per-photo LUT thumbnails (lazy generation)', () => {
     const [next, commands] = update(
       model,
       EditLoaded({
-        id: editId(),
-        chain: [],
         bitmap: new MockImageBitmap(200, 150),
-        width: 200,
+        chain: [],
         height: 150,
+        id: editId(),
         source: new Uint8Array([9]),
+        width: 200,
       }),
     )
     expect(next.lutThumbs).toEqual({})
@@ -384,57 +386,61 @@ describe('per-photo LUT thumbnails (lazy generation)', () => {
 })
 
 describe('preview cleanup on bar-closing transitions', () => {
-  const closingTransitions: ReadonlyArray<{
+  const closingTransitions: readonly {
     readonly name: string
     readonly make: () => Model
     readonly fire: (model: Model) => Model
-  }> = [
+  }[] = [
     {
-      name: 'SelectedTool (new draft context)',
-      make: selectedLut,
       fire: (m) => update(m, SelectedTool({ type: 'exposure' }))[0],
+      make: selectedLut,
+      name: 'SelectedTool (new draft context)',
     },
-    { name: 'ConfirmedDraft', make: lutDraft, fire: (m) => update(m, ConfirmedDraft())[0] },
-    { name: 'CancelledDraft', make: lutDraft, fire: (m) => update(m, CancelledDraft())[0] },
+    { fire: (m) => update(m, ConfirmedDraft())[0], make: lutDraft, name: 'ConfirmedDraft' },
+    { fire: (m) => update(m, CancelledDraft())[0], make: lutDraft, name: 'CancelledDraft' },
     {
-      name: 'SelectedLayer (another layer)',
-      make: selectedLutWithExposure,
       fire: (m) => {
         const other = m.chain.find((l) => l.type !== 'lut')
-        if (!other) throw new Error('fixture: expected a non-lut layer')
+        if (!other) {
+          throw new Error('fixture: expected a non-lut layer')
+        }
         return update(m, SelectedLayer({ id: other.id }))[0]
       },
+      make: selectedLutWithExposure,
+      name: 'SelectedLayer (another layer)',
     },
     {
-      name: 'RemovedLayer',
-      make: selectedLut,
       fire: (m) => {
         const lut = m.chain.find((l) => l.type === 'lut')
-        if (!lut) throw new Error('fixture: expected a lut layer')
+        if (!lut) {
+          throw new Error('fixture: expected a lut layer')
+        }
         return update(m, RemovedLayer({ id: lut.id }))[0]
       },
+      make: selectedLut,
+      name: 'RemovedLayer',
     },
-    { name: 'ClearedImage', make: lutDraft, fire: (m) => update(m, ClearedImage())[0] },
+    { fire: (m) => update(m, ClearedImage())[0], make: lutDraft, name: 'ClearedImage' },
     {
-      name: 'EditLoaded',
-      make: lutDraft,
       fire: (m) =>
         update(
           m,
           EditLoaded({
-            id: editId(),
-            chain: [],
             bitmap: new MockImageBitmap(200, 150),
-            width: 200,
+            chain: [],
             height: 150,
+            id: editId(),
             source: new Uint8Array([9]),
+            width: 200,
           }),
         )[0],
+      make: lutDraft,
+      name: 'EditLoaded',
     },
     {
-      name: 'ToggledLutPicker (closing)',
-      make: lutDraft,
       fire: (m) => update(m, ToggledLutPicker())[0],
+      make: lutDraft,
+      name: 'ToggledLutPicker (closing)',
     },
   ]
 
@@ -450,12 +456,12 @@ describe('persistence-during-preview dismissal', () => {
   /** A LUT draft on a save-ready editor (attached record + rendered frame). */
   const saveReady = () => ({
     ...initialModel(),
-    phase: Idle(),
-    catalog,
-    source: { bitmap: new MockImageBitmap(640, 480), width: 640, height: 480, error: null },
-    lastRender: stubHandle(),
-    renderedStamp: 1,
     attachedEdit: { id: null, source: new Uint8Array([1, 2, 3]) },
+    catalog,
+    lastRender: stubHandle(),
+    phase: Idle(),
+    renderedStamp: 1,
+    source: { bitmap: new MockImageBitmap(640, 480), error: null, height: 480, width: 640 },
   })
 
   const hoveredDraft = () => {
@@ -529,12 +535,12 @@ describe('catalog load state (LUT card status slot)', () => {
 const sceneConfig = { update, view } as const
 
 const stageMounts = [
-  Mount.resolve(PanZoom, ScaledCanvas({ scale: 1, offsetX: 0, offsetY: 0 })),
+  Mount.resolve(PanZoom, ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
   Mount.resolve(RegisterCanvas, CanvasRegistered()),
 ]
 
 const resolveRender = () => [
-  Command.resolve(RenderChain, RenderedFrame({ stamp: 999, handle: stubHandle() })),
+  Command.resolve(RenderChain, RenderedFrame({ handle: stubHandle(), stamp: 999 })),
   Command.resolve(ReadHistogram, HistogramComputed({ bins: new Uint32Array(256), stamp: 999 })),
 ]
 
@@ -641,8 +647,10 @@ describe('LUT bar view', () => {
 
   it('bar thumbs show the vendored generic jpg until the per-photo preview lands', () => {
     const model = lutDraft()
-    const bitmap = model.source.bitmap
-    if (!bitmap) throw new Error('fixture: expected a bitmap')
+    const { bitmap } = model.source
+    if (!bitmap) {
+      throw new Error('fixture: expected a bitmap')
+    }
     scene(
       sceneConfig,
       given(model),
@@ -657,7 +665,7 @@ describe('LUT bar view', () => {
       click(role('button', { name: 'Bw' })),
       Command.resolve(
         GenerateLutThumb,
-        LutThumbGenerated({ lutId: lutBw, url: 'blob:photo', bitmap }),
+        LutThumbGenerated({ bitmap, lutId: lutBw, url: 'blob:photo' }),
       ),
       sceneExpect(role('img', { name: 'Agfa APX 100' })).toHaveAttr('src', 'blob:photo'),
       Command.expectNone(),

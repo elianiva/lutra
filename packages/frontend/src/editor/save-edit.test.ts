@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { Option } from 'effect'
-import { Command } from 'foldkit'
+import type { Command } from 'foldkit'
 import {
   Command as SceneCommand,
   Mount,
@@ -38,22 +38,23 @@ const id = () => EditId('11111111-1111-4111-8111-111111111111')
 const otherId = () => EditId('22222222-2222-4222-8222-222222222222')
 const bitmap = (width = 640, height = 480) => new MockImageBitmap(width, height)
 const source = () => new Uint8Array([1, 2, 3])
+// SAFETY: fabricated GPU handle stub — tests never execute GPU work, so only its type flows through the model; the buffer has no backing storage and is never read.
 const handle = () =>
-  // oxlint-disable-next-line consistent-type-assertions
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
   new RenderHandle({} as GPUTexture, 200, 150, { buffer: {} as GPUBuffer, map: null })
 
 /** An editor with a loaded, rendered image and an attached-edit record. */
 const loaded = (attached: { id: EditId | null; source: Uint8Array }) => ({
   ...initialModel(),
-  phase: Idle(),
-  source: { bitmap: bitmap(), width: 640, height: 480, error: null },
-  lastRender: handle(),
-  renderedStamp: 1,
   attachedEdit: attached,
+  lastRender: handle(),
+  phase: Idle(),
+  renderedStamp: 1,
+  source: { bitmap: bitmap(), error: null, height: 480, width: 640 },
 })
 
 /** The SaveEdit command among a command list, if one was dispatched. */
-const saveEditOf = (commands: ReadonlyArray<Command.Command<unknown, unknown, unknown>>) =>
+const saveEditOf = (commands: readonly Command.Command<unknown, unknown, unknown>[]) =>
   commands.find((c) => c.name === 'SaveEdit')
 
 // ---- tests ----
@@ -147,7 +148,7 @@ describe('editor: save flow (Save / Save as)', () => {
   it('ImageDecoded records the picked bytes as an unattached source record', () => {
     const [model] = update(
       { ...initialModel(), phase: Loading() },
-      ImageDecoded({ bitmap: bitmap(), width: 640, height: 480, source: source() }),
+      ImageDecoded({ bitmap: bitmap(), height: 480, source: source(), width: 640 }),
     )
     expect(model.attachedEdit).toEqual({ id: null, source: source() })
     expect(model.saveStatus).toEqual({ _tag: 'idle' })
@@ -157,12 +158,12 @@ describe('editor: save flow (Save / Save as)', () => {
     const [model] = update(
       initialModel(),
       EditLoaded({
-        id: id(),
-        chain: [],
         bitmap: bitmap(),
-        width: 640,
+        chain: [],
         height: 480,
+        id: id(),
         source: source(),
+        width: 640,
       }),
     )
     expect(model.attachedEdit).toEqual({ id: id(), source: source() })
@@ -186,7 +187,7 @@ const config = {
 // The canvas stage mounts these when an image is showing; resolve them so the
 // scene ends cleanly (as in file-picker.test.ts).
 const settleCanvasMounts = [
-  Mount.resolve(PanZoom, { _tag: 'ScaledCanvas', scale: 1, offsetX: 0, offsetY: 0 }),
+  Mount.resolve(PanZoom, { _tag: 'ScaledCanvas', offsetX: 0, offsetY: 0, scale: 1 }),
   Mount.resolve(RegisterCanvas, { _tag: 'CanvasRegistered' }),
 ] as const
 

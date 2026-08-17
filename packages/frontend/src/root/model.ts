@@ -14,9 +14,9 @@ import { Offline } from '../offline/model'
  * download states reach the editor's LUT bar through the root's delegation).
  */
 export const Model = S.Struct({
-  route: AppRoute,
-  gallery: GalleryModel,
   editor: EditorModel,
+  gallery: GalleryModel,
   offline: Offline,
+  route: AppRoute,
 })
 export type Model = typeof Model.Type

@@ -1,6 +1,5 @@
-import { Submodel } from 'foldkit'
+import { Submodel, AsyncData } from 'foldkit'
 import type { HtmlBuilder } from 'foldkit/html'
-import { AsyncData } from 'foldkit'
 import { ClickedEdit, DeleteRequested, OpenPhotoRequested, RefreshRequested } from './message'
 import type { GalleryMessage } from './message'
 import type { Model } from './model'
@@ -17,7 +16,7 @@ import type { EditSummary, EditId, StoreError } from '@lutra/store'
  * thumbnail contract (docs/adr/0007).
  */
 export const view = Submodel.defineView<Model, GalleryMessage>((model, h) => {
-  const grid = model.grid
+  const { grid } = model
   return h.div(
     [h.Class('flex h-full flex-col bg-bg text-ink')],
     [
@@ -66,15 +65,15 @@ const header = (h: HtmlBuilder<GalleryMessage>) =>
 
 const gridBody = (
   h: HtmlBuilder<GalleryMessage>,
-  grid: AsyncData.AsyncData<ReadonlyArray<EditSummary>, StoreError>,
+  grid: AsyncData.AsyncData<readonly EditSummary[], StoreError>,
 ) =>
   AsyncData.match(grid, {
+    onFailure: (error) => errorState(h, error.message),
     onIdle: () => spinner(h),
     onLoading: () => spinner(h),
     onRefreshing: () => spinner(h),
-    onSuccess: (summaries) => (summaries.length === 0 ? emptyState(h) : gridTiles(h, summaries)),
-    onFailure: (error) => errorState(h, error.message),
     onStale: () => spinner(h),
+    onSuccess: (summaries) => (summaries.length === 0 ? emptyState(h) : gridTiles(h, summaries)),
   })
 
 const spinner = (h: HtmlBuilder<GalleryMessage>) =>
@@ -112,7 +111,7 @@ const errorState = (h: HtmlBuilder<GalleryMessage>, error: string) =>
     ],
   )
 
-const gridTiles = (h: HtmlBuilder<GalleryMessage>, summaries: ReadonlyArray<EditSummary>) =>
+const gridTiles = (h: HtmlBuilder<GalleryMessage>, summaries: readonly EditSummary[]) =>
   h.div(
     [h.Class('grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4 p-4')],
     summaries.map((summary) => tile(h, summary)),
@@ -139,9 +138,7 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) =>
         [
           h.span(
             [h.Class('text-[10px] text-white/80')],
-            [
-              `${Number(summary.savedAt) > 0 ? new Date(summary.savedAt).toLocaleDateString() : ''}`,
-            ],
+            [Number(summary.savedAt) > 0 ? new Date(summary.savedAt).toLocaleDateString() : ''],
           ),
           h.div(
             [h.Class('flex items-center gap-1')],
@@ -172,9 +169,8 @@ const tileThumb = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) => {
   let url = thumbnailUrlCache.get(summary.id)
   const bytes = summary.thumbnail
   if (!url && bytes) {
-    // The bytes' buffer came from the store as a transferred ArrayBuffer; TS
-    // can't know that, hence the BlobPart assertion (as in PrepareExport).
-    // oxlint-disable-next-line consistent-type-assertions
+    // SAFETY: the store hands back the thumbnail bytes as a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
+    // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
     const blob = new Blob([bytes as BlobPart], { type: 'image/png' })
     url = URL.createObjectURL(blob)
     thumbnailUrlCache.set(summary.id, url)
