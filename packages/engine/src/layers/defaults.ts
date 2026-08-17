@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
 import { nextLayerId } from './id'
 import type { LayerEntry } from './registry'
-import type { Layer, LayerType } from './schemas'
+import type { LayerType } from './schemas'
 
 /**
  * A layer factory was asked for a type the registry does not define. The
