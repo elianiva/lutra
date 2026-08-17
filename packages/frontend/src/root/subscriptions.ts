@@ -20,7 +20,7 @@ import type { RootMessage } from './message' /**
 export const subscriptions = Subscription.make<Model, RootMessage, OfflineFill>()((_entry) => ({
   connectivity: Subscription.persistent(
     Stream.callback<RootMessage>((queue) =>
-      Effect.fn('connectivity')(function* () {
+      Effect.gen(function* () {
         const emit = (online: boolean) => Queue.offerUnsafe(queue, ConnectivityChanged({ online }))
         // The initial state, then the browser's events.
         emit(globalThis.navigator === undefined ? true : navigator.onLine)
@@ -39,7 +39,7 @@ export const subscriptions = Subscription.make<Model, RootMessage, OfflineFill>(
             }),
         )
         return yield* Effect.never
-      })(),
+      }),
     ),
   ),
   offlineFill: Subscription.persistent(

@@ -23,7 +23,7 @@ import { OfflineReadyDismissed, StoragePersisted } from '../offline/messages'
  */
 export const StartOfflineFill = Command.define('StartOfflineFill', {
   args: { requirePersist: S.Boolean },
-  execute: Effect.fn('execute')(function* ({ requirePersist }) {
+  execute: ({ requirePersist }) => Effect.gen(function* () {
     const fill = yield* OfflineFill
     const persisted = yield* Effect.tryPromise(
       async () => await navigator.storage.persist(),

@@ -11,7 +11,7 @@ import type { EncodeRequest, EncodeResponse } from './worker'
  */
 export const ImageEncoderWorkerLive = Layer.effect(
   ImageEncoder,
-  Effect.fn('ImageEncoderWorkerLive')(function* () {
+  Effect.gen(function* () {
     const worker = new Worker(new URL('worker.ts', import.meta.url), { type: 'module' })
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
@@ -64,7 +64,7 @@ export const ImageEncoderWorkerLive = Layer.effect(
     }
 
     return ImageEncoder.of({
-      encode: Effect.fn('encode')(function* ({ image, settings }) {
+      encode: ({ image, settings }) => Effect.gen(function* () {
         const id = yield* Ref.getAndUpdate(nextIdRef, (n) => n + 1)
         const deferred = yield* Deferred.make<Uint8Array, EncodeError>()
         yield* Ref.update(pendingRef, (pending) => new Map(pending).set(id, deferred))
@@ -73,5 +73,5 @@ export const ImageEncoderWorkerLive = Layer.effect(
         return yield* Deferred.await(deferred)
       }),
     })
-  })(),
+  }),
 )

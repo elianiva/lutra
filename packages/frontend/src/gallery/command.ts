@@ -19,7 +19,7 @@ import {
  * an error state.
  */
 export const ListEdits = Command.define('ListEdits', {
-  execute: Effect.fn('execute')(function* () {
+  execute: Effect.gen(function* () {
     const store = yield* EditStore
     const summaries = yield* store.list()
     return EditsListed({ summaries })
@@ -36,7 +36,7 @@ export const ListEdits = Command.define('ListEdits', {
  */
 export const DeleteEdit = Command.define('DeleteEdit', {
   args: { id: EditIdSchema },
-  execute: Effect.fn('execute')(function* ({ id }) {
+  execute: ({ id }) => Effect.gen(function* () {
     const store = yield* EditStore
     yield* store.delete(id)
     return EditDeleted()
@@ -47,8 +47,6 @@ export const DeleteEdit = Command.define('DeleteEdit', {
   ),
   messages: [EditDeleted, DeleteFailed],
 })
-
-// ---- open a photo (new edit) ----
 
 /** The accepted image types for the native picker (mirrors the editor's `PickImageFile`). */
 const IMAGE_TYPES = ['image/*', '.jpg', '.jpeg', '.png', '.webp', '.avif']
@@ -73,7 +71,7 @@ const thumbnailBytes = (
   file: File,
   maxDim = 320,
 ): Effect.Effect<Uint8Array, ImageDecodeError | ThumbnailEncodeError> =>
-  Effect.fn('thumbnailBytes')(function* () {
+  Effect.gen(function* () {
     const bitmap = yield* Effect.tryPromise({
       catch: (cause) =>
         new ImageDecodeError({
@@ -112,7 +110,7 @@ const thumbnailBytes = (
     } finally {
       bitmap.close()
     }
-  })()
+  })
 
 /**
  * The gallery's "open a photo" flow (mirrors the mobile main menu): open the
@@ -124,7 +122,7 @@ const thumbnailBytes = (
  * dropping the photo.
  */
 export const OpenPhoto = Command.define('OpenPhoto', {
-  execute: Effect.fn('execute')(function* () {
+  execute: Effect.gen(function* () {
     const picked = yield* FoldkitFile.select(IMAGE_TYPES)
     if (Option.isNone(picked)) {
       return PhotoPickCancelled()

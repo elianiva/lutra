@@ -8,8 +8,6 @@ import type { LutCube, LutId } from '@lutra/engine'
 // startup) and per-cube bytes (fetched on demand, parsed once per lutId,
 // then memoized). The engine stays pure — it only parses text it is given.
 
-// ---- catalog ----
-
 /** One entry of the upstream film_luts.json, verbatim. */
 export interface LutCatalogEntry {
   readonly name: string
@@ -18,8 +16,6 @@ export interface LutCatalogEntry {
   readonly category: string
   readonly thumbnail: string
 }
-
-// ---- errors ----
 
 /**
  * The LUT library could not be loaded — an HTTP failure of the catalog or a
@@ -31,8 +27,6 @@ export class LutLoadError extends Schema.TaggedErrorClass<LutLoadError>()('LutLo
   cause: Schema.optional(Schema.Unknown),
   message: Schema.String,
 }) {}
-
-// ---- service ----
 
 export interface LutStoreContract {
   /** The LUT library catalog (film_luts.json). Memoized; failures are not cached. */
@@ -95,7 +89,7 @@ const parseCatalog = (text: string): Effect.Effect<readonly LutCatalogEntry[], L
  */
 export const LutStoreLive = Layer.effect(
   LutStore,
-  Effect.fn('LutStoreLive')(function* () {
+  Effect.gen(function* () {
     const catalogRef = yield* Ref.make<
       Option.Option<Effect.Effect<readonly LutCatalogEntry[], LutLoadError>>
     >(Option.none())
@@ -104,7 +98,7 @@ export const LutStoreLive = Layer.effect(
     )
 
     return LutStore.of({
-      getCatalog: Effect.fn('getCatalog')(function* () {
+      getCatalog: () => Effect.gen(function* () {
         const cached = yield* Ref.get(catalogRef)
           if (Option.isSome(cached)) {
             return yield* cached.value
@@ -120,7 +114,7 @@ export const LutStoreLive = Layer.effect(
         return yield* effect
       }),
 
-      getCube: Effect.fn('getCube')(function* (lutId) {
+      getCube: (lutId) => Effect.gen(function* () {
         const cached = yield* Ref.get(cubeCacheRef).pipe(Effect.map((cache) => cache.get(lutId)))
           if (cached) {
             return yield* cached
@@ -144,5 +138,5 @@ export const LutStoreLive = Layer.effect(
         return yield* effect
       }),
     })
-  })(),
+  }),
 )

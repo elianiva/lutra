@@ -79,7 +79,7 @@ export const createLayerFor = (type: LayerType) => createLayer(type, ENGINE_REGI
  */
 export const CreateLayer = Command.define('CreateLayer', {
   args: { type: Schema.Literals(LAYER_TYPES) },
-  execute: Effect.fn('execute')(function* ({ type }) {
+  execute: ({ type }) => Effect.gen(function* () {
     const layer = yield* createLayerFor(type)
     return LayerCreated({ layer })
   }).pipe(
@@ -131,7 +131,7 @@ export const PickImageFile = Command.define('PickImageFile', {
  */
 export const DecodeImage = Command.define('DecodeImage', {
   args: { file: Schema.instanceOf(File) },
-  execute: Effect.fn('execute')(function* ({ file }) {
+  execute: ({ file }) => Effect.gen(function* () {
     // Read the picked file's stored bytes alongside the decode: they are
     // the Edit's source image, so a later Save-as-new can persist them
     // without holding the File (the store's carrier is bytes).
@@ -174,7 +174,7 @@ export const DecodeImage = Command.define('DecodeImage', {
  */
 export const LoadEdit = Command.define('LoadEdit', {
   args: { id: EditIdSchema },
-  execute: Effect.fn('execute')(function* ({ id }) {
+  execute: ({ id }) => Effect.gen(function* () {
     const store = yield* EditStore
     const maybeEdit = yield* store.load(id)
     if (Option.isNone(maybeEdit)) {
@@ -272,7 +272,7 @@ export const SaveEdit = Command.define('SaveEdit', {
     id: Schema.NullOr(EditIdSchema),
     source: Schema.Uint8Array,
   },
-  execute: Effect.fn('execute')(function* ({ id, chain, source, handle }) {
+  execute: ({ id, chain, source, handle }) => Effect.gen(function* () {
     const backend = yield* GpuBackend
     const frame = yield* backend.snapshot(handle)
     const thumbnail = yield* thumbnailFromFrame(frame)
@@ -299,7 +299,7 @@ export const SaveEdit = Command.define('SaveEdit', {
  * the app doesn't know.
  */
 export const LoadCatalog = Command.define('LoadCatalog', {
-  execute: Effect.fn('execute')(function* () {
+  execute: Effect.gen(function* () {
     const store = yield* LutStore
     const catalog = yield* store.getCatalog()
     return CatalogLoaded({ catalog })
@@ -319,7 +319,7 @@ export const LoadCatalog = Command.define('LoadCatalog', {
 const resolveLuts = (
   layers: readonly Layer[],
 ): Effect.Effect<ReadonlyMap<LutId, LutCube>, LutLoadError | LutParseError, LutStore> =>
-  Effect.fn('resolveLuts')(function* () {
+  Effect.gen(function* () {
     const store = yield* LutStore
     const luts = new Map<LutId, LutCube>()
     for (const layer of layers) {
@@ -333,7 +333,7 @@ const resolveLuts = (
       luts.set(layer.lutId, cube)
     }
     return luts
-  })()
+  })
 
 /**
  * Render the current chain (plus an optional draft appended last) through
@@ -361,7 +361,7 @@ export const RenderChain = Command.define('RenderChain', {
     // blit applies the current mode and split position.
     present: PresentState,
   },
-  execute: Effect.fn('execute')(function* ({ layers, draft, bitmap, stamp, present }) {
+  execute: ({ layers, draft, bitmap, stamp, present }) => Effect.gen(function* () {
     yield* Render.afterCommit
     // The canvas is registered into the CanvasRef service when it mounts;
     // resolve it from the app context instead of a global DOM query. The
@@ -407,7 +407,7 @@ export const RenderChain = Command.define('RenderChain', {
  */
 export const PresentFrame = Command.define('PresentFrame', {
   args: { present: PresentState },
-  execute: Effect.fn('execute')(function* ({ present }) {
+  execute: ({ present }) => Effect.gen(function* () {
     yield* Render.afterCommit
     const canvasRef = yield* CanvasRef
     const canvas = yield* Ref.get(canvasRef)
@@ -437,7 +437,7 @@ export const PresentFrame = Command.define('PresentFrame', {
  */
 export const ReadHistogram = Command.define('ReadHistogram', {
   args: { handle: Schema.instanceOf(RenderHandle), stamp: Schema.Number },
-  execute: Effect.fn('execute')(function* ({ handle, stamp }) {
+  execute: ({ handle, stamp }) => Effect.gen(function* () {
     const backend = yield* GpuBackend
     const bins = yield* backend.readHistogram(handle)
     return HistogramComputed({ bins, stamp })
@@ -460,7 +460,7 @@ const EXPORT_SETTINGS_KEY = 'exportSettings'
  */
 export const SnapshotForExport = Command.define('SnapshotForExport', {
   args: { handle: Schema.instanceOf(RenderHandle) },
-  execute: Effect.fn('execute')(function* ({ handle }) {
+  execute: ({ handle }) => Effect.gen(function* () {
     const backend = yield* GpuBackend
     const image = yield* backend.snapshot(handle)
     return ExportSnapshotted({ image })
@@ -484,7 +484,7 @@ export const PrepareExport = Command.define('PrepareExport', {
     previousUrl: Schema.NullOr(Schema.String),
     settings: ExportSettings,
   },
-  execute: Effect.fn('execute')(function* ({ image, settings, previousUrl }) {
+  execute: ({ image, settings, previousUrl }) => Effect.gen(function* () {
     if (previousUrl) {
       yield* Effect.sync(() => {
         URL.revokeObjectURL(previousUrl)
@@ -532,7 +532,7 @@ export const RevokeExportUrl = Command.define('RevokeExportUrl', {
 
 /** Restore persisted export settings (dispatched once at startup). */
 export const LoadExportSettings = Command.define('LoadExportSettings', {
-  execute: Effect.fn('execute')(function* () {
+  execute: Effect.gen(function* () {
     const store = yield* Persistence.KeyValueStore
     const schemaStore = Persistence.toSchemaStore(store, ExportSettings)
     // `Effect.option` wraps the success (itself an Option) — flatten.
@@ -550,7 +550,7 @@ export const LoadExportSettings = Command.define('LoadExportSettings', {
 /** Persist export settings (fired on every change; localStorage is cheap). */
 export const SaveExportSettings = Command.define('SaveExportSettings', {
   args: { settings: ExportSettings },
-  execute: Effect.fn('execute')(function* ({ settings }) {
+  execute: ({ settings }) => Effect.gen(function* () {
     const store = yield* Persistence.KeyValueStore
     yield* Persistence.toSchemaStore(store, ExportSettings)
       .set(EXPORT_SETTINGS_KEY, settings)
@@ -567,7 +567,7 @@ const LUT_RECENTS_KEY = 'lutRecents'
 /** Restore persisted LUT recents (dispatched once at startup, like
  *  LoadExportSettings). Missing or corrupt recents fall back to []. */
 export const LoadLutRecents = Command.define('LoadLutRecents', {
-  execute: Effect.fn('execute')(function* () {
+  execute: Effect.gen(function* () {
     const store = yield* Persistence.KeyValueStore
     const schemaStore = Persistence.toSchemaStore(store, Schema.Array(LutIdSchema))
     // `Effect.option` wraps the success (itself an Option) — flatten.
@@ -580,7 +580,7 @@ export const LoadLutRecents = Command.define('LoadLutRecents', {
 /** Persist LUT recents (fired on every bump; localStorage is cheap). */
 export const SaveLutRecents = Command.define('SaveLutRecents', {
   args: { recents: Schema.Array(LutIdSchema) },
-  execute: Effect.fn('execute')(function* ({ recents }) {
+  execute: ({ recents }) => Effect.gen(function* () {
     const store = yield* Persistence.KeyValueStore
     yield* Persistence.toSchemaStore(store, Schema.Array(LutIdSchema))
       .set(LUT_RECENTS_KEY, recents)
@@ -608,7 +608,7 @@ export const GenerateLutThumb = Command.define('GenerateLutThumb', {
     bitmap: Schema.instanceOf(ImageBitmap),
     lutId: LutIdSchema,
   },
-  execute: Effect.fn('execute')(function* ({ lutId, bitmap }) {
+  execute: ({ lutId, bitmap }) => Effect.gen(function* () {
     const store = yield* LutStore
     const thumbs = yield* LutThumbnailer
     const cube = yield* store.getCube(lutId).pipe(Effect.option)
