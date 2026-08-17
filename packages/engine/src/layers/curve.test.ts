@@ -177,16 +177,16 @@ describe('curve body renderer', () => {
   const bodySourceOf = (source: string | BodySource): BodySource =>
     Schema.is(Schema.String)(source) ? { stmts: source } : source
 
-  it('emits the piecewise-linear evaluator and per-channel application', () => {
+  it('emits the monotone cubic Hermite spline evaluator and per-channel application', () => {
     const source = bodySourceOf(renderToneCurve(0))
     const stmts = source.stmts
     const helpers = source.helpers ?? ''
-    expect(stmts).toContain(
-      'curveEval(srgb.r, l0_p0x, l0_p0y, l0_p1x, l0_p1y, l0_p2x, l0_p2y, l0_p3x, l0_p3y, l0_p4x, l0_p4y)',
-    )
-    expect(stmts).toContain('curveEval(srgb.g,')
-    expect(stmts).toContain('curveEval(srgb.b,')
-    expect(helpers).toContain('fn curveEval(')
+    expect(stmts).toContain('curveTangents(l0_p0x, l0_p0y, l0_p1x, l0_p1y, l0_p2x, l0_p2y, l0_p3x, l0_p3y, l0_p4x, l0_p4y)')
+    expect(stmts).toContain('curveSpline(srgb.r,')
+    expect(stmts).toContain('curveSpline(srgb.g,')
+    expect(stmts).toContain('curveSpline(srgb.b,')
+    expect(helpers).toContain('fn curveTangents(')
+    expect(helpers).toContain('fn curveSpline(')
     expect(helpers).toContain('fn curveSrgbToLinear(')
     expect(helpers).toContain('fn curveLinearToSrgb(')
     // The body must be self-contained: no dependency on the pass template's
