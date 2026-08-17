@@ -1,3 +1,4 @@
+import { DateTime } from 'effect'
 import { Submodel, AsyncData } from 'foldkit'
 import type { HtmlBuilder } from 'foldkit/html'
 import { ClickedEdit, DeleteRequested, OpenPhotoRequested, RefreshRequested } from './message'
@@ -118,17 +119,24 @@ const gridTiles = (h: HtmlBuilder<GalleryMessage>, summaries: readonly EditSumma
   )
 
 const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) =>
-  h.button(
+  h.div(
     [
-      h.OnClick(ClickedEdit({ id: summary.id })),
-      h.AriaLabel(`Open saved edit`),
       h.DataAttribute('edit-id', summary.id),
       h.Class(
         'group relative aspect-square overflow-hidden rounded border border-border bg-panel hover:border-muted',
       ),
     ],
     [
-      tileThumb(h, summary),
+      // Click target for opening the edit — must not include the delete button
+      // so that delete clicks don't bubble up into ClickedEdit.
+      h.button(
+        [
+          h.OnClick(ClickedEdit({ id: summary.id })),
+          h.AriaLabel(`Open saved edit`),
+          h.Class('absolute inset-0'),
+        ],
+        [tileThumb(h, summary)],
+      ),
       h.div(
         [
           h.Class(
@@ -138,7 +146,7 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) =>
         [
           h.span(
             [h.Class('text-[10px] text-white/80')],
-            [Number(summary.savedAt) > 0 ? new Date(summary.savedAt).toLocaleDateString() : ''],
+            [summary.savedAt > 0 ? DateTime.formatLocal({ dateStyle: 'short' })(DateTime.makeUnsafe(summary.savedAt)) : ''],
           ),
           h.div(
             [h.Class('flex items-center gap-1')],
@@ -150,7 +158,7 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) =>
                   // size-7: a finger-sized hit target on touch screens
                   // (docs/adr/0024-mobile-ui) — the glyph stays small.
                   h.Class(
-                    'grid size-7 place-items-center text-[10px] text-white/80 hover:text-white',
+                    'relative z-10 grid size-7 place-items-center text-[10px] text-white/80 hover:text-white',
                   ),
                   h.DataAttribute('delete-edit-id', summary.id),
                 ],

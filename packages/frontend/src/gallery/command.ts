@@ -1,4 +1,4 @@
-import { Effect, Option } from 'effect'
+import { DateTime, Effect, Option } from 'effect'
 import { Command, File as FoldkitFile } from 'foldkit'
 import type { StoreError } from '@lutra/store'
 import { EditStore, EditIdSchema, Edit, newEditId } from '@lutra/store'
@@ -140,7 +140,7 @@ export const OpenPhoto = Command.define('OpenPhoto', {
       Edit.make({
         chain: [],
         id,
-        savedAt: Date.now(),
+        savedAt: DateTime.nowUnsafe().epochMilliseconds,
         source,
         thumbnail,
       }),

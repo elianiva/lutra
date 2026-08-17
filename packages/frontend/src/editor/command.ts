@@ -1,4 +1,4 @@
-import { Effect, Option, Ref, Schema } from 'effect'
+import { DateTime, Effect, Option, Ref, Schema } from 'effect'
 import { Command, File as FoldkitFile, Render } from 'foldkit'
 import * as Persistence from 'effect/unstable/persistence/KeyValueStore'
 import type { StoreError } from '@lutra/store'
@@ -278,7 +278,7 @@ export const SaveEdit = Command.define('SaveEdit', {
     const thumbnail = yield* thumbnailFromFrame(frame)
     const store = yield* EditStore
     const editId = id ?? newEditId()
-    const savedAt = Date.now()
+    const savedAt = DateTime.nowUnsafe().epochMilliseconds
     yield* store.save(Edit.make({ chain, id: editId, savedAt, source, thumbnail }))
     return EditSaved({ id: editId, savedAt })
   }).pipe(

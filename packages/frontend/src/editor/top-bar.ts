@@ -1,4 +1,4 @@
-import { Match } from 'effect'
+import { DateTime, Match } from 'effect'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 import { CopyPlus, Download, Plus } from 'lucide'
 import { icon } from '../components/icon'
@@ -100,7 +100,7 @@ const saveStatusText = (h: HtmlBuilder<EditorMessage>, model: Model) =>
     Match.when({ _tag: 'saved' }, (status) =>
       h.span(
         [h.Class('hidden pr-1 text-[10px] text-muted sm:inline')],
-        [`Saved ${new Date(status.at).toLocaleTimeString()}`],
+        [`Saved ${DateTime.formatLocal({ timeStyle: 'short' })(DateTime.makeUnsafe(status.at))}`],
       ),
     ),
     Match.when({ _tag: 'failed' }, (status) =>
