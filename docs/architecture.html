@@ -1027,57 +1027,56 @@ color = mix(vec3&lt;f32&gt;(luma), color, 1.0 + l0_amount);</code></pre>
       </p>
 
       <h3>
-        7.7 Grain — <code>texture</code>, <code>size</code>, <code>blur</code> &isin; [0, 1]
+        7.7 Grain — <code>amount</code>, <code>profile</code>, <code>size</code>, <code>chroma</code>
         <span class="tag good">correct</span>
       </h3>
 
-      <pre><code>// 3-octave FBM over smooth value noise (integer lattice hash, quintic easing)
-let f = 0.6667 * pow(0.15, l0_size);         // cell: 1.5 px (0) &rarr; 10 px (1), log scale
-let p = 0.6 - 0.45 * l0_blur;                 // octave persistence 0.6 &rarr; 0.15
-let n = grainNoise(coord * f, u_frame) * inv
-    + grainNoise(coord * f * 2 + offset1, u_frame * 3u + 17u) * (p * inv)
-    + grainNoise(coord * f * 4 + offset2, u_frame * 5u + 29u) * (p * p * inv);  // weights sum to 1
-let noise = (n - 0.5) * 2.0;                  // &plusmn;1
-let w = max(1.0 - abs(L - 0.5) * 1.4, 0.35);  // midtone weighting
-color += noise * l0_texture * 0.15 * w;</code></pre>
+      <pre><code>// Asymmetric luminance curve: Gaussian highlights &times; power-law shadows &times; smoothstep
+let L = clamp(dot(color, vec3&lt;f32&gt;(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
+let r = select(rolloff, rolloff * 0.35, L &gt; peak);  // tight highlight rolloff
+let bell = exp(-0.5 * ((L - peak) / r) &circ; 2);
+let shadow = min(pow(L / peak, 0.18), 1.0) * smoothstep(0.0, 0.03, L);
+let weight = bell * shadow;
+// Multi-scale noise: fine + coarse (0.67&times;) value noise layers
+let fine = grainNoise(coord * f, u_frame);
+let coarse = grainNoise(coord * f * 0.667, u_frame + 17u);
+let noise = mix(fine, coarse, 0.35) * 2.0 - 1.0;
+color += noise * l0_amount * 0.15 * weight;
+// Chromatic grain: separate R/B at 1.8&times; scale
+let cr = (grainNoise(coord * cf + offsetR, u_frame + 31u) - 0.5) * 2.0;
+let cb = (grainNoise(coord * cf + offsetB, u_frame + 57u) - 0.5) * 2.0;
+color.r += cr * l0_chroma * l0_amount * 0.15 * weight;
+color.b += cb * l0_chroma * l0_amount * 0.15 * weight;</code></pre>
 
       <p>
-        Grain is three-octave FBM over <em>smooth value noise</em>: the lattice is hashed with an
-        integer hash (a few multiply/xor/shift operations on the pixel coordinate plus the frame
-        counter — no transcendentals), and the hash values are interpolated with quintic easing.
-        Because neighboring pixels share lattice points, the noise is spatially coherent — it clumps
-        and swirls like real film grain, instead of the per-pixel static the mobile version shipped.
-        The frame seed animates the whole field between frames, and octaves 2 and 3 use derived
-        seeds so they decorrelate over time. Three knobs shape it:
+        Film grain is <em>luminance-dependent</em>: its intensity varies across the tonal range
+        following an asymmetric curve validated against real film scans and the AV1 grain synthesis
+        spec. The curve uses a tight Gaussian for highlights (grain vanishes quickly above the
+        peak), a power-law ramp (&gamma; = 0.18) for shadows (grain persists in dark tones), and a
+        smoothstep kill below 3% luminance to prevent black-point lift. The peak is configurable
+        per profile, typically 0.35–0.42.<label
+          for="sn-grain"
+          class="margin-toggle sidenote-number"
+        ></label
+        ><input type="checkbox" id="sn-grain" class="margin-toggle" /><span class="sidenote"
+          >This asymmetric curve is the single most important piece — it&rsquo;s what makes grain
+          feel &ldquo;right&rdquo; versus noise-on-top-of-image. The power-law exponent 0.18 is
+          validated against real film reference scans and matches the AV1 film grain synthesis
+          paper (Figure 5). See <code>docs/grain.html</code> for the full derivation.</span
+        >
       </p>
 
-      <ul>
-        <li>
-          <strong><code>texture</code> — strength.</strong> Amplitude &plusmn;0.15 linear at full
-          slider (&asymp; &plusmn;14 sRGB levels at midtone), masked to midtones: the triangle
-          <code>w</code> peaks at luma 0.5 and falls to a floor of 0.35 at the extremes, so blacks
-          and whites stay relatively clean.<label
-            for="sn-grain"
-            class="margin-toggle sidenote-number"
-          ></label
-          ><input type="checkbox" id="sn-grain" class="margin-toggle" /><span class="sidenote"
-            >Grain is added in linear light, but the display curve stretches dark values — so the
-            same linear amplitude looks larger in the shadows on screen. AMD&rsquo;s &ldquo;Fine Art
-            of Film Grain&rdquo; (GPUOpen) discusses exactly this effect and how real pipelines
-            scale grain with the signal. The midtone floor keeps blacks from lifting outright, but
-            per-signal scaling is a future refinement.</span
-          >
-        </li>
-        <li>
-          <strong><code>size</code> — noise cell.</strong> Log scale from 1.5 px fine speckle to 10
-          px chunky grain.
-        </li>
-        <li>
-          <strong><code>blur</code> — octave persistence.</strong> 0.6 &rarr; 0.15; the octave
-          weights are normalized by construction (1, p, p&sup2; &divide; their sum), so blur changes
-          the character of the grain, not its loudness.
-        </li>
-      </ul>
+      <p>
+        Noise is multi-scale: a fine grain layer plus a coarse layer at 0.67&times; frequency
+        (1.5&times; size), mixed to create the organic clustering of real silver halide
+        conglomerations. Chromatic grain adds separate R and B noise at 1.8&times; the luma grain
+        size — dye clouds are larger than silver crystals on real film — producing subtle warm/cool
+        color shifts. Green is left clean. Five film-stock profiles (Subtle, Medium, Heavy,
+        Vintage, Cinematic) pre-set the grain size, luminance peak, rolloff, and coarse/fine mix;
+        the <code>amount</code> slider controls strength independently. The hash is integer-only
+        (ADR-0025), the frame seed animates the field, and grain is added in linear light so its
+        display-space size grows toward the blacks.
+      </p>
 
       <h3>
         7.8 Vignette — <code>amount</code>, <code>size</code> <span class="tag good">correct</span>
@@ -1361,8 +1360,8 @@ fn main(@builtin(global_invocation_id) gid: vec3&lt;u32&gt;) {
         </tr>
         <tr>
           <td>Grain amplitude</td>
-          <td>&plusmn;0.15 linear at texture 1, midtone</td>
-          <td>grain</td>
+          <td>&plusmn;0.15 linear at amount 1, midtone</td>
+          <td>grain (see <code>docs/grain.html</code>)</td>
         </tr>
         <tr>
           <td>CA corner shift</td>

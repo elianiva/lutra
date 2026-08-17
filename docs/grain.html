@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lutra's film grain — luminance-dependent, multi-scale, chromatic</title>
+    <style>
+      html {
+        font-size: 15px;
+      }
+      body {
+        font-family:
+          Palatino, 'Palatino Linotype', 'Book Antiqua', 'Liberation Serif', Georgia, serif;
+        background-color: #fffff8;
+        color: #111;
+        max-width: 87.5rem;
+        margin: 0 auto;
+        padding: 0 1.5rem;
+        line-height: 1.5;
+      }
+      article {
+        position: relative;
+        max-width: 55rem;
+        padding: 0 0 6rem 0;
+      }
+      p,
+      li {
+        font-size: 1.05rem;
+        line-height: 1.6;
+      }
+      p {
+        margin: 1.2rem 0 0 0;
+      }
+      ul,
+      ol {
+        margin: 1rem 0 0 0;
+        padding-left: 1.6rem;
+      }
+      li {
+        margin-top: 0.3rem;
+      }
+      h1 {
+        font-weight: 400;
+        font-size: 2.3rem;
+        line-height: 1.15;
+        margin: 3.5rem 0 0.5rem 0;
+      }
+      h2 {
+        font-weight: 400;
+        font-size: 1.45rem;
+        margin: 3rem 0 0.2rem 0;
+        letter-spacing: 0.01em;
+      }
+      h3 {
+        font-weight: 400;
+        font-style: italic;
+        font-size: 1.2rem;
+        margin: 1.8rem 0 0.2rem 0;
+      }
+      .subtitle {
+        font-style: italic;
+        font-size: 1.25rem;
+        color: #555;
+        margin-top: 0.2rem;
+      }
+      .sans {
+        font-family: 'Gill Sans', 'Gill Sans MT', 'Trebuchet MS', sans-serif;
+      }
+      a {
+        color: #111;
+        text-decoration: underline;
+      }
+      a:hover {
+        color: #7a2e1e;
+      }
+      code {
+        font-family: 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+        font-size: 0.82em;
+        background: #f4f2e8;
+        padding: 0.08em 0.25em;
+        border-radius: 2px;
+      }
+      pre {
+        font-family: 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+        font-size: 0.78rem;
+        line-height: 1.45;
+        background: #f4f2e8;
+        border: 1px solid #e3e0d2;
+        border-left: 3px solid #d0cdbd;
+        padding: 0.9rem 1.1rem;
+        margin: 1.1rem 0 0 0;
+        overflow-x: auto;
+        white-space: pre;
+      }
+      pre code {
+        background: none;
+        padding: 0;
+        font-size: 1em;
+      }
+      blockquote {
+        border-left: 3px solid #d0cdbd;
+        padding-left: 1.2rem;
+        font-style: italic;
+        color: #444;
+        margin: 1.4rem 0 0 0;
+      }
+      blockquote footer {
+        font-style: normal;
+        font-size: 0.85rem;
+        color: #666;
+      }
+      .epigraph {
+        border-left: none;
+        padding-left: 0;
+        margin: 4rem 0 0 0;
+        font-size: 1.3rem;
+        color: #333;
+      }
+      .epigraph footer {
+        margin-top: 0.3rem;
+      }
+      .newthought {
+        font-variant: small-caps;
+        letter-spacing: 0.04em;
+      }
+      figure {
+        margin: 1.8rem 0 0 0;
+        text-align: center;
+      }
+      figure img,
+      figure svg {
+        max-width: 100%;
+      }
+      figcaption {
+        font-size: 0.85rem;
+        font-style: italic;
+        color: #555;
+        margin-top: 0.4rem;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 1.2rem 0 0 0;
+        font-size: 0.95rem;
+      }
+      th {
+        border-bottom: 2px solid #111;
+        text-align: left;
+        padding: 0.4rem 0.8rem 0.3rem 0;
+        font-weight: 400;
+        font-variant: small-caps;
+        letter-spacing: 0.03em;
+      }
+      td {
+        border-bottom: 1px solid #ddd;
+        padding: 0.45rem 0.8rem 0.45rem 0;
+        vertical-align: top;
+      }
+      tr:last-child td {
+        border-bottom: none;
+      }
+      hr {
+        border: none;
+        border-top: 1px solid #ddd;
+        margin: 3rem 0;
+      }
+      .marginnote,
+      .sidenote {
+        font-size: 0.78rem;
+        line-height: 1.4;
+        color: #333;
+      }
+      .sidenote-number {
+        counter-increment: sidenote-counter;
+        cursor: pointer;
+      }
+      .sidenote-number::after {
+        content: counter(sidenote-counter);
+        vertical-align: super;
+        font-size: 0.65em;
+        font-family: 'SF Mono', Menlo, Consolas, monospace;
+      }
+      .sidenote::before {
+        content: counter(sidenote-counter) '  ';
+        font-family: 'SF Mono', Menlo, Consolas, monospace;
+      }
+      .margin-toggle {
+        display: none;
+      }
+      @media (min-width: 1200px) {
+        .sidenote {
+          position: absolute;
+          right: -24rem;
+          width: 20rem;
+          margin-top: 0.2rem;
+        }
+        .marginnote {
+          position: absolute;
+          right: -24rem;
+          width: 20rem;
+          margin-top: 0.2rem;
+        }
+        .sidenote-number::after {
+          content: '';
+        }
+        .sidenote::before {
+          content: '';
+        }
+      }
+      @media (max-width: 1199px) {
+        .sidenote {
+          display: none;
+        }
+        .margin-toggle:checked + .sidenote {
+          display: block;
+          float: left;
+          clear: both;
+          width: 95%;
+          margin: 1rem 0;
+          padding: 0.8rem 1rem;
+          background: #f4f2e8;
+          border-left: 3px solid #d0cdbd;
+        }
+      }
+      .flow {
+        display: flex;
+        align-items: stretch;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin: 1.4rem 0 0 0;
+      }
+      .flow .box {
+        border: 1px solid #111;
+        padding: 0.5rem 0.8rem;
+        text-align: center;
+        font-size: 0.85rem;
+        background: #fbfaf2;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .flow .box .t {
+        font-weight: 600;
+      }
+      .flow .box .s {
+        font-size: 0.72rem;
+        color: #555;
+      }
+      .flow .arrow {
+        align-self: center;
+        font-size: 1.2rem;
+        color: #555;
+      }
+      .callout {
+        border-left: 3px solid #a34a2f;
+        background: #fbf4ee;
+        padding: 0.7rem 1rem;
+        margin: 1.2rem 0 0 0;
+        font-size: 0.95rem;
+      }
+      .callout .h {
+        font-variant: small-caps;
+        letter-spacing: 0.04em;
+        font-weight: 600;
+      }
+      .tag {
+        display: inline-block;
+        font-family: 'SF Mono', Menlo, Consolas, monospace;
+        font-size: 0.7rem;
+        border: 1px solid #999;
+        border-radius: 3px;
+        padding: 0.05em 0.45em;
+        margin-left: 0.4em;
+        vertical-align: middle;
+      }
+      .tag.good {
+        border-color: #3f7d3f;
+        color: #2c5e2c;
+      }
+      .tag.warn {
+        border-color: #a34a2f;
+        color: #8a3a22;
+      }
+      .tag.note {
+        border-color: #6a6a8a;
+        color: #4b4b6a;
+      }
+      footer.fineprint {
+        margin-top: 4rem;
+        padding-top: 1rem;
+        border-top: 1px solid #ddd;
+        font-size: 0.85rem;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <article>
+      <header>
+        <h1>Lutra's film grain</h1>
+        <p class="subtitle">
+          Luminance-dependent, multi-scale, chromatic grain — how silver halide physics became a
+          WGSL compute shader
+        </p>
+      </header>
+
+      <blockquote class="epigraph">
+        <p>
+          &ldquo;Film grain is the very mechanism with which film gives us its image, and is well
+          deserving of some careful crafting.&rdquo;
+        </p>
+        <footer>— Denis Pătruț, <em>Simple Physically-Based Film Grain Simulation</em></footer>
+      </blockquote>
+
+      <p>
+        <span class="newthought">Most digital grain is noise.</span> It is uniform, symmetric, and
+        independent of the image it sits on. Real film grain is none of those things: it varies with
+        brightness, clusters at multiple scales, carries subtle color, and is
+        <em>the image itself</em> — not an overlay. Lutra's grain shader models these properties so
+        that the texture you see is shaped by the same physics that shaped analog film for a century.
+        This document walks through the algorithm from the pixel-level math up to the five film-stock
+        profiles, assuming you've read
+        <a href="architecture.html">architecture.html</a> and know what a compute pass is.
+      </p>
+
+      <h2>0 · Why grain is not noise</h2>
+
+      <p>
+        A photograph on film is formed by silver halide crystals. When photons hit a crystal, it
+        becomes developable — a binary event, on or off. The grain you see is the spatial
+        distribution of these binary events, averaged over many tiny crystals by the human eye into
+        the perception of texture. Three properties of this process make film grain fundamentally
+        different from digital noise:
+      </p>
+
+      <ul>
+        <li>
+          <strong>Grain is density-dependent.</strong> In highlights (maximum silver accumulation on
+          the negative), grain exists but is less visible because the bright background masks it. In
+          midtones, grain peaks perceptually — moderate crystal density against high perceptual
+          contrast. In shadows, grain appears again because the print media's own grain becomes
+          visible through the negative's clear areas. Deep below ~3% luminance, grain vanishes
+          entirely.
+        </li>
+        <li>
+          <strong>Grain clusters at multiple scales.</strong> Individual silver halide crystals are
+          microscopic (0.5–3 &mu;m), but they form conglomerations — tiny grains don't exist alone.
+          The texture you see is a hierarchy: fine crystals grouping into larger visible structures.
+        </li>
+        <li>
+          <strong>Grain carries color.</strong> Color film has separate dye layers (blue, green, red),
+          each with its own grain structure. The red and blue channels have independent noise at a
+          coarser scale than the luminance grain — subtle warm/cool shifts that digital noise,
+          which is correlated across channels, never produces.
+        </li>
+      </ul>
+
+      <h2>1 · The luminance curve</h2>
+
+      <p>
+        The single most important piece of the grain shader is the <em>luminance weight</em>: how
+        much grain to add at each brightness level. This is an asymmetric curve validated against
+        real film reference scans and the AV1 film grain synthesis specification (Figure 5 of the
+        AOMedia technical report):
+      </p>
+
+      <pre><code>fn grainLumaWeight(luma: f32, peak: f32, rolloff: f32) -&gt; f32 {
+  // Highlight side: tight Gaussian (35% of base rolloff)
+  // Shadow side: power law ramp with smoothstep cutoff near true black
+  let r = select(rolloff, rolloff * 0.35, luma &gt; peak);
+  let d = (luma - peak) / r;
+  let bell = exp(-0.5 * d * d);
+  let shadow = min(pow(luma / max(peak, 0.001), 0.18), 1.0)
+             * smoothstep(0.0, 0.03, luma);
+  return bell * shadow;
+}</code></pre>
+
+      <p>Three pieces make up the curve:</p>
+
+      <ul>
+        <li>
+          <strong>Bell (Gaussian).</strong> Centered at <code>peak</code> (configurable per profile,
+          typically 0.35–0.42), with different widths on each side. The highlight side uses
+          <code>rolloff &times; 0.35</code> — a <em>tight</em> Gaussian so grain disappears quickly
+          above the peak. The shadow side uses the full <code>rolloff</code> — a wider ramp.
+        </li>
+        <li>
+          <strong>Shadow power law.</strong> <code>pow(luma / peak, 0.18)</code> — a gentle ramp
+          that rises from zero at black toward 1 at the peak. The 0.18 exponent is validated against
+          real film scans: it matches the characteristic curve (Hurter–Driffield) of how grain
+          density grows with exposure in the shadow region.
+        </li>
+        <li>
+          <strong>Smoothstep cutoff.</strong> <code>smoothstep(0.0, 0.03, luma)</code> — a hard
+          kill below 3% luminance. This prevents grain from lifting true blacks above zero, which
+          would look like a lifted black point rather than film texture.
+        </li>
+      </ul>
+
+      <figure>
+        <svg viewBox="0 0 320 180" width="480" role="img" aria-label="Grain luminance weight curve">
+          <!-- axes -->
+          <line x1="30" y1="155" x2="300" y2="155" stroke="#999" stroke-width="1" />
+          <line x1="30" y1="10" x2="30" y2="155" stroke="#999" stroke-width="1" />
+          <text x="22" y="168" font-size="10" fill="#666">0</text>
+          <text x="120" y="168" font-size="10" fill="#666">0.4</text>
+          <text x="265" y="168" font-size="10" fill="#666">1.0</text>
+          <text x="4" y="14" font-size="10" fill="#666">1</text>
+          <text x="160" y="178" font-size="10" fill="#666">luminance</text>
+          <!-- grain weight curve (peak at 0.38, rolloff 0.4) -->
+          <polyline
+            points="30,155 40,155 48,155 56,152 64,145 72,132 80,112 88,85 96,55 104,30 112,18 120,14 128,18 136,30 144,48 152,68 160,88 168,105 176,118 184,128 192,135 200,140 208,144 216,147 224,149 232,150 240,151 248,152 256,153 264,154 272,154 280,155 288,155 296,155 300,155"
+            fill="none"
+            stroke="#7a2e1e"
+            stroke-width="2"
+          />
+          <!-- peak marker -->
+          <line x1="120" y1="14" x2="120" y2="155" stroke="#aaa" stroke-width="0.8" stroke-dasharray="3 3" />
+          <circle cx="120" cy="14" r="3" fill="#7a2e1e" />
+          <text x="124" y="28" font-size="10" fill="#7a2e1e">peak</text>
+          <!-- region labels -->
+          <text x="50" y="145" font-size="9" fill="#666">shadows</text>
+          <text x="95" y="145" font-size="9" fill="#666">midtones</text>
+          <text x="180" y="145" font-size="9" fill="#666">highlights</text>
+          <!-- smoothstep kill zone -->
+          <rect x="30" y="148" width="20" height="7" fill="#f4f2e8" stroke="#d0cdbd" stroke-width="0.5" />
+          <text x="32" y="143" font-size="8" fill="#a34a2f">&lt;3%</text>
+        </svg>
+        <figcaption>
+          The luminance weight curve. Grain peaks in the midtones, fades sharply in the highlights
+          (tight Gaussian), ramps gently in the shadows (power law &gamma; = 0.18), and vanishes
+          below 3% luminance (smoothstep kill).
+        </figcaption>
+      </figure>
+
+      <p>
+        The curve is asymmetric by design. Real film grain <em>is</em> asymmetric: highlights
+        always contain grain (maximum silver accumulation on the negative), but it is less visible
+        because the bright background masks it. Shadows contain grain from the print media's own
+        texture. The Gaussian/power-law split captures both behaviors with two parameters
+        (<code>peak</code> and <code>rolloff</code>) that map directly to film stock properties.<label
+          for="sn-fuji"
+          class="margin-toggle sidenote-number"
+        ></label
+        ><input type="checkbox" id="sn-fuji" class="margin-toggle" /><span class="sidenote"
+          >This is the luminance dependence you see in Fuji cameras' grain effect and in the AV1
+          film grain synthesis spec. Fuji's exact implementation is undocumented (their patent
+          describes M-sequence procedural generation, not a static texture), but the perceptual
+          behavior — grain that breathes with brightness — is the same physical phenomenon.</span
+        >
+      </p>
+
+      <h2>2 · Multi-scale value noise</h2>
+
+      <p>
+        Grain is generated as <em>smooth value noise</em>: random values on a coarser grid,
+        interpolated between grid points with quintic easing (C² continuous — no visible grid
+        edges). Two layers run simultaneously:
+      </p>
+
+      <pre><code>fn grainSample(pos: vec2&lt;f32&gt;, frame: u32, grainSize: f32, blurAmt: f32) -&gt; f32 {
+  let fine = grainNoise(pos, frame);
+  let coarse = grainNoise(pos * 0.667, frame + 17u);
+  return mix(fine, coarse, blurAmt);
+}</code></pre>
+
+      <ul>
+        <li>
+          <strong>Fine layer</strong> at <code>grainSize</code> — the primary grain texture, with
+          cell size log-scaled from ~0.3 px (fine) to ~1.5 px (coarse).
+        </li>
+        <li>
+          <strong>Coarse layer</strong> at <code>grainSize &times; 1.5</code> (0.67&times; frequency)
+          — adds the organic clustering of real silver halide conglomerations.
+        </li>
+      </ul>
+
+      <p>
+        The coarse layer is mixed in by the profile's <code>blur</code> parameter. More blur means
+        more coarse layer — softer, cloudier grain. Less blur means crisp, fine-grained texture.
+        The two layers are seeded from the same frame counter but decorrelated (different coordinate
+        offsets and frame seeds) so they shimmer independently.
+      </p>
+
+      <p>
+        The hash function is integer-only — <code>u32</code> multiplies and xor-shifts, no
+        transcendentals — per ADR-0025. The quintic easing
+        (<code>t³ · (t · (6t − 15) + 10)</code>) produces smoother interpolation than the cubic
+        alternative, which matters at coarse grain sizes where grid artifacts would otherwise show.
+      </p>
+
+      <h3>Why not Perlin noise or FBM?</h3>
+
+      <p>
+        The previous implementation used 3-octave FBM (fractal Brownian motion) — the standard
+        approach for procedural textures. FBM is designed for <em>terrain</em>: self-similar detail
+        at every scale. Film grain is not self-similar. It has two distinct scales — fine crystals
+        and coarse clusters — with a specific ratio between them. Multi-scale value noise with a
+        controlled mix ratio models this more accurately than an FBM cascade, and the simpler
+        structure is cheaper to evaluate.
+      </p>
+
+      <h2>3 · Chromatic grain</h2>
+
+      <p>
+        Real color film has separate dye layers, each with its own grain structure. The red and blue
+        channels are noisier than green (fewer silver halide crystals per unit area in those layers)
+        and the noise is <em>coarser</em> — dye clouds are larger than the silver crystals that
+        formed them. The shader reproduces this:
+      </p>
+
+      <pre><code>// Chromatic grain: separate R and B noise at 1.8× grain size
+let chromaAmt = l0_chroma * grainAmt;
+if (chromaAmt &gt; 0.001) {
+  let chromaSize = baseSize * 0.56;  // 1/1.8 — coarser frequency
+  let cf = 0.6667 * pow(0.15, chromaSize);
+  let cr = (grainNoise(vec2&lt;f32&gt;(coord) * cf + vec2&lt;f32&gt;(3.7, 11.3), u_frame + 31u) - 0.5) * 2.0;
+  let cb = (grainNoise(vec2&lt;f32&gt;(coord) * cf + vec2&lt;f32&gt;(7.1, 15.9), u_frame + 57u) - 0.5) * 2.0;
+  color.r += cr * chromaAmt;
+  color.b += cb * chromaAmt;
+}</code></pre>
+
+      <p>
+        The <code>chroma</code> slider (0–1, default 0.2) controls how much color variation appears
+        in the grain. At 0, grain is monochrome — the same noise added to all channels equally
+        (like a scan of black-and-white film). At 1, the red and blue channels get independent
+        coarser noise, producing the subtle warm/cool color shifts you see in color negative film.
+        Green is left alone — it carries the luminance signal and should stay clean.
+      </p>
+
+      <p>
+        The 1.8&times; scale factor comes from the physical reality that dye clouds are larger than
+        silver crystals. On the shader side, it means the chromatic noise frequency is
+        <code>baseSize &times; 0.56</code> (the inverse of 1.8), so color grain is visibly coarser
+        than luminance grain — exactly as it should be.
+      </p>
+
+      <h2>4 · Film stock profiles</h2>
+
+      <p>
+        Different film stocks have different grain character: fine-grained slide film behaves
+        differently from pushed high-ISO negative stock. The shader encodes five profiles, each
+        pre-setting the grain size, luminance peak, rolloff width, and blur (coarse/fine mix):
+      </p>
+
+      <table>
+        <tr>
+          <th>Profile</th>
+          <th>Grain Size</th>
+          <th>Peak</th>
+          <th>Rolloff</th>
+          <th>Blur</th>
+          <th>Character</th>
+        </tr>
+        <tr>
+          <td>Subtle</td>
+          <td>0.30</td>
+          <td>0.40</td>
+          <td>0.35</td>
+          <td>0.60</td>
+          <td>Fine 35mm, low intensity, gentle shadow rolloff</td>
+        </tr>
+        <tr>
+          <td>Medium</td>
+          <td>0.50</td>
+          <td>0.38</td>
+          <td>0.40</td>
+          <td>0.55</td>
+          <td>Balanced 35mm, peak in midtones (default)</td>
+        </tr>
+        <tr>
+          <td>Heavy</td>
+          <td>0.70</td>
+          <td>0.35</td>
+          <td>0.50</td>
+          <td>0.45</td>
+          <td>Pushed film, visible grain in shadows</td>
+        </tr>
+        <tr>
+          <td>Vintage</td>
+          <td>0.80</td>
+          <td>0.42</td>
+          <td>0.55</td>
+          <td>0.35</td>
+          <td>Soft, warm chroma, coarse grain, wide rolloff</td>
+        </tr>
+        <tr>
+          <td>Cinematic</td>
+          <td>1.00</td>
+          <td>0.36</td>
+          <td>0.45</td>
+          <td>0.40</td>
+          <td>Coarse 16mm, high chroma, tight highlight rolloff</td>
+        </tr>
+      </table>
+
+      <p>
+        The profile is selected by the <code>profile</code> uniform (a float 0–4, rounded to int in
+        the shader). The <code>size</code> slider provides a manual override: when non-zero, it
+        blends the profile's grain size toward the user's value, so you can tune without switching
+        profiles. The <code>amount</code> slider controls overall strength independently of
+        character.
+      </p>
+
+      <div class="callout">
+        <span class="h">Why profiles instead of more sliders.</span> The luminance curve's
+        parameters (peak, rolloff, power-law exponent, smoothstep threshold) are physically
+        meaningful but not intuitively tunable by a photographer. A profile bundles them into a
+        named character — "Heavy" or "Vintage" — that maps to a film stock's behavior without
+        exposing the underlying math. The <code>amount</code> and <code>size</code> sliders give
+        enough manual control for fine-tuning; the profile handles the rest.
+      </div>
+
+      <h2>5 · Putting it together</h2>
+
+      <p>
+        The full grain pass, in order of operations:
+      </p>
+
+      <ol>
+        <li>
+          <strong>Look up the profile.</strong> Round <code>profile</code> to an integer, fetch
+          <code>[grainSize, peak, rolloff, blur]</code>.
+        </li>
+        <li>
+          <strong>Resolve grain size.</strong> If <code>size &gt; 0</code>, blend the profile's
+          grain size toward <code>0.2 + size &times; 1.3</code>. Otherwise use the profile default.
+        </li>
+        <li>
+          <strong>Compute noise frequency.</strong> <code>f = 0.6667 &times; pow(0.15, baseSize)</code>
+          — log scale from fine to coarse.
+        </li>
+        <li>
+          <strong>Sample fine + coarse noise.</strong> Two value-noise layers at different
+          frequencies, mixed by the profile's blur.
+        </li>
+        <li>
+          <strong>Apply luminance weight.</strong> The asymmetric bell &times; power law &times;
+          smoothstep curve, evaluated at the pixel's Rec. 709 luma.
+        </li>
+        <li>
+          <strong>Add luma grain.</strong> <code>color += noise &times; amount &times; 0.15 &times;
+          weight</code> — same offset to all channels.
+        </li>
+        <li>
+          <strong>Add chromatic grain.</strong> Separate R and B noise at 1.8&times; scale, scaled
+          by <code>chroma &times; amount &times; 0.15 &times; weight</code>.
+        </li>
+        <li>
+          <strong>Clamp.</strong> Prevent negative values from dark-channel clipping.
+        </li>
+      </ol>
+
+      <p>
+        The 0.15 amplitude constant means full strength adds &plusmn;0.15 linear at midtone
+        (&asymp;&plusmn;14 sRGB levels) — enough to be visible without dominating the image.
+        Everything is in linear light, so the display curve stretches dark values: the same linear
+        amplitude looks larger in shadows on screen, which is physically correct (film grain
+        <em>is</em> more visible in shadows).
+      </p>
+
+      <h2>6 · What changed from the old grain</h2>
+
+      <table>
+        <tr>
+          <th>Aspect</th>
+          <th>Before</th>
+          <th>After</th>
+        </tr>
+        <tr>
+          <td>Luminance curve</td>
+          <td>Symmetric triangle: <code>max(1 − |L−0.5| × 1.4, 0.35)</code></td>
+          <td>Asymmetric: Gaussian highlights + power-law shadows + smoothstep at 3%</td>
+        </tr>
+        <tr>
+          <td>Noise structure</td>
+          <td>3-octave FBM, same for all channels</td>
+          <td>Multi-scale: fine + coarse (0.67&times;) value noise layers</td>
+        </tr>
+        <tr>
+          <td>Color grain</td>
+          <td>None (monochrome)</td>
+          <td>Separate R/B noise at 1.8&times; grain size</td>
+        </tr>
+        <tr>
+          <td>Parameters</td>
+          <td><code>texture</code> (strength), <code>size</code> (cell), <code>blur</code>
+          (persistence)</td>
+          <td><code>amount</code> (strength), <code>profile</code> (preset), <code>size</code>
+          (override), <code>chroma</code> (color)</td>
+        </tr>
+        <tr>
+          <td>Film stock presets</td>
+          <td>None</td>
+          <td>5 profiles: Subtle, Medium, Heavy, Vintage, Cinematic</td>
+        </tr>
+      </table>
+
+      <p>
+        The old grain's symmetric midtone weight treated shadows and highlights identically — grain
+        faded equally toward both extremes. The new asymmetric curve captures the physical reality
+        that grain <em>persists</em> in shadows (print media grain) while <em>vanishing</em> in
+        highlights (no undeveloped silver at Dmax). This is the difference between "noise added to
+        an image" and "grain that the image is made of."
+      </p>
+
+      <h2>7 · Reference</h2>
+
+      <table>
+        <tr>
+          <th>Constant</th>
+          <th>Value</th>
+          <th>Notes</th>
+        </tr>
+        <tr>
+          <td>Grain amplitude</td>
+          <td>&plusmn;0.15 linear at amount 1, midtone</td>
+          <td>&asymp;&plusmn;14 sRGB levels</td>
+        </tr>
+        <tr>
+          <td>Shadow power-law exponent</td>
+          <td>0.18</td>
+          <td>validated against AV1 spec Figure 5 and real film scans</td>
+        </tr>
+        <tr>
+          <td>Highlight Gaussian width</td>
+          <td>rolloff &times; 0.35</td>
+          <td>tight rolloff — grain vanishes quickly above peak</td>
+        </tr>
+        <tr>
+          <td>Smoothstep kill</td>
+          <td>0.0 – 0.03 luma</td>
+          <td>prevents black-point lift</td>
+        </tr>
+        <tr>
+          <td>Chromatic grain scale</td>
+          <td>1.8&times; luma grain size</td>
+          <td>dye clouds are larger than silver crystals</td>
+        </tr>
+        <tr>
+          <td>Coarse layer frequency</td>
+          <td>0.67&times; fine (1.5&times; size)</td>
+          <td>organic clustering ratio</td>
+        </tr>
+        <tr>
+          <td>Luma coefficients</td>
+          <td>(0.2126, 0.7152, 0.0722)</td>
+          <td>Rec. 709, same as all other effects</td>
+        </tr>
+        <tr>
+          <td>Animation</td>
+          <td><code>u_frame</code> (binding 3)</td>
+          <td>hash-seeded per frame; grain shimmers naturally</td>
+        </tr>
+      </table>
+
+      <h3>Sources</h3>
+
+      <ul>
+        <li>
+          Newson et al. (2017) — <em>A Stochastic Film Grain Model for Resolution-Independent
+          Rendering</em>
+          (<a href="https://hal.science/hal-01520260v1/file/Film_grain_synthesis_computer_graphics_forum.pdf"
+            >PDF</a
+          >)
+        </li>
+        <li>
+          Aurélien Pierre (2023) — <em>Stochastic photographic grain synthesis from crystallographic
+          structure simulation</em>
+          (<a
+            href="https://eng.aurelienpierre.com/2023/07/stochastic-photographic-grain-synthesis-from-crystallographic-structure-simulation/"
+            >article</a
+          >)
+        </li>
+        <li>
+          cinegrain — GLSL film grain shader for mpv
+          (<a href="https://github.com/mr-berndt/cinegrain">GitHub</a>)
+        </li>
+        <li>
+          AOMedia — <em>Technical report on film grain synthesis technology</em>
+          (<a
+            href="https://aomedia.org/docs/CWG-C051o_TR_AOMedia_film_grain_synthesis_technology_v2.pdf"
+            >PDF</a
+          >)
+        </li>
+        <li>
+          Dehancer — <em>How does film grain work</em>
+          (<a href="https://blog.dehancer.com/articles/how-does-film-grain-work-in-dehancer-ofx-plugin/"
+            >blog</a
+          >)
+        </li>
+      </ul>
+
+      <footer class="fineprint">
+        <p class="sans">
+          Lutra — a color-grading app for film simulation. Grain algorithm: WGSL compute shader in
+          <code>packages/engine/src/shaders/bodies/grain.ts</code>. Research:
+          <code>docs/research/film-grain-algorithms.md</code>. The surrounding render pipeline is
+          documented in <code>docs/architecture.html</code>.
+        </p>
+      </footer>
+    </article>
+  </body>
+</html>
