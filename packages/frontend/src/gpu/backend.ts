@@ -43,6 +43,14 @@ export interface ComparePresent {
   readonly showBefore: boolean
 }
 
+interface GpuContext {
+  readonly device: GPUDevice
+  readonly sampler: GPUSampler
+  readonly swapFormat: GPUTextureFormat
+  readonly blitPipeline: GPURenderPipeline
+  readonly histogramPipeline: GPUComputePipeline
+}
+
 export interface GpuBackendContract {
   /**
    * Execute a render request: run the chain compute shader over the source
@@ -90,47 +98,11 @@ export interface GpuBackendContract {
 
 export class GpuBackend extends Context.Service<GpuBackend, GpuBackendContract>()('GpuBackend') {}
 
-// Uncaptured WebGPU errors fire synchronously from the device event bus, at a
-// moment where dispatching a new Effect fiber is the right escape hatch: the
-// runtime is not on the stack, so route through the default runtime's
-// background fork. Surfaces as a structured log line instead of console.
-
-/**
- * Acquire a GPUDevice once, held for the page's lifetime. Provided to the
- * app via `resources` in `makeApplication`, so every render Command's Effect
- * resolves `GpuBackend` against this same device.
- *
- * Acquisition failures are turned into defects (crash the app) so the
- * Layer's error channel is `never` — the runtime requires `Layer<_, never, never>`.
- */
-const acquireDevice = Effect.gen(function* () {
-  const adapter = yield* Effect.tryPromise({
-    catch: (cause) => new GpuError({ cause, message: 'No WebGPU adapter available' }),
-    try: async () => await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }),
-  }).pipe(
-    Effect.flatMap((adapter) =>
-      adapter === null
-        ? Effect.fail(new GpuError({ message: 'No WebGPU adapter available' }))
-        : Effect.succeed(adapter),
-    ),
-  )
-  const device = yield* Effect.tryPromise({
-    catch: (cause) => new GpuError({ cause, message: 'Failed to acquire GPU device' }),
-    try: async () => await adapter.requestDevice(),
-  })
-  device.addEventListener('uncapturederror', (event) => {
-    // Surface runtime shader errors. Uncaptured errors are the only signal
-    // after a pipeline validates successfully, so they must not vanish.
-    // Background-fork the log: the event bus fires outside the Effect
-    // runtime's stack, so a raw Effect call here would be lost.
-    void Effect.runFork(Effect.logError(`[WebGPU uncapturederror] ${event.error.message}`))
-  })
-  return device
-}).pipe(
-  // Convert acquisition failures to defects so the Layer error channel is `never`.
-  // The app genuinely cannot work without a GPU — crashing with a message is appropriate.
-  Effect.catchTag('GpuError', (cause: GpuError) => Effect.die(cause)),
-)
+// Device acquisition lives inside `GpuBackendLive` now (docs/adr-0029): it is
+// deferred to first use so the Layer builds at boot whether or not a GPU is
+// present — the app never dies on a no-WebGPU device. The root view gates the
+// editor on `WebGpuCapability`, so acquisition only runs once the device is
+// known good; failures surface as `GpuError` for the command to catch.
 
 // ---- presentation pass ----
 
@@ -328,8 +300,6 @@ interface Session {
 export const GpuBackendLive = Layer.effect(
   GpuBackend,
   Effect.gen(function* () {
-    const device = yield* acquireDevice
-
     const sessionRef = yield* Ref.make<Option.Option<Session>>(Option.none())
     const pipelineCacheRef = yield* Ref.make<
       Record<string, { readonly pipeline: GPUComputePipeline; readonly layout: GPUBindGroupLayout }>
@@ -342,34 +312,72 @@ export const GpuBackendLive = Layer.effect(
     // forever, session rebuilds included.
     let readbackCursor = 0
 
-    const sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' })
-
-    const blitModule = device.createShaderModule({ code: BLIT_SOURCE })
-    const swapFormat = navigator.gpu.getPreferredCanvasFormat()
-    const blitPipeline = device.createRenderPipeline({
-      fragment: {
-        entryPoint: 'fs',
-        module: blitModule,
-        targets: [{ format: swapFormat }],
-      },
-      layout: 'auto',
-      primitive: { topology: 'triangle-list' },
-      vertex: { entryPoint: 'vs', module: blitModule },
+    // Device acquisition is deferred to first use (docs/adr/0029): the Layer
+    // builds at boot whether or not a GPU is present, so the app never dies on
+    // a no-WebGPU device. The root view gates the editor on `WebGpuCapability`,
+    // so `getGpu` only runs once the device is known good. Acquisition failures
+    // surface as `GpuError` for the calling command to catch — never as a defect.
+    const gpuCtxRef = yield* Ref.make<Option.Option<GpuContext>>(Option.none())
+    const acquireGpu = Effect.gen(function* () {
+      const adapter = yield* Effect.tryPromise({
+        catch: (cause) => new GpuError({ cause, message: 'No WebGPU adapter available' }),
+        try: async () => await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }),
+      }).pipe(
+        Effect.flatMap((adapter) =>
+          adapter === null
+            ? Effect.fail(new GpuError({ message: 'No WebGPU adapter available' }))
+            : Effect.succeed(adapter),
+        ),
+      )
+      const device = yield* Effect.tryPromise({
+        catch: (cause) => new GpuError({ cause, message: 'Failed to acquire GPU device' }),
+        try: async () => await adapter.requestDevice(),
+      })
+      device.addEventListener('uncapturederror', (event) => {
+        // Surface runtime shader errors. Uncaptured errors are the only signal
+        // after a pipeline validates successfully, so they must not vanish.
+        // Background-fork the log: the event bus fires outside the Effect
+        // runtime's stack, so a raw Effect call here would be lost.
+        void Effect.runFork(Effect.logError(`[WebGPU uncapturederror] ${event.error.message}`))
+      })
+      const sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' })
+      const swapFormat = navigator.gpu.getPreferredCanvasFormat()
+      const blitModule = device.createShaderModule({ code: BLIT_SOURCE })
+      const blitPipeline = device.createRenderPipeline({
+        fragment: {
+          entryPoint: 'fs',
+          module: blitModule,
+          targets: [{ format: swapFormat }],
+        },
+        layout: 'auto',
+        primitive: { topology: 'triangle-list' },
+        vertex: { entryPoint: 'vs', module: blitModule },
+      })
+      const histogramModule = device.createShaderModule({ code: HISTOGRAM_SOURCE })
+      const histogramPipeline = device.createComputePipeline({
+        compute: { entryPoint: 'main', module: histogramModule },
+        layout: 'auto',
+      })
+      return { device, sampler, swapFormat, blitPipeline, histogramPipeline } as const
     })
-
-    // Device-scoped histogram pipeline (fixed shader, like the blit). The
-    // bind group is per session — it references the session's bins
-    // accumulator and dstTex, neither of which change per render.
-    const histogramModule = device.createShaderModule({ code: HISTOGRAM_SOURCE })
-    const histogramPipeline = device.createComputePipeline({
-      compute: { entryPoint: 'main', module: histogramModule },
-      layout: 'auto',
+    const getGpu = Effect.gen(function* () {
+      const cached = yield* Ref.get(gpuCtxRef)
+      if (Option.isSome(cached)) {
+        return cached.value
+      }
+      const ctx = yield* acquireGpu
+      yield* Ref.set(gpuCtxRef, Option.some(ctx))
+      return ctx
     })
 
     // Device-scoped LUT texture cache: a cube uploads once per lutId and
     // survives image changes (session teardown), because the cube is a
     // property of the layer, not of the image.
-    const ensureLutTexture = (lutId: string, cube: LutCube): Effect.Effect<GPUTexture, GpuError> =>
+    const ensureLutTexture = (
+      device: GPUDevice,
+      lutId: string,
+      cube: LutCube,
+    ): Effect.Effect<GPUTexture, GpuError> =>
       Effect.gen(function* () {
         const cached = yield* Ref.get(lutTexturesRef).pipe(Effect.map((cache) => cache.get(lutId)))
         if (cached) {
@@ -440,11 +448,13 @@ export const GpuBackendLive = Layer.effect(
      * throw raw exceptions, which `ensureSession` wraps.
      */
     const buildSession = (
+      gpu: GpuContext,
       canvas: HTMLCanvasElement,
       width: number,
       height: number,
       srcBitmap: ImageBitmap,
     ): Session => {
+      const { device, sampler, swapFormat, blitPipeline, histogramPipeline } = gpu
       const ctx = canvas.getContext('webgpu')
       if (!ctx) {
         throw new GpuError({ message: 'WebGPU canvas context unavailable' })
@@ -594,7 +604,8 @@ export const GpuBackendLive = Layer.effect(
      * `srcTex`, `dstTex`, and the intermediates keep their contents, so the
      * last rendered frame re-presents instead of a blank texture.
      */
-    const resizeCanvas = (s: Session): void => {
+    const resizeCanvas = (gpu: GpuContext, s: Session): void => {
+      const { device, swapFormat } = gpu
       s.ctx.configure({ alphaMode: 'opaque', device, format: swapFormat })
       device.queue.writeBuffer(
         s.canvasSizeBuffer,
@@ -615,6 +626,7 @@ export const GpuBackendLive = Layer.effect(
      * resources.
      */
     const ensureSession = (
+      gpu: GpuContext,
       canvas: HTMLCanvasElement,
       width: number,
       height: number,
@@ -633,7 +645,7 @@ export const GpuBackendLive = Layer.effect(
             current.value.canvasWidth !== canvas.width ||
             current.value.canvasHeight !== canvas.height
           ) {
-            resizeCanvas(current.value)
+            resizeCanvas(gpu, current.value)
           }
           return current.value
         }
@@ -646,7 +658,7 @@ export const GpuBackendLive = Layer.effect(
             cause instanceof GpuError
               ? cause
               : new GpuError({ cause, message: 'Failed to prepare canvas' }),
-          try: () => buildSession(canvas, width, height, srcBitmap),
+          try: () => buildSession(gpu, canvas, width, height, srcBitmap),
         })
         yield* Ref.set(sessionRef, Option.some(s))
         return s
@@ -661,6 +673,7 @@ export const GpuBackendLive = Layer.effect(
      * layer's lutId, so their cache key includes it.
      */
     const getCompute = (
+      gpu: GpuContext,
       s: Session,
       pass: ChainPass,
       src: GPUTexture,
@@ -668,6 +681,7 @@ export const GpuBackendLive = Layer.effect(
       luts: ReadonlyMap<string, LutCube>,
     ): Effect.Effect<ComputeEntry, GpuError> =>
       Effect.gen(function* () {
+        const { device, sampler } = gpu
         const cacheKey =
           pass.lutId === undefined ? pass.source : `${pass.source}::lut:${pass.lutId}`
         const cached = s.compute[cacheKey]
@@ -730,7 +744,7 @@ export const GpuBackendLive = Layer.effect(
           // The view dimension must be explicit: createView() on a 3D
           // texture defaults to e2DArray in Chrome, which fails bind-group
           // validation against the shader's texture_3d (viewDimension e3D).
-          const lutTex = yield* ensureLutTexture(pass.lutId, cube)
+          const lutTex = yield* ensureLutTexture(device, pass.lutId, cube)
           entries.push({
             binding: 6,
             resource: lutTex.createView({ dimension: '3d' }),
@@ -751,7 +765,14 @@ export const GpuBackendLive = Layer.effect(
      * blit, not a re-render. Shared by `execute` (the render's final blit)
      * and `present` (the blit-only re-present).
      */
-    const blit = (encoder: GPUCommandEncoder, s: Session, present: ComparePresent): void => {
+    const blit = (
+      device: GPUDevice,
+      blitPipeline: GPURenderPipeline,
+      swapFormat: GPUTextureFormat,
+      encoder: GPUCommandEncoder,
+      s: Session,
+      present: ComparePresent,
+    ): void => {
       const wgslMode =
         present.mode === 'off'
           ? 0
@@ -792,7 +813,8 @@ export const GpuBackendLive = Layer.effect(
           return yield* Effect.fail(new GpuError({ message: 'Empty source bitmap' }))
         }
 
-        const s = yield* ensureSession(canvas, width, height, request.srcBitmap)
+        const gpu = yield* getGpu
+        const s = yield* ensureSession(gpu, canvas, width, height, request.srcBitmap)
 
         const { passes } = request.shader
 
@@ -800,10 +822,10 @@ export const GpuBackendLive = Layer.effect(
         // frame counter once, then dispatch every pass. No allocations, no
         // texture churn.
         if (request.shader.usesFrame) {
-          device.queue.writeBuffer(s.frameBuffer, 0, new Uint32Array([request.frame >>> 0]))
+          gpu.device.queue.writeBuffer(s.frameBuffer, 0, new Uint32Array([request.frame >>> 0]))
         }
 
-        const encoder = device.createCommandEncoder()
+        const encoder = gpu.device.createCommandEncoder()
 
         // Pass 1..N: each layer runs as its own compute pass. Pass 0 reads
         // the sRGB source (or the linearize pass output); every later pass
@@ -814,6 +836,7 @@ export const GpuBackendLive = Layer.effect(
           const src = i === 0 ? s.srcTex : s.intermediates[(i - 1) % 2]!
           const dst = i === passes.length - 1 ? s.dstTex : s.intermediates[i % 2]!
           const { paramsBuffer, bindGroup, pipeline } = yield* getCompute(
+            gpu,
             s,
             pass,
             src,
@@ -824,7 +847,7 @@ export const GpuBackendLive = Layer.effect(
           if (paramsBuffer) {
             const paramsData = new Float32Array(roundUp(request.uniforms[i]!.length, 4))
             paramsData.set(request.uniforms[i]!)
-            device.queue.writeBuffer(paramsBuffer, 0, paramsData)
+            gpu.device.queue.writeBuffer(paramsBuffer, 0, paramsData)
           }
 
           const computePass = encoder.beginComputePass()
@@ -857,9 +880,9 @@ export const GpuBackendLive = Layer.effect(
           slot.buffer.unmap()
           slot.map = null
         }
-        device.queue.writeBuffer(s.binsBuffer, 0, s.binsZeros)
+        gpu.device.queue.writeBuffer(s.binsBuffer, 0, s.binsZeros)
         const histogramPass = encoder.beginComputePass()
-        histogramPass.setPipeline(histogramPipeline)
+        histogramPass.setPipeline(gpu.histogramPipeline)
         histogramPass.setBindGroup(0, s.histogramGroup)
         histogramPass.dispatchWorkgroups(
           Math.ceil(width / WORKGROUP_SIZE),
@@ -871,15 +894,15 @@ export const GpuBackendLive = Layer.effect(
 
         // Finally: blit dstTex (or the compare view of srcTex/dstTex) onto
         // the canvas swapchain texture.
-        blit(encoder, s, present)
+        blit(gpu.device, gpu.blitPipeline, gpu.swapFormat, encoder, s, present)
 
-        device.queue.submit([encoder.finish()])
+        gpu.device.queue.submit([encoder.finish()])
 
         // Resolve only when the GPU has caught up — lets the caller keep at
         // most one render in flight (no CPU stall; this is a promise).
         yield* Effect.tryPromise({
           catch: (cause) => new GpuError({ cause, message: 'GPU work failed' }),
-          try: async () => await device.queue.onSubmittedWorkDone(),
+          try: async () => await gpu.device.queue.onSubmittedWorkDone(),
         })
 
         // Issue this slot's map NOW, before any later render can submit:
@@ -912,20 +935,22 @@ export const GpuBackendLive = Layer.effect(
         if (Option.isNone(current) || current.value.canvas !== canvas) {
           return
         }
+        const gpu = yield* getGpu
         // The canvas drawing-buffer size may have changed since the
         // session was built — Side by side doubles the canvas width.
         // ensureSession follows the resize in place (swapchain
         // re-configured, u_canvas rewritten, nothing image-sized
         // touched), so the graded frame survives and re-presents.
         const session = yield* ensureSession(
+          gpu,
           canvas,
           current.value.width,
           current.value.height,
           current.value.srcBitmap,
         )
-        const encoder = device.createCommandEncoder()
-        blit(encoder, session, present)
-        device.queue.submit([encoder.finish()])
+        const encoder = gpu.device.createCommandEncoder()
+        blit(gpu.device, gpu.blitPipeline, gpu.swapFormat, encoder, session, present)
+        gpu.device.queue.submit([encoder.finish()])
       }).pipe(
         Effect.catchDefect((cause: unknown) =>
           Effect.fail(new GpuError({ cause, message: 'Unexpected GPU error during present' })),
@@ -933,15 +958,16 @@ export const GpuBackendLive = Layer.effect(
       ),
 
       snapshot: (handle) => Effect.gen(function* () {
+        const gpu = yield* getGpu
         const { dstTex, width, height } = handle
 
         const bytesPerRowPadded = roundUp(width * 4, 256)
-        const readBuffer = device.createBuffer({
+        const readBuffer = gpu.device.createBuffer({
           size: bytesPerRowPadded * height,
           usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
         })
 
-        const encoder = device.createCommandEncoder()
+        const encoder = gpu.device.createCommandEncoder()
         encoder.copyTextureToBuffer(
           { mipLevel: 0, origin: { x: 0, y: 0, z: 0 }, texture: dstTex },
           {
@@ -952,7 +978,7 @@ export const GpuBackendLive = Layer.effect(
           },
           { depthOrArrayLayers: 1, height, width },
         )
-        device.queue.submit([encoder.finish()])
+        gpu.device.queue.submit([encoder.finish()])
         yield* Effect.tryPromise({
           catch: (cause) => new GpuError({ cause, message: 'Failed to map readback buffer' }),
           try: async () => await readBuffer.mapAsync(GPUMapMode.READ),

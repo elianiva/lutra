@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { Option } from 'effect'
 import { Url } from 'foldkit'
 import { init } from './init'
+import { webGpuSupported } from '../gpu/capability'
 import { update } from './update'
 import type { Model } from './model'
 import { Filling, Paused, Ready, QuotaError, Idle } from '../offline/machine'
@@ -29,7 +30,7 @@ const lutA = LutId('luts/print/kodak_2393_cuspclip.cube')
 
 const galleryUrl = () => Option.getOrThrow(Url.fromString('https://lutra.test/'))
 
-const galleryModel = (): Model => init(galleryUrl())[0]
+const galleryModel = (): Model => init(webGpuSupported, galleryUrl())[0]
 
 const fillStarted = () => update(galleryModel(), OfflineFillStarted({ done: 7, total: 593 }))
 
@@ -46,7 +47,7 @@ describe('root: offline library', () => {
   })
 
   it('init fires the auto-start command unless saveData is set', () => {
-    const [, commands] = init(galleryUrl())
+    const [, commands] = init(webGpuSupported, galleryUrl())
     expect(commands.map((c) => c.name)).toContain('StartOfflineFill')
   })
 
@@ -55,7 +56,7 @@ describe('root: offline library', () => {
       configurable: true,
       value: { saveData: true },
     })
-    const [, commands] = init(galleryUrl())
+    const [, commands] = init(webGpuSupported, galleryUrl())
     expect(commands.map((c) => c.name)).not.toContain('StartOfflineFill')
   })
 

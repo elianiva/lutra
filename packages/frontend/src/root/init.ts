@@ -14,6 +14,7 @@ import { GalleryRoute, EditorRoute, parseRoute } from '../route'
 import * as Gallery from '../gallery'
 import * as Editor from '../editor'
 import type { LutThumbnailer } from '../thumbs/worker-layer'
+import type { WebGpuCapability } from '../gpu/capability'
 import { initialOffline } from '../offline/model'
 import { StartOfflineFill } from './offline-command'
 import type { OfflineFill } from '../offline/fill'
@@ -40,7 +41,7 @@ export type InitReturn = readonly [Model, readonly Command.Command<RootMessage, 
  *   Editor  → `Editor.init`  (fires the LUT catalog + export-settings loads)
  *   NotFound → neither
  */
-export const init = (url: Url.Url): InitReturn => {
+export const init = (capability: WebGpuCapability, url: Url.Url): InitReturn => {
   const route = parseRoute(url)
 
   const [gallery, galleryCommands] = Gallery.init(route)
@@ -64,6 +65,7 @@ export const init = (url: Url.Url): InitReturn => {
       gallery,
       offline,
       route,
+      webgpu: capability,
     },
     // The offline fill's boot auto-start (docs/adr/0015): unless the device
     // asked for reduced data usage — then the card's manual start button

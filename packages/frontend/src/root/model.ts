@@ -3,6 +3,7 @@ import { AppRoute } from '../route'
 import { Model as GalleryModel } from '../gallery/model'
 import { Model as EditorModel } from '../editor/model'
 import { Offline } from '../offline/model'
+import { WebGpuCapability } from '../gpu/capability'
 
 /**
  * The root's Model (docs/adr/0009): the current route plus the two Submodel
@@ -18,5 +19,6 @@ export const Model = S.Struct({
   gallery: GalleryModel,
   offline: Offline,
   route: AppRoute,
+  webgpu: WebGpuCapability,
 })
 export type Model = typeof Model.Type
