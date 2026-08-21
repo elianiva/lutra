@@ -1,7 +1,7 @@
 import { Effect, Layer, Option } from 'effect'
 import type { IndexedDbDatabase } from '@effect/platform-browser'
 import { IndexedDb } from '@effect/platform-browser'
-import { EditDbSchema } from './edit-db'
+import { LutraDbSchema } from '../db'
 import { EditTable } from './edit-table'
 import type { Edit as EditType } from './edit'
 import type { EditSummary } from './edit-summary'
@@ -47,7 +47,7 @@ export const EditStoreLive: Layer.Layer<
 > = Layer.effect(
   EditStore,
   Effect.gen(function* EditStoreLive() {
-    const builder = yield* EditDbSchema
+    const builder = yield* LutraDbSchema
     const table = builder.from(EditTable.tableName)
 
     const toSummary = (edit: EditType): EditSummary => ({
@@ -96,7 +96,7 @@ export const EditStoreLive: Layer.Layer<
  * resource stack.
  */
 export const EditStoreIndexedDb: Layer.Layer<EditStore> = EditStoreLive.pipe(
-  Layer.provide(EditDbSchema.layer('lutra')),
+  Layer.provide(LutraDbSchema.layer('lutra')),
   Layer.provide(IndexedDb.layerWindow),
   Layer.catch((error) =>
     Layer.succeed(
