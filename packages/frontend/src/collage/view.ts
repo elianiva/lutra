@@ -4,6 +4,7 @@ import {
   BackRequested,
   ChangedColumns,
   ChangedGutter,
+  ExportRequested,
   MovedTile,
   RemovedTile,
   ToggledBackground,
@@ -13,6 +14,9 @@ import type { Model } from './model'
 import { LAYOUT_BOUNDS } from './update'
 import type { Collage, EditSummary } from '@lutra/store'
 import { thumbnailUrl } from '../thumbnail-url'
+import { icon } from '../components/icon'
+import { Download } from 'lucide'
+import { collageExportDialogView } from './export-dialog'
 
 /**
  * The Collage Submodel's view (docs/adr/0009, 0030): the fixed-grid preview
@@ -23,11 +27,12 @@ import { thumbnailUrl } from '../thumbnail-url'
  */
 export const view = Submodel.defineView<Model, CollageMessage>((model, h) => {
   return h.div(
-    [h.Class('flex h-full flex-col bg-bg text-ink')],
+    [h.Class('relative flex h-full flex-col bg-bg text-ink')],
     [
       header(h),
       notice(model.notice, h),
       h.main([h.Class('flex min-h-0 flex-1 flex-col overflow-auto')], [body(h, model)]),
+      collageExportDialogView(h, model),
     ],
   )
 })
@@ -49,6 +54,16 @@ const header = (h: HtmlBuilder<CollageMessage>) =>
           ),
           h.h1([h.Class('text-sm font-semibold tracking-[0.3em] text-accent')], ['COLLAGE']),
         ],
+      ),
+      h.button(
+        [
+          h.OnClick(ExportRequested()),
+          h.AriaLabel('Export this collage'),
+          // Icon-only, like the editor's top bar — the dialog's Export
+          // button stays the only visible 'Export' text on the screen.
+          h.Class('grid size-8 place-items-center text-muted hover:text-ink'),
+        ],
+        [icon(h, Download, 'Export this collage')],
       ),
     ],
   )

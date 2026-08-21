@@ -8,27 +8,43 @@ import {
   given,
   role,
   scene,
+  selector,
   text,
 } from 'foldkit/scene'
+import { Dialog } from '@foldkit/ui'
 import {
   Collage,
   CollageId,
   defaultCollageLayout,
+  EditId,
   StoreError,
 } from '@lutra/store'
 import type { Collage as CollageRecord } from '@lutra/store'
-import type { EditId } from '@lutra/store'
+
 import { initialModel } from './model'
 import type { Model } from './model'
 import { update } from './update'
 import { view } from './view'
-import { NavigateMenu, SaveCollage } from './command'
+import {
+  DownloadCollageExport,
+  EncodeCollageExport,
+  NavigateMenu,
+  RevokeCollageExportUrl,
+  SaveCollageExportSettings,
+  SnapshotCollageExport,
+} from './command'
 import {
   BackRequested,
   ChangedColumns,
   ChangedGutter,
+  CollageDownloaded,
+  CollageEncodePrepared,
+  CollageExportSettingsSaved,
+  CollageExportSnapshotted,
   CollageLoaded,
   CollageMissing,
+  CollageExportUrlRevoked,
+  ExportRequested as ExportRequestedMessage,
   LoadFailed,
   MovedTile,
   NavigatedBack,
@@ -47,7 +63,7 @@ const id = CollageId('11111111-1111-4111-8111-111111111111')
 /** Distinct format-valid Edit ids for the tiles. */
 const tileEditId = (n: number): EditId => {
   const digits = String(n).padStart(12, '0')
-  return `22222222-2222-4222-8222-${digits}` as EditId
+  return EditId(`22222222-2222-4222-8222-${digits}`)
 }
 
 const collageWith = (
@@ -217,5 +233,104 @@ describe('collage submodel: arrangement auto-saves', () => {
     const loaded = loadedWith([1, 2, 3], { gutter: 8 })
     const [, commands] = update(loaded, ChangedGutter({ gutter: 16 }))
     expect(commands.map((c) => c.name)).toEqual(['SaveCollage'])
+  })
+})
+
+
+// ---- export flow ----
+
+// Resolve the dialog's internal ShowDialog command.
+const openDialog = [
+  Command.expectHas(Dialog.ShowDialog),
+  Command.resolve(Dialog.ShowDialog, Dialog.CompletedShowDialog()),
+]
+
+describe('collage submodel: export', () => {
+  it('opens on ExportRequested, composes once, and encodes only on Export press', () => {
+    scene(
+      config,
+      given(loadedWith([1, 2])),
+      click(selector('[aria-label^="Export"]')),
+      ...openDialog,
+      // The dialog shows the shared sections and the collage filename.
+      sceneExpect(text('EXPORT')).toExist(),
+      sceneExpect(text('lutra-collage.png')).toExist(),
+      sceneExpect(text('PNG')).toExist(),
+      sceneExpect(text('100%')).toExist(),
+      // Composition starts immediately and lands in the model.
+      Command.expectHas(SnapshotCollageExport),
+      Command.resolve(SnapshotCollageExport, CollageExportSnapshotted({ failedTiles: 0 })),
+      Command.expectNone(),
+
+      // Pressing Export encodes and downloads — the size appears.
+      click(text('Export')),
+      sceneExpect(text('Encoding…')).toExist(),
+      Command.expectHas(EncodeCollageExport),
+      Command.resolve(EncodeCollageExport, CollageEncodePrepared({ sizeBytes: 4096, url: 'blob:collage-1' })),
+      Command.expectHas(DownloadCollageExport),
+      Command.resolve(DownloadCollageExport, CollageDownloaded({ url: 'blob:collage-1' })),
+      sceneExpect(text('Downloaded', { exact: false })).toExist(),
+      sceneExpect(text('4.0 KB', { exact: false })).toExist(),
+      // The dialog stays open after a download.
+      sceneExpect(text('EXPORT')).toExist(),
+      Command.expectNone(),
+    )
+  })
+
+  it('closing the dialog revokes the blob url', () => {
+    scene(
+      config,
+      given(loadedWith([1])),
+      click(selector('[aria-label^="Export"]')),
+      ...openDialog,
+      Command.resolve(SnapshotCollageExport, CollageExportSnapshotted({ failedTiles: 0 })),
+      click(text('Export')),
+      Command.resolve(EncodeCollageExport, CollageEncodePrepared({ sizeBytes: 4096, url: 'blob:collage-1' })),
+      Command.resolve(DownloadCollageExport, CollageDownloaded({ url: 'blob:collage-1' })),
+      // Cancel closes: the composed frame drops and the url is revoked.
+      click(text('Cancel')),
+      Command.resolve(Dialog.CloseDialog, Dialog.CompletedCloseDialog()),
+      Command.resolve(RevokeCollageExportUrl, CollageExportUrlRevoked()),
+    )
+  })
+
+  it('format changes persist through the shared settings key and update the filename', () => {
+    scene(
+      config,
+      given(loadedWith([1])),
+      click(selector('[aria-label^="Export"]')),
+      ...openDialog,
+      Command.resolve(SnapshotCollageExport, CollageExportSnapshotted({ failedTiles: 0 })),
+      click(text('JPEG')),
+      sceneExpect(text('lutra-collage.jpeg')).toExist(),
+      Command.resolve(SaveCollageExportSettings, CollageExportSettingsSaved()),
+      Command.expectNone(),
+    )
+  })
+})
+
+describe('collage export: update-level guards', () => {
+  it('a compose that lands while the dialog is closed is dropped', () => {
+    // No ExportRequested has opened the dialog.
+    const [model, commands] = update(
+      initialModel(),
+      CollageExportSnapshotted({ failedTiles: 0 }),
+    )
+    expect(model.exportReady).toBe(false)
+    expect(commands).toEqual([])
+  })
+
+  it('failed tiles surface a count in the notice', () => {
+    const [opened] = update(loadedWith([1, 2]), ExportRequestedMessage())
+    expect(opened.exportDialog.isOpen).toBe(true)
+    const [model] = update(opened, CollageExportSnapshotted({ failedTiles: 2 }))
+    expect(model.notice).toBe('2 photos could not be rendered and show as blank')
+    expect(model.exportReady).toBe(true)
+  })
+
+  it('one failed tile reads in the singular', () => {
+    const [opened] = update(loadedWith([1]), ExportRequestedMessage())
+    const [model] = update(opened, CollageExportSnapshotted({ failedTiles: 1 }))
+    expect(model.notice).toBe('1 photo could not be rendered and show as blank')
   })
 })

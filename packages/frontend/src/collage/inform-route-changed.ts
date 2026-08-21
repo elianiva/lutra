@@ -1,23 +1,31 @@
 import { AsyncData } from 'foldkit'
 import type { Command } from 'foldkit'
+import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import type { CollageStore, EditStore } from '@lutra/store'
 import type { AppRoute } from '../route'
 import type { Model } from './model'
 import type { CollageMessage } from './message'
-import { LoadCollage } from './command'
+import { LoadCollage, LoadCollageExportSettings } from './command'
+
+type Resource = KeyValueStore | CollageStore | EditStore
 
 export type InformReturn = readonly [
   Model,
-  readonly Command.Command<CollageMessage, never, CollageStore | EditStore>[],
+  readonly Command.Command<CollageMessage, never, Resource>[],
 ]
 
 /**
  * Route changed into or out of the collage (docs/adr/0009). Arriving at a
  * collage re-fetches the record — reload and in-app navigation behave
  * identically, and auto-save means there is no unsaved local state to
- * protect. Leaving (or the bare `/collage` redirect) touches nothing.
+ * protect — and restores the persisted export settings (shared with the
+ * editor's dialog, docs/adr/0031). Leaving (or the bare `/collage`
+ * redirect) only restores the settings.
  */
 export const informRouteChanged = (model: Model, route: AppRoute): InformReturn =>
   route._tag === 'Collage' && route.collageId !== null
-    ? [{ ...model, collage: AsyncData.Loading() }, [LoadCollage({ id: route.collageId })]]
-    : [model, []]
+    ? [
+        { ...model, collage: AsyncData.Loading() },
+        [LoadCollage({ id: route.collageId }), LoadCollageExportSettings()],
+      ]
+    : [model, [LoadCollageExportSettings()]]

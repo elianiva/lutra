@@ -15,7 +15,10 @@ export const moveTile = <T>(tiles: readonly T[], from: number, to: number): read
   }
   const next = [...tiles]
   const [moved] = next.splice(from, 1)
-  next.splice(to, 0, moved as T)
+  if (moved === undefined) {
+    return tiles
+  }
+  next.splice(to, 0, moved)
   return next
 }
 

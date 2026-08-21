@@ -6,24 +6,21 @@ import { Edit, EditStore, EditIdSchema, newEditId } from '@lutra/store'
 import {
   type EncodeError,
   type GpuError,
-  type LutParseError,
   createLayer,
   createRenderRequest,
   ExportSettings,
-  defaultExportSettings,
   mimeFor,
   ImageEncoder,
   Layer,
   LAYER_TYPES,
   LutIdSchema,
   type LayerType,
-  type LutCube,
-  type LutId,
 } from '@lutra/engine'
 import { GpuBackend, RenderHandle } from '../gpu/backend'
 import { CanvasRef } from '../gpu/canvas-ref'
 import type { LutLoadError } from '../luts/store'
 import { LutStore } from '../luts/store'
+import { resolveLuts } from '../luts/resolve'
 import { LutThumbnailer } from '../thumbs/worker-layer'
 import {
   CanvasUnavailableError,
@@ -312,30 +309,6 @@ export const LoadCatalog = Command.define('LoadCatalog', {
 })
 
 /**
- * Resolve every LUT layer's cube through the LUT store, then hand the
- * id→cube map to the render request (the engine bakes sizes into the
- * shader and the GPU backend uploads textures from it).
- */
-const resolveLuts = (
-  layers: readonly Layer[],
-): Effect.Effect<ReadonlyMap<LutId, LutCube>, LutLoadError | LutParseError, LutStore> =>
-  Effect.gen(function* () {
-    const store = yield* LutStore
-    const luts = new Map<LutId, LutCube>()
-    for (const layer of layers) {
-      if (layer.type !== 'lut') {
-        continue
-      }
-      if (luts.has(layer.lutId)) {
-        continue
-      }
-      const cube = yield* store.getCube(layer.lutId)
-      luts.set(layer.lutId, cube)
-    }
-    return luts
-  })
-
-/**
  * Render the current chain (plus an optional draft appended last) through
  * WebGPU straight into the center-stage canvas. `stamp` is the model revision
  * at dispatch time so a render that arrives after a newer mutation can be
@@ -451,7 +424,8 @@ export const ReadHistogram = Command.define('ReadHistogram', {
 
 // ---- export dialog ----
 
-const EXPORT_SETTINGS_KEY = 'exportSettings'
+/** Settings persistence is shared with the collage's export dialog (docs/adr/0031). */
+import { loadExportSettings, saveExportSettings } from '../export-settings'
 
 /**
  * Read the frame identified by `handle` back from the GPU once, when the
@@ -532,31 +506,15 @@ export const RevokeExportUrl = Command.define('RevokeExportUrl', {
 
 /** Restore persisted export settings (dispatched once at startup). */
 export const LoadExportSettings = Command.define('LoadExportSettings', {
-  execute: Effect.gen(function* () {
-    const store = yield* Persistence.KeyValueStore
-    const schemaStore = Persistence.toSchemaStore(store, ExportSettings)
-    // `Effect.option` wraps the success (itself an Option) — flatten.
-    const saved = Option.flatten(
-      yield* schemaStore.get(EXPORT_SETTINGS_KEY).pipe(
-        // Missing or corrupt settings fall back to defaults.
-        Effect.option,
-      ),
-    )
-    return ExportSettingsLoaded({ settings: Option.getOrElse(defaultExportSettings)(saved) })
-  }),
+  execute: Effect.map(loadExportSettings, (settings) => ExportSettingsLoaded({ settings })),
   messages: [ExportSettingsLoaded],
 })
 
 /** Persist export settings (fired on every change; localStorage is cheap). */
 export const SaveExportSettings = Command.define('SaveExportSettings', {
   args: { settings: ExportSettings },
-  execute: ({ settings }) => Effect.gen(function* () {
-    const store = yield* Persistence.KeyValueStore
-    yield* Persistence.toSchemaStore(store, ExportSettings)
-      .set(EXPORT_SETTINGS_KEY, settings)
-      .pipe(Effect.ignore)
-    return ExportSettingsSaved()
-  }),
+  execute: ({ settings }) =>
+    Effect.as(Effect.ignore(saveExportSettings(settings)), ExportSettingsSaved()),
   messages: [ExportSettingsSaved],
 })
 

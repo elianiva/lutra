@@ -11,6 +11,7 @@ Previews must be instant and free: thumbnails are already persisted per Edit and
 - Cells compose at **1024px square** before the export scale preset; scale means a fraction of the composed size, downscale-only (docs/adr/0005).
 - Filename `lutra-collage.<format>`; export dialog settings reuse the editor's `ExportSettings` schema and KeyValueStore persistence.
 - The export dialog's presentational settings sections are **extracted into a shared module** consumed by both the editor dialog and a thin collage-local dialog built on the same `@foldkit/ui` `Dialog.Model` pattern — one convention, editor behavior unchanged.
+- The composed frame **bypasses the TEA model**: a full-resolution `ImageData` is megabytes of pixels, and routing it through Messages/Model makes every model log, diff, or devtools snapshot enumerate millions of array cells (observed as a hard crash with the devtools mounted). The model holds an `exportReady` flag; a module-level cache (`collage/export-frame.ts`, the same seam as `thumbnail-url.ts`) owns the pixels for the dialog's lifetime and is cleared on close.
 
 ### Consequences
 

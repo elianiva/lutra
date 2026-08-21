@@ -7,11 +7,13 @@ import {
   DeleteRequested,
   OpenPhotoRequested,
   RefreshRequested,
+  SettingsRequested,
   ToggledSelection,
 } from './message'
 import type { GalleryMessage } from './message'
 import type { Model } from './model'
 import type { EditSummary, EditId, StoreError } from '@lutra/store'
+import { settingsDialogView } from './settings-dialog'
 
 /**
  * The Gallery Submodel's view (docs/adr/0009). Branded via `defineView` so it
@@ -27,7 +29,12 @@ export const view = Submodel.defineView<Model, GalleryMessage>((model, h) => {
   const { grid } = model
   return h.div(
     [h.Class('flex h-full flex-col bg-bg text-ink')],
-    [header(h, model.selection.length), notice(model.notice, h), h.main([h.Class('flex min-h-0 flex-1')], [gridBody(h, grid, model.selection)])],
+    [
+      header(h, model.selection.length),
+      notice(model.notice, h),
+      h.main([h.Class('flex min-h-0 flex-1')], [gridBody(h, grid, model.selection)]),
+      settingsDialogView(h, model),
+    ],
   )
 })
 
@@ -78,6 +85,17 @@ const header = (h: HtmlBuilder<GalleryMessage>, selectedCount: number) =>
               h.Class('px-2 text-xs text-muted hover:text-ink'),
             ],
             ['Refresh'],
+          ),
+          // Same utility-action styling as "Refresh" — settings is chrome,
+          // not a primary CTA like "Open photo".
+          h.button(
+            [
+              h.OnClick(SettingsRequested()),
+              h.AriaLabel('Open settings'),
+              h.DataAttribute('open-settings', 'true'),
+              h.Class('px-2 text-xs text-muted hover:text-ink'),
+            ],
+            ['Settings'],
           ),
         ],
       ),

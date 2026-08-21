@@ -1,5 +1,6 @@
 import { Schema as S } from 'effect'
 import { AsyncData } from 'foldkit'
+import { Dialog } from '@foldkit/ui'
 import { EditSummary, StoreError, EditIdSchema } from '@lutra/store'
 
 /**
@@ -24,6 +25,15 @@ export const Model = S.Struct({
   // The current collage selection: Edit ids picked via the per-tile select
   // controls. Empty means nothing is selected; "Create collage" enables at two.
   selection: S.Array(EditIdSchema),
+  // The settings dialog submodel (@foldkit/ui): open/close/animation state.
+  settingsDialog: Dialog.Model,
+  // The Experimental section's flags. UI-only for now — nothing reads them
+  // yet; wiring them up changes app behavior and comes later.
+  experimental: S.Struct({
+    // "Infinite canvas": pan/zoom a Figma-style workspace instead of the
+    // fixed photo canvas. Not wired up — a visual toggle only.
+    infiniteCanvas: S.Boolean,
+  }),
 })
 export type Model = typeof Model.Type
 
@@ -31,4 +41,8 @@ export const initialModel = (): Model => ({
   grid: EditList.Idle(),
   notice: null,
   selection: [],
+  settingsDialog: Dialog.init({ id: 'gallery-settings-dialog' }),
+  experimental: {
+    infiniteCanvas: false,
+  },
 })

@@ -13,7 +13,7 @@ import {
 
 type CollageRecord = typeof Collage.Type
 
-const tile = (editId: string): CollageTile => ({ editId: editId as CollageTile['editId'] })
+const tile = (editId: string): CollageTile => ({ editId: EditId(editId) })
 
 const collage = (id: string, savedAt: number): CollageRecord =>
   Collage.make({
@@ -240,12 +240,17 @@ describe('CollageStoreIndexedDb (IndexedDB local backend)', () => {
     // A corrupt id is corruption, not a recoverable case — `Collage.make`
     // refuses to even construct one, so force a raw record past the
     // type-side constructor: the store must still refuse to persist it.
-    const raw = {
-      id: 'not-a-uuid',
-      savedAt: 1,
-      layout: defaultCollageLayout(),
-      tiles: [],
-    } as unknown as CollageRecord
+    // SAFETY: this case exists to hand the store a record whose id fails
+    // the schema's UUID refine — past Collage.make, which would refuse to
+    // build one. The JSON round-trip is that bypass's boundary.
+    const raw: CollageRecord = JSON.parse(
+      JSON.stringify({
+        id: 'not-a-uuid',
+        savedAt: 1,
+        layout: defaultCollageLayout(),
+        tiles: [],
+      }),
+    )
     await expect(run(save(raw))).rejects.toThrow()
   })
 })

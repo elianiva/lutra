@@ -1,5 +1,6 @@
 import { Schema as S } from 'effect'
 import { Message } from 'foldkit'
+import { Dialog } from '@foldkit/ui'
 import { EditSummary, EditIdSchema, StoreError, CollageIdSchema } from '@lutra/store'
 import { ImageDecodeError, ThumbnailEncodeError } from '../errors'
 
@@ -46,6 +47,21 @@ export const CollageCreated = Message.m('CollageCreated', { id: CollageIdSchema 
 /** The store refused the collage write. */
 export const CollageCreateFailed = Message.m('CollageCreateFailed', { error: StoreError })
 
+// ---- settings dialog ----
+
+/** "Settings" was pressed in the header: open the settings dialog. */
+export const SettingsRequested = Message.m('SettingsRequested')
+
+// The dialog is a foldkit submodel (@foldkit/ui). Its messages arrive
+// wrapped; update delegates to `Dialog.update` (mirrors the export dialogs).
+export const GotSettingsDialogMessage = Message.m('GotSettingsDialogMessage', {
+  message: Dialog.Message,
+})
+
+/** An experimental toggle flipped (the new checked state). UI-only for now —
+ *  nothing consumes the flag yet. */
+export const ToggledInfiniteCanvas = Message.m('ToggledInfiniteCanvas', { isEnabled: S.Boolean })
+
 export const GalleryMessage = S.Union([
   EditsListed,
   ListFailed,
@@ -62,6 +78,9 @@ export const GalleryMessage = S.Union([
   PhotoCreateFailed,
   CollageCreated,
   CollageCreateFailed,
+  SettingsRequested,
+  GotSettingsDialogMessage,
+  ToggledInfiniteCanvas,
 ])
 export type GalleryMessage = typeof GalleryMessage.Type
 

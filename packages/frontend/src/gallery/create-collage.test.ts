@@ -36,7 +36,7 @@ const config = {
 
 const editId = (n: number): EditId => {
   const digits = String(n).padStart(12, '0')
-  return `33333333-3333-4333-8333-${digits}` as EditId
+  return EditId(`33333333-3333-4333-8333-${digits}`)
 }
 
 const summary = (id: EditId): EditSummaryRecord =>

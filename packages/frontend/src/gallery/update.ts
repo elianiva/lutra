@@ -1,8 +1,9 @@
 import { Match as M, Option } from 'effect'
-import type { Command } from 'foldkit'
-import type { EditStore, CollageStore, EditId } from '@lutra/store'
+import { Command } from 'foldkit'
+import { Dialog } from '@foldkit/ui'
+import type { EditStore, CollageStore } from '@lutra/store'
 import type { GalleryMessage, GalleryOutMessage } from './message'
-import { CreatedCollage, OpenedEdit } from './message'
+import { CreatedCollage, OpenedEdit, GotSettingsDialogMessage } from './message'
 import { CreateCollage, DeleteEdit, ListEdits, OpenPhoto } from './command'
 import type { Model } from './model'
 import { editList } from './model'
@@ -82,6 +83,34 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
         [],
         Option.none(),
       ],
+
+      // ---- settings dialog ----
+      SettingsRequested: () => {
+        const [dialog, dialogCommands] = Dialog.open(model.settingsDialog)
+        return [
+          { ...model, settingsDialog: dialog },
+          Command.mapMessages(dialogCommands, toSettingsDialogMessage),
+          Option.none(),
+        ]
+      },
+      GotSettingsDialogMessage: ({ message }) => {
+        const [dialog, dialogCommands] = Dialog.update(model.settingsDialog, message)
+        return [
+          { ...model, settingsDialog: dialog },
+          Command.mapMessages(dialogCommands, toSettingsDialogMessage),
+          Option.none(),
+        ]
+      },
+      // Experimental toggles are UI-only for now — the flag flips and
+      // nothing else in the app reads it.
+      ToggledInfiniteCanvas: ({ isEnabled }) => [
+        { ...model, experimental: { ...model.experimental, infiniteCanvas: isEnabled } },
+        [],
+        Option.none(),
+      ],
     }),
     M.exhaustive,
   )
+
+const toSettingsDialogMessage = (message: Dialog.Message): GalleryMessage =>
+  GotSettingsDialogMessage({ message })
