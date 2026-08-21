@@ -1,6 +1,6 @@
 import { Schema as S } from 'effect'
 import { Message } from 'foldkit'
-import { EditSummary, EditIdSchema, StoreError } from '@lutra/store'
+import { EditSummary, EditIdSchema, StoreError, CollageIdSchema } from '@lutra/store'
 import { ImageDecodeError, ThumbnailEncodeError } from '../errors'
 
 /**
@@ -23,6 +23,12 @@ export const DeleteRequested = Message.m('DeleteRequested', { id: EditIdSchema }
 export const EditDeleted = Message.m('EditDeleted')
 export const DeleteFailed = Message.m('DeleteFailed', { error: StoreError })
 
+// ---- collage selection (docs/adr/0030) ----
+/** A tile's select control was tapped: the id joins or leaves the selection. */
+export const ToggledSelection = Message.m('ToggledSelection', { id: EditIdSchema })
+/** "Create collage" was pressed with two or more selected. */
+export const CreateCollageRequested = Message.m('CreateCollageRequested')
+
 // ---- open a photo (new edit) ----
 /** The user pressed "Open photo": fire the native file picker and create a new Edit. */
 export const OpenPhotoRequested = Message.m('OpenPhotoRequested')
@@ -34,6 +40,12 @@ export const PhotoCreateFailed = Message.m('PhotoCreateFailed', {
   error: S.Union([ImageDecodeError, ThumbnailEncodeError, StoreError]),
 })
 
+// ---- create a collage (persist-first, docs/adr/0030) ----
+/** The Collage record was persisted from the current selection. */
+export const CollageCreated = Message.m('CollageCreated', { id: CollageIdSchema })
+/** The store refused the collage write. */
+export const CollageCreateFailed = Message.m('CollageCreateFailed', { error: StoreError })
+
 export const GalleryMessage = S.Union([
   EditsListed,
   ListFailed,
@@ -42,17 +54,23 @@ export const GalleryMessage = S.Union([
   DeleteRequested,
   EditDeleted,
   DeleteFailed,
+  ToggledSelection,
+  CreateCollageRequested,
   OpenPhotoRequested,
   PhotoPickCancelled,
   PhotoCreated,
   PhotoCreateFailed,
+  CollageCreated,
+  CollageCreateFailed,
 ])
 export type GalleryMessage = typeof GalleryMessage.Type
 
 /**
- * The fact the gallery surfaces to the root (docs/adr/0009). Narrow and
- * semantic: the root owns navigation, so "open this edit" is the one fact the
- * gallery emits. The root reacts by pushing the `/edit/:id` URL.
+ * The facts the gallery surfaces to the root (docs/adr/0009). Narrow and
+ * semantic: the root owns navigation, so "open this edit" and "open this
+ * collage" are the only facts the gallery emits. The root reacts by pushing
+ * the corresponding URL.
  */
 export const OpenedEdit = Message.m('OpenedEdit', { id: EditIdSchema })
-export type GalleryOutMessage = typeof OpenedEdit.Type
+export const CreatedCollage = Message.m('CreatedCollage', { id: CollageIdSchema })
+export type GalleryOutMessage = typeof OpenedEdit.Type | typeof CreatedCollage.Type

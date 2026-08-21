@@ -3,7 +3,7 @@ import { Command } from 'foldkit'
 import { pushUrl } from 'foldkit/navigation'
 import { evo } from 'foldkit/struct'
 import type { EditStore, CollageStore } from '@lutra/store'
-import { EditIdSchema } from '@lutra/store'
+import { EditIdSchema, CollageIdSchema } from '@lutra/store'
 import type { GpuBackend } from '../gpu/backend'
 import type { CanvasRef } from '../gpu/canvas-ref'
 import type { LutStore } from '../luts/store'
@@ -59,6 +59,15 @@ const NavigateToEdit = Command.define('NavigateToEdit', {
  *  show — the bare form is a redirect, not a destination. */
 const NavigateHome = Command.define('NavigateHome', {
   execute: pushUrl('/').pipe(Effect.as(NavigatedTo())),
+  messages: [NavigatedTo],
+})
+
+/** Push the collage URL for a Collage the user created from the gallery. The
+ *  URL change triggers a `ChangedRoute`, which moves the collage screen into
+ *  place — this Command is just the side effect that starts it. */
+const NavigateToCollage = Command.define('NavigateToCollage', {
+  args: { id: CollageIdSchema },
+  execute: ({ id }) => pushUrl(`/collage/${id}`).pipe(Effect.as(NavigatedTo())),
   messages: [NavigatedTo],
 })
 
@@ -135,10 +144,16 @@ export const update = (model: Model, message: RootMessage): UpdateReturn =>
         const mapped = Command.mapMessages(cmds, (m) => GotGalleryMessage({ message: m }))
         return Option.match(out, {
           onNone: () => [evo(model, { gallery: (_) => nextGallery }), mapped],
-          onSome: ({ id }) => [
-            evo(model, { gallery: (_) => nextGallery }),
-            [...mapped, NavigateToEdit({ id })],
-          ],
+          onSome: (fact) =>
+            fact._tag === 'OpenedEdit'
+              ? [
+                  evo(model, { gallery: (_) => nextGallery }),
+                  [...mapped, NavigateToEdit({ id: fact.id })],
+                ]
+              : [
+                  evo(model, { gallery: (_) => nextGallery }),
+                  [...mapped, NavigateToCollage({ id: fact.id })],
+                ],
         })
       },
       GotEditorMessage: ({ message: editorMessage }) => {

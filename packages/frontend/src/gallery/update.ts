@@ -1,15 +1,15 @@
 import { Match as M, Option } from 'effect'
 import type { Command } from 'foldkit'
-import type { EditStore } from '@lutra/store'
+import type { EditStore, CollageStore, EditId } from '@lutra/store'
 import type { GalleryMessage, GalleryOutMessage } from './message'
-import { OpenedEdit } from './message'
-import { DeleteEdit, ListEdits, OpenPhoto } from './command'
+import { CreatedCollage, OpenedEdit } from './message'
+import { CreateCollage, DeleteEdit, ListEdits, OpenPhoto } from './command'
 import type { Model } from './model'
 import { editList } from './model'
 
 export type UpdateReturn = readonly [
   Model,
-  readonly Command.Command<GalleryMessage, never, EditStore>[],
+  readonly Command.Command<GalleryMessage, never, EditStore | CollageStore>[],
   Option.Option<GalleryOutMessage>,
 ]
 
@@ -24,7 +24,14 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
     M.withReturnType<UpdateReturn>(),
     M.tags({
       EditsListed: ({ summaries }) => [
-        { ...model, grid: editList.Success({ data: summaries }), notice: null },
+        {
+          ...model,
+          grid: editList.Success({ data: summaries }),
+          notice: null,
+          // Prune the collage selection to edits that still exist — a tile
+          // deleted elsewhere must not join a new collage as a dangling ref.
+          selection: model.selection.filter((id) => summaries.some((s) => s.id === id)),
+        },
         [],
         Option.none(),
       ],
@@ -42,6 +49,24 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
       EditDeleted: () => [model, [ListEdits()], Option.none()],
       DeleteFailed: ({ error }) => [
         { ...model, notice: `Delete failed: ${error.message}` },
+        [],
+        Option.none(),
+      ],
+
+      // ---- collage selection (docs/adr/0030) ----
+      ToggledSelection: ({ id }) => {
+        const selected = model.selection.some((selected) => selected === id)
+        const selection = selected
+          ? model.selection.filter((selected) => selected !== id)
+          : [...model.selection, id]
+        return [{ ...model, selection }, [], Option.none()]
+      },
+      CreateCollageRequested: () => [model, [CreateCollage({ editIds: model.selection })], Option.none()],
+      // Persisted: surface it upward — the root pushes `/collage/:id` — and
+      // clear the selection (the arrangement now lives in its own record).
+      CollageCreated: ({ id }) => [{ ...model, selection: [] }, [], Option.some(CreatedCollage({ id }))],
+      CollageCreateFailed: ({ error }) => [
+        { ...model, notice: `Could not create the collage: ${error.message}` },
         [],
         Option.none(),
       ],

@@ -1,7 +1,14 @@
 import { DateTime } from 'effect'
 import { Submodel, AsyncData } from 'foldkit'
 import type { HtmlBuilder } from 'foldkit/html'
-import { ClickedEdit, DeleteRequested, OpenPhotoRequested, RefreshRequested } from './message'
+import {
+  ClickedEdit,
+  CreateCollageRequested,
+  DeleteRequested,
+  OpenPhotoRequested,
+  RefreshRequested,
+  ToggledSelection,
+} from './message'
 import type { GalleryMessage } from './message'
 import type { Model } from './model'
 import type { EditSummary, EditId, StoreError } from '@lutra/store'
@@ -20,11 +27,7 @@ export const view = Submodel.defineView<Model, GalleryMessage>((model, h) => {
   const { grid } = model
   return h.div(
     [h.Class('flex h-full flex-col bg-bg text-ink')],
-    [
-      header(h),
-      notice(model.notice, h),
-      h.main([h.Class('flex min-h-0 flex-1')], [gridBody(h, grid)]),
-    ],
+    [header(h, model.selection.length), notice(model.notice, h), h.main([h.Class('flex min-h-0 flex-1')], [gridBody(h, grid, model.selection)])],
   )
 })
 
@@ -33,7 +36,7 @@ const notice = (message: string | null, h: HtmlBuilder<GalleryMessage>) =>
     ? null
     : h.div([h.Class('border-b border-border bg-panel px-4 py-1 text-xs text-accent')], [message])
 
-const header = (h: HtmlBuilder<GalleryMessage>) =>
+const header = (h: HtmlBuilder<GalleryMessage>, selectedCount: number) =>
   h.header(
     [h.Class('flex items-center justify-between border-b border-border bg-panel px-4 py-2')],
     [
@@ -41,6 +44,23 @@ const header = (h: HtmlBuilder<GalleryMessage>) =>
       h.div(
         [h.Class('flex items-center gap-2')],
         [
+          // "Create collage" appears once two or more edits are selected
+          // (docs/adr/0030): below that there is nothing to arrange.
+          ...(selectedCount >= 2
+            ? [
+                h.button(
+                  [
+                    h.OnClick(CreateCollageRequested()),
+                    h.AriaLabel(`Create a collage from ${selectedCount} selected edits`),
+                    h.DataAttribute('create-collage', 'true'),
+                    h.Class(
+                      'rounded bg-accent px-3 py-1 text-xs text-ink hover:opacity-80',
+                    ),
+                  ],
+                  [`Create collage (${selectedCount})`],
+                ),
+              ]
+            : []),
           h.button(
             [
               h.OnClick(OpenPhotoRequested()),
@@ -67,6 +87,7 @@ const header = (h: HtmlBuilder<GalleryMessage>) =>
 const gridBody = (
   h: HtmlBuilder<GalleryMessage>,
   grid: AsyncData.AsyncData<readonly EditSummary[], StoreError>,
+  selection: readonly EditId[],
 ) =>
   AsyncData.match(grid, {
     onFailure: (error) => errorState(h, error.message),
@@ -74,7 +95,8 @@ const gridBody = (
     onLoading: () => spinner(h),
     onRefreshing: () => spinner(h),
     onStale: () => spinner(h),
-    onSuccess: (summaries) => (summaries.length === 0 ? emptyState(h) : gridTiles(h, summaries)),
+    onSuccess: (summaries) =>
+      summaries.length === 0 ? emptyState(h) : gridTiles(h, summaries, selection),
   })
 
 const spinner = (h: HtmlBuilder<GalleryMessage>) =>
@@ -112,23 +134,29 @@ const errorState = (h: HtmlBuilder<GalleryMessage>, error: string) =>
     ],
   )
 
-const gridTiles = (h: HtmlBuilder<GalleryMessage>, summaries: readonly EditSummary[]) =>
+const gridTiles = (
+  h: HtmlBuilder<GalleryMessage>,
+  summaries: readonly EditSummary[],
+  selection: readonly EditId[],
+) =>
   h.div(
     [h.Class('grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4 p-4')],
-    summaries.map((summary) => tile(h, summary)),
+    summaries.map((summary) => tile(h, summary, selection.includes(summary.id))),
   )
 
-const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) =>
+const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary, selected: boolean) =>
   h.div(
     [
       h.DataAttribute('edit-id', summary.id),
       h.Class(
-        'group relative aspect-square overflow-hidden rounded border border-border bg-panel hover:border-muted',
+        `group relative aspect-square overflow-hidden rounded border bg-panel hover:border-muted ${
+          selected ? 'border-accent' : 'border-border'
+        }`,
       ),
     ],
     [
-      // Click target for opening the edit — must not include the delete button
-      // so that delete clicks don't bubble up into ClickedEdit.
+      // Click target for opening the edit — must not include the select or
+      // delete buttons so those clicks don't bubble up into ClickedEdit.
       h.button(
         [
           h.OnClick(ClickedEdit({ id: summary.id })),
@@ -136,6 +164,26 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) =>
           h.Class('absolute inset-0'),
         ],
         [tileThumb(h, summary)],
+      ),
+      // The collage-select control (docs/adr/0030): a persistent overlay
+      // like the delete control — no separate "select mode" to enter or
+      // leave; the header CTA appears at two or more.
+      h.button(
+        [
+          h.OnClick(ToggledSelection({ id: summary.id })),
+          h.AriaLabel(
+            selected ? 'Remove from collage selection' : 'Add to collage selection',
+          ),
+          h.DataAttribute('select-edit-id', summary.id),
+          h.Class(
+            `absolute left-1 top-1 z-10 grid size-7 place-items-center rounded-full border text-[10px] ${
+              selected
+                ? 'border-accent bg-accent text-ink'
+                : 'border-white/60 bg-black/40 text-white/80 hover:text-white'
+            }`,
+          ),
+        ],
+        [selected ? '✓' : ''],
       ),
       h.div(
         [

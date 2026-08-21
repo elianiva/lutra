@@ -1,7 +1,16 @@
-import { DateTime, Effect, Option } from 'effect'
+import { DateTime, Effect, Option, Schema as S } from 'effect'
 import { Command, File as FoldkitFile } from 'foldkit'
 import type { StoreError } from '@lutra/store'
-import { EditStore, EditIdSchema, Edit, newEditId } from '@lutra/store'
+import {
+  Collage,
+  CollageStore,
+  EditStore,
+  EditIdSchema,
+  Edit,
+  newCollageId,
+  newEditId,
+  defaultCollageLayout,
+} from '@lutra/store'
 import { ImageDecodeError, ThumbnailEncodeError } from '../errors'
 import {
   EditsListed,
@@ -11,6 +20,8 @@ import {
   PhotoCreated,
   PhotoCreateFailed,
   PhotoPickCancelled,
+  CollageCreated,
+  CollageCreateFailed,
 } from './message'
 
 /**
@@ -156,4 +167,35 @@ export const OpenPhoto = Command.define('OpenPhoto', {
     ),
   ),
   messages: [PhotoCreated, PhotoPickCancelled, PhotoCreateFailed],
+})
+
+/**
+ * The gallery's "create collage" flow (docs/adr/0030): persist a new Collage
+ * (fresh uuid, default layout, one tile per selected Edit in pick order) and
+ * surface the id as `CollageCreated`. Persist-first, like opening a photo —
+ * the record exists before the screen opens, and the root navigates onto it.
+ * A backend failure surfaces as `CollageCreateFailed` so the gallery can show
+ * it instead of silently dropping the selection.
+ */
+export const CreateCollage = Command.define('CreateCollage', {
+  args: { editIds: S.Array(EditIdSchema) },
+  execute: ({ editIds }) =>
+    Effect.gen(function* CreateCollage() {
+      const store = yield* CollageStore
+      const id = newCollageId()
+      yield* store.save(
+        Collage.make({
+          id,
+          savedAt: DateTime.nowUnsafe().epochMilliseconds,
+          layout: defaultCollageLayout(),
+          tiles: editIds.map((editId) => ({ editId })),
+        }),
+      )
+      return CollageCreated({ id })
+    }).pipe(
+      Effect.catchTag('StoreError', (err: StoreError) =>
+        Effect.succeed(CollageCreateFailed({ error: err })),
+      ),
+    ),
+  messages: [CollageCreated, CollageCreateFailed],
 })

@@ -1,6 +1,6 @@
 import { Schema as S } from 'effect'
 import { AsyncData } from 'foldkit'
-import { EditSummary, StoreError } from '@lutra/store'
+import { EditSummary, StoreError, EditIdSchema } from '@lutra/store'
 
 /**
  * The Gallery Submodel's model (docs/adr/0009): the list of saved Edits
@@ -21,10 +21,14 @@ export const Model = S.Struct({
   grid: EditList.schema,
   // A transient banner message (e.g. a failed photo create), null when clean.
   notice: S.NullOr(S.String),
+  // The current collage selection: Edit ids picked via the per-tile select
+  // controls. Empty means nothing is selected; "Create collage" enables at two.
+  selection: S.Array(EditIdSchema),
 })
 export type Model = typeof Model.Type
 
 export const initialModel = (): Model => ({
   grid: EditList.Idle(),
   notice: null,
+  selection: [],
 })
