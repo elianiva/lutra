@@ -115,6 +115,14 @@ _Avoid_: "thumbnail card" (it's the record, not the visual card), "saved-edit ti
 **savedAt**:
 The timestamp stored on an **Edit** that orders the **main menu**. Because the local IndexedDB table is keyed by **Edit id** and not ordered by time, `list()` sorts summaries by `savedAt` in memory (a future sqlite/cloud backend may order server-side instead — docs/adr/0007).
 
+**Collage**:
+A gallery-side record arranging several **Edits** into one shareable image: a stable UUID, its **savedAt**, a fixed-grid layout, and an ordered set of **Collage tiles**. A Collage owns no pixels — it references Edits **by id**: previews draw each tile's stored thumbnail, and export re-renders each referenced Edit's chain (docs/adr/0030, 0031). Created persist-first from a multi-select in the **main menu**; layout changes auto-save; there is no Save/Save as. Listed in the main menu's **Collages** section, ordered by **savedAt**.
+_Avoid_: "moodboard" (implies freeform placement; the layout is a fixed grid), "Contact sheet" (names the grid layout style, not the record), "collage layer" (a collage contains no adjustment layers).
+
+**Collage tile**:
+One placed **Edit** within a **Collage**: the referenced **Edit id** — position is the tile's array index in reading order. Tiles support remove and reorder only; there is no add-after-creation in v1. An Edit deleted after being placed is dropped from the Collage on load, with a notice; saving persists the cleaned set.
+_Avoid_: "cell" (the cell is the layout slot; the tile is the placed Edit).
+
 **Store error**:
 The tagged error type a failed **Edit store** operation raises (a genuine failure — quota, blocked access, corruption — not a missing record, which `load` reports as `Option.None`). Its purpose is to give the frontend a channel to surface failures (in the **main menu** or **Options screen**) and to let future sync distinguish local from server failure.
 _Avoid_: reusing the engine's `GpuError`/`EncodeError` — storage failures are a distinct defect class in a distinct package.
@@ -180,7 +188,7 @@ Tool selection and layer selection are edges only from the editable states, so a
 - **Chain data ops, pan/zoom, export, LUT bar state** (open, hover preview, tab, recents, per-photo **LUT preview thumbnails**): pure data updates.
 
 **Layer drawer**:
-The right sidebar of the **editor**, always visible, showing the current **edit chain** as a vertical list. Displays each layer with its icon, label, formatted value, visibility toggle, and delete button. When a layer is selected or a **draft layer** is active, the slider and confirm/cancel controls render inline below the layer entry. Supports drag-to-reorder.
+The right sidebar of the **editor**, always visible, showing the current **edit chain** as a vertical list. Displays each layer with its icon, label, formatted value, visibility toggle, and delete button. When a layer is selected or a **draft layer** is active, the slider and confirm/cancel controls render inline below the layer entry. Reorders via adjacent move-up / move-down controls.
 _Avoid_: "layers panel" (was the old bottom tab), "layer list" (too generic)
 
 **Histogram overlay**:
@@ -238,8 +246,12 @@ On phones and portrait tablets (< 1024px, docs/adr/0024) the editor stacks inste
 _Avoid_: "color grading menu", "workspace"
 
 **Main menu**:
-The gallery screen at `/` (the app's entry point). Shows saved **edits** as a grid of **Edit summaries** (their **thumbnails**), ordered by **savedAt**. Selecting a tile opens the **Editor** attached to that **Edit**. An **Open photo** action (header + empty state) fires the native file picker, creates a new **Edit** for the picked photo (fresh **Edit id**, empty **edit chain**, source + thumbnail bytes) through the **Edit store**, and opens the **Editor** on it — the same persist-then-open flow as the mobile main menu. v1 tile actions are **open** (the whole tile) and **delete** (a per-tile control that calls the **Edit store**); no rename or multi-select in v1. The **Options screen** affordance (storage info, "Clear all") anchors here. The grid reflows to two columns on a phone (docs/adr/0024); the offline card spans the viewport width below 768px.
+The gallery screen at `/` (the app's entry point). Shows saved **edits** as a grid of **Edit summaries** (their **thumbnails**), ordered by **savedAt**. Selecting a tile opens the **Editor** attached to that **Edit**. An **Open photo** action (header + empty state) fires the native file picker, creates a new **Edit** for the picked photo (fresh **Edit id**, empty **edit chain**, source + thumbnail bytes) through the **Edit store**, and opens the **Editor** on it — the same persist-then-open flow as the mobile main menu. Tile actions are **open** (the whole tile) and **delete** (a per-tile control that calls the **Edit store**); no rename. A **Select** header action enters multi-select mode, where tapping tiles toggles selection and a **Create collage** action (enabled at two or more selected) builds a **Collage** persist-first and opens the **Collage screen**. A **Collages** section below the edits grid lists saved **Collages** ordered by **savedAt**, each shown as a live mini-preview composited client-side from its tiles' thumbnails, with per-item delete. The **Options screen** affordance (storage info, "Clear all") anchors here. The grid reflows to two columns on a phone (docs/adr/0024); the offline card spans the viewport width below 768px.
 _Avoid_: "Gallery" (ambiguous with the image-processing sense of the word), "landing page".
+
+**Collage screen**:
+The screen at `/collage/<collage id>`, reached from **Create collage** or a **Collages**-section tile. Renders the fixed-grid preview — each **Collage tile** drawn from its referenced **Edit**'s stored thumbnail, fitted to the viewport — with layout controls (columns, gutter, background), per-tile remove and move controls, an export button reusing the export dialog, and back navigation to the **main menu**. Layout changes auto-save; references whose Edit was deleted are dropped on load with a notice.
+_Avoid_: "collage editor" (nothing is edited but the arrangement).
 
 **Attached edit**:
 The state of the **Editor** when it was opened from a **Main menu** tile: the editor is tied to that **Edit id**, its source image, and its **edit chain**. In this state, **Save** updates that Edit in place (source image untouched, thumbnail refreshed from the graded result) and **Save as** forks. When the editor is instead seeded from a fresh in-editor file pick, there is no attached edit and **Save** creates a new one. Opening a photo from the **Main menu** is persist-first: the gallery creates the **Edit** (fresh id, empty chain) and navigates the editor onto it, so the editor always has an attached edit there. The attached edit is model data (id + source bytes), not a new editor phase — an opened Edit is the existing `Idle` phase. Through the **Edit store** seam both write modes are the same call: **Save** is `save(edit)` with the existing id, **Save as** is `save(edit)` with a freshly generated id and duplicated source bytes.
