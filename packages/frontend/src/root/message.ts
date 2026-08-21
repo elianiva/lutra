@@ -3,6 +3,7 @@ import { Message } from 'foldkit'
 import { AppRoute } from '../route'
 import * as Gallery from '../gallery/message'
 import * as Editor from '../editor/message'
+import * as Collage from '../collage/message'
 import * as Offline from '../offline/messages'
 // The offline UI's own requests/acks, re-exported so root-owned views
 // (the strip's start button, the toast) can dispatch them directly.
@@ -23,6 +24,8 @@ export const Navigated = Message.m('Navigated', { request: S.Unknown })
 export const GotGalleryMessage = Message.m('GotGalleryMessage', { message: Gallery.GalleryMessage })
 /** Wraps an Editor Submodel Message so the root can delegate to `Editor.update`. */
 export const GotEditorMessage = Message.m('GotEditorMessage', { message: Editor.EditorMessage })
+/** Wraps a Collage Submodel Message so the root can delegate to `Collage.update`. */
+export const GotCollageMessage = Message.m('GotCollageMessage', { message: Collage.CollageMessage })
 
 /** The root pushed `/edit/:id` in response to a Gallery `OpenedEdit` fact.
  *  Observability only — the URL change itself drives the route transition. */
@@ -33,6 +36,7 @@ export const RootMessage = S.Union([
   Navigated,
   GotGalleryMessage,
   GotEditorMessage,
+  GotCollageMessage,
   NavigatedTo,
   // The offline slice's universe (../offline/messages): the fill's bridged
   // events, the connectivity facts, and the UI's requests/acks. The root

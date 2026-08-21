@@ -2,7 +2,7 @@ import { Effect, Match, Option, Schema as S } from 'effect'
 import { Command } from 'foldkit'
 import { pushUrl } from 'foldkit/navigation'
 import { evo } from 'foldkit/struct'
-import type { EditStore } from '@lutra/store'
+import type { EditStore, CollageStore } from '@lutra/store'
 import { EditIdSchema } from '@lutra/store'
 import type { GpuBackend } from '../gpu/backend'
 import type { CanvasRef } from '../gpu/canvas-ref'
@@ -11,12 +11,13 @@ import type { LutThumbnailer } from '../thumbs/worker-layer'
 import type { ImageEncoder } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import type { RootMessage } from './message'
-import { GotGalleryMessage, GotEditorMessage, NavigatedTo } from './message'
+import { GotGalleryMessage, GotEditorMessage, GotCollageMessage, NavigatedTo } from './message'
 import type { Model } from './model'
-import { GalleryRoute, EditorRoute } from '../route'
+import { GalleryRoute, EditorRoute, CollageRoute, CollageHomeRoute } from '../route'
 import type { AppRoute } from '../route'
 import * as Gallery from '../gallery'
 import * as Editor from '../editor'
+import * as Collage from '../collage'
 import { offlineMachine } from '../offline/machine'
 import type { Offline } from '../offline/model'
 import {
@@ -35,6 +36,7 @@ type Resource =
   | ImageEncoder
   | KeyValueStore
   | EditStore
+  | CollageStore
   | LutThumbnailer
   | OfflineFill
 
@@ -49,6 +51,14 @@ export type UpdateReturn = readonly [
 const NavigateToEdit = Command.define('NavigateToEdit', {
   args: { id: EditIdSchema },
   execute: ({ id }) => pushUrl(`/edit/${id}`).pipe(Effect.as(NavigatedTo())),
+  messages: [NavigatedTo],
+})
+
+/** Push the menu URL for a bare `/collage` (no id): collages are created
+ *  persist-first from the gallery, so there is no "new collage" screen to
+ *  show — the bare form is a redirect, not a destination. */
+const NavigateHome = Command.define('NavigateHome', {
+  execute: pushUrl('/').pipe(Effect.as(NavigatedTo())),
   messages: [NavigatedTo],
 })
 
@@ -69,6 +79,15 @@ const applyRoute = (model: Model, route: AppRoute) =>
       const [nextEditor, cmds] = Editor.informRouteChanged(model.editor, route)
       const mapped = Command.mapMessages(cmds, (m) => GotEditorMessage({ message: m }))
       return [withRoute(evo(model, { editor: (_) => nextEditor }), route), mapped]
+    }),
+    Match.when(S.is(CollageHomeRoute), (route) => {
+      // Bare `/collage` is a redirect home, not a screen.
+      return [withRoute(model, route), [NavigateHome()]]
+    }),
+    Match.when(S.is(CollageRoute), (route) => {
+      const [nextCollage, cmds] = Collage.informRouteChanged(model.collage, route)
+      const mapped = Command.mapMessages(cmds, (m) => GotCollageMessage({ message: m }))
+      return [withRoute(evo(model, { collage: (_) => nextCollage }), route), mapped]
     }),
     Match.orElse((route) => [withRoute(model, route), []]),
   )
@@ -136,6 +155,11 @@ export const update = (model: Model, message: RootMessage): UpdateReturn =>
             [...mapped, NavigateToEdit({ id })],
           ],
         })
+      },
+      GotCollageMessage: ({ message: collageMessage }) => {
+        const [nextCollage, cmds] = Collage.update(model.collage, collageMessage)
+        const mapped = Command.mapMessages(cmds, (m) => GotCollageMessage({ message: m }))
+        return [evo(model, { collage: (_) => nextCollage }), mapped]
       },
       NavigatedTo: () => [model, []],
 

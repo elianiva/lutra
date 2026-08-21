@@ -2,6 +2,7 @@ import { Schema as S } from 'effect'
 import { AppRoute } from '../route'
 import { Model as GalleryModel } from '../gallery/model'
 import { Model as EditorModel } from '../editor/model'
+import { Model as CollageModel } from '../collage/model'
 import { Offline } from '../offline/model'
 import { WebGpuCapability } from '../gpu/capability'
 
@@ -17,6 +18,7 @@ import { WebGpuCapability } from '../gpu/capability'
 export const Model = S.Struct({
   editor: EditorModel,
   gallery: GalleryModel,
+  collage: CollageModel,
   offline: Offline,
   route: AppRoute,
   webgpu: WebGpuCapability,

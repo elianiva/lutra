@@ -6,13 +6,14 @@ import type { CanvasRef } from '../gpu/canvas-ref'
 import type { LutStore } from '../luts/store'
 import type { ImageEncoder } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
-import type { EditStore } from '@lutra/store'
+import type { EditStore, CollageStore } from '@lutra/store'
 import type { RootMessage } from './message'
-import { GotGalleryMessage, GotEditorMessage } from './message'
+import { GotGalleryMessage, GotEditorMessage, GotCollageMessage } from './message'
 import type { Model } from './model'
-import { GalleryRoute, EditorRoute, parseRoute } from '../route'
+import { GalleryRoute, EditorRoute, CollageRoute, parseRoute } from '../route'
 import * as Gallery from '../gallery'
 import * as Editor from '../editor'
+import * as Collage from '../collage'
 import type { LutThumbnailer } from '../thumbs/worker-layer'
 import type { WebGpuCapability } from '../gpu/capability'
 import { initialOffline } from '../offline/model'
@@ -26,6 +27,7 @@ type Resource =
   | ImageEncoder
   | KeyValueStore
   | EditStore
+  | CollageStore
   | LutThumbnailer
   | OfflineFill
 
@@ -39,13 +41,15 @@ export type InitReturn = readonly [Model, readonly Command.Command<RootMessage, 
  *
  *   Gallery → `Gallery.init` (fires `ListEdits` so the grid populates)
  *   Editor  → `Editor.init`  (fires the LUT catalog + export-settings loads)
- *   NotFound → neither
+ *   Collage → `Collage.init` (fires `LoadCollage` when a collage is the boot URL)
+ *   NotFound → none
  */
 export const init = (capability: WebGpuCapability, url: Url.Url): InitReturn => {
   const route = parseRoute(url)
 
   const [gallery, galleryCommands] = Gallery.init(route)
   const [editor, editorCommands] = Editor.init(route)
+  const [collage, collageCommands] = Collage.init(route)
   const offline = initialOffline()
 
   const commands = Match.value(route).pipe(
@@ -56,6 +60,9 @@ export const init = (capability: WebGpuCapability, url: Url.Url): InitReturn => 
     Match.when(S.is(EditorRoute), () =>
       Command.mapMessages(editorCommands, (message) => GotEditorMessage({ message })),
     ),
+    Match.when(S.is(CollageRoute), () =>
+      Command.mapMessages(collageCommands, (message) => GotCollageMessage({ message })),
+    ),
     Match.orElse(() => []),
   )
 
@@ -63,6 +70,7 @@ export const init = (capability: WebGpuCapability, url: Url.Url): InitReturn => 
     {
       editor,
       gallery,
+      collage,
       offline,
       route,
       webgpu: capability,

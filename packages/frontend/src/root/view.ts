@@ -5,12 +5,14 @@ import type { RootMessage } from './message'
 import {
   GotGalleryMessage,
   GotEditorMessage,
+  GotCollageMessage,
   OfflineFillRequested,
   OfflineReadyDismissed,
 } from './message'
-import { GalleryRoute, EditorRoute } from '../route'
+import { GalleryRoute, EditorRoute, CollageRoute, CollageHomeRoute } from '../route'
 import * as Gallery from '../gallery'
 import * as Editor from '../editor'
+import * as Collage from '../collage'
 
 /**
  * The root's view (docs/adr/0009). Emits a whole-document shell and embeds
@@ -199,6 +201,18 @@ const activeRoute = (model: Model, h: HtmlBuilder<RootMessage>) =>
         slotId: 'editor',
         toParentMessage: (message) => GotEditorMessage({ message }),
         view: Editor.view,
+      }),
+    ),
+    Match.when(S.is(CollageHomeRoute), () =>
+      // Bare `/collage` redirects home; render nothing for the one tick.
+      h.div([], []),
+    ),
+    Match.when(S.is(CollageRoute), () =>
+      h.submodel({
+        model: model.collage,
+        slotId: 'collage',
+        toParentMessage: (message) => GotCollageMessage({ message }),
+        view: Collage.view,
       }),
     ),
     Match.orElse(() => notFound(h)),
