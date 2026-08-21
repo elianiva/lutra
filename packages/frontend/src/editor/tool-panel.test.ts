@@ -130,7 +130,7 @@ describe('tool panel cards', () => {
         text('Adjusts hue, saturation, and brightness of one color range at a time.'),
       ).toExist(),
       sceneExpect(text('Recolor a single tone — sky, skin, grass — and leave the rest.')).toExist(),
-      sceneExpect(text('Adds animated film grain for an analog feel.')).toExist(),
+      sceneExpect(text('Luminance-aware film grain with stock-specific character.')).toExist(),
       sceneExpect(text('Give the photo texture, like classic film.')).toExist(),
       sceneExpect(text("Darkens or brightens the photo's edges.")).toExist(),
       sceneExpect(text('Focus the center, or add a vintage frame.')).toExist(),
