@@ -1,5 +1,5 @@
 import type { Command } from 'foldkit'
-import type { CollageStore } from '@lutra/store'
+import type { CollageStore, EditStore } from '@lutra/store'
 import type { AppRoute } from '../route'
 import { initialModel } from './model'
 import type { Model } from './model'
@@ -18,7 +18,7 @@ import { LoadCollage } from './command'
  */
 export type InitReturn = readonly [
   Model,
-  readonly Command.Command<CollageMessage, never, CollageStore>[],
+  readonly Command.Command<CollageMessage, never, CollageStore | EditStore>[],
 ]
 export const init = (route: AppRoute): InitReturn => {
   const commands =

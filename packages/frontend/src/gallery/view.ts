@@ -219,18 +219,10 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary, selected: bo
     ],
   )
 
-/** Memoize bytes→object URL per summary id. Dormant while the store is empty. */
-const thumbnailUrlCache = new Map<EditId, string>()
+/** Memoize bytes→object URL per summary id via the shared cache. */
+import { thumbnailUrl } from '../thumbnail-url'
 const tileThumb = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) => {
-  let url = thumbnailUrlCache.get(summary.id)
-  const bytes = summary.thumbnail
-  if (!url && bytes) {
-    // SAFETY: the store hands back the thumbnail bytes as a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
-    // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
-    const blob = new Blob([bytes as BlobPart], { type: 'image/png' })
-    url = URL.createObjectURL(blob)
-    thumbnailUrlCache.set(summary.id, url)
-  }
+  const url = thumbnailUrl(summary.id, summary.thumbnail)
   return url
     ? h.img([h.Src(url), h.Alt(''), h.Class('h-full w-full object-cover')])
     : h.div([h.Class('flex h-full w-full items-center justify-center text-muted')], ['No thumb'])

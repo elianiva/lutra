@@ -1,6 +1,6 @@
 import { AsyncData } from 'foldkit'
 import type { Command } from 'foldkit'
-import type { CollageStore } from '@lutra/store'
+import type { CollageStore, EditStore } from '@lutra/store'
 import type { AppRoute } from '../route'
 import type { Model } from './model'
 import type { CollageMessage } from './message'
@@ -8,7 +8,7 @@ import { LoadCollage } from './command'
 
 export type InformReturn = readonly [
   Model,
-  readonly Command.Command<CollageMessage, never, CollageStore>[],
+  readonly Command.Command<CollageMessage, never, CollageStore | EditStore>[],
 ]
 
 /**
