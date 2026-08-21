@@ -1,7 +1,7 @@
 import { Schema as S } from 'effect'
 import { Message } from 'foldkit'
 import { Dialog } from '@foldkit/ui'
-import { EditSummary, EditIdSchema, StoreError, CollageIdSchema } from '@lutra/store'
+import { EditSummary, EditIdSchema, StoreError, CollageIdSchema, Collage } from '@lutra/store'
 import { ImageDecodeError, ThumbnailEncodeError } from '../errors'
 
 /**
@@ -41,6 +41,23 @@ export const PhotoCreateFailed = Message.m('PhotoCreateFailed', {
   error: S.Union([ImageDecodeError, ThumbnailEncodeError, StoreError]),
 })
 
+// ---- collage section (docs/adr/0030): list + open + delete ----
+/** A fresh list of collages landed from the CollageStore (a ListCollages result). */
+export const CollagesListed = Message.m('CollagesListed', { collages: S.Array(Collage) })
+export const CollageListFailed = Message.m('CollageListFailed', { error: StoreError })
+/** A collage card was clicked; the update emits the `OpenedCollage` OutMessage. */
+export const CollageOpenRequested = Message.m('CollageOpenRequested', { id: CollageIdSchema })
+/** A collage card's ✕ was tapped: enter or leave the two-step confirm (docs/adr/0022). */
+export const ToggledCollageDeleteConfirm = Message.m('ToggledCollageDeleteConfirm', {
+  id: CollageIdSchema,
+})
+/** The confirm step was cancelled (✗ or a different card's ✕). */
+export const CollageDeleteConfirmCancelled = Message.m('CollageDeleteConfirmCancelled')
+/** The red confirm ✕ was tapped: delete the collage record. */
+export const CollageDeleteRequested = Message.m('CollageDeleteRequested', { id: CollageIdSchema })
+export const CollageDeleted = Message.m('CollageDeleted')
+export const CollageDeleteFailed = Message.m('CollageDeleteFailed', { error: StoreError })
+
 // ---- create a collage (persist-first, docs/adr/0030) ----
 /** The Collage record was persisted from the current selection. */
 export const CollageCreated = Message.m('CollageCreated', { id: CollageIdSchema })
@@ -78,6 +95,14 @@ export const GalleryMessage = S.Union([
   PhotoCreateFailed,
   CollageCreated,
   CollageCreateFailed,
+  CollagesListed,
+  CollageListFailed,
+  CollageOpenRequested,
+  ToggledCollageDeleteConfirm,
+  CollageDeleteConfirmCancelled,
+  CollageDeleteRequested,
+  CollageDeleted,
+  CollageDeleteFailed,
   SettingsRequested,
   GotSettingsDialogMessage,
   ToggledInfiniteCanvas,
@@ -92,4 +117,8 @@ export type GalleryMessage = typeof GalleryMessage.Type
  */
 export const OpenedEdit = Message.m('OpenedEdit', { id: EditIdSchema })
 export const CreatedCollage = Message.m('CreatedCollage', { id: CollageIdSchema })
-export type GalleryOutMessage = typeof OpenedEdit.Type | typeof CreatedCollage.Type
+export const OpenedCollage = Message.m('OpenedCollage', { id: CollageIdSchema })
+export type GalleryOutMessage =
+  | typeof OpenedEdit.Type
+  | typeof CreatedCollage.Type
+  | typeof OpenedCollage.Type

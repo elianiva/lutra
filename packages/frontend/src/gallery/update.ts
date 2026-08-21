@@ -3,10 +3,10 @@ import { Command } from 'foldkit'
 import { Dialog } from '@foldkit/ui'
 import type { EditStore, CollageStore } from '@lutra/store'
 import type { GalleryMessage, GalleryOutMessage } from './message'
-import { CreatedCollage, OpenedEdit, GotSettingsDialogMessage } from './message'
-import { CreateCollage, DeleteEdit, ListEdits, OpenPhoto } from './command'
+import { CreatedCollage, OpenedCollage, OpenedEdit, GotSettingsDialogMessage } from './message'
+import { CreateCollage, DeleteCollage, DeleteEdit, ListCollages, ListEdits, OpenPhoto } from './command'
 import type { Model } from './model'
-import { editList } from './model'
+import { collageList, editList } from './model'
 
 export type UpdateReturn = readonly [
   Model,
@@ -68,6 +68,43 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
       CollageCreated: ({ id }) => [{ ...model, selection: [] }, [], Option.some(CreatedCollage({ id }))],
       CollageCreateFailed: ({ error }) => [
         { ...model, notice: `Could not create the collage: ${error.message}` },
+        [],
+        Option.none(),
+      ],
+
+      // ---- collage section (docs/adr/0030): list + open + delete ----
+      CollagesListed: ({ collages }) => [
+        { ...model, collages: collageList.Success({ data: collages }) },
+        [],
+        Option.none(),
+      ],
+      CollageListFailed: ({ error }) => [
+        { ...model, collages: collageList.Failure({ error }) },
+        [],
+        Option.none(),
+      ],
+      // A collage card clicked: surface the fact upward — the root pushes
+      // `/collage/:id`, exactly as for a created collage.
+      CollageOpenRequested: ({ id }) => [model, [], Option.some(OpenedCollage({ id }))],
+      // ADR-0022's inline two-step confirm: first ✕ arms the card; arming a
+      // different card moves the state; ✗ or re-tap disarms.
+      ToggledCollageDeleteConfirm: ({ id }) => [
+        {
+          ...model,
+          confirmingCollageDelete: model.confirmingCollageDelete === id ? null : id,
+        },
+        [],
+        Option.none(),
+      ],
+      CollageDeleteConfirmCancelled: () => [{ ...model, confirmingCollageDelete: null }, [], Option.none()],
+      CollageDeleteRequested: ({ id }) => [model, [DeleteCollage({ id })], Option.none()],
+      CollageDeleted: () => [
+        { ...model, confirmingCollageDelete: null },
+        [ListCollages()],
+        Option.none(),
+      ],
+      CollageDeleteFailed: ({ error }) => [
+        { ...model, confirmingCollageDelete: null, notice: `Could not delete the collage: ${error.message}` },
         [],
         Option.none(),
       ],

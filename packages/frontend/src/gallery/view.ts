@@ -3,16 +3,20 @@ import { Submodel, AsyncData } from 'foldkit'
 import type { HtmlBuilder } from 'foldkit/html'
 import {
   ClickedEdit,
+  CollageDeleteConfirmCancelled,
+  CollageDeleteRequested,
+  CollageOpenRequested,
   CreateCollageRequested,
   DeleteRequested,
   OpenPhotoRequested,
   RefreshRequested,
   SettingsRequested,
+  ToggledCollageDeleteConfirm,
   ToggledSelection,
 } from './message'
 import type { GalleryMessage } from './message'
 import type { Model } from './model'
-import type { EditSummary, EditId, StoreError } from '@lutra/store'
+import type { Collage as CollageRecord, EditSummary, EditId, StoreError } from '@lutra/store'
 import { settingsDialogView } from './settings-dialog'
 
 /**
@@ -32,7 +36,13 @@ export const view = Submodel.defineView<Model, GalleryMessage>((model, h) => {
     [
       header(h, model.selection.length),
       notice(model.notice, h),
-      h.main([h.Class('flex min-h-0 flex-1')], [gridBody(h, grid, model.selection)]),
+      h.main(
+        [h.Class('flex min-h-0 flex-1 flex-col overflow-auto')],
+        [
+          gridBody(h, grid, model.selection),
+          collagesSection(h, model),
+        ],
+      ),
       settingsDialogView(h, model),
     ],
   )
@@ -245,3 +255,163 @@ const tileThumb = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) => {
     ? h.img([h.Src(url), h.Alt(''), h.Class('h-full w-full object-cover')])
     : h.div([h.Class('flex h-full w-full items-center justify-center text-muted')], ['No thumb'])
 }
+
+
+// ---- Collages section (docs/adr/0030) ----
+
+/**
+ * The saved-collages strip beneath the edits grid. Each card composes a live
+ * mini-preview client-side: a CSS grid mirroring the collage's layout
+ * (columns, gutter, background) filled with the referenced Edits' cached
+ * thumbnails — no pixels are copied; the record is the summary. Hidden
+ * entirely while the store holds no collages.
+ */
+const collagesSection = (h: HtmlBuilder<GalleryMessage>, model: Model) =>
+  AsyncData.match(model.collages, {
+    onFailure: () => null,
+    onIdle: () => null,
+    onLoading: () => null,
+    onRefreshing: () => null,
+    onStale: () => null,
+    onSuccess: (collages) =>
+      collages.length === 0 ? null : collageCards(h, collages, model),
+  })
+
+const collageCards = (
+  h: HtmlBuilder<GalleryMessage>,
+  collages: readonly CollageRecord[],
+  model: Model,
+) =>
+  h.section(
+    [h.DataAttribute('collages-section', 'true'), h.Class('border-t border-border p-4')],
+    [
+      h.h2(
+        [h.Class('mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted')],
+        ['Collages'],
+      ),
+      h.div(
+        [h.Class('grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4')],
+        collages.map((collage) => collageCard(h, collage, model)),
+      ),
+    ],
+  )
+
+const collageCard = (h: HtmlBuilder<GalleryMessage>, collage: CollageRecord, model: Model) => {
+  // Tile identity → thumbnail lookup against the loaded edits grid; a tile
+  // whose Edit is missing (deleted after the collage was made) renders as a
+  // placeholder cell until the collage screen drops it on load.
+  const byId = new Map(model.grid._tag === 'Success' ? model.grid.data.map((s) => [s.id, s]) : [])
+  const confirming = model.confirmingCollageDelete === collage.id
+  return h.div(
+    [
+      h.DataAttribute('collage-id', collage.id),
+      h.Class(
+        `group relative aspect-square overflow-hidden rounded border bg-panel hover:border-muted ${
+          confirming ? 'border-accent' : 'border-border'
+        }`,
+      ),
+    ],
+    [
+      // The mini-preview doubles as the open click target; the confirm and
+      // delete controls sit above it so their clicks don't bubble.
+      h.button(
+        [
+          h.OnClick(CollageOpenRequested({ id: collage.id })),
+          h.AriaLabel(`Open collage with ${collage.tiles.length} photos`),
+          h.DataAttribute('open-collage-id', collage.id),
+          h.Class('absolute inset-0'),
+        ],
+        [miniPreview(h, collage, byId)],
+      ),
+      h.div(
+        [
+          h.Class(
+            'absolute bottom-0 left-0 right-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent px-2 py-1',
+          ),
+        ],
+        [
+          h.span(
+            [h.Class('text-[10px] text-white/80 tnum')],
+            [
+              `${collage.tiles.length} ${collage.tiles.length === 1 ? 'photo' : 'photos'} · ${
+                collage.savedAt > 0
+                  ? DateTime.formatLocal({ dateStyle: 'short' })(DateTime.makeUnsafe(collage.savedAt))
+                  : ''
+              }`,
+            ],
+          ),
+          h.div(
+            [h.Class('relative z-10 flex items-center gap-1')],
+            confirming
+              ? [
+                  // ADR-0022's two-step inline confirm: red confirm + cancel.
+                  h.button(
+                    [
+                      h.OnClick(CollageDeleteRequested({ id: collage.id })),
+                      h.AriaLabel('Confirm deleting this collage'),
+                      h.DataAttribute('confirm-delete-collage-id', collage.id),
+                      h.Class('grid size-7 place-items-center text-[10px] text-red-400 hover:text-red-300'),
+                    ],
+                    ['✕'],
+                  ),
+                  h.button(
+                    [
+                      h.OnClick(CollageDeleteConfirmCancelled()),
+                      h.AriaLabel('Cancel deleting this collage'),
+                      h.DataAttribute('cancel-delete-collage-id', collage.id),
+                      h.Class('grid size-7 place-items-center text-[10px] text-white/80 hover:text-white'),
+                    ],
+                    ['✗'],
+                  ),
+                ]
+              : [
+                  h.button(
+                    [
+                      h.OnClick(ToggledCollageDeleteConfirm({ id: collage.id })),
+                      h.AriaLabel('Delete this collage'),
+                      h.DataAttribute('delete-collage-id', collage.id),
+                      h.Class('grid size-7 place-items-center text-[10px] text-white/80 hover:text-white'),
+                    ],
+                    ['✕'],
+                  ),
+                ],
+          ),
+        ],
+      ),
+    ],
+  )
+}
+
+/** The CSS-grid mini-preview: layout-faithful, thumbnails cover-cropped. */
+const miniPreview = (
+  h: HtmlBuilder<GalleryMessage>,
+  collage: CollageRecord,
+  byId: Map<EditId, EditSummary>,
+) =>
+  h.div(
+    [
+      h.Class('flex h-full w-full items-center justify-center p-1'),
+      h.Style({
+        backgroundColor: collage.layout.background === 'dark' ? '#000000' : '#ffffff',
+      }),
+    ],
+    [
+      h.div(
+        [
+          h.Class('grid h-full w-full'),
+          h.Style({
+            display: 'grid',
+            gridTemplateColumns: `repeat(${collage.layout.columns}, 1fr)`,
+            gap: `${Math.max(1, Math.round(collage.layout.gutter / 4))}px`,
+          }),
+        ],
+        collage.tiles.map((tileRef) => {
+          const summary = byId.get(tileRef.editId)
+          const url = summary ? thumbnailUrl(summary.id, summary.thumbnail) : null
+          return url
+            ? h.img([h.Src(url), h.Alt(''), h.Class('h-full w-full object-cover')], )
+            : h.div([h.Class('h-full w-full bg-neutral-700')], [])
+        }),
+      ),
+    ],
+  )

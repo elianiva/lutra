@@ -4,6 +4,7 @@ import type { StoreError } from '@lutra/store'
 import {
   Collage,
   CollageStore,
+  CollageIdSchema,
   EditStore,
   EditIdSchema,
   Edit,
@@ -22,6 +23,10 @@ import {
   PhotoPickCancelled,
   CollageCreated,
   CollageCreateFailed,
+  CollagesListed,
+  CollageListFailed,
+  CollageDeleted,
+  CollageDeleteFailed,
 } from './message'
 
 /**
@@ -45,6 +50,45 @@ export const ListEdits = Command.define('ListEdits', {
  * the smaller grid. An unknown id is a no-op. A backend failure surfaces as
  * `DeleteFailed`.
  */
+/**
+ * Fetch the saved collages for the main menu's Collages section
+ * (docs/adr/0030): full records — the layout drives the mini-previews. The
+ * store orders newest-first.
+ */
+export const ListCollages = Command.define('ListCollages', {
+  execute: Effect.gen(function* () {
+    const store = yield* CollageStore
+    const collages = yield* store.list()
+    return CollagesListed({ collages })
+  }).pipe(
+    Effect.catchTag('StoreError', (err: StoreError) =>
+      Effect.succeed(CollageListFailed({ error: err })),
+    ),
+  ),
+  messages: [CollagesListed, CollageListFailed],
+})
+
+/**
+ * Delete one collage by id (`CollageStore.delete`); the caller re-lists to
+ * reflect the smaller section. Deleting a collage never touches its
+ * referenced Edits (docs/adr/0030: composition by reference). A backend
+ * failure surfaces as `CollageDeleteFailed`.
+ */
+export const DeleteCollage = Command.define('DeleteCollage', {
+  args: { id: CollageIdSchema },
+  execute: ({ id }) =>
+    Effect.gen(function* () {
+      const store = yield* CollageStore
+      yield* store.delete(id)
+      return CollageDeleted()
+    }).pipe(
+      Effect.catchTag('StoreError', (err: StoreError) =>
+        Effect.succeed(CollageDeleteFailed({ error: err })),
+      ),
+    ),
+  messages: [CollageDeleted, CollageDeleteFailed],
+})
+
 export const DeleteEdit = Command.define('DeleteEdit', {
   args: { id: EditIdSchema },
   execute: ({ id }) => Effect.gen(function* () {
