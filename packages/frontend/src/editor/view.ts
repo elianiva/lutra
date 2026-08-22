@@ -13,7 +13,8 @@ import { layerDrawer } from './layer-drawer'
 import { canvasStage } from './canvas-stage'
 import { lutBar } from './lut-bar'
 import { lutTarget } from './lut-bar/target'
-import { exportDialogView } from './export-dialog'
+import * as ExportDialog from '../export-dialog'
+import { GotExportDialogMessage } from './message'
 import { icon } from '../components/icon'
 
 /**
@@ -51,7 +52,11 @@ const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
       // The mobile tab bar (docs/adr/0024-mobile-ui): toggles the two bottom sheets,
       // plus a LUT toggle while a LUT target exists. Hidden on desktop.
       mobileTabBar(h, model),
-      exportDialogView(h, model),
+      // The shared export-dialog machine's view, embedded under the editor
+      // boundary (docs/adr/0031).
+      ExportDialog.exportDialogView(h, model.exportDialog, (message) =>
+        GotExportDialogMessage({ message }),
+      ),
     ],
   )
 }

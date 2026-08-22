@@ -4,13 +4,9 @@ import * as Persistence from 'effect/unstable/persistence/KeyValueStore'
 import type { StoreError } from '@lutra/store'
 import { Edit, EditStore, EditIdSchema, newEditId } from '@lutra/store'
 import {
-  EncodeError,
   type GpuError,
   createLayer,
   createRenderRequest,
-  ExportSettings,
-  mimeFor,
-  ImageEncoder,
   Layer,
   LAYER_TYPES,
   LutIdSchema,
@@ -41,12 +37,6 @@ import {
   HistogramFailed,
   ExportSnapshotted,
   ExportSnapshotFailed,
-  ExportPrepared,
-  ExportEncodeFailed,
-  ExportDownloaded,
-  ExportSettingsLoaded,
-  ExportUrlRevoked,
-  ExportSettingsSaved,
   LutRecentsLoaded,
   LutRecentsSaved,
   LutThumbGenerated,
@@ -425,21 +415,20 @@ export const ReadHistogram = Command.define('ReadHistogram', {
 // ---- export dialog ----
 
 /** Settings persistence is shared with the collage's export dialog (docs/adr/0031). */
-import { loadExportSettings, saveExportSettings } from '../export-settings'
-import { setEditorExportFrame, peekEditorExportFrame } from './export-frame'
+import { setFrame } from '../export-dialog'
 
 /**
  * Read the frame identified by `handle` back from the GPU once, when the
- * export dialog opens. The ImageData lands in the export-frame cache for
- * the dialog's lifetime so pressing Export again re-encodes without another
- * readback — it never rides through the model (docs/adr/0031).
+ * export dialog opens. The ImageData lands in the shared export-dialog
+ * frame slot for the dialog's lifetime so pressing Export again re-encodes
+ * without another readback — it never rides through the model (docs/adr/0031).
  */
 export const SnapshotForExport = Command.define('SnapshotForExport', {
   args: { handle: Schema.instanceOf(RenderHandle) },
   execute: ({ handle }) => Effect.gen(function* () {
     const backend = yield* GpuBackend
     const image = yield* backend.snapshot(handle)
-    setEditorExportFrame(image)
+    setFrame(image)
     return ExportSnapshotted()
   }).pipe(
       Effect.catchTag('GpuError', (err: GpuError) =>
@@ -447,83 +436,6 @@ export const SnapshotForExport = Command.define('SnapshotForExport', {
       ),
     ),
   messages: [ExportSnapshotted, ExportSnapshotFailed],
-})
-
-/**
- * Encode the export frame with the given settings and report the resulting
- * size + blob URL. Runs once per Export press — there is no live size
- * preview (encoding for it was too slow). The previous blob URL is revoked
- * here — the model's `exportUrl` is only ever replaced, never leaked.
- */
-export const PrepareExport = Command.define('PrepareExport', {
-  args: {
-    previousUrl: Schema.NullOr(Schema.String),
-    settings: ExportSettings,
-  },
-  execute: ({ settings, previousUrl }) => Effect.gen(function* () {
-    const image = peekEditorExportFrame()
-    if (!image) {
-      return ExportEncodeFailed({
-        error: new EncodeError({ message: 'no cached frame to encode' }),
-      })
-    }
-    if (previousUrl) {
-      yield* Effect.sync(() => {
-        URL.revokeObjectURL(previousUrl)
-      })
-    }
-    const encoder = yield* ImageEncoder
-    const bytes = yield* encoder.encode({ image, settings })
-    // SAFETY: the encoder returned its output over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
-    // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
-    const blob = new Blob([bytes as BlobPart], { type: mimeFor(settings.format) })
-    const url = URL.createObjectURL(blob)
-    return ExportPrepared({ sizeBytes: bytes.byteLength, url })
-  }).pipe(
-      Effect.catchTag('EncodeError', (err: EncodeError) =>
-        Effect.succeed(ExportEncodeFailed({ error: err })),
-      ),
-    ),
-  messages: [ExportPrepared, ExportEncodeFailed],
-})
-
-/** Trigger the browser download of the encoded blob (the url stays alive
- *  until the dialog closes — the tweak-and-re-export loop needs it). */
-export const ExportDownload = Command.define('ExportDownload', {
-  args: { filename: Schema.String, url: Schema.String },
-  execute: ({ url, filename }) =>
-    Effect.sync(() => {
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      a.click()
-      return ExportDownloaded({ url })
-    }),
-  messages: [ExportDownloaded],
-})
-
-/** Revoke a blob URL (dialog close, stale encode result). */
-export const RevokeExportUrl = Command.define('RevokeExportUrl', {
-  args: { url: Schema.String },
-  execute: ({ url }) =>
-    Effect.sync(() => {
-      URL.revokeObjectURL(url)
-    }).pipe(Effect.as(ExportUrlRevoked())),
-  messages: [ExportUrlRevoked],
-})
-
-/** Restore persisted export settings (dispatched once at startup). */
-export const LoadExportSettings = Command.define('LoadExportSettings', {
-  execute: Effect.map(loadExportSettings, (settings) => ExportSettingsLoaded({ settings })),
-  messages: [ExportSettingsLoaded],
-})
-
-/** Persist export settings (fired on every change; localStorage is cheap). */
-export const SaveExportSettings = Command.define('SaveExportSettings', {
-  args: { settings: ExportSettings },
-  execute: ({ settings }) =>
-    Effect.as(Effect.ignore(saveExportSettings(settings)), ExportSettingsSaved()),
-  messages: [ExportSettingsSaved],
 })
 
 // ---- LUT recents (the bar's Recents tab, docs/adr/0012) ----

@@ -44,40 +44,51 @@ const renderTileInner = (
   chain: readonly Layer[],
   cellSize: number,
 ): Effect.Effect<TileRender, unknown, GpuBackend | LutStore> =>
-  Effect.gen(function* renderTileInner() {
-    // SAFETY: the store hands back image bytes over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
-    // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
-    const blob = new Blob([source as BlobPart])
-    const decoded = yield* Effect.tryPromise(() => createImageBitmap(blob))
+  Effect.scoped(
+    Effect.gen(function* renderTileInner() {
+      // SAFETY: the store hands back image bytes over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
+      // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
+      const blob = new Blob([source as BlobPart])
+      // Both bitmaps are scope-owned: they close on success AND on every
+      // failure path, instead of leaking when a later step throws.
+      const decoded = yield* Effect.acquireRelease(
+        Effect.tryPromise(() => createImageBitmap(blob)),
+        (bitmap) => Effect.sync(() => bitmap.close()),
+      )
 
-    // Center-crop to a square, then downscale to the cell size in one step.
-    const side = Math.min(decoded.width, decoded.height)
-    const sx = (decoded.width - side) / 2
-    const sy = (decoded.height - side) / 2
-    const square = yield* Effect.tryPromise(
-      () => createImageBitmap(decoded, sx, sy, side, side, { resizeWidth: cellSize, resizeHeight: cellSize }),
-    )
-    yield* Effect.sync(() => decoded.close())
+      // Center-crop to a square, then downscale to the cell size in one step.
+      const side = Math.min(decoded.width, decoded.height)
+      const sx = (decoded.width - side) / 2
+      const sy = (decoded.height - side) / 2
+      const square = yield* Effect.acquireRelease(
+        Effect.tryPromise(() =>
+          createImageBitmap(decoded, sx, sy, side, side, {
+            resizeWidth: cellSize,
+            resizeHeight: cellSize,
+          }),
+        ),
+        (bitmap) => Effect.sync(() => bitmap.close()),
+      )
 
-    const luts = yield* resolveLuts(chain)
-    const request: RenderRequest = yield* createRenderRequest(
-      [...chain],
-      ENGINE_REGISTRY,
-      square,
-      // Grain animates per frame; an export is a still — frame 0.
-      0,
-      luts,
-    )
+      const luts = yield* resolveLuts(chain)
+      const request: RenderRequest = yield* createRenderRequest(
+        [...chain],
+        ENGINE_REGISTRY,
+        square,
+        // Grain animates per frame; an export is a still — frame 0.
+        0,
+        luts,
+      )
 
-    const backend = yield* GpuBackend
-    const canvas = document.createElement('canvas')
-    canvas.width = cellSize
-    canvas.height = cellSize
-    const handle = yield* backend.execute(request, canvas, OFF_PRESENT)
-    const image = yield* backend.snapshot(handle)
-    yield* Effect.sync(() => square.close())
-    return { image, ok: true } satisfies TileRender
-  })
+      const backend = yield* GpuBackend
+      const canvas = document.createElement('canvas')
+      canvas.width = cellSize
+      canvas.height = cellSize
+      const handle = yield* backend.execute(request, canvas, OFF_PRESENT)
+      const image = yield* backend.snapshot(handle)
+      return { image, ok: true } satisfies TileRender
+    }),
+  )
 
 /** The compare presentation for offscreen renders: plain graded output. */
 const OFF_PRESENT = { mode: 'off', splitAt: 0, showBefore: false } as const

@@ -10,7 +10,7 @@ import { GotSettingsDialogMessage, ToggledInfiniteCanvas } from './message'
  * instead of the fixed photo canvas). The toggle is UI-only: it flips a
  * model flag nothing reads yet; wiring it into the editor comes later.
  *
- * Mirrors the export dialogs' structure (`editor/export-dialog.ts`): a
+ * Mirrors the export dialog's structure (`export-dialog/view.ts`): a
  * foldkit Dialog submodel rendered headless, with the backdrop and panel
  * positioned against the native `<dialog>` element.
  */

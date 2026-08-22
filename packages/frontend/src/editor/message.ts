@@ -1,15 +1,10 @@
 import { Schema as S } from 'effect'
 import { Message } from 'foldkit'
-import { Dialog } from '@foldkit/ui'
+import * as ExportDialog from '../export-dialog'
 import { RenderHandle } from '../gpu/backend'
 import { EditIdSchema, StoreError } from '@lutra/store'
 import { LutLoadError } from '../luts/store'
 import {
-  EncodeError,
-  ExportFormat,
-  ExportQuality,
-  ExportScale,
-  ExportSettings,
   FieldKeySchema,
   GpuError,
   LAYER_TYPES,
@@ -52,10 +47,6 @@ export type SourceError = typeof SourceError.Type
 /** Every failure a Save can surface: snapshot, thumbnail encode, or store. */
 export const SaveError = S.Union([GpuError, StoreError, ThumbnailEncodeError])
 export type SaveError = typeof SaveError.Type
-
-/** Every failure the export dialog can surface: snapshot readback or encode. */
-export const ExportError = S.Union([GpuError, EncodeError])
-export type ExportError = typeof ExportError.Type
 
 // A decoded source bitmap plus its pixel size. The bitmap is held in the model
 // as a plain ImageBitmap (`instanceOf` bypasses structural validation) so the
@@ -235,11 +226,11 @@ export const PreviewedLut = Message.m('PreviewedLut', {
 export const SelectedLutTab = Message.m('SelectedLutTab', {
   tab: S.Union([S.Literal('recents'), S.String]),
 })
-// Recents restored from localStorage (boot-time, mirrors ExportSettingsLoaded).
+// Recents restored from localStorage (boot-time, like the export settings load).
 export const LutRecentsLoaded = Message.m('LutRecentsLoaded', {
   recents: S.Array(LutIdSchema),
 })
-// Ack for SaveLutRecents (observability, mirrors ExportSettingsSaved).
+// Ack for SaveLutRecents (observability, like the export settings save).
 export const LutRecentsSaved = Message.m('LutRecentsSaved')
 
 // ---- per-photo LUT thumbnails (filmstrip previews, docs/adr/0013) ----
@@ -259,7 +250,7 @@ export const LutThumbGenerated = Message.m('LutThumbGenerated', {
 // encode). The bar silently keeps the vendored generic jpg — previews are
 // presentation-only, so failures are not user-visible (docs/adr/0013).
 export const LutThumbFailed = Message.m('LutThumbFailed', { lutId: LutIdSchema })
-// Ack for RevokeLutThumbs (observability, like ExportUrlRevoked).
+// Ack for RevokeLutThumbs (observability, like the export URL revoke ack).
 export const LutThumbsRevoked = Message.m('LutThumbsRevoked')
 
 /** For toggled layers (White Balance, Vignette): cycle the active field shown in the drawer. */
@@ -372,55 +363,22 @@ export const CanvasRegistered = Message.m('CanvasRegistered')
 // Opens the export dialog instead of downloading immediately.
 export const ExportRequested = Message.m('ExportRequested')
 
-// The dialog is a foldkit submodel (@foldkit/ui). Its messages arrive
-// wrapped; update delegates to `Dialog.update`.
+// The shared export-dialog machine's messages arrive wrapped (docs/adr/0031);
+// update delegates to its update. Snapshot outcomes are fed in through
+// ExportSnapshotted / ExportSnapshotFailed below.
 export const GotExportDialogMessage = Message.m('GotExportDialogMessage', {
-  message: Dialog.Message,
+  message: ExportDialog.Message,
 })
 
-export const ChangedExportFormat = Message.m('ChangedExportFormat', {
-  format: ExportFormat,
-})
-export const ChangedExportQuality = Message.m('ChangedExportQuality', {
-  quality: ExportQuality,
-})
-export const ChangedExportScale = Message.m('ChangedExportScale', {
-  scale: ExportScale,
-})
-
-// The frame to export, read back from the GPU once per dialog open (the
-// dialog encodes from this cache when the user presses Export).
 /**
- * The GPU readback landed. The pixels stay in the editor's export-frame
- * cache — megabytes of ImageData never ride through the model; only the
- * readiness flag does (docs/adr/0031).
+ * The GPU readback landed. The pixels stay in the shared export-dialog
+ * frame slot — megabytes of ImageData never ride through the model; only
+ * the readiness flag does (docs/adr/0031).
  */
 export const ExportSnapshotted = Message.m('ExportSnapshotted', {})
 export const ExportSnapshotFailed = Message.m('ExportSnapshotFailed', {
   error: GpuError,
 })
-// An encode completed: size + object URL of the encoded blob. The download
-// is triggered from here — encoding happens on Export press, not on
-// settings change (encoding for a live size preview was too slow).
-export const ExportPrepared = Message.m('ExportPrepared', {
-  sizeBytes: S.Number,
-  url: S.String,
-})
-export const ExportEncodeFailed = Message.m('ExportEncodeFailed', {
-  error: EncodeError,
-})
-// The user asked to download the current blob (the button in the dialog).
-export const ExportDownloadRequested = Message.m('ExportDownloadRequested')
-// The download was triggered.
-export const ExportDownloaded = Message.m('ExportDownloaded', { url: S.String })
-// Persisted settings restored from localStorage.
-export const ExportSettingsLoaded = Message.m('ExportSettingsLoaded', {
-  settings: ExportSettings,
-})
-// Acks for fire-and-forget export commands (observability, like
-// CanvasRegistered).
-export const ExportUrlRevoked = Message.m('ExportUrlRevoked')
-export const ExportSettingsSaved = Message.m('ExportSettingsSaved')
 
 // ---- save ----
 
@@ -491,18 +449,8 @@ export const EditorMessage = S.Union([
   CanvasRegistered,
   ExportRequested,
   GotExportDialogMessage,
-  ChangedExportFormat,
-  ChangedExportQuality,
-  ChangedExportScale,
   ExportSnapshotted,
   ExportSnapshotFailed,
-  ExportPrepared,
-  ExportEncodeFailed,
-  ExportDownloadRequested,
-  ExportDownloaded,
-  ExportSettingsLoaded,
-  ExportUrlRevoked,
-  ExportSettingsSaved,
   SaveRequested,
   SaveAsRequested,
   EditSaved,

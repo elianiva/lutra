@@ -2,32 +2,19 @@ import { describe, it, expect as vitestExpect } from 'vitest'
 import { Command, Mount, click, expect, given, scene, selector, text } from 'foldkit/scene'
 import { Dialog } from '@foldkit/ui'
 import { MockImageBitmap } from '../vitest-setup'
+import * as ExportDialog from '../export-dialog'
 import { initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
 import { Idle } from './phase'
 import { PanZoom, RegisterCanvas } from './canvas-stage'
 import { RenderHandle } from '../gpu/backend'
-import { EncodeError } from '@lutra/engine'
-import { setEditorExportFrame } from './export-frame'
+import { SnapshotForExport } from './command'
 import {
-  SnapshotForExport,
-  PrepareExport,
-  ExportDownload,
-  RevokeExportUrl,
-  SaveExportSettings,
-} from './command'
-import {
-  ExportSnapshotted,
-  ExportPrepared,
-  ExportEncodeFailed,
-  ExportDownloaded,
-  ExportUrlRevoked,
-  ExportSettingsSaved,
   ScaledCanvas,
   CanvasRegistered,
+  ExportSnapshotted,
   ExportRequested as ExportRequestedMessage,
-  ExportDownloadRequested as ExportDownloadRequestedMessage,
   GotExportDialogMessage,
 } from './message'
 
@@ -50,9 +37,13 @@ const loadedModel = () => ({
 
 /** A 200×150 export frame, as the snapshot readback produces it. */
 const exportImage = new ImageData(200, 150)
-// The dialog's size line reads the export-frame cache (the pixels never
-// ride through the model); tests that assert it seed the cache directly.
-setEditorExportFrame(exportImage)
+// The dialog's size line reads the shared frame slot (the pixels never ride
+// through the model); tests that assert it seed the slot directly.
+ExportDialog.setFrame(exportImage)
+
+/** Wrap a raw @foldkit/ui Dialog message for delivery through the editor boundary. */
+const dialogMessage = (message: Dialog.Message) =>
+  GotExportDialogMessage({ message: ExportDialog.GotDialogMessage({ message }) })
 
 const mountLoadedStage = [
   Mount.resolve(PanZoom, ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
@@ -85,19 +76,22 @@ describe('Export dialog', () => {
       expect(text('100%')).toExist(),
       Command.expectHas(SnapshotForExport),
 
-      // The snapshot lands and is cached — no encode yet.
+      // The snapshot lands and is slotted — no encode yet.
       Command.resolve(SnapshotForExport, ExportSnapshotted()),
       Command.expectNone(),
 
       // Pressing Export starts the encode and shows the loading state.
       click(text('Export')),
       expect(text('Encoding…')).toExist(),
-      Command.expectHas(PrepareExport),
+      Command.expectHas(ExportDialog.PrepareExport),
 
       // The encode completes; the download fires and the size appears.
-      Command.resolve(PrepareExport, ExportPrepared({ sizeBytes: 4096, url: 'blob:export-1' })),
-      Command.expectHas(ExportDownload),
-      Command.resolve(ExportDownload, ExportDownloaded({ url: 'blob:export-1' })),
+      Command.resolve(
+        ExportDialog.PrepareExport,
+        ExportDialog.EncodePrepared({ sizeBytes: 4096, url: 'blob:export-1' }),
+      ),
+      Command.expectHas(ExportDialog.ExportDownload),
+      Command.resolve(ExportDialog.ExportDownload, ExportDialog.Downloaded({ url: 'blob:export-1' })),
       expect(text('Downloaded', { exact: false })).toExist(),
       expect(text('4.0 KB', { exact: false })).toExist(),
       // The dialog stays open after a download — tweak and re-export.
@@ -129,11 +123,11 @@ describe('Export dialog', () => {
       click(text('JPEG')),
       expect(text('JPEG')).toHaveClass('bg-accent'),
       expect(text('PNG')).not.toHaveClass('bg-accent'),
-      Command.resolve(SaveExportSettings, ExportSettingsSaved()),
+      Command.resolve(ExportDialog.SaveExportSettings, ExportDialog.SettingsSaved()),
       click(text('50%')),
       expect(text('50%')).toHaveClass('bg-accent'),
       expect(text('100%')).not.toHaveClass('bg-accent'),
-      Command.resolve(SaveExportSettings, ExportSettingsSaved()),
+      Command.resolve(ExportDialog.SaveExportSettings, ExportDialog.SettingsSaved()),
       Command.expectNone(),
     )
   })
@@ -154,20 +148,23 @@ describe('Export dialog', () => {
       click(text('JPEG')),
       expect(text('Quality')).toExist(),
       expect(text('75')).toExist(),
-      Command.expectHas(SaveExportSettings),
-      Command.resolve(SaveExportSettings, ExportSettingsSaved()),
+      Command.expectHas(ExportDialog.SaveExportSettings),
+      Command.resolve(ExportDialog.SaveExportSettings, ExportDialog.SettingsSaved()),
       Command.expectNone(),
 
       // Scale down to 50% — dims shown; again no encode.
       click(text('50%')),
       expect(text('200 × 150 → 100 × 75')).toExist(),
-      Command.resolve(SaveExportSettings, ExportSettingsSaved()),
+      Command.resolve(ExportDialog.SaveExportSettings, ExportDialog.SettingsSaved()),
       Command.expectNone(),
 
       // The pressed settings (JPEG, 50%) are what the export encodes.
       click(text('Export')),
-      Command.resolve(PrepareExport, ExportPrepared({ sizeBytes: 1024, url: 'blob:export-1' })),
-      Command.resolve(ExportDownload, ExportDownloaded({ url: 'blob:export-1' })),
+      Command.resolve(
+        ExportDialog.PrepareExport,
+        ExportDialog.EncodePrepared({ sizeBytes: 1024, url: 'blob:export-1' }),
+      ),
+      Command.resolve(ExportDialog.ExportDownload, ExportDialog.Downloaded({ url: 'blob:export-1' })),
       expect(text('1.0 KB', { exact: false })).toExist(),
       Command.expectNone(),
     )
@@ -183,21 +180,24 @@ describe('Export dialog', () => {
       Command.resolve(SnapshotForExport, ExportSnapshotted()),
       click(text('Export')),
       Command.resolve(
-        PrepareExport,
-        ExportEncodeFailed({ error: new EncodeError({ message: 'encode exploded' }) }),
+        ExportDialog.PrepareExport,
+        ExportDialog.EncodeFailed({ message: 'encode exploded' }),
       ),
       expect(text('encode exploded')).toExist(),
 
       // The button is back to Export and can retry.
       click(text('Export')),
-      Command.resolve(PrepareExport, ExportPrepared({ sizeBytes: 2048, url: 'blob:export-2' })),
-      Command.resolve(ExportDownload, ExportDownloaded({ url: 'blob:export-2' })),
+      Command.resolve(
+        ExportDialog.PrepareExport,
+        ExportDialog.EncodePrepared({ sizeBytes: 2048, url: 'blob:export-2' }),
+      ),
+      Command.resolve(ExportDialog.ExportDownload, ExportDialog.Downloaded({ url: 'blob:export-2' })),
       expect(text('2.0 KB', { exact: false })).toExist(),
       Command.expectNone(),
     )
   })
 
-  it('closes, revoking the blob URL and dropping the cached frame', () => {
+  it('closes, revoking the blob URL and dropping the slotted frame', () => {
     scene(
       config,
       given(loadedModel()),
@@ -206,15 +206,19 @@ describe('Export dialog', () => {
       ...openDialog,
       Command.resolve(SnapshotForExport, ExportSnapshotted()),
       click(text('Export')),
-      Command.resolve(PrepareExport, ExportPrepared({ sizeBytes: 4096, url: 'blob:export-1' })),
-      Command.resolve(ExportDownload, ExportDownloaded({ url: 'blob:export-1' })),
+      Command.resolve(
+        ExportDialog.PrepareExport,
+        ExportDialog.EncodePrepared({ sizeBytes: 4096, url: 'blob:export-1' }),
+      ),
+      Command.resolve(ExportDialog.ExportDownload, ExportDialog.Downloaded({ url: 'blob:export-1' })),
 
       click(text('Cancel')),
       Command.expectHas(Dialog.CloseDialog),
       Command.resolve(Dialog.CloseDialog, Dialog.CompletedCloseDialog()),
-      // Close cleanup: the cached frame is dropped and the URL revoked.
-      Command.expectHas(RevokeExportUrl),
-      Command.resolve(RevokeExportUrl, ExportUrlRevoked()),
+      // Close cleanup (inside the machine): the slotted frame is dropped
+      // and the URL revoked.
+      Command.expectHas(ExportDialog.RevokeExportUrl),
+      Command.resolve(ExportDialog.RevokeExportUrl, ExportDialog.UrlRevoked()),
       expect(text('EXPORT')).not.toExist(),
       Command.expectNone(),
     )
@@ -238,12 +242,12 @@ describe('Export dialog', () => {
     // Open, close (bypassing the dialog's own commands), then deliver the
     // snapshot — nothing may encode or retain a blob URL.
     let [model] = update(loadedModel(), ExportRequestedMessage())
-    ;[model] = update(model, GotExportDialogMessage({ message: Dialog.RequestedClose() }))
-    ;[model] = update(model, GotExportDialogMessage({ message: Dialog.CompletedCloseDialog() }))
-    vitestExpect(model.exportDialog.isOpen).toBe(false)
+    ;[model] = update(model, dialogMessage(Dialog.RequestedClose()))
+    ;[model] = update(model, dialogMessage(Dialog.CompletedCloseDialog()))
+    vitestExpect(model.exportDialog.dialog.isOpen).toBe(false)
 
     const [after, commands] = update(model, ExportSnapshotted())
-    vitestExpect(after.exportReady).toBe(false)
+    vitestExpect(after.exportDialog.ready).toBe(false)
     vitestExpect(commands).toHaveLength(0)
   })
 
@@ -252,16 +256,24 @@ describe('Export dialog', () => {
     // can close mid-encode. A late result must not trigger a download.
     let [model] = update(loadedModel(), ExportRequestedMessage())
     ;[model] = update(model, ExportSnapshotted())
-    ;[model] = update(model, ExportDownloadRequestedMessage())
-    vitestExpect(model.exportEncoding).toBe(true)
+    ;[model] = update(
+      model,
+      GotExportDialogMessage({ message: ExportDialog.EncodeRequested() }),
+    )
+    vitestExpect(model.exportDialog.encoding).toBe(true)
 
     // Close while the encode is in flight.
-    ;[model] = update(model, GotExportDialogMessage({ message: Dialog.RequestedClose() }))
-    ;[model] = update(model, GotExportDialogMessage({ message: Dialog.CompletedCloseDialog() }))
+    ;[model] = update(model, dialogMessage(Dialog.RequestedClose()))
+    ;[model] = update(model, dialogMessage(Dialog.CompletedCloseDialog()))
 
-    const [after, commands] = update(model, ExportPrepared({ sizeBytes: 100, url: 'blob:late' }))
-    vitestExpect(after.exportEncoding).toBe(false)
+    const [after, commands] = update(
+      model,
+      GotExportDialogMessage({
+        message: ExportDialog.EncodePrepared({ sizeBytes: 100, url: 'blob:late' }),
+      }),
+    )
+    vitestExpect(after.exportDialog.encoding).toBe(false)
     vitestExpect(commands.map((c) => c.name)).toEqual(['RevokeExportUrl'])
-    vitestExpect(after.exportUrl).toBeNull()
+    vitestExpect(after.exportDialog.url).toBeNull()
   })
 })

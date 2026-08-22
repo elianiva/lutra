@@ -1,41 +1,19 @@
-import { Effect, Layer, Option } from 'effect'
+import { Effect, Layer } from 'effect'
 import type { IndexedDbDatabase } from '@effect/platform-browser'
-import { IndexedDb } from '@effect/platform-browser'
 import { LutraDbSchema } from '../db'
+import { indexedDbStoreLayer, tableCrud } from '../store-support'
 import { EditTable } from './edit-table'
 import type { Edit as EditType } from './edit'
 import type { EditSummary } from './edit-summary'
-import type { EditId } from './edit-id'
 import { EditStore } from './edit-store'
 import type { EditStoreContract } from './edit-store'
-import { StoreError } from './store-error'
-
-const mapQueryError = (cause: unknown): StoreError =>
-  new StoreError({ cause, message: 'edit store query failed' })
-
-const unavailable = (reason: string): StoreError =>
-  new StoreError({ cause: undefined, message: reason })
-
-/**
- * A store that rejects every operation with a `StoreError` — the fallback
- * served when the IndexedDB database cannot be opened (blocked, private
- * mode, quota, missing backend). The app stays alive and the gallery surfaces
- * the failure rather than silently dropping data.
- */
-const EditStoreUnavailable = (reason: string): EditStoreContract =>
-  EditStore.of({
-    clearAll: () => Effect.fail(unavailable(reason)),
-    delete: () => Effect.fail(unavailable(reason)),
-    list: () => Effect.fail(unavailable(reason)),
-    load: () => Effect.fail(unavailable(reason)),
-    save: () => Effect.fail(unavailable(reason)),
-  })
+import type { StoreError } from './store-error'
 
 /**
  * The IndexedDB local backend for {@link Edit}s (docs/adr/0007, 0008). One
  * row per Edit in the `edits` object store, keyed by id; the gallery list is
- * the whole table scanned and sorted by `savedAt` in memory (the store isn't a
- * relational orderer).
+ * the whole table scanned and projected to summaries, newest-first (see
+ * `tableCrud`).
  *
  * A Layer that requires the `IndexedDbDatabase` service — fuse it with the
  * database schema (see {@link EditStoreIndexedDb}) to provide a working store.
@@ -50,39 +28,19 @@ export const EditStoreLive: Layer.Layer<
     const builder = yield* LutraDbSchema
     const table = builder.from(EditTable.tableName)
 
-    const toSummary = (edit: EditType): EditSummary => ({
-      byteLength: edit.thumbnail.byteLength,
-      chain: edit.chain,
-      id: edit.id,
-      savedAt: edit.savedAt,
-      thumbnail: edit.thumbnail,
-    })
-
-    const save = (edit: EditType): Effect.Effect<void, StoreError> =>
-      table.upsert(edit).pipe(Effect.asVoid, Effect.mapError(mapQueryError))
-
-    const load = (id: EditId): Effect.Effect<Option.Option<EditType>, StoreError> =>
-      table
-        .select()
-        .equals(id)
-        .pipe(
-          Effect.map((rows) => Option.fromIterable(rows)),
-          Effect.mapError(mapQueryError),
-        )
-
-    const list = (): Effect.Effect<readonly EditSummary[], StoreError> =>
-      table.select().pipe(
-        Effect.map((rows) => rows.map(toSummary).sort((a, b) => b.savedAt - a.savedAt)),
-        Effect.mapError(mapQueryError),
-      )
-
-    const del = (id: EditId): Effect.Effect<void, StoreError> =>
-      table.delete().equals(id).pipe(Effect.asVoid, Effect.mapError(mapQueryError))
-
-    const clearAll = (): Effect.Effect<void, StoreError> =>
-      table.clear.pipe(Effect.mapError(mapQueryError))
-
-    return EditStore.of({ clearAll, delete: del, list, load, save })
+    return EditStore.of(
+      tableCrud({
+        label: 'edit',
+        table,
+        toSummary: (edit: EditType): EditSummary => ({
+          byteLength: edit.thumbnail.byteLength,
+          chain: edit.chain,
+          id: edit.id,
+          savedAt: edit.savedAt,
+          thumbnail: edit.thumbnail,
+        }),
+      }),
+    )
   }),
 )
 
@@ -90,18 +48,13 @@ export const EditStoreLive: Layer.Layer<
  * The ready-to-provide IndexedDB backend: the `EditStoreLive` fused with the
  * typed database schema opened against the `"lutra"` database name and the
  * browser `IndexedDb` primitives. Its error type is `never`: if the database
- * cannot be opened (blocked, private/incognito, quota), the app degrades to a
- * store that rejects every operation with a `StoreError` — the gallery shows
- * its error state instead of the app failing to boot. Wire this into the app
- * resource stack.
+ * cannot be opened, the app degrades to a store that rejects every operation
+ * with a `StoreError` — the gallery shows its error state instead of the app
+ * failing to boot. Wire this into the app resource stack.
  */
-export const EditStoreIndexedDb: Layer.Layer<EditStore> = EditStoreLive.pipe(
-  Layer.provide(LutraDbSchema.layer('lutra')),
-  Layer.provide(IndexedDb.layerWindow),
-  Layer.catch((error) =>
-    Layer.succeed(
-      EditStore,
-      EditStoreUnavailable(`could not open the edit database: ${error.message}`),
-    ),
-  ),
+export const EditStoreIndexedDb: Layer.Layer<EditStore> = indexedDbStoreLayer(
+  EditStore,
+  EditStoreLive,
+  (ops) => EditStore.of(ops),
+  'edit',
 )

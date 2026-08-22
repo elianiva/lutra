@@ -4,9 +4,9 @@ import type { ExportSettings } from '@lutra/engine'
 
 /**
  * The export dialog's presentational settings sections — format, quality
- * (lossy only), and resolution scale (docs/adr/0031). Shared by the editor's
- * export dialog and the collage's: one convention for the same choice, with
- * the owning screen supplying its own message constructors.
+ * (lossy only), and resolution scale (docs/adr/0031). One convention for the
+ * same choice across every owning screen: the shared machine's view renders
+ * them, wiring the buttons to the screen-supplied message constructors.
  */
 
 export const fmtBytes = (bytes: number) => {

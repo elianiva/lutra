@@ -49,9 +49,11 @@ export const gridRects = (
 }
 
 /**
- * Draw the rendered tiles onto the composed canvas: each tile
- * center-cropped into its square cell over the layout's background. Returns
- * the full composed frame as ImageData, ready for the engine encoder.
+ * Draw the rendered tiles onto the composed canvas: each tile copies
+ * pixel-perfect into its square cell over the layout's background. Tiles are
+ * rendered (or blank-filled) exactly at the cell size, so there is no
+ * resampling and no mismatch path. Returns the full composed frame as
+ * ImageData, ready for the engine encoder.
  */
 export const composeGrid = (
   tiles: readonly ImageData[],
@@ -66,28 +68,10 @@ export const composeGrid = (
   }
   ctx.fillStyle = layout.background === 'dark' ? '#000000' : '#ffffff'
   ctx.fillRect(0, 0, width, height)
+  // cells has exactly `tiles.length` entries by construction.
   tiles.forEach((tile, i) => {
-    const cell = cells[i]
-    if (!cell) {
-      return
-    }
-    if (tile.width === cell.width && tile.height === cell.height) {
-      // Exact-size tiles copy pixel-perfect with no resampling.
-      ctx.putImageData(tile, cell.x, cell.y)
-      return
-    }
-    // Mismatched tiles (defensive) center-crop into the square cell via a
-    // scratch canvas — ImageData itself is not a drawImage source.
-    const side = Math.min(tile.width, tile.height)
-    const sx = (tile.width - side) / 2
-    const sy = (tile.height - side) / 2
-    const scratch = new OffscreenCanvas(tile.width, tile.height)
-    const sctx = scratch.getContext('2d')
-    if (!sctx) {
-      throw new Error('2D context unavailable')
-    }
-    sctx.putImageData(tile, 0, 0)
-    ctx.drawImage(scratch, sx, sy, side, side, cell.x, cell.y, cell.width, cell.height)
+    const cell = cells[i]!
+    ctx.putImageData(tile, cell.x, cell.y)
   })
   return ctx.getImageData(0, 0, width, height)
 }

@@ -9,17 +9,10 @@ import {
   EditIdSchema,
   EditStore,
 } from '@lutra/store'
-import { EncodeError, ExportSettings, ImageEncoder, mimeFor } from '@lutra/engine'
 import type { EditId, StoreError } from '@lutra/store'
 import {
-  CollageDownloaded,
-  CollageEncodeFailed,
-  CollageEncodePrepared,
-  CollageExportSettingsLoaded,
-  CollageExportSettingsSaved,
   CollageExportSnapshotFailed,
   CollageExportSnapshotted,
-  CollageExportUrlRevoked,
   CollageLoaded,
   CollageSaved,
   CollageMissing,
@@ -28,9 +21,8 @@ import {
   SaveFailed,
 } from './message'
 import { renderEditTile } from './render-tile'
-import { composeGrid } from './compose'
-import { peekExportFrame, setExportFrame } from './export-frame'
-import { loadExportSettings, saveExportSettings } from '../export-settings'
+import { CELL_SIZE, composeGrid } from './compose'
+import { setFrame } from '../export-dialog'
 
 /**
  * Load one collage by id and resolve its references (docs/adr/0030): tiles
@@ -94,18 +86,14 @@ export const NavigateMenu = Command.define('NavigateMenu', {
   messages: [NavigatedBack],
 })
 
-// ---- export (docs/adr/0031) ----
-
-/** Export composes at fixed square cells before the scale preset (docs/adr/0031). */
-const CELL_EXPORT_SIZE = 1024
-
 /**
- * Compose the export frame once per dialog open: load every referenced
- * Edit in full (source bytes + chain), render each chain to its square cell
- * through the GPU, and draw the grid. The composed ImageData is cached for
- * the dialog's lifetime — pressing Export re-encodes without re-rendering.
- * A tile whose Edit vanished mid-flow, or whose render failed, leaves its
- * cell as background; `failedTiles` counts them so the screen can say so.
+ * Compose the export frame once per dialog open (docs/adr/0031): load every
+ * referenced Edit in full (source bytes + chain), render each chain to its
+ * square cell through the GPU, and draw the grid at the shared machine's
+ * `CELL_SIZE`. The composed ImageData is slotted for the dialog's lifetime
+ * — pressing Export re-encodes without re-rendering. A tile whose Edit
+ * vanished mid-flow, or whose render failed, leaves its cell as background;
+ * `failedTiles` counts them so the screen can say so.
  */
 export const SnapshotCollageExport = Command.define('SnapshotCollageExport', {
   args: { editIds: S.Array(EditIdSchema), layout: CollageLayout },
@@ -122,7 +110,7 @@ export const SnapshotCollageExport = Command.define('SnapshotCollageExport', {
         }
         const edit = loaded.value
         const tile = yield* renderEditTile({
-          cellSize: CELL_EXPORT_SIZE,
+          cellSize: CELL_SIZE,
           chain: edit.chain,
           source: edit.source,
         })
@@ -132,92 +120,19 @@ export const SnapshotCollageExport = Command.define('SnapshotCollageExport', {
         tiles.push(tile.image)
       }
       const image = composeGrid(tiles, layout)
-      // The pixels bypass the model entirely (see export-frame.ts).
-      setExportFrame(image)
+      // The pixels bypass the model entirely (see export-dialog/frame.ts).
+      setFrame(image)
       return CollageExportSnapshotted({ failedTiles })
-      }).pipe(
+    }).pipe(
       Effect.matchEager({
         // Any failure of load/render/compose degrades to a dialog error —
         // the collage itself is untouched (auto-save owns its persistence).
         onFailure: (error) =>
-          CollageExportSnapshotFailed({ message: `could not compose the collage: ${String(error)}` }),
+          CollageExportSnapshotFailed({
+            message: `could not compose the collage: ${String(error)}`,
+          }),
         onSuccess: (message) => message,
       }),
     ),
   messages: [CollageExportSnapshotted, CollageExportSnapshotFailed],
-})
-
-/**
- * Encode the composed frame on Export press — no live size preview (the
- * same trade as the editor's dialog). The previous blob URL is revoked here;
- * the model's `exportUrl` is only ever replaced, never leaked.
- */
-export const EncodeCollageExport = Command.define('EncodeCollageExport', {
-  args: {
-    previousUrl: S.NullOr(S.String),
-    settings: ExportSettings,
-  },
-  execute: ({ settings, previousUrl }) =>
-    Effect.gen(function* EncodeCollageExport() {
-      const image = peekExportFrame()
-      if (!image) {
-        return CollageEncodeFailed({ message: 'no composed frame to encode' })
-      }
-      if (previousUrl) {
-        yield* Effect.sync(() => {
-          URL.revokeObjectURL(previousUrl)
-        })
-      }
-      const encoder = yield* ImageEncoder
-      const bytes = yield* encoder.encode({ image, settings })
-      // SAFETY: the encoder returned its output over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
-      // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
-      const blob = new Blob([bytes as BlobPart], { type: mimeFor(settings.format) })
-      const url = URL.createObjectURL(blob)
-      return CollageEncodePrepared({ sizeBytes: bytes.byteLength, url })
-    }).pipe(
-      Effect.catchTag('EncodeError', (err: EncodeError) =>
-        Effect.succeed(CollageEncodeFailed({ message: err.message })),
-      ),
-    ),
-  messages: [CollageEncodePrepared, CollageEncodeFailed],
-})
-
-/** Trigger the browser download of the encoded blob (the url stays alive
- *  until the dialog closes — the tweak-and-re-export loop needs it). */
-export const DownloadCollageExport = Command.define('DownloadCollageExport', {
-  args: { filename: S.String, url: S.String },
-  execute: ({ filename, url }) =>
-    Effect.sync(() => {
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      a.click()
-      return CollageDownloaded({ url })
-    }),
-  messages: [CollageDownloaded],
-})
-
-/** Revoke a blob URL (dialog close, stale encode result). */
-export const RevokeCollageExportUrl = Command.define('RevokeCollageExportUrl', {
-  args: { url: S.String },
-  execute: ({ url }) =>
-    Effect.sync(() => {
-      URL.revokeObjectURL(url)
-    }).pipe(Effect.as(CollageExportUrlRevoked())),
-  messages: [CollageExportUrlRevoked],
-})
-
-/** Restore persisted export settings (shared key with the editor, docs/adr/0031). */
-export const LoadCollageExportSettings = Command.define('LoadCollageExportSettings', {
-  execute: Effect.map(loadExportSettings, (settings) => CollageExportSettingsLoaded({ settings })),
-  messages: [CollageExportSettingsLoaded],
-})
-
-/** Persist export settings (fired on every change; localStorage is cheap). */
-export const SaveCollageExportSettings = Command.define('SaveCollageExportSettings', {
-  args: { settings: ExportSettings },
-  execute: ({ settings }) =>
-    Effect.as(Effect.ignore(saveExportSettings(settings)), CollageExportSettingsSaved()),
-  messages: [CollageExportSettingsSaved],
 })

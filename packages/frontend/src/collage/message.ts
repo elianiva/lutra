@@ -1,8 +1,7 @@
 import { Schema as S } from 'effect'
 import { Message } from 'foldkit'
-import { Dialog } from '@foldkit/ui'
+import * as ExportDialog from '../export-dialog'
 import { Collage, EditSummary, StoreError } from '@lutra/store'
-import { ExportSettings } from '@lutra/engine'
 
 /**
  * The Collage Submodel's message union (docs/adr/0009). Internal to the
@@ -46,12 +45,12 @@ export const BackRequested = Message.m('BackRequested')
  *  drives the route transition (mirrors the root's `NavigatedTo`). */
 export const NavigatedBack = Message.m('NavigatedBack')
 
-// ---- export (docs/adr/0031: compose on open, encode on press) ----
+// ---- export (docs/adr/0031) ----
 export const ExportRequested = Message.m('ExportRequested')
 /**
- * The composed grid landed (all tiles rendered + drawn). The pixels stay in
- * the export-frame cache — megabytes of ImageData never ride through the
- * model; only the readiness flag and the failed-tile count do.
+ * The composed grid landed in the export-dialog's frame slot — all tiles
+ * rendered + drawn. `failedTiles` counts the photos that could not be
+ * rendered so the screen can say so.
  */
 export const CollageExportSnapshotted = Message.m('CollageExportSnapshotted', {
   failedTiles: S.Number,
@@ -59,31 +58,10 @@ export const CollageExportSnapshotted = Message.m('CollageExportSnapshotted', {
 export const CollageExportSnapshotFailed = Message.m('CollageExportSnapshotFailed', {
   message: S.String,
 })
-/** Wraps the @foldkit/ui Dialog submodel's messages for the export dialog. */
+/** Wraps the shared export-dialog machine's messages (docs/adr/0031). */
 export const GotCollageExportDialogMessage = Message.m('GotCollageExportDialogMessage', {
-  message: Dialog.Message,
+  message: ExportDialog.Message,
 })
-export const ChangedCollageExportFormat = Message.m('ChangedCollageExportFormat', {
-  format: S.Literals(['png', 'jpeg', 'webp', 'avif']),
-})
-export const ChangedCollageExportQuality = Message.m('ChangedCollageExportQuality', {
-  quality: S.Number,
-})
-export const ChangedCollageExportScale = Message.m('ChangedCollageExportScale', {
-  scale: S.Literals([1, 0.75, 0.5, 0.25]),
-})
-export const CollageEncodePrepared = Message.m('CollageEncodePrepared', {
-  sizeBytes: S.Number,
-  url: S.String,
-})
-export const CollageEncodeFailed = Message.m('CollageEncodeFailed', { message: S.String })
-export const CollageDownloadRequested = Message.m('CollageDownloadRequested')
-export const CollageDownloaded = Message.m('CollageDownloaded', { url: S.String })
-export const CollageExportSettingsLoaded = Message.m('CollageExportSettingsLoaded', {
-  settings: ExportSettings,
-})
-export const CollageExportSettingsSaved = Message.m('CollageExportSettingsSaved')
-export const CollageExportUrlRevoked = Message.m('CollageExportUrlRevoked')
 
 export const CollageMessage = S.Union([
   CollageLoaded,
@@ -102,15 +80,5 @@ export const CollageMessage = S.Union([
   CollageExportSnapshotted,
   CollageExportSnapshotFailed,
   GotCollageExportDialogMessage,
-  ChangedCollageExportFormat,
-  ChangedCollageExportQuality,
-  ChangedCollageExportScale,
-  CollageEncodePrepared,
-  CollageEncodeFailed,
-  CollageDownloadRequested,
-  CollageDownloaded,
-  CollageExportSettingsLoaded,
-  CollageExportSettingsSaved,
-  CollageExportUrlRevoked,
 ])
 export type CollageMessage = typeof CollageMessage.Type

@@ -5,25 +5,26 @@ import {
   ChangedColumns,
   ChangedGutter,
   ExportRequested,
+  GotCollageExportDialogMessage,
   MovedTile,
   RemovedTile,
   ToggledBackground,
 } from './message'
+import * as ExportDialog from '../export-dialog'
 import type { CollageMessage } from './message'
 import type { Model } from './model'
-import { LAYOUT_BOUNDS } from './update'
+import { LAYOUT_BOUNDS } from './model'
 import type { Collage, EditSummary } from '@lutra/store'
 import { thumbnailUrl } from '../thumbnail-url'
 import { icon } from '../components/icon'
 import { Download } from 'lucide'
-import { collageExportDialogView } from './export-dialog'
 
 /**
  * The Collage Submodel's view (docs/adr/0009, 0030): the fixed-grid preview
  * — each tile drawn from its referenced Edit's stored thumbnail, fitted to
  * the viewport — with layout controls (columns, gutter, background), per-tile
- * remove and move controls, and back navigation. Export lands with the
- * export chunk.
+ * remove and move controls, and back navigation. Stepper controls emit raw
+ * ±1/±8 intents; clamping to `LAYOUT_BOUNDS` happens once, in update.
  */
 export const view = Submodel.defineView<Model, CollageMessage>((model, h) => {
   return h.div(
@@ -32,7 +33,9 @@ export const view = Submodel.defineView<Model, CollageMessage>((model, h) => {
       header(h),
       notice(model.notice, h),
       h.main([h.Class('flex min-h-0 flex-1 flex-col overflow-auto')], [body(h, model)]),
-      collageExportDialogView(h, model),
+      ExportDialog.exportDialogView(h, model.exportDialog, (message) =>
+        GotCollageExportDialogMessage({ message }),
+      ),
     ],
   )
 })
@@ -85,7 +88,7 @@ const body = (h: HtmlBuilder<CollageMessage>, model: Model) =>
         ? emptyState(h)
         : h.div(
             [h.Class('flex min-h-0 flex-1 flex-col gap-4 p-4')],
-            [controls(h, model, collage), grid(h, model, collage)],
+            [controls(h, collage), grid(h, model, collage)],
           ),
   })
 
@@ -124,7 +127,7 @@ const stepperButton = (
     [label],
   )
 
-const controls = (h: HtmlBuilder<CollageMessage>, model: Model, collage: Collage) => {
+const controls = (h: HtmlBuilder<CollageMessage>, collage: Collage) => {
   return h.div(
     [h.Class('flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted')],
     [
@@ -136,14 +139,14 @@ const controls = (h: HtmlBuilder<CollageMessage>, model: Model, collage: Collage
             h,
             '−',
             'One fewer column',
-            ChangedColumns({ columns: Math.max(LAYOUT_BOUNDS.minColumns, Math.round(collage.layout.columns) - 1) }),
+            ChangedColumns({ columns: Math.round(collage.layout.columns) - 1 }),
           ),
           h.span([h.Class('tnum text-ink')], [String(Math.round(collage.layout.columns))]),
           stepperButton(
             h,
             '+',
             'One more column',
-            ChangedColumns({ columns: Math.min(LAYOUT_BOUNDS.maxColumns, Math.round(collage.layout.columns) + 1) }),
+            ChangedColumns({ columns: Math.round(collage.layout.columns) + 1 }),
           ),
         ],
       ),
@@ -155,14 +158,14 @@ const controls = (h: HtmlBuilder<CollageMessage>, model: Model, collage: Collage
             h,
             '−',
             'Smaller gutter',
-            ChangedGutter({ gutter: Math.max(LAYOUT_BOUNDS.minGutter, Math.round(collage.layout.gutter) - 8) }),
+            ChangedGutter({ gutter: Math.round(collage.layout.gutter) - 8 }),
           ),
           h.span([h.Class('tnum text-ink')], [`${Math.round(collage.layout.gutter)}px`]),
           stepperButton(
             h,
             '+',
             'Larger gutter',
-            ChangedGutter({ gutter: Math.min(LAYOUT_BOUNDS.maxGutter, Math.round(collage.layout.gutter) + 8) }),
+            ChangedGutter({ gutter: Math.round(collage.layout.gutter) + 8 }),
           ),
         ],
       ),

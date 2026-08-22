@@ -1,17 +1,26 @@
 import { AsyncData } from 'foldkit'
-import type { Command } from 'foldkit'
+import { Command } from 'foldkit'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import type { CollageStore, EditStore } from '@lutra/store'
+import * as ExportDialog from '../export-dialog'
 import type { AppRoute } from '../route'
 import type { Model } from './model'
 import type { CollageMessage } from './message'
-import { LoadCollage, LoadCollageExportSettings } from './command'
+import { GotCollageExportDialogMessage } from './message'
+import { LoadCollage } from './command'
 
 type Resource = KeyValueStore | CollageStore | EditStore
 
 export type InformReturn = readonly [
   Model,
   readonly Command.Command<CollageMessage, never, Resource>[],
+]
+
+const toSelf = (message: ExportDialog.Message): CollageMessage =>
+  GotCollageExportDialogMessage({ message })
+
+const settings = [
+  Command.mapMessage(ExportDialog.LoadExportSettings(), toSelf),
 ]
 
 /**
@@ -26,6 +35,6 @@ export const informRouteChanged = (model: Model, route: AppRoute): InformReturn 
   route._tag === 'Collage' && route.collageId !== null
     ? [
         { ...model, collage: AsyncData.Loading() },
-        [LoadCollage({ id: route.collageId }), LoadCollageExportSettings()],
+        [LoadCollage({ id: route.collageId }), ...settings],
       ]
-    : [model, [LoadCollageExportSettings()]]
+    : [model, settings]

@@ -1,15 +1,13 @@
 import { Schema } from 'effect'
-import { Dialog } from '@foldkit/ui'
 import { RenderHandle } from '../gpu/backend'
-import { SourceImage, CompareMode, Catalog, SaveError, ExportError } from './message'
+import { SourceImage, CompareMode, Catalog, SaveError } from './message'
 import {
-  ExportSettings,
-  defaultExportSettings,
   LayerIdSchema,
   LutIdSchema,
   Layer,
 } from '@lutra/engine'
 import { EditIdSchema } from '@lutra/store'
+import * as ExportDialog from '../export-dialog'
 import { EditorPhase, editorMachine } from './phase'
 import { DownloadState } from '../offline/model'
 import { LutLoadError } from '../luts/store'
@@ -151,25 +149,9 @@ export const Model = Schema.Struct({
   // Monotonic counter hashed into the render trigger stamp.
   revision: Schema.Number,
   // ---- export dialog ----
-  // The foldkit dialog submodel (open/close/animation state).
-  exportDialog: Dialog.Model,
-  // The export settings (format/quality/scale); persisted across sessions.
-  exportSettings: ExportSettings,
-  // True while a frame read back from the GPU is cached for the open
-  // dialog — pressing Export encodes from it without another readback.
-  // The pixels live in the export-frame cache, never in the model
-  // (docs/adr/0031).
-  exportReady: Schema.Boolean,
-  // True while an export encode is running (the Export button is disabled
-  // and the dialog shows "Encoding…").
-  exportEncoding: Schema.Boolean,
-  // The encoded blob's size and object URL (the download target).
-  exportSize: Schema.NullOr(Schema.Number),
-  exportUrl: Schema.NullOr(Schema.String),
-  // Encode failure reason, shown in the dialog.
-  exportError: Schema.NullOr(ExportError),
-  // True after a successful download, until the next settings change.
-  exportDownloaded: Schema.Boolean,
+  // The shared export-dialog machine (docs/adr/0031): settings, encode
+  // flow, and the frame slot's readiness flag.
+  exportDialog: ExportDialog.Model,
 })
 
 export type Model = typeof Model.Type
@@ -186,14 +168,7 @@ export const initialModel = (): Model => ({
   layerCreationError: null,
   compareSplitAt: 0.5,
   compareToggleBefore: false,
-  exportDialog: Dialog.init({ id: 'export-dialog' }),
-  exportDownloaded: false,
-  exportEncoding: false,
-  exportError: null,
-  exportReady: false,
-  exportSettings: defaultExportSettings(),
-  exportSize: null,
-  exportUrl: null,
+  exportDialog: ExportDialog.init({ id: 'export-dialog', fileStem: 'lutra-edit' }),
   lastRender: null,
   lutBarOpen: false,
   lutDownloads: {},

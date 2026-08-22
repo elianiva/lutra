@@ -1,4 +1,4 @@
-import type { Command } from 'foldkit'
+import { Command } from 'foldkit'
 import type { GpuBackend } from '../gpu/backend'
 import type { CanvasRef } from '../gpu/canvas-ref'
 import type { LutStore } from '../luts/store'
@@ -6,11 +6,13 @@ import type { LutThumbnailer } from '../thumbs/worker-layer'
 import type { ImageEncoder } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import type { EditStore } from '@lutra/store'
+import * as ExportDialog from '../export-dialog'
+import type { AppRoute } from '../route'
 import { initialModel } from './model'
 import type { Model } from './model'
 import type { EditorMessage } from './message'
-import type { AppRoute } from '../route'
-import { LoadCatalog, LoadEdit, LoadExportSettings, LoadLutRecents } from './command'
+import { GotExportDialogMessage } from './message'
+import { LoadCatalog, LoadEdit, LoadLutRecents } from './command'
 
 type Resource =
   | GpuBackend
@@ -31,7 +33,12 @@ type Resource =
  */
 export type InitReturn = [Model, readonly Command.Command<EditorMessage, never, Resource>[]]
 export const init = (route: AppRoute): InitReturn => {
-  const boot = [LoadCatalog(), LoadExportSettings(), LoadLutRecents()]
+  const settings = [
+    Command.mapMessage(ExportDialog.LoadExportSettings(), (message) =>
+      GotExportDialogMessage({ message }),
+    ),
+  ]
+  const boot = [LoadCatalog(), ...settings, LoadLutRecents()]
   const commands = route._tag === 'Editor' ? [LoadEdit({ id: route.editId }), ...boot] : boot
   return [initialModel(), commands]
 }

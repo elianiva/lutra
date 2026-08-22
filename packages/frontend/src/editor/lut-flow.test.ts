@@ -492,11 +492,11 @@ describe('persistence-during-preview dismissal', () => {
   it('ExportRequested while previewing dismisses the preview instead of opening', () => {
     const [model, commands] = update(hoveredDraft(), ExportRequested())
     expect(model.previewLut).toBeNull()
-    expect(model.exportDialog.isOpen).toBe(false)
+    expect(model.exportDialog.dialog.isOpen).toBe(false)
     expect(commands.some((c) => c.name === 'SnapshotForExport')).toBe(false)
     // The next Export opens the dialog.
     const [next, nextCommands] = update(model, ExportRequested())
-    expect(next.exportDialog.isOpen).toBe(true)
+    expect(next.exportDialog.dialog.isOpen).toBe(true)
     expect(nextCommands.some((c) => c.name === 'SnapshotForExport')).toBe(true)
   })
 })

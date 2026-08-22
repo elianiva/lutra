@@ -25,25 +25,15 @@ import { initialModel } from './model'
 import type { Model } from './model'
 import { update } from './update'
 import { view } from './view'
-import {
-  DownloadCollageExport,
-  EncodeCollageExport,
-  NavigateMenu,
-  RevokeCollageExportUrl,
-  SaveCollageExportSettings,
-  SnapshotCollageExport,
-} from './command'
+import { SnapshotCollageExport, NavigateMenu } from './command'
+import * as ExportDialog from '../export-dialog'
 import {
   BackRequested,
   ChangedColumns,
   ChangedGutter,
-  CollageDownloaded,
-  CollageEncodePrepared,
-  CollageExportSettingsSaved,
   CollageExportSnapshotted,
   CollageLoaded,
   CollageMissing,
-  CollageExportUrlRevoked,
   ExportRequested as ExportRequestedMessage,
   LoadFailed,
   MovedTile,
@@ -257,7 +247,7 @@ describe('collage submodel: export', () => {
       sceneExpect(text('lutra-collage.png')).toExist(),
       sceneExpect(text('PNG')).toExist(),
       sceneExpect(text('100%')).toExist(),
-      // Composition starts immediately and lands in the model.
+      // Composition starts immediately and lands in the frame slot.
       Command.expectHas(SnapshotCollageExport),
       Command.resolve(SnapshotCollageExport, CollageExportSnapshotted({ failedTiles: 0 })),
       Command.expectNone(),
@@ -265,10 +255,10 @@ describe('collage submodel: export', () => {
       // Pressing Export encodes and downloads — the size appears.
       click(text('Export')),
       sceneExpect(text('Encoding…')).toExist(),
-      Command.expectHas(EncodeCollageExport),
-      Command.resolve(EncodeCollageExport, CollageEncodePrepared({ sizeBytes: 4096, url: 'blob:collage-1' })),
-      Command.expectHas(DownloadCollageExport),
-      Command.resolve(DownloadCollageExport, CollageDownloaded({ url: 'blob:collage-1' })),
+      Command.expectHas(ExportDialog.PrepareExport),
+      Command.resolve(ExportDialog.PrepareExport, ExportDialog.EncodePrepared({ sizeBytes: 4096, url: 'blob:collage-1' })),
+      Command.expectHas(ExportDialog.ExportDownload),
+      Command.resolve(ExportDialog.ExportDownload, ExportDialog.Downloaded({ url: 'blob:collage-1' })),
       sceneExpect(text('Downloaded', { exact: false })).toExist(),
       sceneExpect(text('4.0 KB', { exact: false })).toExist(),
       // The dialog stays open after a download.
@@ -285,12 +275,12 @@ describe('collage submodel: export', () => {
       ...openDialog,
       Command.resolve(SnapshotCollageExport, CollageExportSnapshotted({ failedTiles: 0 })),
       click(text('Export')),
-      Command.resolve(EncodeCollageExport, CollageEncodePrepared({ sizeBytes: 4096, url: 'blob:collage-1' })),
-      Command.resolve(DownloadCollageExport, CollageDownloaded({ url: 'blob:collage-1' })),
+      Command.resolve(ExportDialog.PrepareExport, ExportDialog.EncodePrepared({ sizeBytes: 4096, url: 'blob:collage-1' })),
+      Command.resolve(ExportDialog.ExportDownload, ExportDialog.Downloaded({ url: 'blob:collage-1' })),
       // Cancel closes: the composed frame drops and the url is revoked.
       click(text('Cancel')),
       Command.resolve(Dialog.CloseDialog, Dialog.CompletedCloseDialog()),
-      Command.resolve(RevokeCollageExportUrl, CollageExportUrlRevoked()),
+      Command.resolve(ExportDialog.RevokeExportUrl, ExportDialog.UrlRevoked()),
     )
   })
 
@@ -303,7 +293,7 @@ describe('collage submodel: export', () => {
       Command.resolve(SnapshotCollageExport, CollageExportSnapshotted({ failedTiles: 0 })),
       click(text('JPEG')),
       sceneExpect(text('lutra-collage.jpeg')).toExist(),
-      Command.resolve(SaveCollageExportSettings, CollageExportSettingsSaved()),
+      Command.resolve(ExportDialog.SaveExportSettings, ExportDialog.SettingsSaved()),
       Command.expectNone(),
     )
   })
@@ -316,16 +306,16 @@ describe('collage export: update-level guards', () => {
       initialModel(),
       CollageExportSnapshotted({ failedTiles: 0 }),
     )
-    expect(model.exportReady).toBe(false)
+    expect(model.exportDialog.ready).toBe(false)
     expect(commands).toEqual([])
   })
 
   it('failed tiles surface a count in the notice', () => {
     const [opened] = update(loadedWith([1, 2]), ExportRequestedMessage())
-    expect(opened.exportDialog.isOpen).toBe(true)
+    expect(opened.exportDialog.dialog.isOpen).toBe(true)
     const [model] = update(opened, CollageExportSnapshotted({ failedTiles: 2 }))
     expect(model.notice).toBe('2 photos could not be rendered and show as blank')
-    expect(model.exportReady).toBe(true)
+    expect(model.exportDialog.ready).toBe(true)
   })
 
   it('one failed tile reads in the singular', () => {

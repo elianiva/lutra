@@ -1,4 +1,4 @@
-import type { Command } from 'foldkit'
+import { Command } from 'foldkit'
 import type { GpuBackend } from '../gpu/backend'
 import type { CanvasRef } from '../gpu/canvas-ref'
 import type { LutStore } from '../luts/store'
@@ -9,7 +9,9 @@ import type { EditStore } from '@lutra/store'
 import type { EditorMessage } from './message'
 import type { Model } from './model'
 import type { AppRoute } from '../route'
-import { LoadCatalog, LoadEdit, LoadExportSettings, LoadLutRecents } from './command'
+import * as ExportDialog from '../export-dialog'
+import { GotExportDialogMessage } from './message'
+import { LoadCatalog, LoadEdit, LoadLutRecents } from './command'
 
 type Resource =
   | GpuBackend
@@ -38,7 +40,12 @@ export type RouteChangedReturn = readonly [
   readonly Command.Command<EditorMessage, never, Resource>[],
 ]
 export const informRouteChanged = (model: Model, route: AppRoute): RouteChangedReturn => {
-  const boot = [LoadCatalog(), LoadExportSettings(), LoadLutRecents()]
+  const settings = [
+    Command.mapMessage(ExportDialog.LoadExportSettings(), (message) =>
+      GotExportDialogMessage({ message }),
+    ),
+  ]
+  const boot = [LoadCatalog(), ...settings, LoadLutRecents()]
   const commands = route._tag === 'Editor' ? [LoadEdit({ id: route.editId }), ...boot] : boot
   return [model, commands]
 }

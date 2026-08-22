@@ -1,29 +1,18 @@
 import { Match as M, Option } from 'effect'
 import { Command } from 'foldkit'
-import { Dialog } from '@foldkit/ui'
 import type { GpuBackend } from '../gpu/backend'
 import type { LutStore } from '../luts/store'
 import type { ImageEncoder } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import type { Collage, CollageStore, EditStore } from '@lutra/store'
-import type { ExportSettings } from '@lutra/engine'
 import { StoreError as StoreErrorClass } from '@lutra/store'
+import * as ExportDialog from '../export-dialog'
 import type { CollageMessage } from './message'
 import { GotCollageExportDialogMessage } from './message'
-import {
-  EncodeCollageExport,
-  DownloadCollageExport,
-  NavigateMenu,
-  RevokeCollageExportUrl,
-  SaveCollage,
-  SaveCollageExportSettings,
-  SnapshotCollageExport,
-} from './command'
+import { NavigateMenu, SaveCollage, SnapshotCollageExport } from './command'
 import type { Model } from './model'
-import { loadedCollage } from './model'
+import { LAYOUT_BOUNDS, clamp, loadedCollage } from './model'
 import { moveTile, removeTile } from './tiles'
-import { clearExportFrame } from './export-frame'
-
 
 type Resource =
   | GpuBackend
@@ -39,16 +28,6 @@ export type UpdateReturn = readonly [
   Option.Option<never>,
 ]
 
-/** Layout control bounds — the record stores plain numbers; the screen clamps. */
-export const LAYOUT_BOUNDS = {
-  minColumns: 2,
-  maxColumns: 6,
-  minGutter: 0,
-  maxGutter: 32,
-} as const
-
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
-
 /**
  * Mutate the loaded collage's arrangement and queue an auto-save
  * (docs/adr/0030). Arrangement messages with no edge while nothing is loaded
@@ -62,6 +41,24 @@ const mutate = (model: Model, f: (collage: Collage) => Collage): UpdateReturn =>
   return [
     { ...model, collage: loadedCollage.Success({ data: collage }) },
     [SaveCollage({ collage })],
+    Option.none(),
+  ]
+}
+
+/** The shared export-dialog machine's messages ride the collage boundary. */
+const toExportDialogMessage = (message: ExportDialog.Message): CollageMessage =>
+  GotCollageExportDialogMessage({ message })
+
+/** Step the export-dialog machine and lift its results into the collage. */
+const delegate = (
+  model: Model,
+  message: ExportDialog.Message,
+  notice: string | null = model.notice,
+): UpdateReturn => {
+  const [dialogModel, commands] = ExportDialog.update(model.exportDialog, message)
+  return [
+    { ...model, exportDialog: dialogModel, notice },
+    Command.mapMessages(commands, toExportDialogMessage),
     Option.none(),
   ]
 }
@@ -108,7 +105,7 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         Option.none(),
       ],
 
-      // ---- arrangement (each mutation auto-saves) ----
+      // ---- arrangement (each mutation auto-saves; bounds live in model.ts) ----
       ChangedColumns: ({ columns }) =>
         mutate(model, (c) => ({
           ...c,
@@ -130,8 +127,10 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
           ...c,
           layout: { ...c.layout, background: c.layout.background === 'dark' ? 'light' : 'dark' },
         })),
-      RemovedTile: ({ index }) => mutate(model, (c) => ({ ...c, tiles: removeTile(c.tiles, index) })),
-      MovedTile: ({ from, to }) => mutate(model, (c) => ({ ...c, tiles: moveTile(c.tiles, from, to) })),
+      RemovedTile: ({ index }) =>
+        mutate(model, (c) => ({ ...c, tiles: removeTile(c.tiles, index) })),
+      MovedTile: ({ from, to }) =>
+        mutate(model, (c) => ({ ...c, tiles: moveTile(c.tiles, from, to) })),
 
       // ---- auto-save ----
       CollageSaved: () => [model, [], Option.none()],
@@ -141,14 +140,14 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         Option.none(),
       ],
 
-      // ---- export (mirrors the editor's dialog flow) ----
+      // ---- export (docs/adr/0031: compose on open, encode on press) ----
       ExportRequested: () => {
         if (model.collage._tag !== 'Success') {
           return [model, [], Option.none()]
         }
-        const [dialog, dialogCommands] = Dialog.open(model.exportDialog)
+        const [dialogModel, dialogCommands] = ExportDialog.open(model.exportDialog)
         return [
-          { ...model, exportDialog: dialog, exportDownloaded: false },
+          { ...model, exportDialog: dialogModel },
           [
             ...Command.mapMessages(dialogCommands, toExportDialogMessage),
             SnapshotCollageExport({
@@ -159,141 +158,23 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
           Option.none(),
         ]
       },
-      GotCollageExportDialogMessage: ({ message }) => {
-        const [dialog, dialogCommands, out] = Dialog.update(model.exportDialog, message)
-        let next: Model = { ...model, exportDialog: dialog }
-        let commands = Command.mapMessages(dialogCommands, toExportDialogMessage)
-        // On close: drop the composed frame and revoke the blob URL. The
-        // settings stay — they persist across sessions.
-        if (Option.isSome(out) && out.value._tag === 'Closed') {
-          clearExportFrame()
-          next = {
-            ...next,
-            exportDownloaded: false,
-            exportEncoding: false,
-            exportError: null,
-            exportReady: false,
-            exportSize: null,
-            exportUrl: null,
-          }
-          if (model.exportUrl) {
-            commands = [...commands, RevokeCollageExportUrl({ url: model.exportUrl })]
-          }
-        }
-        return [next, commands, Option.none()]
-      },
-      // The composed frame landed in the export-frame cache for the
-      // dialog's lifetime; a late compose after close is dropped.
-      CollageExportSnapshotted: ({ failedTiles }) => {
-        if (!model.exportDialog.isOpen) {
-          clearExportFrame()
-          return [model, [], Option.none()]
-        }
-        return [
-          {
-            ...model,
-            exportError: null,
-            exportReady: true,
-            notice:
-              failedTiles > 0
-                ? `${failedTiles} ${failedTiles === 1 ? 'photo could not be rendered' : 'photos could not be rendered'} and show as blank`
-                : model.notice,
-          },
-          [],
-          Option.none(),
-        ]
-      },
-      CollageExportSnapshotFailed: ({ message }) => [
-        { ...model, exportError: message },
-        [],
-        Option.none(),
-      ],
-      ChangedCollageExportFormat: ({ format }) =>
-        settingsChanged(model, {
-          ...model.exportSettings,
-          format,
-          quality: format === 'png' ? null : (model.exportSettings.quality ?? 75),
-        }),
-      ChangedCollageExportQuality: ({ quality }) =>
-        settingsChanged(model, { ...model.exportSettings, quality }),
-      ChangedCollageExportScale: ({ scale }) =>
-        settingsChanged(model, { ...model.exportSettings, scale }),
-      CollageEncodePrepared: ({ sizeBytes, url }) => {
-        // An encode that completed after the dialog closed has no consumer.
-        if (!model.exportDialog.isOpen) {
-          return [model, [RevokeCollageExportUrl({ url })], Option.none()]
-        }
-        const filename = `lutra-collage.${model.exportSettings.format}`
-        return [
-          {
-            ...model,
-            exportEncoding: false,
-            exportError: null,
-            exportSize: sizeBytes,
-            exportUrl: url,
-          },
-          [DownloadCollageExport({ filename, url })],
-          Option.none(),
-        ]
-      },
-      CollageEncodeFailed: ({ message }) => [
-        { ...model, exportEncoding: false, exportError: message },
-        [],
-        Option.none(),
-      ],
-      CollageDownloadRequested: () => {
-        // The encode runs here, on Export press — not on settings change.
-        if (!model.exportReady || model.exportEncoding) {
-          return [model, [], Option.none()]
-        }
-        return [
-          {
-            ...model,
-            exportDownloaded: false,
-            exportEncoding: true,
-            exportError: null,
-            exportSize: null,
-            exportUrl: null,
-          },
-          [
-            EncodeCollageExport({
-              previousUrl: model.exportUrl,
-              settings: model.exportSettings,
-            }),
-          ],
-          Option.none(),
-        ]
-      },
-      CollageDownloaded: ({ url }) => {
-        // Ignore downloads of a replaced blob (an encode finished after a
-        // newer Export press).
-        if (model.exportUrl !== url) {
-          return [model, [], Option.none()]
-        }
-        return [{ ...model, exportDownloaded: true }, [], Option.none()]
-      },
-      CollageExportSettingsLoaded: ({ settings }) => [
-        { ...model, exportSettings: settings },
-        [],
-        Option.none(),
-      ],
-      CollageExportSettingsSaved: () => [model, [], Option.none()],
-      CollageExportUrlRevoked: () => [model, [], Option.none()],
+      // A failed-tile count surfaces as a notice before the machine takes
+      // over; the readiness flag and late-result guards live in the machine.
+      CollageExportSnapshotted: ({ failedTiles }) =>
+        delegate(
+          model,
+          ExportDialog.FrameReady(),
+          failedTiles > 0
+            ? `${failedTiles} ${failedTiles === 1 ? 'photo could not be rendered' : 'photos could not be rendered'} and show as blank`
+            : model.notice,
+        ),
+      CollageExportSnapshotFailed: ({ message }) =>
+        delegate(model, ExportDialog.FrameFailed({ message }), model.notice),
 
       BackRequested: () => [model, [NavigateMenu()], Option.none()],
       // Observability only — the URL change drives the route transition.
       NavigatedBack: () => [model, [], Option.none()],
+      GotCollageExportDialogMessage: ({ message }) => delegate(model, message),
     }),
     M.exhaustive,
   )
-
-
-const toExportDialogMessage = (message: Dialog.Message): CollageMessage =>
-  GotCollageExportDialogMessage({ message })
-
-/** Persist a settings change; the encode waits for the Export press. */
-const settingsChanged = (model: Model, settings: ExportSettings): UpdateReturn => [
-  { ...model, exportDownloaded: false, exportSettings: settings },
-  [SaveCollageExportSettings({ settings })],
-  Option.none(),
-]
