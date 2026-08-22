@@ -9,23 +9,21 @@ import type { Collage, CollageStore, EditStore } from '@lutra/store'
 import { StoreError as StoreErrorClass, defaultTileFraming } from '@lutra/store'
 import * as ExportDialog from '../export-dialog'
 import type { CollageMessage } from './message'
+import { GotCollageExportDialogMessage, GotDragMessage } from './message'
 import {
-  GotCollageExportDialogMessage,
-  GotDragMessage,
-} from './message'
-import { NavigateMenu, MeasureThumbs, SaveCollage, ScheduleUndoExpiry, ScheduleZoomCommit, SnapshotCollageExport } from './command'
+  NavigateMenu,
+  MeasureThumbs,
+  SaveCollage,
+  ScheduleUndoExpiry,
+  ScheduleZoomCommit,
+  SnapshotCollageExport,
+} from './command'
 import type { Model } from './model'
 import { LAYOUT_BOUNDS, clamp, loadedCollage } from './model'
 import { moveTile, removeTile } from './tiles'
 import { isDefaultFraming, panned, sameFraming, zoomed } from './framing'
 
-type Resource =
-  | GpuBackend
-  | LutStore
-  | ImageEncoder
-  | KeyValueStore
-  | CollageStore
-  | EditStore
+type Resource = GpuBackend | LutStore | ImageEncoder | KeyValueStore | CollageStore | EditStore
 
 export type UpdateReturn = readonly [
   Model,
@@ -157,8 +155,7 @@ const delegate = (
 const toExportDialogMessage = (message: ExportDialog.Message): CollageMessage =>
   GotCollageExportDialogMessage({ message })
 
-const toDragMessage = (message: DragAndDrop.Message): CollageMessage =>
-  GotDragMessage({ message })
+const toDragMessage = (message: DragAndDrop.Message): CollageMessage => GotDragMessage({ message })
 
 /**
  * The Collage Submodel's update loop (docs/adr/0009): the same
@@ -277,11 +274,7 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
           ...c,
           tiles: removeTile(c.tiles, index),
         }))
-        return [
-          emptied ? { ...nextModel, userEmptied: true } : nextModel,
-          commands,
-          Option.none(),
-        ]
+        return [emptied ? { ...nextModel, userEmptied: true } : nextModel, commands, Option.none()]
       },
 
       // ---- drag-and-drop reorder (docs/adr/0033) ----
@@ -372,7 +365,8 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         }
         const imageAspect = aspectOf(model, tile.editId)
         const cellAspect = model.cellPx ? model.cellPx.width / Math.max(1, model.cellPx.height) : 1
-        const start = model.framingDraft?.index === index ? model.framingDraft.framing : tile.framing
+        const start =
+          model.framingDraft?.index === index ? model.framingDraft.framing : tile.framing
         const framing = zoomed(start, Math.exp(-deltaY * 0.002), imageAspect, cellAspect)
         const seq = model.zoomSeq + 1
         return [

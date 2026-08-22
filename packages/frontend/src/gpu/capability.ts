@@ -27,7 +27,8 @@ export const webGpuSupported: WebGpuCapability = { supported: true, reason: '' }
  */
 export const detectWebGpu = Effect.gen(function* () {
   const capability = yield* Effect.tryPromise({
-    catch: () => ({ supported: false, reason: 'WebGPU probe threw an unexpected error.' }) as WebGpuCapability,
+    catch: () =>
+      ({ supported: false, reason: 'WebGPU probe threw an unexpected error.' }) as WebGpuCapability,
     try: async () => {
       if (navigator.gpu === undefined) {
         return {

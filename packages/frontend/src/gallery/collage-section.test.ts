@@ -158,15 +158,16 @@ describe('gallery: collages section', () => {
     const plain = collage(collageId(2), [editId(1), editId(2)])
 
     // Only the custom-framed tile's summary is sent off to be measured.
-    const [model, commands] = update(loadedWith(custom, plain), CollagesListed({ collages: [custom, plain] }))
+    const [model, commands] = update(
+      loadedWith(custom, plain),
+      CollagesListed({ collages: [custom, plain] }),
+    )
     expect(model.collages._tag).toBe('Success')
     expect(commands.map((c) => c.name)).toEqual([MeasureCollageThumbs.name])
     const measure = commands[0]!
     // The Command type erases args to a record; read the declared field by key.
     const args = measure.args ?? {}
-    expect(args['thumbs']).toEqual([
-      { id: editId(1), thumbnail: summary(editId(1)).thumbnail },
-    ])
+    expect(args['thumbs']).toEqual([{ id: editId(1), thumbnail: summary(editId(1)).thumbnail }])
 
     // All-default collages cost nothing.
     const [, none] = update(loadedWith(plain), CollagesListed({ collages: [plain] }))

@@ -23,8 +23,7 @@ import { ScreenMode } from './model'
 
 const liftedDnd = Subscription.lift(DragAndDrop.subscriptions)({
   toChildModel: (model: Model) => model.drag,
-  toParentMessage: (message: DragAndDrop.Message): CollageMessage =>
-    GotDragMessage({ message }),
+  toParentMessage: (message: DragAndDrop.Message): CollageMessage => GotDragMessage({ message }),
 })
 
 const own = Subscription.make<Model, CollageMessage>()((entry) => ({
@@ -35,7 +34,9 @@ const own = Subscription.make<Model, CollageMessage>()((entry) => ({
   panTracking: entry(
     { panActive: S.Literals(['idle', 'active']) },
     {
-      modelToDependencies: (model: Model) => ({ panActive: model.pan === null ? 'idle' : 'active' }),
+      modelToDependencies: (model: Model) => ({
+        panActive: model.pan === null ? 'idle' : 'active',
+      }),
       dependenciesToStream: ({ panActive }: { panActive: 'idle' | 'active' }) =>
         Stream.when(
           Subscription.fromEventFilterMap({
@@ -70,9 +71,7 @@ const own = Subscription.make<Model, CollageMessage>()((entry) => ({
             options: { passive: false },
             toMessage: (event: WheelEvent): Option.Option<CollageMessage> => {
               const tile =
-                event.target instanceof Element
-                  ? event.target.closest('[data-collage-tile]')
-                  : null
+                event.target instanceof Element ? event.target.closest('[data-collage-tile]') : null
               const index = Number(tile?.getAttribute('data-collage-tile'))
               if (!tile || !Number.isInteger(index)) {
                 return Option.none()

@@ -204,8 +204,9 @@ export const LutThumbnailerLive = Layer.effect(
     )
 
     return LutThumbnailer.of({
-      render: (lutId, bitmap, cube) => Effect.gen(function* () {
-        // Downscale once per photo: the slot is keyed by bitmap identity,
+      render: (lutId, bitmap, cube) =>
+        Effect.gen(function* () {
+          // Downscale once per photo: the slot is keyed by bitmap identity,
           // so a group's concurrent commands share one canvas-2D op. The
           // ImageData is then structured-cloned into each request — one
           // buffer serves the whole pool, so it cannot be transferred.
@@ -263,7 +264,7 @@ export const LutThumbnailerLive = Layer.effect(
             return next
           })
           return result
-      }),
+        }),
     })
   }),
 )

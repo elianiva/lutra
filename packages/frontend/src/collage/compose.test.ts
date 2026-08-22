@@ -22,7 +22,7 @@ describe('frameSize', () => {
       width: Math.round(FRAME_SHORT_EDGE * 0.8),
       height: FRAME_SHORT_EDGE,
     })
-    expect(frameSize({ frameRatio: 16 / 9 }).width).toBe(Math.round(FRAME_SHORT_EDGE * 16 / 9))
+    expect(frameSize({ frameRatio: 16 / 9 }).width).toBe(Math.round((FRAME_SHORT_EDGE * 16) / 9))
   })
 
   it('a nonsensical ratio falls back to square', () => {
@@ -88,41 +88,32 @@ describe('composeGrid', () => {
     return t
   }
 
-  it.skipIf(!canvasAvailable)(
-    'draws tiles into their cells over a dark background',
-    () => {
-      const layout = layoutWith({ columns: 2, gutter: 0 })
-      const tiles = [tileAt(0), tileAt(1)]
-      // Scale down so pixel assertions stay tractable: a 4px short edge.
-      const composed = composeGrid(tiles, layout, 4)
-      expect(composed.width).toBe(8)
-      expect(composed.height).toBe(4)
-      // First cell filled with the first tile's gray.
-      expect(composed.data[0]).toBe(10)
-      // Second cell filled with the second tile's gray.
-      expect(composed.data[(4 + 1) * 4]).toBe(100)
-    },
-  )
+  it.skipIf(!canvasAvailable)('draws tiles into their cells over a dark background', () => {
+    const layout = layoutWith({ columns: 2, gutter: 0 })
+    const tiles = [tileAt(0), tileAt(1)]
+    // Scale down so pixel assertions stay tractable: a 4px short edge.
+    const composed = composeGrid(tiles, layout, 4)
+    expect(composed.width).toBe(8)
+    expect(composed.height).toBe(4)
+    // First cell filled with the first tile's gray.
+    expect(composed.data[0]).toBe(10)
+    // Second cell filled with the second tile's gray.
+    expect(composed.data[(4 + 1) * 4]).toBe(100)
+  })
 
-  it.skipIf(!canvasAvailable)(
-    'missing tiles leave background-filled cells',
-    () => {
-      const layout = layoutWith({ columns: 2, gutter: 0 })
-      // One tile in a 2-cell grid: the second cell stays dark background.
-      const composed = composeGrid([tileAt(0)], layout, 4)
-      const secondCellStart = (4 * 4) * 4
-      expect(composed.data[secondCellStart]).toBe(0)
-      expect(composed.data[secondCellStart + 3]).toBe(255)
-    },
-  )
+  it.skipIf(!canvasAvailable)('missing tiles leave background-filled cells', () => {
+    const layout = layoutWith({ columns: 2, gutter: 0 })
+    // One tile in a 2-cell grid: the second cell stays dark background.
+    const composed = composeGrid([tileAt(0)], layout, 4)
+    const secondCellStart = 4 * 4 * 4
+    expect(composed.data[secondCellStart]).toBe(0)
+    expect(composed.data[secondCellStart + 3]).toBe(255)
+  })
 
-  it.skipIf(!canvasAvailable)(
-    'a portrait frame ratio composes a portrait frame',
-    () => {
-      const layout = layoutWith({ columns: 1, gutter: 0, frameRatio: 1 / 2 })
-      const composed = composeGrid([tileAt(0)], layout, 4)
-      expect(composed.width).toBe(2)
-      expect(composed.height).toBe(4)
-    },
-  )
+  it.skipIf(!canvasAvailable)('a portrait frame ratio composes a portrait frame', () => {
+    const layout = layoutWith({ columns: 1, gutter: 0, frameRatio: 1 / 2 })
+    const composed = composeGrid([tileAt(0)], layout, 4)
+    expect(composed.width).toBe(2)
+    expect(composed.height).toBe(4)
+  })
 })

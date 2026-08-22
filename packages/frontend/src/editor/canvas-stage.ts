@@ -1,6 +1,6 @@
 import { Effect, Match, Schema as S, Stream, Queue } from 'effect'
 import { Mount } from 'foldkit'
-import type { Html, HtmlBuilder } from 'foldkit/html'
+import { type Html, type HtmlBuilder, createLazy } from 'foldkit/html'
 import { Eye, EyeOff, SquareSplitHorizontal, Columns2 } from 'lucide'
 import type { IconNode } from 'lucide'
 import {
@@ -429,13 +429,17 @@ export const CompareDivider = Mount.defineStream(
  * effectively undraggable. Rendered only in Split mode; the canvas blit
  * draws the before/after boundary underneath it.
  */
-const splitDivider = (h: HtmlBuilder<EditorMessage>, model: Model) =>
+const lazyHistogram = createLazy()
+const lazyCompare = createLazy()
+const lazySplitDivider = createLazy()
+
+const splitDividerView = (splitAt: number, scale: number, h: HtmlBuilder<EditorMessage>): Html =>
   h.div(
     [
       h.Class('absolute inset-y-0 z-10 -translate-x-1/2 cursor-col-resize'),
       h.Style({
-        left: `${model.compareSplitAt * 100}%`,
-        width: `${12 / model.scale}px`,
+        left: `${splitAt * 100}%`,
+        width: `${12 / scale}px`,
       }),
       h.OnMount(CompareDivider()),
       h.Attribute('data-compare-divider', 'true'),
@@ -444,7 +448,7 @@ const splitDivider = (h: HtmlBuilder<EditorMessage>, model: Model) =>
       h.div(
         [
           h.Class('absolute inset-y-0 left-1/2 -translate-x-1/2 bg-ink/60'),
-          h.Style({ width: `${1 / model.scale}px` }),
+          h.Style({ width: `${1 / scale}px` }),
         ],
         [],
       ),
@@ -453,12 +457,15 @@ const splitDivider = (h: HtmlBuilder<EditorMessage>, model: Model) =>
           h.Class(
             'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 border border-ink bg-panel',
           ),
-          h.Style({ height: `${12 / model.scale}px`, width: `${12 / model.scale}px` }),
+          h.Style({ height: `${12 / scale}px`, width: `${12 / scale}px` }),
         ],
         [],
       ),
     ],
   )
+
+const splitDivider = (h: HtmlBuilder<EditorMessage>, model: Model): Html =>
+  lazySplitDivider(splitDividerView, [model.compareSplitAt, model.scale, h])!
 
 const COMPARE_MODES: readonly {
   readonly mode: CompareMode
@@ -479,7 +486,7 @@ const COMPARE_MODES: readonly {
  * Toggle mode the segment doubles as the flip button (update flips the
  * side).
  */
-const compareControl = (h: HtmlBuilder<EditorMessage>, model: Model, hasImage: boolean) =>
+const compareView = (mode: CompareMode, hasImage: boolean, h: HtmlBuilder<EditorMessage>): Html =>
   h.div(
     [
       h.Class(
@@ -487,17 +494,18 @@ const compareControl = (h: HtmlBuilder<EditorMessage>, model: Model, hasImage: b
       ),
       h.AriaLabel('Compare modes'),
     ],
-    COMPARE_MODES.map(({ mode, label, icon: Icon }) => {
-      const active = model.compareMode === mode
+    COMPARE_MODES.map(({ mode: m, label, icon: Icon }) => {
+      const active = mode === m
       return h.button(
         [
+          h.Key(m),
           h.Class(
             active
               ? 'flex items-center gap-1.5 bg-accent px-3 py-1.5 text-ink'
               : 'flex items-center gap-1.5 px-3 py-1.5 text-muted hover:bg-panel-alt hover:text-ink',
           ),
           h.Disabled(!hasImage),
-          h.OnClick(ChangedCompareMode({ mode })),
+          h.OnClick(ChangedCompareMode({ mode: m })),
           h.AriaLabel(label),
           h.Title(label),
         ],
@@ -505,6 +513,9 @@ const compareControl = (h: HtmlBuilder<EditorMessage>, model: Model, hasImage: b
       )
     }),
   )
+
+const compareControl = (h: HtmlBuilder<EditorMessage>, model: Model, hasImage: boolean): Html =>
+  lazyCompare(compareView, [model.compareMode, hasImage, h])!
 
 // ---- sub-views ----
 
@@ -569,7 +580,7 @@ const HISTOGRAM_HEIGHT = 110
  * baseline. Rendered as SVG in the foldkit view — a pure function of the
  * model's bins, like every other piece of UI.
  */
-const histogramOverlay = (h: HtmlBuilder<EditorMessage>, bins: Uint32Array | null) => {
+const histogramView = (bins: Uint32Array | null, h: HtmlBuilder<EditorMessage>): Html => {
   if (!bins) {
     return null
   }
@@ -629,6 +640,9 @@ const histogramOverlay = (h: HtmlBuilder<EditorMessage>, bins: Uint32Array | nul
     ],
   )
 }
+
+const histogramOverlay = (h: HtmlBuilder<EditorMessage>, bins: Uint32Array | null): Html =>
+  lazyHistogram(histogramView, [bins, h])
 
 const loadedStage = (h: HtmlBuilder<EditorMessage>, model: Model) => {
   const src = model.source

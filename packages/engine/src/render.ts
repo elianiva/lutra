@@ -63,14 +63,13 @@ export interface RenderRequest {
  * assembler emits a passthrough shader, so the request presents the
  * source image unchanged.
  */
-export const createRenderRequest = Effect.fn('createRenderRequest')(
-  function* (
-    chain: readonly Layer[],
-    registry: Record<LayerType, LayerEntry>,
-    srcBitmap: ImageBitmap,
-    frame: number,
-    luts: ReadonlyMap<LutId, LutCube>,
-  ) {
+export const createRenderRequest = Effect.fn('createRenderRequest')(function* (
+  chain: readonly Layer[],
+  registry: Record<LayerType, LayerEntry>,
+  srcBitmap: ImageBitmap,
+  frame: number,
+  luts: ReadonlyMap<LutId, LutCube>,
+) {
   const chainLayers: ChainLayerInfo[] = []
   for (const l of chain) {
     if (!l.visible) continue

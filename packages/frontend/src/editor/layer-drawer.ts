@@ -1,4 +1,4 @@
-import type { HtmlBuilder } from 'foldkit/html'
+import { type Html, type HtmlBuilder, createKeyedLazy, createLazy } from 'foldkit/html'
 import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, Eye, EyeOff, Trash2, X, Check } from 'lucide'
 import { icon } from '../components/icon'
 import {
@@ -41,7 +41,7 @@ const summary = (model: Model, layer: Layer, ui: (typeof LAYER_UI)[LayerType]) =
       : ui.formatValue(layer)
 
 /** The active hue range of a Color Mixer layer's drawer (0..7). */
-const activeMixerColor = (model: Model, layerId: LayerId) =>
+const activeMixerColorFor = (model: Model, layerId: LayerId) =>
   Math.min(7, Math.max(0, Math.round(model.activeMixerColor[layerId] ?? 0)))
 
 /**
@@ -50,7 +50,7 @@ const activeMixerColor = (model: Model, layerId: LayerId) =>
  * show). A pristine layer reads just "Red".
  */
 const mixerSummary = (model: Model, layer: Layer) => {
-  const color = MIXER_COLORS[activeMixerColor(model, layer.id)]!
+  const color = MIXER_COLORS[activeMixerColorFor(model, layer.id)]!
   const value = (suffix: string) => numField(layer, FieldKey(`${color.key}${suffix}`))
   const parts: string[] = [color.name]
   if (value('Hue') !== 0) {
@@ -130,7 +130,7 @@ const layerSliders = (
   kind: 'draft' | 'chain',
 ) => {
   if (layer.type === 'colorMixer') {
-    const color = activeMixerColor(model, layer.id)
+    const color = activeMixerColorFor(model, layer.id)
     return [
       mixerSwatches(h, color, (index) => SelectedMixerColor({ color: index, id: layer.id })),
       ...mixerSliders(h, layer, ui, color, (field, value) =>
@@ -140,9 +140,6 @@ const layerSliders = (
       ),
     ]
   }
-  // The Tone Curve has no sliders: the curve widget replaces the generic
-  // field list entirely (the 10 point fields are meaningless as rulers —
-  // docs/adr/0028).
   if (layer.type === 'toneCurve') {
     return [toneCurveWidget(h, layer)]
   }
@@ -152,6 +149,42 @@ const layerSliders = (
       : chainSlider(h, layer, FieldKey(field), ui, model),
   )
 }
+
+// ---- memoization (ADR 0034) ----
+const lazyDraft = createLazy()
+const lazyRow = createKeyedLazy()
+
+const draftView = (
+  layer: Layer,
+  lutBarOpen: boolean,
+  catalog: Model['catalog'],
+  activeField: number | undefined,
+  activeMixer: number | undefined,
+  h: HtmlBuilder<EditorMessage>,
+): Html => {
+  // Narrow model for the draft row
+  const m = {
+    catalog,
+    lutBarOpen,
+    activeFieldIndex: activeField !== undefined ? { [layer.id]: activeField } : {},
+    activeMixerColor: activeMixer !== undefined ? { [layer.id]: activeMixer } : {},
+    // SAFETY: narrow slice for lazy memoization — only fields the view island reads
+  } as unknown as Model
+  return draftRow(h, m, layer)
+}
+
+const chainRowView = (
+  layer: Layer,
+  index: number,
+  total: number,
+  selected: boolean,
+  lutBarOpen: boolean,
+  catalog: Model['catalog'],
+  activeField: number | undefined,
+  activeMixer: number | undefined,
+  h: HtmlBuilder<EditorMessage>,
+): Html =>
+  chainRowImpl(h, layer, index, total, selected, lutBarOpen, catalog, activeField, activeMixer)
 
 /**
  * The right "Layers" sidebar (docs/adr/0024-mobile-ui): always visible as a side
@@ -181,13 +214,34 @@ export const layerDrawer = (h: HtmlBuilder<EditorMessage>, model: Model, open: b
       h.div(
         [h.Class('flex flex-col overflow-y-auto')],
         [
-          // The draft layer renders first, above the committed chain, with its
-          // confirm/cancel controls — it previews on top in the GPU pipeline
-          // too. The draft itself lives in the phase machine (Drafting).
-          ...(model.phase._tag === 'Drafting' ? [draftRow(h, model, model.phase.layer)] : []),
-          // The chain renders bottom-up (newest at the top, like Lightroom's
-          // history) so the most recent adjustment sits at eye level.
-          ...model.chain.map((layer, index) => chainRow(h, model, layer, index)).reverse(),
+          ...(model.phase._tag === 'Drafting'
+            ? [
+                lazyDraft(draftView, [
+                  model.phase.layer,
+                  model.lutBarOpen,
+                  model.catalog,
+                  model.activeFieldIndex[model.phase.layer.id],
+                  model.activeMixerColor[model.phase.layer.id],
+                  h,
+                ]),
+              ]
+            : []),
+          ...model.chain
+            .map((layer, index) => {
+              const selected = model.phase._tag === 'Selected' && model.phase.layerId === layer.id
+              return lazyRow(layer.id, chainRowView, [
+                layer,
+                index,
+                model.chain.length,
+                selected,
+                model.lutBarOpen,
+                model.catalog,
+                model.activeFieldIndex[layer.id],
+                model.activeMixerColor[layer.id],
+                h,
+              ])!
+            })
+            .reverse(),
           ...(model.chain.length === 0 && model.phase._tag !== 'Drafting' ? [emptyState(h)] : []),
         ],
       ),
@@ -210,8 +264,6 @@ const draftRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer) => 
         [
           icon(h, ui.icon, ui.label),
           h.span([h.Class('min-w-0 flex-1 truncate text-sm font-medium')], [ui.label]),
-          // LUT rows carry the bar toggle (the bar owns browsing; the
-          // drawer keeps the row's sliders).
           ...(layer.type === 'lut' ? [lutBarToggle(h, model)] : []),
         ],
       ),
@@ -258,14 +310,42 @@ const draftSlider = (
   )
 }
 
-const chainRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer, index: number) => {
+// Legacy entry used by tests / non-memoized path — delegates to impl
+const chainRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer, index: number) =>
+  chainRowImpl(
+    h,
+    layer,
+    index,
+    model.chain.length,
+    model.phase._tag === 'Selected' && model.phase.layerId === layer.id,
+    model.lutBarOpen,
+    model.catalog,
+    model.activeFieldIndex[layer.id],
+    model.activeMixerColor[layer.id],
+  )
+
+const chainRowImpl = (
+  h: HtmlBuilder<EditorMessage>,
+  layer: Layer,
+  index: number,
+  total: number,
+  selected: boolean,
+  lutBarOpen: boolean,
+  catalog: Model['catalog'],
+  activeField: number | undefined,
+  activeMixer: number | undefined,
+) => {
   const ui = LAYER_UI[layer.type]
-  // A row is focused only in the Selected phase — the draft (Drafting) takes
-  // priority and blocks new selections.
-  const selected = model.phase._tag === 'Selected' && model.phase.layerId === layer.id
-  const total = model.chain.length
+  const fakeModel = {
+    catalog,
+    activeFieldIndex: activeField !== undefined ? { [layer.id]: activeField } : {},
+    activeMixerColor: activeMixer !== undefined ? { [layer.id]: activeMixer } : {},
+    lutBarOpen,
+    // SAFETY: narrow slice for lazy memoization — only fields the view island reads
+  } as unknown as Model
   return h.div(
     [
+      h.Key(layer.id),
       h.Class(`border-b border-border ${selected ? 'bg-panel-alt' : ''}`),
       h.DataAttribute('layer-id', layer.id),
     ],
@@ -285,16 +365,12 @@ const chainRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer, ind
           h.span([h.Class('min-w-0 flex-1 truncate text-sm')], [ui.label]),
           h.span(
             [h.Class('tnum min-w-0 truncate text-xs text-muted')],
-            [summary(model, layer, ui)],
+            [summary(fakeModel, layer, ui)],
           ),
           h.div(
             [h.Class('flex items-center gap-0.5')],
             [
-              // The chain renders bottom-up (newest at the top), so "Move up"
-              // targets a higher chain index and "Move down" a lower one. A row
-              // at the top of the stack can't move up; a row at the bottom can't
-              // move down.
-              ...(layer.type === 'lut' ? [lutBarToggle(h, model)] : []),
+              ...(layer.type === 'lut' ? [lutBarToggleImpl(h, lutBarOpen)] : []),
               reorderButton(h, 'Move up', ArrowUp, index === total - 1, () =>
                 ReorderedLayer({ from: index, to: index + 1 }),
               ),
@@ -316,7 +392,18 @@ const chainRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer, ind
       selected
         ? h.div(
             [h.Class('flex flex-col gap-3 px-4 pb-4')],
-            [...layerSliders(h, model, layer, ui, 'chain')],
+            [
+              ...(() => {
+                // Chain sliders need a Model with activeFieldIndex/activeMixerColor
+                const m = {
+                  catalog,
+                  activeFieldIndex: activeField !== undefined ? { [layer.id]: activeField } : {},
+                  activeMixerColor: activeMixer !== undefined ? { [layer.id]: activeMixer } : {},
+                  // SAFETY: narrow slice for lazy memoization — only fields the view island reads
+                } as unknown as Model
+                return layerSliders(h, m, layer, ui, 'chain')
+              })(),
+            ],
           )
         : null,
     ],
@@ -333,8 +420,6 @@ const chainSlider = (
   const fieldUi = ui.fields[field]!
   const { min, max } = fieldBounds(layer.type, field)
   const value = num(layer, field)
-  // For toggled layers, only the active field's slider is shown; the label
-  // is clickable to cycle to the next field.
   if (ui.toggled) {
     const keys = Object.keys(ui.fields)
     const activeIndex = model.activeFieldIndex[layer.id] ?? 0
@@ -375,19 +460,19 @@ const reorderButton = (
     [icon(h, node, label)],
   )
 
-/** The chevron on a drawer LUT row: expands/collapses the bottom LUT bar
- *  (the drawer keeps the row's summary + sliders; the bar owns browsing).
- *  Sits inside the row's clickable div, following the nested-button pattern
- *  of the visibility/reorder/delete buttons. */
+/** The chevron on a drawer LUT row: expands/collapses the bottom LUT bar */
 const lutBarToggle = (h: HtmlBuilder<EditorMessage>, model: Model) =>
+  lutBarToggleImpl(h, model.lutBarOpen)
+
+const lutBarToggleImpl = (h: HtmlBuilder<EditorMessage>, open: boolean) =>
   h.button(
     [
       h.OnClick(ToggledLutPicker()),
-      h.AriaExpanded(model.lutBarOpen),
+      h.AriaExpanded(open),
       h.AriaLabel('Toggle LUT bar'),
       h.Class('grid size-6 place-items-center text-muted hover:text-ink'),
     ],
-    [icon(h, model.lutBarOpen ? ChevronUp : ChevronDown, 'Toggle LUT bar')],
+    [icon(h, open ? ChevronUp : ChevronDown, 'Toggle LUT bar')],
   )
 
 export const sliderControl = (

@@ -38,7 +38,33 @@ const capability = await Effect.runPromise(detectWebGpu)
 export const application = Runtime.makeApplication({
   Model,
   container: document.querySelector('#root'),
-  devTools: { Message: RootMessage, overlay },
+  devTools: {
+    Message: RootMessage,
+    overlay,
+    // High-frequency UI gestures would flood the DevTools history and
+    // retain a full RootModel snapshot per entry (linear memory with
+    // Uint8Array/ImageBitmap inside). Exclude them so history stays
+    // useful and time-travel replay stays cheap — ADR 0034.
+    excludeFromHistory: [
+      'ScaledCanvas',
+      'CurvePointDragged',
+      'ChangedSplitPosition',
+      'PreviewedLut',
+      'PanMoved',
+      'WheelZoomed',
+      'MovedLayerReorder',
+    ],
+    maxEntries: 60,
+    keyframeInterval: 12,
+  },
+  slow: {
+    // Keep the default View budget (16ms) but allow Patch a little more
+    // headroom during heavy gallery grids; report every over-budget phase
+    // via the default console.warn so the 2.2s spike from ADR 0034 never
+    // goes unnoticed. Production can switch to { show: 'Development' }
+    // or supply onSlow to forward to analytics.
+    thresholdOverrides: { View: 16, Patch: 12 },
+  },
   init: (url: Url.Url) => init(capability, url),
   resources: Layer.merge(
     GpuBackendLive,

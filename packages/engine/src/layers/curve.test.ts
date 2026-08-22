@@ -181,7 +181,9 @@ describe('curve body renderer', () => {
     const source = bodySourceOf(renderToneCurve(0))
     const stmts = source.stmts
     const helpers = source.helpers ?? ''
-    expect(stmts).toContain('curveTangents(l0_p0x, l0_p0y, l0_p1x, l0_p1y, l0_p2x, l0_p2y, l0_p3x, l0_p3y, l0_p4x, l0_p4y)')
+    expect(stmts).toContain(
+      'curveTangents(l0_p0x, l0_p0y, l0_p1x, l0_p1y, l0_p2x, l0_p2y, l0_p3x, l0_p3y, l0_p4x, l0_p4y)',
+    )
     expect(stmts).toContain('curveSpline(srgb.r,')
     expect(stmts).toContain('curveSpline(srgb.g,')
     expect(stmts).toContain('curveSpline(srgb.b,')

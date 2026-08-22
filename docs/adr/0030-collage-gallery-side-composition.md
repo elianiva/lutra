@@ -1,6 +1,6 @@
 # Collage: a gallery-side composition of Edits by reference, outside the edit chain
 
-A collage arranges several graded photos into one shareable image. We decided it composes **Edits by reference** and lives entirely outside the edit chain: a new persisted record (`Collage`) owned by the Store package alongside `Edit`, holding only ids and layout numbers — never pixels, never layers. It is explicitly *not* an in-editor composite; the engine's single-source, strictly sequential chain is untouched.
+A collage arranges several graded photos into one shareable image. We decided it composes **Edits by reference** and lives entirely outside the edit chain: a new persisted record (`Collage`) owned by the Store package alongside `Edit`, holding only ids and layout numbers — never pixels, never layers. It is explicitly _not_ an in-editor composite; the engine's single-source, strictly sequential chain is untouched.
 
 ## Why
 

@@ -14,8 +14,8 @@ to explicitly **defer** a CPU compute fallback.
 
 - WebGPU is the only rendering path (docs/adr/0001, 0002). There is no
   CPU/Canvas2D color-grading fallback and no plan to add one.
-- ADR 0002 already committed to a *feature-detection gate and a fallback
-  message* for the unsupported slice. This work fulfills that commitment.
+- ADR 0002 already committed to a _feature-detection gate and a fallback
+  message_ for the unsupported slice. This work fulfills that commitment.
 - A hard `Effect.die` on a missing GPU is the worst possible UX for that
   slice: a blank crash instead of a usable app shell.
 
@@ -36,7 +36,7 @@ entered, so the GPU backend is never touched on a gated device.
 foldkit builds the `resources` Layer **eagerly** at boot
 (`Layer.buildWithScope` on the runtime scope); a Layer build failure escapes
 as a crash (the same class of failure we're removing). So `GpuBackendLive`
-must build at boot *without* a GPU. Device acquisition moves out of the
+must build at boot _without_ a GPU. Device acquisition moves out of the
 Layer's build effect into a memoized `getGpu()` (`Ref<Option<GpuContext>>`)
 that runs on first `execute`/`present`/`snapshot`. `acquireGpu` fails with a
 typed `GpuError` (no `Effect.die`) when `requestAdapter`/`requestDevice`

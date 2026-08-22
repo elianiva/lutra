@@ -230,7 +230,10 @@ export const LAYER_UI = {
     fields: {
       amount: { format: formatPercent, label: 'AMOUNT' },
       chroma: { format: formatPercent, label: 'CHROMA' },
-      profile: { format: (v: number) => GRAIN_PROFILES[Math.round(v)]?.name ?? 'Medium', label: 'PROFILE' },
+      profile: {
+        format: (v: number) => GRAIN_PROFILES[Math.round(v)]?.name ?? 'Medium',
+        label: 'PROFILE',
+      },
       size: { format: formatPercent, label: 'SIZE' },
     },
     formatValue: (l) => {

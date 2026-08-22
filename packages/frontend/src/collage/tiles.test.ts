@@ -62,12 +62,16 @@ describe('collage tiles: array operations', () => {
 
   it('removeTile drops exactly the indexed element', () => {
     fc.assert(
-      fc.property(fc.array(fc.string(), { maxLength: 12, minLength: 1 }), fc.nat(), (tiles, raw) => {
-        const index = raw % tiles.length
-        const removed = removeTile(tiles, index)
-        expect(removed).toHaveLength(tiles.length - 1)
-        expect(removed).toEqual([...tiles.slice(0, index), ...tiles.slice(index + 1)])
-      }),
+      fc.property(
+        fc.array(fc.string(), { maxLength: 12, minLength: 1 }),
+        fc.nat(),
+        (tiles, raw) => {
+          const index = raw % tiles.length
+          const removed = removeTile(tiles, index)
+          expect(removed).toHaveLength(tiles.length - 1)
+          expect(removed).toEqual([...tiles.slice(0, index), ...tiles.slice(index + 1)])
+        },
+      ),
     )
   })
 

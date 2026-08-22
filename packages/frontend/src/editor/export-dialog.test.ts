@@ -91,7 +91,10 @@ describe('Export dialog', () => {
         ExportDialog.EncodePrepared({ sizeBytes: 4096, url: 'blob:export-1' }),
       ),
       Command.expectHas(ExportDialog.ExportDownload),
-      Command.resolve(ExportDialog.ExportDownload, ExportDialog.Downloaded({ url: 'blob:export-1' })),
+      Command.resolve(
+        ExportDialog.ExportDownload,
+        ExportDialog.Downloaded({ url: 'blob:export-1' }),
+      ),
       expect(text('Downloaded', { exact: false })).toExist(),
       expect(text('4.0 KB', { exact: false })).toExist(),
       // The dialog stays open after a download — tweak and re-export.
@@ -164,7 +167,10 @@ describe('Export dialog', () => {
         ExportDialog.PrepareExport,
         ExportDialog.EncodePrepared({ sizeBytes: 1024, url: 'blob:export-1' }),
       ),
-      Command.resolve(ExportDialog.ExportDownload, ExportDialog.Downloaded({ url: 'blob:export-1' })),
+      Command.resolve(
+        ExportDialog.ExportDownload,
+        ExportDialog.Downloaded({ url: 'blob:export-1' }),
+      ),
       expect(text('1.0 KB', { exact: false })).toExist(),
       Command.expectNone(),
     )
@@ -191,7 +197,10 @@ describe('Export dialog', () => {
         ExportDialog.PrepareExport,
         ExportDialog.EncodePrepared({ sizeBytes: 2048, url: 'blob:export-2' }),
       ),
-      Command.resolve(ExportDialog.ExportDownload, ExportDialog.Downloaded({ url: 'blob:export-2' })),
+      Command.resolve(
+        ExportDialog.ExportDownload,
+        ExportDialog.Downloaded({ url: 'blob:export-2' }),
+      ),
       expect(text('2.0 KB', { exact: false })).toExist(),
       Command.expectNone(),
     )
@@ -210,7 +219,10 @@ describe('Export dialog', () => {
         ExportDialog.PrepareExport,
         ExportDialog.EncodePrepared({ sizeBytes: 4096, url: 'blob:export-1' }),
       ),
-      Command.resolve(ExportDialog.ExportDownload, ExportDialog.Downloaded({ url: 'blob:export-1' })),
+      Command.resolve(
+        ExportDialog.ExportDownload,
+        ExportDialog.Downloaded({ url: 'blob:export-1' }),
+      ),
 
       click(text('Cancel')),
       Command.expectHas(Dialog.CloseDialog),
@@ -256,10 +268,7 @@ describe('Export dialog', () => {
     // can close mid-encode. A late result must not trigger a download.
     let [model] = update(loadedModel(), ExportRequestedMessage())
     ;[model] = update(model, ExportSnapshotted())
-    ;[model] = update(
-      model,
-      GotExportDialogMessage({ message: ExportDialog.EncodeRequested() }),
-    )
+    ;[model] = update(model, GotExportDialogMessage({ message: ExportDialog.EncodeRequested() }))
     vitestExpect(model.exportDialog.encoding).toBe(true)
 
     // Close while the encode is in flight.

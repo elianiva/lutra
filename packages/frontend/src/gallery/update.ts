@@ -11,7 +11,15 @@ import {
   GotDeleteDialogMessage,
   PhotoCreateError,
 } from './message'
-import { CreateCollage, DeleteCollage, DeleteEdit, ListCollages, ListEdits, MeasureCollageThumbs, OpenPhoto } from './command'
+import {
+  CreateCollage,
+  DeleteCollage,
+  DeleteEdit,
+  ListCollages,
+  ListEdits,
+  MeasureCollageThumbs,
+  OpenPhoto,
+} from './command'
 import type { Model } from './model'
 import { collageList, editList } from './model'
 import { isDefaultFraming } from '../collage/framing'
@@ -98,10 +106,18 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
           : [...model.selection, id]
         return [{ ...model, selection }, [], Option.none()]
       },
-      CreateCollageRequested: () => [model, [CreateCollage({ editIds: model.selection })], Option.none()],
+      CreateCollageRequested: () => [
+        model,
+        [CreateCollage({ editIds: model.selection })],
+        Option.none(),
+      ],
       // Persisted: surface it upward — the root pushes `/collage/:id` — and
       // clear the selection (the arrangement now lives in its own record).
-      CollageCreated: ({ id }) => [{ ...model, selection: [] }, [], Option.some(CreatedCollage({ id }))],
+      CollageCreated: ({ id }) => [
+        { ...model, selection: [] },
+        [],
+        Option.some(CreatedCollage({ id })),
+      ],
       CollageCreateFailed: ({ error }) => [
         { ...model, notice: `Could not create the collage: ${error.message}` },
         [],
@@ -117,7 +133,9 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
           model.grid._tag === 'Success' ? model.grid.data.map((s) => [s.id, s] as const) : [],
         )
         const custom = new Set(
-          collages.flatMap((c) => c.tiles.filter((t) => !isDefaultFraming(t.framing)).map((t) => t.editId)),
+          collages.flatMap((c) =>
+            c.tiles.filter((t) => !isDefaultFraming(t.framing)).map((t) => t.editId),
+          ),
         )
         const thumbs = [...custom].flatMap((id) => {
           const summary = byId.get(id)
@@ -158,7 +176,11 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
         [],
         Option.none(),
       ],
-      CollageDeleteConfirmCancelled: () => [{ ...model, confirmingCollageDelete: null }, [], Option.none()],
+      CollageDeleteConfirmCancelled: () => [
+        { ...model, confirmingCollageDelete: null },
+        [],
+        Option.none(),
+      ],
       CollageDeleteRequested: ({ id }) => [model, [DeleteCollage({ id })], Option.none()],
       CollageDeleted: () => [
         { ...model, confirmingCollageDelete: null },
@@ -166,7 +188,11 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
         Option.none(),
       ],
       CollageDeleteFailed: ({ error }) => [
-        { ...model, confirmingCollageDelete: null, notice: `Could not delete the collage: ${error.message}` },
+        {
+          ...model,
+          confirmingCollageDelete: null,
+          notice: `Could not delete the collage: ${error.message}`,
+        },
         [],
         Option.none(),
       ],
@@ -225,8 +251,7 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
         const [dialog, dialogCommands] = Dialog.update(model.deleteDialog, message)
         // Clear the armed delete only when the dialog actually closed; a
         // conditional spread would hide the omission behind an empty object.
-        const next =
-          message._tag === 'RequestedClose' ? { ...model, pendingDelete: null } : model
+        const next = message._tag === 'RequestedClose' ? { ...model, pendingDelete: null } : model
         return [
           {
             ...next,

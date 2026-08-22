@@ -63,7 +63,10 @@ export const cellSize = (
   const { width, height } = frameSize(layout, basis)
   return {
     width: Math.max(1, Math.round((width - (columns + 1) * gutter) / columns)),
-    height: Math.max(1, Math.round((height - (rowCount(count, columns) + 1) * gutter) / rowCount(count, columns))),
+    height: Math.max(
+      1,
+      Math.round((height - (rowCount(count, columns) + 1) * gutter) / rowCount(count, columns)),
+    ),
   }
 }
 

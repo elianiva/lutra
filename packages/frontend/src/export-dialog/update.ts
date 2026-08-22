@@ -22,10 +22,7 @@ import type { Resource } from './command'
 import type { Model } from './model'
 import { clearFrame } from './frame'
 
-export type UpdateReturn = readonly [
-  Model,
-  readonly Command.Command<Message, never, Resource>[],
-]
+export type UpdateReturn = readonly [Model, readonly Command.Command<Message, never, Resource>[]]
 
 /** The dialog's filename in header and download: `<stem>.<format>`. */
 export const filenameFor = (model: Model): string => `${model.fileStem}.${model.settings.format}`

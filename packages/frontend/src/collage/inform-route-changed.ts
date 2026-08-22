@@ -19,9 +19,7 @@ export type InformReturn = readonly [
 const toSelf = (message: ExportDialog.Message): CollageMessage =>
   GotCollageExportDialogMessage({ message })
 
-const settings = [
-  Command.mapMessage(ExportDialog.LoadExportSettings(), toSelf),
-]
+const settings = [Command.mapMessage(ExportDialog.LoadExportSettings(), toSelf)]
 
 /**
  * Route changed into or out of the collage (docs/adr/0009). Arriving at a

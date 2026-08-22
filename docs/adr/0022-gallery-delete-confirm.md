@@ -55,9 +55,12 @@ That pending item is now resolved as described above.
 
 ## Consequences
 
-- ~~~40 lines across `gallery/model.ts`, `message.ts`, `update.ts`,
+- ```40 lines across `gallery/model.ts`, `message.ts`, `update.ts`,
   `view.ts`~~ Realized as: collage inline confirm (shipped) + edit-tile
   dialog (`gallery/delete-dialog.ts`, model/message/update arms).
+  ```
+
+  ```
 - Tests (gallery per-slice pattern): toggling confirm state, confirm deletes,
   cancel clears, delete from a different tile clears the first — covered for
   collages in `collage-section.test.ts`; the dialog paths are covered in

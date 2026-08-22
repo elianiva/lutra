@@ -53,9 +53,10 @@ export const settingsDialogView = (h: HtmlBuilder<GalleryMessage>, model: Model)
                         ),
                       ],
                     ),
-                    h.div([h.Class('flex flex-col gap-5 px-4 py-4')], [
-                      experimentalSection(h, model),
-                    ]),
+                    h.div(
+                      [h.Class('flex flex-col gap-5 px-4 py-4')],
+                      [experimentalSection(h, model)],
+                    ),
                     h.div(
                       [h.Class('flex justify-end gap-2 border-t border-border px-4 py-3')],
                       [
@@ -77,10 +78,13 @@ export const settingsDialogView = (h: HtmlBuilder<GalleryMessage>, model: Model)
   })
 
 const experimentalSection = (h: HtmlBuilder<GalleryMessage>, model: Model) =>
-  h.section([h.Class('flex flex-col gap-3')], [
-    h.h3([h.Class('text-[10px] uppercase tracking-[0.14em] text-muted')], ['Experimental']),
-    infiniteCanvasRow(h, model),
-  ])
+  h.section(
+    [h.Class('flex flex-col gap-3')],
+    [
+      h.h3([h.Class('text-[10px] uppercase tracking-[0.14em] text-muted')], ['Experimental']),
+      infiniteCanvasRow(h, model),
+    ],
+  )
 
 /** The infinite-canvas switch row: label + description on the left, the
  *  switch track on the right. Clicking the label toggles too (the Switch's
@@ -96,13 +100,18 @@ const infiniteCanvasRow = (h: HtmlBuilder<GalleryMessage>, model: Model) => {
         h.div(
           [h.Class('flex items-center justify-between gap-6')],
           [
-            h.div([h.Class('flex flex-col gap-1')], [
-              h.span([...label, h.Class('text-xs text-ink')], ['Infinite canvas']),
-              h.span(
-                [...description, h.Class('max-w-[240px] text-[11px] leading-snug text-muted')],
-                ['Pan and zoom a Figma-style infinite canvas instead of the fixed photo view. Useful if you want to edit multiple photos at once, move them freely as moodboard, etc.'],
-              ),
-            ]),
+            h.div(
+              [h.Class('flex flex-col gap-1')],
+              [
+                h.span([...label, h.Class('text-xs text-ink')], ['Infinite canvas']),
+                h.span(
+                  [...description, h.Class('max-w-[240px] text-[11px] leading-snug text-muted')],
+                  [
+                    'Pan and zoom a Figma-style infinite canvas instead of the fixed photo view. Useful if you want to edit multiple photos at once, move them freely as moodboard, etc.',
+                  ],
+                ),
+              ],
+            ),
             // Hard-edged track and square thumb — the app uses no rounded
             // corners anywhere (styles.css); ON fills with the accent red,
             // matching the active fills elsewhere.

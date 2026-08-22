@@ -2,12 +2,7 @@ import { describe, expect, it, afterEach } from 'vitest'
 import * as fc from 'fast-check'
 import { Effect, Option } from 'effect'
 import { CollageId } from './collage-id'
-import {
-  Collage,
-  defaultCollageLayout,
-  defaultTileFraming,
-  type CollageTile,
-} from './collage'
+import { Collage, defaultCollageLayout, defaultTileFraming, type CollageTile } from './collage'
 import {
   CollageStore,
   CollageStoreIndexedDb,

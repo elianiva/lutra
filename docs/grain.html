@@ -317,9 +317,9 @@
         independent of the image it sits on. Real film grain is none of those things: it varies with
         brightness, clusters at multiple scales, carries subtle color, and is
         <em>the image itself</em> — not an overlay. Lutra's grain shader models these properties so
-        that the texture you see is shaped by the same physics that shaped analog film for a century.
-        This document walks through the algorithm from the pixel-level math up to the five film-stock
-        profiles, assuming you've read
+        that the texture you see is shaped by the same physics that shaped analog film for a
+        century. This document walks through the algorithm from the pixel-level math up to the five
+        film-stock profiles, assuming you've read
         <a href="architecture.html">architecture.html</a> and know what a compute pass is.
       </p>
 
@@ -348,9 +348,9 @@
           The texture you see is a hierarchy: fine crystals grouping into larger visible structures.
         </li>
         <li>
-          <strong>Grain carries color.</strong> Color film has separate dye layers (blue, green, red),
-          each with its own grain structure. The red and blue channels have independent noise at a
-          coarser scale than the luminance grain — subtle warm/cool shifts that digital noise,
+          <strong>Grain carries color.</strong> Color film has separate dye layers (blue, green,
+          red), each with its own grain structure. The red and blue channels have independent noise
+          at a coarser scale than the luminance grain — subtle warm/cool shifts that digital noise,
           which is correlated across channels, never produces.
         </li>
       </ul>
@@ -391,9 +391,9 @@
           density grows with exposure in the shadow region.
         </li>
         <li>
-          <strong>Smoothstep cutoff.</strong> <code>smoothstep(0.0, 0.03, luma)</code> — a hard
-          kill below 3% luminance. This prevents grain from lifting true blacks above zero, which
-          would look like a lifted black point rather than film texture.
+          <strong>Smoothstep cutoff.</strong> <code>smoothstep(0.0, 0.03, luma)</code> — a hard kill
+          below 3% luminance. This prevents grain from lifting true blacks above zero, which would
+          look like a lifted black point rather than film texture.
         </li>
       </ul>
 
@@ -415,7 +415,15 @@
             stroke-width="2"
           />
           <!-- peak marker -->
-          <line x1="120" y1="14" x2="120" y2="155" stroke="#aaa" stroke-width="0.8" stroke-dasharray="3 3" />
+          <line
+            x1="120"
+            y1="14"
+            x2="120"
+            y2="155"
+            stroke="#aaa"
+            stroke-width="0.8"
+            stroke-dasharray="3 3"
+          />
           <circle cx="120" cy="14" r="3" fill="#7a2e1e" />
           <text x="124" y="28" font-size="10" fill="#7a2e1e">peak</text>
           <!-- region labels -->
@@ -423,7 +431,15 @@
           <text x="95" y="145" font-size="9" fill="#666">midtones</text>
           <text x="180" y="145" font-size="9" fill="#666">highlights</text>
           <!-- smoothstep kill zone -->
-          <rect x="30" y="148" width="20" height="7" fill="#f4f2e8" stroke="#d0cdbd" stroke-width="0.5" />
+          <rect
+            x="30"
+            y="148"
+            width="20"
+            height="7"
+            fill="#f4f2e8"
+            stroke="#d0cdbd"
+            stroke-width="0.5"
+          />
           <text x="32" y="143" font-size="8" fill="#a34a2f">&lt;3%</text>
         </svg>
         <figcaption>
@@ -434,11 +450,11 @@
       </figure>
 
       <p>
-        The curve is asymmetric by design. Real film grain <em>is</em> asymmetric: highlights
-        always contain grain (maximum silver accumulation on the negative), but it is less visible
-        because the bright background masks it. Shadows contain grain from the print media's own
-        texture. The Gaussian/power-law split captures both behaviors with two parameters
-        (<code>peak</code> and <code>rolloff</code>) that map directly to film stock properties.<label
+        The curve is asymmetric by design. Real film grain <em>is</em> asymmetric: highlights always
+        contain grain (maximum silver accumulation on the negative), but it is less visible because
+        the bright background masks it. Shadows contain grain from the print media's own texture.
+        The Gaussian/power-law split captures both behaviors with two parameters (<code>peak</code>
+        and <code>rolloff</code>) that map directly to film stock properties.<label
           for="sn-fuji"
           class="margin-toggle sidenote-number"
         ></label
@@ -470,23 +486,23 @@
           cell size log-scaled from ~0.3 px (fine) to ~1.5 px (coarse).
         </li>
         <li>
-          <strong>Coarse layer</strong> at <code>grainSize &times; 1.5</code> (0.67&times; frequency)
-          — adds the organic clustering of real silver halide conglomerations.
+          <strong>Coarse layer</strong> at <code>grainSize &times; 1.5</code> (0.67&times;
+          frequency) — adds the organic clustering of real silver halide conglomerations.
         </li>
       </ul>
 
       <p>
         The coarse layer is mixed in by the profile's <code>blur</code> parameter. More blur means
-        more coarse layer — softer, cloudier grain. Less blur means crisp, fine-grained texture.
-        The two layers are seeded from the same frame counter but decorrelated (different coordinate
+        more coarse layer — softer, cloudier grain. Less blur means crisp, fine-grained texture. The
+        two layers are seeded from the same frame counter but decorrelated (different coordinate
         offsets and frame seeds) so they shimmer independently.
       </p>
 
       <p>
         The hash function is integer-only — <code>u32</code> multiplies and xor-shifts, no
-        transcendentals — per ADR-0025. The quintic easing
-        (<code>t³ · (t · (6t − 15) + 10)</code>) produces smoother interpolation than the cubic
-        alternative, which matters at coarse grain sizes where grid artifacts would otherwise show.
+        transcendentals — per ADR-0025. The quintic easing (<code>t³ · (t · (6t − 15) + 10)</code>)
+        produces smoother interpolation than the cubic alternative, which matters at coarse grain
+        sizes where grid artifacts would otherwise show.
       </p>
 
       <h3>Why not Perlin noise or FBM?</h3>
@@ -522,10 +538,10 @@ if (chromaAmt &gt; 0.001) {
 
       <p>
         The <code>chroma</code> slider (0–1, default 0.2) controls how much color variation appears
-        in the grain. At 0, grain is monochrome — the same noise added to all channels equally
-        (like a scan of black-and-white film). At 1, the red and blue channels get independent
-        coarser noise, producing the subtle warm/cool color shifts you see in color negative film.
-        Green is left alone — it carries the luminance signal and should stay clean.
+        in the grain. At 0, grain is monochrome — the same noise added to all channels equally (like
+        a scan of black-and-white film). At 1, the red and blue channels get independent coarser
+        noise, producing the subtle warm/cool color shifts you see in color negative film. Green is
+        left alone — it carries the luminance signal and should stay clean.
       </p>
 
       <p>
@@ -613,9 +629,7 @@ if (chromaAmt &gt; 0.001) {
 
       <h2>5 · Putting it together</h2>
 
-      <p>
-        The full grain pass, in order of operations:
-      </p>
+      <p>The full grain pass, in order of operations:</p>
 
       <ol>
         <li>
@@ -627,7 +641,8 @@ if (chromaAmt &gt; 0.001) {
           grain size toward <code>0.2 + size &times; 1.3</code>. Otherwise use the profile default.
         </li>
         <li>
-          <strong>Compute noise frequency.</strong> <code>f = 0.6667 &times; pow(0.15, baseSize)</code>
+          <strong>Compute noise frequency.</strong>
+          <code>f = 0.6667 &times; pow(0.15, baseSize)</code>
           — log scale from fine to coarse.
         </li>
         <li>
@@ -639,16 +654,15 @@ if (chromaAmt &gt; 0.001) {
           smoothstep curve, evaluated at the pixel's Rec. 709 luma.
         </li>
         <li>
-          <strong>Add luma grain.</strong> <code>color += noise &times; amount &times; 0.15 &times;
-          weight</code> — same offset to all channels.
+          <strong>Add luma grain.</strong>
+          <code>color += noise &times; amount &times; 0.15 &times; weight</code> — same offset to
+          all channels.
         </li>
         <li>
           <strong>Add chromatic grain.</strong> Separate R and B noise at 1.8&times; scale, scaled
           by <code>chroma &times; amount &times; 0.15 &times; weight</code>.
         </li>
-        <li>
-          <strong>Clamp.</strong> Prevent negative values from dark-channel clipping.
-        </li>
+        <li><strong>Clamp.</strong> Prevent negative values from dark-channel clipping.</li>
       </ol>
 
       <p>
@@ -684,10 +698,14 @@ if (chromaAmt &gt; 0.001) {
         </tr>
         <tr>
           <td>Parameters</td>
-          <td><code>texture</code> (strength), <code>size</code> (cell), <code>blur</code>
-          (persistence)</td>
-          <td><code>amount</code> (strength), <code>profile</code> (preset), <code>size</code>
-          (override), <code>chroma</code> (color)</td>
+          <td>
+            <code>texture</code> (strength), <code>size</code> (cell),
+            <code>blur</code> (persistence)
+          </td>
+          <td>
+            <code>amount</code> (strength), <code>profile</code> (preset),
+            <code>size</code> (override), <code>chroma</code> (color)
+          </td>
         </tr>
         <tr>
           <td>Film stock presets</td>
@@ -758,34 +776,37 @@ if (chromaAmt &gt; 0.001) {
 
       <ul>
         <li>
-          Newson et al. (2017) — <em>A Stochastic Film Grain Model for Resolution-Independent
-          Rendering</em>
-          (<a href="https://hal.science/hal-01520260v1/file/Film_grain_synthesis_computer_graphics_forum.pdf"
+          Newson et al. (2017) —
+          <em>A Stochastic Film Grain Model for Resolution-Independent Rendering</em> (<a
+            href="https://hal.science/hal-01520260v1/file/Film_grain_synthesis_computer_graphics_forum.pdf"
             >PDF</a
           >)
         </li>
         <li>
-          Aurélien Pierre (2023) — <em>Stochastic photographic grain synthesis from crystallographic
-          structure simulation</em>
+          Aurélien Pierre (2023) —
+          <em
+            >Stochastic photographic grain synthesis from crystallographic structure simulation</em
+          >
           (<a
             href="https://eng.aurelienpierre.com/2023/07/stochastic-photographic-grain-synthesis-from-crystallographic-structure-simulation/"
             >article</a
           >)
         </li>
         <li>
-          cinegrain — GLSL film grain shader for mpv
-          (<a href="https://github.com/mr-berndt/cinegrain">GitHub</a>)
+          cinegrain — GLSL film grain shader for mpv (<a
+            href="https://github.com/mr-berndt/cinegrain"
+            >GitHub</a
+          >)
         </li>
         <li>
-          AOMedia — <em>Technical report on film grain synthesis technology</em>
-          (<a
+          AOMedia — <em>Technical report on film grain synthesis technology</em> (<a
             href="https://aomedia.org/docs/CWG-C051o_TR_AOMedia_film_grain_synthesis_technology_v2.pdf"
             >PDF</a
           >)
         </li>
         <li>
-          Dehancer — <em>How does film grain work</em>
-          (<a href="https://blog.dehancer.com/articles/how-does-film-grain-work-in-dehancer-ofx-plugin/"
+          Dehancer — <em>How does film grain work</em> (<a
+            href="https://blog.dehancer.com/articles/how-does-film-grain-work-in-dehancer-ofx-plugin/"
             >blog</a
           >)
         </li>

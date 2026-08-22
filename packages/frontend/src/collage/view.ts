@@ -1,6 +1,12 @@
 import { Option } from 'effect'
 import { Submodel, AsyncData } from 'foldkit'
-import type { Attribute, HtmlBuilder } from 'foldkit/html'
+import {
+  type Html,
+  type Attribute,
+  type HtmlBuilder,
+  createLazy,
+  createKeyedLazy,
+} from 'foldkit/html'
 import { DragAndDrop } from '@foldkit/ui'
 import { Download, RotateCcw, X } from 'lucide'
 import {
@@ -47,15 +53,30 @@ const FRAME_PRESETS: readonly { label: string; value: number }[] = [
 
 const matchesPreset = (ratio: number, value: number) => Math.abs(ratio - value) < 1e-9
 
+// ---- lazy islands (ADR 0034) ----
+const lazyControls = createLazy()
+const lazyGrid = createLazy()
+const lazyCell = createKeyedLazy()
+const lazyUndo = createLazy()
+const lazyGhost = createLazy()
+const lazyHeader = createLazy()
+const lazyNoticeBar = createLazy()
+
+const headerView = (h: HtmlBuilder<CollageMessage>): Html => header(h)
+const noticeView = (notice: string | null, h: HtmlBuilder<CollageMessage>): Html =>
+  notice === null
+    ? null
+    : h.div([h.Class('border-b border-border bg-panel px-4 py-1 text-xs text-accent')], [notice])
+
 export const view = Submodel.defineView<Model, CollageMessage>((model, h) => {
   return h.div(
     [h.Class('relative flex h-full flex-col bg-bg text-ink')],
     [
-      header(h),
-      notice(model.notice, h),
+      lazyHeader(headerView, [h])!,
+      lazyNoticeBar(noticeView, [model.notice, h]),
       h.main([h.Class('flex min-h-0 flex-1 flex-col overflow-auto')], [body(h, model)]),
-      undoToast(h, model),
-      ghost(h, model),
+      lazyUndo(undoToastView, [model.undo, model.undoLabel, h]),
+      lazyGhost(ghostView, [model.photos, model.drag, h]),
       ExportDialog.exportDialogView(h, model.exportDialog, (message) =>
         GotCollageExportDialogMessage({ message }),
       ),
@@ -99,6 +120,66 @@ const notice = (message: string | null, h: HtmlBuilder<CollageMessage>) =>
     ? null
     : h.div([h.Class('border-b border-border bg-panel px-4 py-1 text-xs text-accent')], [message])
 
+const undoToastView = (
+  undo: Model['undo'],
+  undoLabel: Model['undoLabel'],
+  h: HtmlBuilder<CollageMessage>,
+): Html => {
+  if (undo === null || undoLabel === null) return null
+  return h.div(
+    [
+      h.DataAttribute('undo-toast', 'true'),
+      h.Class(
+        'absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded border border-border bg-panel px-3 py-1.5 text-xs shadow-lg',
+      ),
+    ],
+    [
+      h.span([h.Class('text-muted')], [undoLabel]),
+      h.button(
+        [
+          h.OnClick(UndoPressed()),
+          h.AriaLabel(`Undo: ${undoLabel.toLowerCase()}`),
+          h.DataAttribute('undo-button', 'true'),
+          h.Class('rounded bg-accent px-2 py-0.5 text-ink hover:opacity-80'),
+        ],
+        ['Undo'],
+      ),
+    ],
+  )
+}
+
+const ghostView = (
+  photos: Model['photos'],
+  drag: Model['drag'],
+  h: HtmlBuilder<CollageMessage>,
+): Html => {
+  const photoById = new Map(photos.map((p) => [p.id, p]))
+  return Option.match(DragAndDrop.ghostStyle(drag), {
+    onNone: () => null,
+    onSome: (style) => {
+      const dragged = Option.match(DragAndDrop.maybeDraggedItemId(drag), {
+        onNone: () => null,
+        // SAFETY: EditId brand is string at runtime; DragAndDrop stores it as string
+        onSome: (id) => photoById.get(id as unknown as import('@lutra/store').EditId) ?? null,
+      })
+      const draggedUrl = dragged && photoUrl(dragged.id, dragged.source)
+      if (!dragged || !draggedUrl) return null
+      return h.div(
+        [
+          h.Style(style),
+          h.Class('-translate-x-1/2 -translate-y-1/2 overflow-hidden rounded border border-accent'),
+        ],
+        [
+          h.div(
+            [h.Class('h-20 w-20')],
+            [h.img([h.Src(draggedUrl), h.Alt(''), h.Class('h-full w-full object-cover')])],
+          ),
+        ],
+      )
+    },
+  })
+}
+
 // ---- undo toast ----
 
 const undoToast = (h: HtmlBuilder<CollageMessage>, model: Model) => {
@@ -128,40 +209,19 @@ const undoToast = (h: HtmlBuilder<CollageMessage>, model: Model) => {
   )
 }
 
-// ---- the drag ghost ----
-
-const photoMap = (model: Model): Map<string, (typeof model.photos)[number]> =>
-  new Map(model.photos.map((p) => [p.id, p]))
-
-const ghost = (h: HtmlBuilder<CollageMessage>, model: Model) =>
-  Option.match(DragAndDrop.ghostStyle(model.drag), {
-    onNone: () => null,
-    onSome: (style) => {
-      const photoById = photoMap(model)
-      const dragged = Option.match(DragAndDrop.maybeDraggedItemId(model.drag), {
-        onNone: () => null,
-        onSome: (id) => photoById.get(id) ?? null,
-      })
-      const draggedUrl = dragged && photoUrl(dragged.id, dragged.source)
-      if (!dragged || !draggedUrl) {
-        return null
-      }
-      return h.div(
-        [
-          h.Style(style),
-          h.Class('-translate-x-1/2 -translate-y-1/2 overflow-hidden rounded border border-accent'),
-        ],
-        [
-          h.div(
-            [h.Class('h-20 w-20')],
-            [h.img([h.Src(draggedUrl), h.Alt(''), h.Class('h-full w-full object-cover')])],
-          ),
-        ],
-      )
-    },
-  })
+// (ghost superseded by ghostView)
 
 // ---- body ----
+
+const controlsWrapper = (
+  mode: Model['mode'],
+  collage: Collage,
+  h: HtmlBuilder<CollageMessage>,
+): Html => {
+  // SAFETY: narrow slice for lazy memoization — only fields the view island reads
+  const m = { mode } as unknown as Model
+  return controls(h, m, collage)
+}
 
 const body = (h: HtmlBuilder<CollageMessage>, model: Model) =>
   AsyncData.match(model.collage, {
@@ -175,7 +235,7 @@ const body = (h: HtmlBuilder<CollageMessage>, model: Model) =>
         ? emptyState(h, model.userEmptied)
         : h.div(
             [h.Class('flex min-h-0 flex-1 flex-col gap-4 p-4')],
-            [controls(h, model, collage), grid(h, model, collage)],
+            [lazyControls(controlsWrapper, [model.mode, collage, h])!, grid(h, model, collage)],
           ),
   })
 
@@ -372,14 +432,20 @@ const controls = (h: HtmlBuilder<CollageMessage>, model: Model, collage: Collage
     ],
   )
 
-const grid = (h: HtmlBuilder<CollageMessage>, model: Model, collage: Collage) => {
-  const columns = Math.round(collage.layout.columns)
-  const gutter = Math.round(collage.layout.gutter)
-
-  // Only the cells' shape matters at preview scale; the pixel basis does not.
-  const cell = cellSize(collage.layout, collage.tiles.length, 1000)
-  const cellAspect = cell.width / cell.height
-  const background = collage.layout.background === 'dark' ? 'bg-black' : 'bg-white'
+const gridView = (
+  columns: number,
+  gutter: number,
+  cellAspect: number,
+  background: string,
+  tiles: Collage['tiles'],
+  framingDraft: Model['framingDraft'],
+  mode: Model['mode'],
+  drag: Model['drag'],
+  photos: Model['photos'],
+  sizes: Model['sizes'],
+  h: HtmlBuilder<CollageMessage>,
+): Html => {
+  const photoById = new Map(photos.map((p) => [p.id, p]))
   return h.div(
     [
       h.DataAttribute('collage-grid', `${columns}`),
@@ -391,49 +457,47 @@ const grid = (h: HtmlBuilder<CollageMessage>, model: Model, collage: Collage) =>
       }),
       h.Class(`overflow-hidden mx-auto max-h-[48rem] max-w-[40rem] w-full ${background}`),
     ],
-    collage.tiles.map((tile, index) =>
-      tileCell(
-        h,
-        model,
+    tiles.map((tile, index) =>
+      lazyCell(tile.editId, tileCellView, [
         tile.editId,
         index,
-        model.framingDraft?.index === index ? model.framingDraft.framing : tile.framing,
+        framingDraft?.index === index ? framingDraft.framing : tile.framing,
         cellAspect,
-      ),
+        mode,
+        drag,
+        photoById,
+        sizes,
+        h,
+      ])!,
     ),
   )
 }
 
-const aspectOfPhoto = (model: Model, editId: string): number | null => {
-  const size = model.sizes.find((s) => s.editId === editId)
-  return !size || size.width <= 0 || size.height <= 0 ? null : size.width / size.height
-}
-
-const tileCell = (
-  h: HtmlBuilder<CollageMessage>,
-  model: Model,
-  editId: string,
+const tileCellView = (
+  editId: import('@lutra/store').EditId,
   index: number,
   framing: TileFraming,
   cellAspect: number,
-) => {
-  const photo = photoMap(model).get(editId)
+  mode: Model['mode'],
+  drag: Model['drag'],
+  photoById: Map<string, Model['photos'][number]>,
+  sizes: Model['sizes'],
+  h: HtmlBuilder<CollageMessage>,
+): Html => {
+  // SAFETY: EditId brand is string at runtime
+  const photo = (photoById as Map<string, Model['photos'][number]>).get(editId as string)
   const url = photo === undefined ? null : photoUrl(photo.id, photo.source)
-  const arrange = model.mode === 'arrange'
-
-  // The DnD machine's drop target for this cell, if the pointer (or the
-  // keyboard caret) is hovering it.
-  const dropTarget = Option.match(DragAndDrop.maybeDropTarget(model.drag), {
+  const arrange = mode === 'arrange'
+  const dropTarget = Option.match(DragAndDrop.maybeDropTarget(drag), {
     onNone: () => null,
     onSome: (t) => (t.containerId === `tile-${index}` ? t : null),
   })
   const draggedHere =
-    DragAndDrop.isDragging(model.drag) &&
-    Option.match(DragAndDrop.maybeDraggedItemId(model.drag), {
+    DragAndDrop.isDragging(drag) &&
+    Option.match(DragAndDrop.maybeDraggedItemId(drag), {
       onNone: () => false,
       onSome: (id) => id === editId,
     })
-
   const cellClass = [
     'relative overflow-hidden',
     ...(dropTarget !== null ? ['ring-2 ring-accent'] : []),
@@ -441,14 +505,13 @@ const tileCell = (
     ...(!arrange ? ['cursor-grab select-none'] : []),
   ].join(' ')
   const cellAttrs: Attribute<CollageMessage>[] = [
+    h.Key(editId),
     h.DataAttribute('collage-cell', `${index}`),
     h.DataAttribute('collage-tile', `${index}`),
     h.Style({ aspectRatio: String(cellAspect) }),
-    // Droppable: the DnD machine resolves drops against these containers.
     ...DragAndDrop.droppable(`tile-${index}`, `Photo slot ${index + 1}`),
     h.Class(cellClass),
   ]
-
   if (!arrange) {
     cellAttrs.push(
       h.OnPointerDown((_pointerType, button, screenX, screenY) =>
@@ -457,7 +520,6 @@ const tileCell = (
       h.OnDoubleClick(ResetFraming({ index })),
     )
   }
-
   return h.div(cellAttrs, [
     h.div(
       [
@@ -465,7 +527,7 @@ const tileCell = (
           ? [
               ...DragAndDrop.draggable(
                 {
-                  model: model.drag,
+                  model: drag,
                   toParentMessage: (message) => GotDragMessage({ message }),
                   itemId: editId,
                   containerId: `tile-${index}`,
@@ -484,8 +546,7 @@ const tileCell = (
               [h.Class('flex h-full w-full items-center justify-center text-xs text-muted')],
               ['No photo'],
             )
-          : framedPhoto(h, url, model, editId, framing, cellAspect),
-        // Mode-appropriate corner action: remove in Arrange, reset in Frame.
+          : framedPhotoCached(h, url, editId, framing, cellAspect, sizes),
         arrange
           ? h.button(
               [
@@ -509,16 +570,12 @@ const tileCell = (
               ],
               [icon(h, RotateCcw, `Reset framing of photo ${index + 1}`, 12)],
             ),
-        // Insertion indicator while this cell is the drop target: leading
-        // edge when the drop lands before it, trailing edge when after.
         dropTarget !== null
           ? h.div(
               [
                 h.DataAttribute('drop-indicator', `${dropTarget.index}`),
                 h.Class(
-                  `absolute z-10 w-1 bg-accent ${
-                    dropTarget.index === 0 ? 'left-0 top-0 h-full' : 'bottom-0 right-0 h-full'
-                  }`,
+                  `absolute z-10 w-1 bg-accent ${dropTarget.index === 0 ? 'left-0 top-0 h-full' : 'bottom-0 right-0 h-full'}`,
                 ),
               ],
               [],
@@ -529,24 +586,18 @@ const tileCell = (
   ])
 }
 
-/**
- * One tile's full-resolution source, drawn through its framing. Percentages
- * of the cell — the same placement math export uses. Until the photo's
- * aspect has been measured (a beat after load), the photo falls back to
- * cover so nothing flashes mispositioned.
- */
-const framedPhoto = (
+const framedPhotoCached = (
   h: HtmlBuilder<CollageMessage>,
   url: string,
-  model: Model,
-  editId: string,
+  editId: import('@lutra/store').EditId,
   framing: TileFraming,
   cellAspect: number,
-) => {
-  const imageAspect = aspectOfPhoto(model, editId)
-  if (imageAspect === null) {
+  sizes: Model['sizes'],
+): Html => {
+  const size = sizes.find((s) => s.editId === editId)
+  const imageAspect = !size || size.width <= 0 || size.height <= 0 ? null : size.width / size.height
+  if (imageAspect === null)
     return h.img([h.Src(url), h.Alt(''), h.Class('h-full w-full object-cover')])
-  }
   const p = placement(framing, imageAspect, cellAspect)
   return h.img([
     h.Src(url),
@@ -559,4 +610,25 @@ const framedPhoto = (
       top: `${p.top * 100}%`,
     }),
   ])
+}
+
+const grid = (h: HtmlBuilder<CollageMessage>, model: Model, collage: Collage) => {
+  const columns = Math.round(collage.layout.columns)
+  const gutter = Math.round(collage.layout.gutter)
+  const cell = cellSize(collage.layout, collage.tiles.length, 1000)
+  const cellAspect = cell.width / cell.height
+  const background = collage.layout.background === 'dark' ? 'bg-black' : 'bg-white'
+  return lazyGrid(gridView, [
+    columns,
+    gutter,
+    cellAspect,
+    background,
+    collage.tiles,
+    model.framingDraft,
+    model.mode,
+    model.drag,
+    model.photos,
+    model.sizes,
+    h,
+  ])!
 }

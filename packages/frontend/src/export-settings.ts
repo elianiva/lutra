@@ -11,22 +11,19 @@ import { ExportSettings, defaultExportSettings } from '@lutra/engine'
 export const EXPORT_SETTINGS_KEY = 'exportSettings'
 
 /** Restore persisted export settings; missing or corrupt falls back to defaults. */
-export const loadExportSettings: Effect.Effect<
-  ExportSettings,
-  never,
-  Persistence.KeyValueStore
-> = Effect.gen(function* loadExportSettings() {
-  const store = yield* Persistence.KeyValueStore
-  const schemaStore = Persistence.toSchemaStore(store, ExportSettings)
-  // `Effect.option` wraps the success (itself an Option) — flatten.
-  const saved = Option.flatten(
-    yield* schemaStore.get(EXPORT_SETTINGS_KEY).pipe(
-      // Missing or corrupt settings fall back to defaults.
-      Effect.option,
-    ),
-  )
-  return Option.getOrElse(defaultExportSettings)(saved)
-})
+export const loadExportSettings: Effect.Effect<ExportSettings, never, Persistence.KeyValueStore> =
+  Effect.gen(function* loadExportSettings() {
+    const store = yield* Persistence.KeyValueStore
+    const schemaStore = Persistence.toSchemaStore(store, ExportSettings)
+    // `Effect.option` wraps the success (itself an Option) — flatten.
+    const saved = Option.flatten(
+      yield* schemaStore.get(EXPORT_SETTINGS_KEY).pipe(
+        // Missing or corrupt settings fall back to defaults.
+        Effect.option,
+      ),
+    )
+    return Option.getOrElse(defaultExportSettings)(saved)
+  })
 
 /** Persist export settings (fired on every change; localStorage is cheap). */
 export const saveExportSettings = (

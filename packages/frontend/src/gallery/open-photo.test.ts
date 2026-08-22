@@ -96,12 +96,14 @@ const summary = (id: EditId): EditSummaryRecord =>
 
 const otherId = EditId('22222222-2222-4222-8222-222222222222')
 
-const added = (overrides: {
-  added?: number
-  failed?: number
-  error?: Option.Option<typeof PhotoCreateError.Type>
-  summaries?: Option.Option<readonly EditSummaryRecord[]>
-} = {}) =>
+const added = (
+  overrides: {
+    added?: number
+    failed?: number
+    error?: Option.Option<typeof PhotoCreateError.Type>
+    summaries?: Option.Option<readonly EditSummaryRecord[]>
+  } = {},
+) =>
   PhotosAdded({
     added: 0,
     failed: 0,
@@ -153,9 +155,7 @@ describe('gallery: opening several photos at once', () => {
         summaries: Option.some([summary(id), summary(otherId)]),
       }),
     )
-    expect(model.notice).toBe(
-      'Added 2 photos, 1 could not be opened: decode failed',
-    )
+    expect(model.notice).toBe('Added 2 photos, 1 could not be opened: decode failed')
     // The successful picks still show up.
     if (model.grid._tag === 'Success') {
       expect(model.grid.data.map((s) => s.id)).toEqual([id, otherId])

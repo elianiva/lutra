@@ -108,7 +108,10 @@ describe('gallery: delete-confirmation dialog', () => {
   })
 
   it('a failed delete surfaces the notice banner', () => {
-    const [failed] = update(loaded, DeleteFailed({ error: new StoreError({ message: 'disk full' }) }))
+    const [failed] = update(
+      loaded,
+      DeleteFailed({ error: new StoreError({ message: 'disk full' }) }),
+    )
     vitestExpect(failed.notice).toBe('Delete failed: disk full')
   })
 })

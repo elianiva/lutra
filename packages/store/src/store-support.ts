@@ -59,10 +59,13 @@ export const tableCrud = <Table extends IndexedDbTable.AnyWithProps, Summary>({
     save: (row) => table.upsert(row).pipe(Effect.asVoid, Effect.mapError(mapQueryError)),
 
     load: (key) =>
-      table.select().equals(key).pipe(
-        Effect.map((rows) => Option.fromIterable(rows)),
-        Effect.mapError(mapQueryError),
-      ),
+      table
+        .select()
+        .equals(key)
+        .pipe(
+          Effect.map((rows) => Option.fromIterable(rows)),
+          Effect.mapError(mapQueryError),
+        ),
 
     list: () =>
       table.select().pipe(
@@ -127,7 +130,10 @@ export const indexedDbStoreLayer = <Id, Shape>(
     Layer.catch((error) =>
       Layer.succeed(
         tag,
-        rejectingStore(ofContract, `could not open the ${databaseLabel} database: ${error.message}`),
+        rejectingStore(
+          ofContract,
+          `could not open the ${databaseLabel} database: ${error.message}`,
+        ),
       ),
     ),
   )

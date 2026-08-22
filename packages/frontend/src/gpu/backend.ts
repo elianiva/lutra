@@ -321,7 +321,8 @@ export const GpuBackendLive = Layer.effect(
     const acquireGpu = Effect.gen(function* () {
       const adapter = yield* Effect.tryPromise({
         catch: (cause) => new GpuError({ cause, message: 'No WebGPU adapter available' }),
-        try: async () => await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }),
+        try: async () =>
+          await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }),
       }).pipe(
         Effect.flatMap((adapter) =>
           adapter === null
@@ -806,223 +807,228 @@ export const GpuBackendLive = Layer.effect(
     }
 
     return GpuBackend.of({
-      execute: (request, canvas, present) => Effect.gen(function* () {
-        const { width } = request.srcBitmap
-        const { height } = request.srcBitmap
-        if (width === 0 || height === 0) {
-          return yield* Effect.fail(new GpuError({ message: 'Empty source bitmap' }))
-        }
-
-        const gpu = yield* getGpu
-        const s = yield* ensureSession(gpu, canvas, width, height, request.srcBitmap)
-
-        const { passes } = request.shader
-
-        // Cheap per-tick updates: repack each pass's params buffer and the
-        // frame counter once, then dispatch every pass. No allocations, no
-        // texture churn.
-        if (request.shader.usesFrame) {
-          gpu.device.queue.writeBuffer(s.frameBuffer, 0, new Uint32Array([request.frame >>> 0]))
-        }
-
-        const encoder = gpu.device.createCommandEncoder()
-
-        // Pass 1..N: each layer runs as its own compute pass. Pass 0 reads
-        // the sRGB source (or the linearize pass output); every later pass
-        // reads the previous pass's output through the ping-pong
-        // intermediates; the last pass writes the sRGB-encoded dstTex.
-        for (let i = 0; i < passes.length; i++) {
-          const pass = passes[i]!
-          const src = i === 0 ? s.srcTex : s.intermediates[(i - 1) % 2]!
-          const dst = i === passes.length - 1 ? s.dstTex : s.intermediates[i % 2]!
-          const { paramsBuffer, bindGroup, pipeline } = yield* getCompute(
-            gpu,
-            s,
-            pass,
-            src,
-            dst,
-            request.luts,
-          )
-
-          if (paramsBuffer) {
-            const paramsData = new Float32Array(roundUp(request.uniforms[i]!.length, 4))
-            paramsData.set(request.uniforms[i]!)
-            gpu.device.queue.writeBuffer(paramsBuffer, 0, paramsData)
+      execute: (request, canvas, present) =>
+        Effect.gen(function* () {
+          const { width } = request.srcBitmap
+          const { height } = request.srcBitmap
+          if (width === 0 || height === 0) {
+            return yield* Effect.fail(new GpuError({ message: 'Empty source bitmap' }))
           }
 
-          const computePass = encoder.beginComputePass()
-          computePass.setPipeline(pipeline)
-          computePass.setBindGroup(0, bindGroup)
-          computePass.dispatchWorkgroups(
+          const gpu = yield* getGpu
+          const s = yield* ensureSession(gpu, canvas, width, height, request.srcBitmap)
+
+          const { passes } = request.shader
+
+          // Cheap per-tick updates: repack each pass's params buffer and the
+          // frame counter once, then dispatch every pass. No allocations, no
+          // texture churn.
+          if (request.shader.usesFrame) {
+            gpu.device.queue.writeBuffer(s.frameBuffer, 0, new Uint32Array([request.frame >>> 0]))
+          }
+
+          const encoder = gpu.device.createCommandEncoder()
+
+          // Pass 1..N: each layer runs as its own compute pass. Pass 0 reads
+          // the sRGB source (or the linearize pass output); every later pass
+          // reads the previous pass's output through the ping-pong
+          // intermediates; the last pass writes the sRGB-encoded dstTex.
+          for (let i = 0; i < passes.length; i++) {
+            const pass = passes[i]!
+            const src = i === 0 ? s.srcTex : s.intermediates[(i - 1) % 2]!
+            const dst = i === passes.length - 1 ? s.dstTex : s.intermediates[i % 2]!
+            const { paramsBuffer, bindGroup, pipeline } = yield* getCompute(
+              gpu,
+              s,
+              pass,
+              src,
+              dst,
+              request.luts,
+            )
+
+            if (paramsBuffer) {
+              const paramsData = new Float32Array(roundUp(request.uniforms[i]!.length, 4))
+              paramsData.set(request.uniforms[i]!)
+              gpu.device.queue.writeBuffer(paramsBuffer, 0, paramsData)
+            }
+
+            const computePass = encoder.beginComputePass()
+            computePass.setPipeline(pipeline)
+            computePass.setBindGroup(0, bindGroup)
+            computePass.dispatchWorkgroups(
+              Math.ceil(width / WORKGROUP_SIZE),
+              Math.ceil(height / WORKGROUP_SIZE),
+              1,
+            )
+            computePass.end()
+          }
+
+          // Histogram scatter pass: bin the final frame's Rec.709 luma into
+          // 256 atomic bins (full-res, exact). The pass writes the
+          // session-scoped bins accumulator; the bins are then copied into
+          // this frame's slot of the readback ring in the same encoder
+          // (MAP_READ buffers can't receive storage writes, so the copy is
+          // the bridge). The accumulator is zeroed per render — atomics add
+          // across renders, and the previous render's work completed before
+          // this one started (execute resolves on onSubmittedWorkDone).
+          const slot = s.readbacks[readbackCursor % HISTOGRAM_SLOTS]!
+          readbackCursor += 1
+          if (slot.map !== null) {
+            // Abnormal flow: the previous frame on this slot was never
+            // consumed (a dropped RenderedFrame). Wait out its map so we
+            // don't copy into a mapped buffer, then reclaim the slot.
+            const pending = slot.map
+            yield* Effect.ignore(Effect.promise(async () => await pending))
+            slot.buffer.unmap()
+            slot.map = null
+          }
+          gpu.device.queue.writeBuffer(s.binsBuffer, 0, s.binsZeros)
+          const histogramPass = encoder.beginComputePass()
+          histogramPass.setPipeline(gpu.histogramPipeline)
+          histogramPass.setBindGroup(0, s.histogramGroup)
+          histogramPass.dispatchWorkgroups(
             Math.ceil(width / WORKGROUP_SIZE),
             Math.ceil(height / WORKGROUP_SIZE),
             1,
           )
-          computePass.end()
-        }
+          histogramPass.end()
+          encoder.copyBufferToBuffer(s.binsBuffer, 0, slot.buffer, 0, HISTOGRAM_BINS * 4)
 
-        // Histogram scatter pass: bin the final frame's Rec.709 luma into
-        // 256 atomic bins (full-res, exact). The pass writes the
-        // session-scoped bins accumulator; the bins are then copied into
-        // this frame's slot of the readback ring in the same encoder
-        // (MAP_READ buffers can't receive storage writes, so the copy is
-        // the bridge). The accumulator is zeroed per render — atomics add
-        // across renders, and the previous render's work completed before
-        // this one started (execute resolves on onSubmittedWorkDone).
-        const slot = s.readbacks[readbackCursor % HISTOGRAM_SLOTS]!
-        readbackCursor += 1
-        if (slot.map !== null) {
-          // Abnormal flow: the previous frame on this slot was never
-          // consumed (a dropped RenderedFrame). Wait out its map so we
-          // don't copy into a mapped buffer, then reclaim the slot.
-          const pending = slot.map
-          yield* Effect.ignore(Effect.promise(async () => await pending))
-          slot.buffer.unmap()
-          slot.map = null
-        }
-        gpu.device.queue.writeBuffer(s.binsBuffer, 0, s.binsZeros)
-        const histogramPass = encoder.beginComputePass()
-        histogramPass.setPipeline(gpu.histogramPipeline)
-        histogramPass.setBindGroup(0, s.histogramGroup)
-        histogramPass.dispatchWorkgroups(
-          Math.ceil(width / WORKGROUP_SIZE),
-          Math.ceil(height / WORKGROUP_SIZE),
-          1,
-        )
-        histogramPass.end()
-        encoder.copyBufferToBuffer(s.binsBuffer, 0, slot.buffer, 0, HISTOGRAM_BINS * 4)
+          // Finally: blit dstTex (or the compare view of srcTex/dstTex) onto
+          // the canvas swapchain texture.
+          blit(gpu.device, gpu.blitPipeline, gpu.swapFormat, encoder, s, present)
 
-        // Finally: blit dstTex (or the compare view of srcTex/dstTex) onto
-        // the canvas swapchain texture.
-        blit(gpu.device, gpu.blitPipeline, gpu.swapFormat, encoder, s, present)
+          gpu.device.queue.submit([encoder.finish()])
 
-        gpu.device.queue.submit([encoder.finish()])
+          // Resolve only when the GPU has caught up — lets the caller keep at
+          // most one render in flight (no CPU stall; this is a promise).
+          yield* Effect.tryPromise({
+            catch: (cause) => new GpuError({ cause, message: 'GPU work failed' }),
+            try: async () => await gpu.device.queue.onSubmittedWorkDone(),
+          })
 
-        // Resolve only when the GPU has caught up — lets the caller keep at
-        // most one render in flight (no CPU stall; this is a promise).
-        yield* Effect.tryPromise({
-          catch: (cause) => new GpuError({ cause, message: 'GPU work failed' }),
-          try: async () => await gpu.device.queue.onSubmittedWorkDone(),
-        })
+          // Issue this slot's map NOW, before any later render can submit:
+          // mapAsync is enqueued on the queue timeline behind every pending
+          // submission, so a map issued later (from the readback command)
+          // would queue behind the next render — and the next after that
+          // during a drag — landing stale and getting dropped. Issued right
+          // after this frame's own submit completed, it resolves before the
+          // frame's RenderedFrame is even handled, and readHistogram
+          // consumes it with no waiting.
+          slot.map = slot.buffer.mapAsync(GPUMapMode.READ)
 
-        // Issue this slot's map NOW, before any later render can submit:
-        // mapAsync is enqueued on the queue timeline behind every pending
-        // submission, so a map issued later (from the readback command)
-        // would queue behind the next render — and the next after that
-        // during a drag — landing stale and getting dropped. Issued right
-        // after this frame's own submit completed, it resolves before the
-        // frame's RenderedFrame is even handled, and readHistogram
-        // consumes it with no waiting.
-        slot.map = slot.buffer.mapAsync(GPUMapMode.READ)
-
-        return new RenderHandle(s.dstTex, s.width, s.height, slot)
-      }).pipe(
-        // Any unexpected exception (bind group/layout mismatch, browser-
-        // specific WGSL rejection) must surface as a GpuError. Without
-        // this, a defect escapes the command's catchTag and renderPending
-        // stays true forever — the app silently stops rendering.
-        Effect.catchDefect((cause: unknown) =>
-          Effect.fail(new GpuError({ cause, message: 'Unexpected GPU error' })),
+          return new RenderHandle(s.dstTex, s.width, s.height, slot)
+        }).pipe(
+          // Any unexpected exception (bind group/layout mismatch, browser-
+          // specific WGSL rejection) must surface as a GpuError. Without
+          // this, a defect escapes the command's catchTag and renderPending
+          // stays true forever — the app silently stops rendering.
+          Effect.catchDefect((cause: unknown) =>
+            Effect.fail(new GpuError({ cause, message: 'Unexpected GPU error' })),
+          ),
         ),
-      ),
 
       // Blit-only re-present (docs/adr/0011): re-blit the last rendered
       // frame with a new compare presentation state, without re-running the
       // chain. Uses the current session's textures as-is; no-op when no
       // session exists for the canvas (nothing has rendered yet).
-      present: (canvas, present) => Effect.gen(function* () {
-        const current = yield* Ref.get(sessionRef)
-        if (Option.isNone(current) || current.value.canvas !== canvas) {
-          return
-        }
-        const gpu = yield* getGpu
-        // The canvas drawing-buffer size may have changed since the
-        // session was built — Side by side doubles the canvas width.
-        // ensureSession follows the resize in place (swapchain
-        // re-configured, u_canvas rewritten, nothing image-sized
-        // touched), so the graded frame survives and re-presents.
-        const session = yield* ensureSession(
-          gpu,
-          canvas,
-          current.value.width,
-          current.value.height,
-          current.value.srcBitmap,
-        )
-        const encoder = gpu.device.createCommandEncoder()
-        blit(gpu.device, gpu.blitPipeline, gpu.swapFormat, encoder, session, present)
-        gpu.device.queue.submit([encoder.finish()])
-      }).pipe(
-        Effect.catchDefect((cause: unknown) =>
-          Effect.fail(new GpuError({ cause, message: 'Unexpected GPU error during present' })),
+      present: (canvas, present) =>
+        Effect.gen(function* () {
+          const current = yield* Ref.get(sessionRef)
+          if (Option.isNone(current) || current.value.canvas !== canvas) {
+            return
+          }
+          const gpu = yield* getGpu
+          // The canvas drawing-buffer size may have changed since the
+          // session was built — Side by side doubles the canvas width.
+          // ensureSession follows the resize in place (swapchain
+          // re-configured, u_canvas rewritten, nothing image-sized
+          // touched), so the graded frame survives and re-presents.
+          const session = yield* ensureSession(
+            gpu,
+            canvas,
+            current.value.width,
+            current.value.height,
+            current.value.srcBitmap,
+          )
+          const encoder = gpu.device.createCommandEncoder()
+          blit(gpu.device, gpu.blitPipeline, gpu.swapFormat, encoder, session, present)
+          gpu.device.queue.submit([encoder.finish()])
+        }).pipe(
+          Effect.catchDefect((cause: unknown) =>
+            Effect.fail(new GpuError({ cause, message: 'Unexpected GPU error during present' })),
+          ),
         ),
-      ),
 
-      snapshot: (handle) => Effect.gen(function* () {
-        const gpu = yield* getGpu
-        const { dstTex, width, height } = handle
+      snapshot: (handle) =>
+        Effect.gen(function* () {
+          const gpu = yield* getGpu
+          const { dstTex, width, height } = handle
 
-        const bytesPerRowPadded = roundUp(width * 4, 256)
-        const readBuffer = gpu.device.createBuffer({
-          size: bytesPerRowPadded * height,
-          usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-        })
+          const bytesPerRowPadded = roundUp(width * 4, 256)
+          const readBuffer = gpu.device.createBuffer({
+            size: bytesPerRowPadded * height,
+            usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+          })
 
-        const encoder = gpu.device.createCommandEncoder()
-        encoder.copyTextureToBuffer(
-          { mipLevel: 0, origin: { x: 0, y: 0, z: 0 }, texture: dstTex },
-          {
-            buffer: readBuffer,
-            bytesPerRow: bytesPerRowPadded,
-            offset: 0,
-            rowsPerImage: height,
-          },
-          { depthOrArrayLayers: 1, height, width },
-        )
-        gpu.device.queue.submit([encoder.finish()])
-        yield* Effect.tryPromise({
-          catch: (cause) => new GpuError({ cause, message: 'Failed to map readback buffer' }),
-          try: async () => await readBuffer.mapAsync(GPUMapMode.READ),
-        })
+          const encoder = gpu.device.createCommandEncoder()
+          encoder.copyTextureToBuffer(
+            { mipLevel: 0, origin: { x: 0, y: 0, z: 0 }, texture: dstTex },
+            {
+              buffer: readBuffer,
+              bytesPerRow: bytesPerRowPadded,
+              offset: 0,
+              rowsPerImage: height,
+            },
+            { depthOrArrayLayers: 1, height, width },
+          )
+          gpu.device.queue.submit([encoder.finish()])
+          yield* Effect.tryPromise({
+            catch: (cause) => new GpuError({ cause, message: 'Failed to map readback buffer' }),
+            try: async () => await readBuffer.mapAsync(GPUMapMode.READ),
+          })
 
-        const mapped = new Uint8Array(readBuffer.getMappedRange())
-        // Un-pad rows into a dense RGBA buffer.
-        const dense = new Uint8ClampedArray(width * height * 4)
-        for (let y = 0; y < height; y++) {
-          const srcOffset = y * bytesPerRowPadded
-          const dstOffset = y * width * 4
-          dense.set(mapped.subarray(srcOffset, srcOffset + width * 4), dstOffset)
-        }
-        readBuffer.unmap()
-        readBuffer.destroy()
+          const mapped = new Uint8Array(readBuffer.getMappedRange())
+          // Un-pad rows into a dense RGBA buffer.
+          const dense = new Uint8ClampedArray(width * height * 4)
+          for (let y = 0; y < height; y++) {
+            const srcOffset = y * bytesPerRowPadded
+            const dstOffset = y * width * 4
+            dense.set(mapped.subarray(srcOffset, srcOffset + width * 4), dstOffset)
+          }
+          readBuffer.unmap()
+          readBuffer.destroy()
 
-        const imageData = new ImageData(dense, width, height)
-        return imageData
-      }),
+          const imageData = new ImageData(dense, width, height)
+          return imageData
+        }),
 
-      readHistogram: (handle) => Effect.gen(function* () {
-        const slot = handle.readback
-        const live = yield* Ref.get(sessionRef)
-        const { map } = slot
-        if (map === null || Option.isNone(live) || !live.value.readbacks.includes(slot)) {
-          // Consumed already, or the owning session was torn down (its
-          // buffers destroyed — the map would reject). Either way the
-          // frame is stale and its bins would be dropped by the stamp
-          // guard: resolve with empty bins rather than surfacing a
-          // spurious failure.
-          return new Uint32Array(HISTOGRAM_BINS)
-        }
-        // The map was issued by execute after this frame's submit
-        // completed, so it resolves without waiting on any later render.
-        yield* Effect.tryPromise({
-          catch: (cause) => new GpuError({ cause, message: 'Failed to map histogram bins buffer' }),
-          try: async () => await map,
-        })
-        const bins = new Uint32Array(slot.buffer.getMappedRange())
-        const copy = new Uint32Array(bins)
-        slot.buffer.unmap()
-        slot.map = null
-        return copy
-      }),
+      readHistogram: (handle) =>
+        Effect.gen(function* () {
+          const slot = handle.readback
+          const live = yield* Ref.get(sessionRef)
+          const { map } = slot
+          if (map === null || Option.isNone(live) || !live.value.readbacks.includes(slot)) {
+            // Consumed already, or the owning session was torn down (its
+            // buffers destroyed — the map would reject). Either way the
+            // frame is stale and its bins would be dropped by the stamp
+            // guard: resolve with empty bins rather than surfacing a
+            // spurious failure.
+            return new Uint32Array(HISTOGRAM_BINS)
+          }
+          // The map was issued by execute after this frame's submit
+          // completed, so it resolves without waiting on any later render.
+          yield* Effect.tryPromise({
+            catch: (cause) =>
+              new GpuError({ cause, message: 'Failed to map histogram bins buffer' }),
+            try: async () => await map,
+          })
+          const bins = new Uint32Array(slot.buffer.getMappedRange())
+          const copy = new Uint32Array(bins)
+          slot.buffer.unmap()
+          slot.map = null
+          return copy
+        }),
     })
   }),
 )

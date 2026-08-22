@@ -48,8 +48,9 @@ export const subscriptions = Subscription.aggregate<Model, RootMessage, OfflineF
       ),
     ),
     offlineFill: Subscription.persistent(
-      Stream.flatMap(Stream.service(OfflineFill), (service) => Stream.fromPubSub(service.events))
-        .pipe(Stream.map((event): RootMessage => fillEventToMessage(event))),
+      Stream.flatMap(Stream.service(OfflineFill), (service) =>
+        Stream.fromPubSub(service.events),
+      ).pipe(Stream.map((event): RootMessage => fillEventToMessage(event))),
     ),
   })),
   // The collage screen's gesture listeners (docs/adr/0033): the drag-and-drop

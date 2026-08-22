@@ -1,6 +1,6 @@
 import { DateTime } from 'effect'
 import { Submodel, AsyncData } from 'foldkit'
-import type { HtmlBuilder } from 'foldkit/html'
+import { type Html, type HtmlBuilder, createLazy, createKeyedLazy } from 'foldkit/html'
 import { Check, Undo2, X } from 'lucide'
 import {
   ClickedEdit,
@@ -31,18 +31,36 @@ import { deleteDialogView } from './delete-dialog'
  * on unmount / delete) is refined in the editor save-flow slice per the
  * thumbnail contract (docs/adr/0007).
  */
+// ---- memoization (ADR 0034) ----
+const lazyHeader = createLazy()
+const lazyNotice = createLazy()
+const lazyTile = createKeyedLazy()
+const lazyCollageCard = createKeyedLazy()
+const lazyCollageSection = createLazy()
+
+const headerView = (selectedCount: number, h: HtmlBuilder<GalleryMessage>): Html =>
+  header(h, selectedCount)
+const noticeView = (message: string | null, h: HtmlBuilder<GalleryMessage>): Html =>
+  notice(message, h)
+
 export const view = Submodel.defineView<Model, GalleryMessage>((model, h) => {
   const { grid } = model
   return h.div(
     [h.Class('flex h-full flex-col bg-bg text-ink')],
     [
-      header(h, model.selection.length),
-      notice(model.notice, h),
+      lazyHeader(headerView, [model.selection.length, h])!,
+      lazyNotice(noticeView, [model.notice, h]) ?? notice(model.notice, h),
       h.main(
         [h.Class('flex min-h-0 flex-1 flex-col overflow-auto')],
         [
           gridBody(h, grid, model.selection),
-          collagesSection(h, model),
+          lazyCollageSection(collagesSectionView, [
+            model.collages,
+            model.grid,
+            model.collageThumbSizes,
+            model.confirmingCollageDelete,
+            h,
+          ]) ?? collagesSection(h, model),
         ],
       ),
       settingsDialogView(h, model),
@@ -50,6 +68,23 @@ export const view = Submodel.defineView<Model, GalleryMessage>((model, h) => {
     ],
   )
 })
+
+const collagesSectionView = (
+  collages: Model['collages'],
+  grid: Model['grid'],
+  thumbSizes: Model['collageThumbSizes'],
+  confirming: Model['confirmingCollageDelete'],
+  h: HtmlBuilder<GalleryMessage>,
+): Html => {
+  const m = {
+    collages,
+    grid,
+    collageThumbSizes: thumbSizes,
+    confirmingCollageDelete: confirming,
+    // SAFETY: narrow slice for lazy memoization — only fields the view island reads
+  } as unknown as Model
+  return collagesSection(h, m)
+}
 
 const notice = (message: string | null, h: HtmlBuilder<GalleryMessage>) =>
   message === null
@@ -73,9 +108,7 @@ const header = (h: HtmlBuilder<GalleryMessage>, selectedCount: number) =>
                     h.OnClick(CreateCollageRequested()),
                     h.AriaLabel(`Create a collage from ${selectedCount} selected edits`),
                     h.DataAttribute('create-collage', 'true'),
-                    h.Class(
-                      'rounded bg-accent px-3 py-1 text-xs text-ink hover:opacity-80',
-                    ),
+                    h.Class('rounded bg-accent px-3 py-1 text-xs text-ink hover:opacity-80'),
                   ],
                   [`Create collage (${selectedCount})`],
                 ),
@@ -179,12 +212,18 @@ const gridTiles = (
 ) =>
   h.div(
     [h.Class('grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4 p-4')],
-    summaries.map((summary) => tile(h, summary, selection.includes(summary.id))),
+    summaries.map((summary) =>
+      lazyTile(summary.id, tileView, [summary, selection.includes(summary.id), h])!,
+    ),
   )
+
+const tileView = (summary: EditSummary, selected: boolean, h: HtmlBuilder<GalleryMessage>): Html =>
+  tile(h, summary, selected)
 
 const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary, selected: boolean) =>
   h.div(
     [
+      h.Key(summary.id),
       h.DataAttribute('edit-id', summary.id),
       h.Class(
         `group relative aspect-square overflow-hidden rounded border bg-panel hover:border-muted ${
@@ -211,9 +250,7 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary, selected: bo
       h.button(
         [
           h.OnClick(ToggledSelection({ id: summary.id })),
-          h.AriaLabel(
-            selected ? 'Remove from collage selection' : 'Add to collage selection',
-          ),
+          h.AriaLabel(selected ? 'Remove from collage selection' : 'Add to collage selection'),
           h.DataAttribute('select-edit-id', summary.id),
           h.Class(
             `absolute left-1 top-1 z-10 grid size-7 place-items-center rounded-full border ${
@@ -236,7 +273,11 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary, selected: bo
         [
           h.span(
             [h.Class('text-[10px] text-white/80')],
-            [summary.savedAt > 0 ? DateTime.formatLocal({ dateStyle: 'short' })(DateTime.makeUnsafe(summary.savedAt)) : ''],
+            [
+              summary.savedAt > 0
+                ? DateTime.formatLocal({ dateStyle: 'short' })(DateTime.makeUnsafe(summary.savedAt))
+                : '',
+            ],
           ),
           h.div(
             [h.Class('flex items-center gap-1')],
@@ -273,7 +314,6 @@ const tileThumb = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) => {
     : h.div([h.Class('flex h-full w-full items-center justify-center text-muted')], ['No thumb'])
 }
 
-
 // ---- Collages section (docs/adr/0030) ----
 
 /**
@@ -290,8 +330,7 @@ const collagesSection = (h: HtmlBuilder<GalleryMessage>, model: Model) =>
     onLoading: () => null,
     onRefreshing: () => null,
     onStale: () => null,
-    onSuccess: (collages) =>
-      collages.length === 0 ? null : collageCards(h, collages, model),
+    onSuccess: (collages) => (collages.length === 0 ? null : collageCards(h, collages, model)),
   })
 
 const collageCards = (
@@ -308,19 +347,41 @@ const collageCards = (
       ),
       h.div(
         [h.Class('grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4')],
-        collages.map((collage) => collageCard(h, collage, model)),
+        collages.map((collage) =>
+          lazyCollageCard(collage.id, collageCardView, [
+            collage,
+            model.grid,
+            model.collageThumbSizes,
+            model.confirmingCollageDelete,
+            h,
+          ])!,
+        ),
       ),
     ],
   )
 
+const collageCardView = (
+  collage: CollageRecord,
+  grid: Model['grid'],
+  thumbSizes: Model['collageThumbSizes'],
+  confirmingId: Model['confirmingCollageDelete'],
+  h: HtmlBuilder<GalleryMessage>,
+): Html => {
+  const m = {
+    grid,
+    collageThumbSizes: thumbSizes,
+    confirmingCollageDelete: confirmingId,
+    // SAFETY: narrow slice for lazy memoization — only fields the view island reads
+  } as unknown as Model
+  return collageCard(h, collage, m)
+}
+
 const collageCard = (h: HtmlBuilder<GalleryMessage>, collage: CollageRecord, model: Model) => {
-  // Tile identity → thumbnail lookup against the loaded edits grid; a tile
-  // whose Edit is missing (deleted after the collage was made) renders as a
-  // placeholder cell until the collage screen drops it on load.
   const byId = new Map(model.grid._tag === 'Success' ? model.grid.data.map((s) => [s.id, s]) : [])
   const confirming = model.confirmingCollageDelete === collage.id
   return h.div(
     [
+      h.Key(collage.id),
       h.DataAttribute('collage-id', collage.id),
       h.Class(
         `group relative aspect-square overflow-hidden rounded border bg-panel hover:border-muted ${
@@ -355,7 +416,9 @@ const collageCard = (h: HtmlBuilder<GalleryMessage>, collage: CollageRecord, mod
             [
               `${collage.tiles.length} ${collage.tiles.length === 1 ? 'photo' : 'photos'} · ${
                 collage.savedAt > 0
-                  ? DateTime.formatLocal({ dateStyle: 'short' })(DateTime.makeUnsafe(collage.savedAt))
+                  ? DateTime.formatLocal({ dateStyle: 'short' })(
+                      DateTime.makeUnsafe(collage.savedAt),
+                    )
                   : ''
               }`,
             ],
@@ -436,25 +499,28 @@ const miniPreview = (
           const summary = byId.get(tileRef.editId)
           const url = summary ? thumbnailUrl(summary.id, summary.thumbnail) : null
           if (!url) {
-            return h.div([h.Class('h-full w-full bg-neutral-700')], [])
+            return h.div([h.Key(tileRef.editId), h.Class('h-full w-full bg-neutral-700')], [])
           }
-          // Mirror only what diverges from the default: measured custom
-          // framings place the thumbnail by percentage; everything else —
-          // and anything unmeasured — stays a plain cover crop.
           if (isDefaultFraming(tileRef.framing)) {
-            return h.img([h.Src(url), h.Alt(''), h.Class('h-full w-full object-cover')])
+            return h.img([
+              h.Key(tileRef.editId),
+              h.Src(url),
+              h.Alt(''),
+              h.Class('h-full w-full object-cover'),
+            ])
           }
           const size = sizes.find((s) => s.editId === tileRef.editId)
           if (!size || size.width <= 0 || size.height <= 0) {
-            return h.img([h.Src(url), h.Alt(''), h.Class('h-full w-full object-cover')])
+            return h.img([
+              h.Key(tileRef.editId),
+              h.Src(url),
+              h.Alt(''),
+              h.Class('h-full w-full object-cover'),
+            ])
           }
-          const p = placement(
-            tileRef.framing,
-            size.width / size.height,
-            cellAspect,
-          )
+          const p = placement(tileRef.framing, size.width / size.height, cellAspect)
           return h.div(
-            [h.Class('relative h-full w-full overflow-hidden')],
+            [h.Key(tileRef.editId), h.Class('relative h-full w-full overflow-hidden')],
             [
               h.img([
                 h.Src(url),

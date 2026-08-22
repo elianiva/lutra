@@ -11,11 +11,7 @@ import {
   text,
   role,
 } from 'foldkit/scene'
-import {
-  CollageId,
-  EditId,
-  EditSummary,
-} from '@lutra/store'
+import { CollageId, EditId, EditSummary } from '@lutra/store'
 import type { EditSummary as EditSummaryRecord } from '@lutra/store'
 import { initialModel } from './model'
 import { update } from './update'
@@ -84,11 +80,7 @@ describe('gallery: collage selection', () => {
     )
 
     const [twoSelected] = update(oneSelected, ToggledSelection({ id: two }))
-    scene(
-      config,
-      given(twoSelected),
-      sceneExpect(text('Create collage (2)')).toExist(),
-    )
+    scene(config, given(twoSelected), sceneExpect(text('Create collage (2)')).toExist())
   })
 
   it('the select control dispatches ToggledSelection without opening the edit', () => {

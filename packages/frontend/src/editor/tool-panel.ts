@@ -1,4 +1,4 @@
-import type { HtmlBuilder } from 'foldkit/html'
+import { type Html, type HtmlBuilder, createKeyedLazy } from 'foldkit/html'
 import { icon } from '../components/icon'
 import { LAYER_UI, LAYER_TYPES_ORDER } from './layer-meta'
 import { SelectedTool } from './message'
@@ -19,8 +19,21 @@ import type { LayerType } from '@lutra/engine'
  * renders as a full-width bottom sheet, visible only while its tab is
  * active; the classes flip back to the in-flow side column at `lg`.
  */
-export const toolPanel = (h: HtmlBuilder<EditorMessage>, model: Model, open: boolean) =>
-  h.aside(
+const lazyCard = createKeyedLazy()
+
+const toolCardView = (
+  type: LayerType,
+  count: number,
+  editable: boolean,
+  lutEnabled: boolean,
+  catalogError: Model['catalogError'],
+  h: HtmlBuilder<EditorMessage>,
+): Html => toolCardInner(h, type, count, editable, lutEnabled, catalogError)
+
+export const toolPanel = (h: HtmlBuilder<EditorMessage>, model: Model, open: boolean) => {
+  const editable = canPickTool(model.phase)
+  const lutEnabled = model.catalog !== null
+  return h.aside(
     [
       h.Class(
         `${open ? 'flex' : 'hidden'} order-3 max-h-[45dvh] shrink-0 flex-col overflow-y-auto border-t border-border bg-panel lg:order-none lg:flex lg:max-h-none lg:w-72 lg:overflow-y-visible lg:border-r lg:border-t-0`,
@@ -36,16 +49,22 @@ export const toolPanel = (h: HtmlBuilder<EditorMessage>, model: Model, open: boo
         ],
         ['Adjustments'],
       ),
-      // The card list scrolls under the pinned header, like the LUT bar's
-      // tab column — 11 cards outgrow short viewports.
       h.nav(
         [h.Class('flex min-h-0 flex-1 flex-col overflow-y-auto')],
         LAYER_TYPES_ORDER.map((type) =>
-          toolCard(h, model, type, canPickTool(model.phase), model.catalog !== null),
+          lazyCard(type, toolCardView, [
+            type,
+            chainCount(model, type),
+            editable,
+            lutEnabled,
+            model.catalogError,
+            h,
+          ]),
         ),
       ),
     ],
   )
+}
 
 /** The machine owns the real gate (no SelectedTool edge from Empty/Loading/
  *  Error/Drafting — see ./phase.ts); this mirrors it so the buttons read
@@ -57,33 +76,28 @@ const canPickTool = (phase: EditorPhase) => phase._tag === 'Idle' || phase._tag 
 export const chainCount = (model: Model, type: LayerType): number =>
   model.chain.filter((layer) => layer.type === type).length
 
-const toolCard = (
+const toolCardInner = (
   h: HtmlBuilder<EditorMessage>,
-  model: Model,
   type: LayerType,
+  count: number,
   editable: boolean,
   lutEnabled: boolean,
+  catalogError: Model['catalogError'],
 ) => {
   const ui = LAYER_UI[type]
-  // The LUT tool needs the catalog: a draft must reference a real lutId.
   const disabled = !editable || (type === 'lut' && !lutEnabled)
-  const count = chainCount(model, type)
-  // While the catalog is loading or failed (plan 06), the LUT card's
-  // description slot shows the status instead of the copy — the tool is
-  // disabled anyway, and the failure keeps its `title` error message.
   const catalogStatus =
-    type === 'lut' && model.catalog === null
-      ? model.catalogError === null
+    type === 'lut' && !lutEnabled
+      ? catalogError === null
         ? 'Loading LUTs…'
         : 'LUTs unavailable'
       : null
   return h.button(
     [
+      h.Key(type),
       h.OnClick(SelectedTool({ type })),
       h.Disabled(disabled),
-      ...(catalogStatus !== null && model.catalogError !== null
-        ? [h.Title(model.catalogError.message)]
-        : []),
+      ...(catalogStatus !== null && catalogError !== null ? [h.Title(catalogError.message)] : []),
       h.AriaLabel(`Add ${ui.label} adjustment`),
       h.Class(
         'flex flex-col gap-1.5 border-b border-border px-4 py-3 text-left transition-colors hover:bg-panel-alt disabled:cursor-not-allowed disabled:opacity-40',

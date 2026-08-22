@@ -1027,7 +1027,8 @@ color = mix(vec3&lt;f32&gt;(luma), color, 1.0 + l0_amount);</code></pre>
       </p>
 
       <h3>
-        7.7 Grain — <code>amount</code>, <code>profile</code>, <code>size</code>, <code>chroma</code>
+        7.7 Grain — <code>amount</code>, <code>profile</code>, <code>size</code>,
+        <code>chroma</code>
         <span class="tag good">correct</span>
       </h3>
 
@@ -1053,16 +1054,16 @@ color.b += cb * l0_chroma * l0_amount * 0.15 * weight;</code></pre>
         following an asymmetric curve validated against real film scans and the AV1 grain synthesis
         spec. The curve uses a tight Gaussian for highlights (grain vanishes quickly above the
         peak), a power-law ramp (&gamma; = 0.18) for shadows (grain persists in dark tones), and a
-        smoothstep kill below 3% luminance to prevent black-point lift. The peak is configurable
-        per profile, typically 0.35–0.42.<label
+        smoothstep kill below 3% luminance to prevent black-point lift. The peak is configurable per
+        profile, typically 0.35–0.42.<label
           for="sn-grain"
           class="margin-toggle sidenote-number"
         ></label
         ><input type="checkbox" id="sn-grain" class="margin-toggle" /><span class="sidenote"
           >This asymmetric curve is the single most important piece — it&rsquo;s what makes grain
           feel &ldquo;right&rdquo; versus noise-on-top-of-image. The power-law exponent 0.18 is
-          validated against real film reference scans and matches the AV1 film grain synthesis
-          paper (Figure 5). See <code>docs/grain.html</code> for the full derivation.</span
+          validated against real film reference scans and matches the AV1 film grain synthesis paper
+          (Figure 5). See <code>docs/grain.html</code> for the full derivation.</span
         >
       </p>
 
@@ -1071,9 +1072,9 @@ color.b += cb * l0_chroma * l0_amount * 0.15 * weight;</code></pre>
         (1.5&times; size), mixed to create the organic clustering of real silver halide
         conglomerations. Chromatic grain adds separate R and B noise at 1.8&times; the luma grain
         size — dye clouds are larger than silver crystals on real film — producing subtle warm/cool
-        color shifts. Green is left clean. Five film-stock profiles (Subtle, Medium, Heavy,
-        Vintage, Cinematic) pre-set the grain size, luminance peak, rolloff, and coarse/fine mix;
-        the <code>amount</code> slider controls strength independently. The hash is integer-only
+        color shifts. Green is left clean. Five film-stock profiles (Subtle, Medium, Heavy, Vintage,
+        Cinematic) pre-set the grain size, luminance peak, rolloff, and coarse/fine mix; the
+        <code>amount</code> slider controls strength independently. The hash is integer-only
         (ADR-0025), the frame seed animates the field, and grain is added in linear light so its
         display-space size grows toward the blacks.
       </p>

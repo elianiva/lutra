@@ -54,11 +54,15 @@ export const deleteDialogView = (h: HtmlBuilder<GalleryMessage>, model: Model) =
                         ),
                       ],
                     ),
-                    h.div([h.Class('px-4 py-4')], [
-                      h.p([...description, h.Class('text-xs leading-snug text-muted')], [
-                        'This photo will be permanently deleted. This cannot be undone.',
-                      ]),
-                    ]),
+                    h.div(
+                      [h.Class('px-4 py-4')],
+                      [
+                        h.p(
+                          [...description, h.Class('text-xs leading-snug text-muted')],
+                          ['This photo will be permanently deleted. This cannot be undone.'],
+                        ),
+                      ],
+                    ),
                     h.div(
                       [h.Class('flex justify-end gap-2 border-t border-border px-4 py-3')],
                       [
@@ -78,7 +82,9 @@ export const deleteDialogView = (h: HtmlBuilder<GalleryMessage>, model: Model) =
                                   h.OnClick(DeleteRequested({ id: model.pendingDelete })),
                                   h.AriaLabel('Confirm deleting this photo'),
                                   h.DataAttribute('confirm-delete', 'true'),
-                                  h.Class('bg-accent px-4 py-1.5 text-xs text-ink hover:opacity-90'),
+                                  h.Class(
+                                    'bg-accent px-4 py-1.5 text-xs text-ink hover:opacity-90',
+                                  ),
                                 ],
                                 ['Delete'],
                               ),

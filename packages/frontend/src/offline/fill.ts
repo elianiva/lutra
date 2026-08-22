@@ -263,13 +263,14 @@ export const OfflineFillLive = Layer.effect(
 
     return OfflineFill.of({
       events,
-      start: () => Effect.gen(function* () {
-        if (yield* Ref.get(startedRef)) {
-          return
-        }
-        yield* Ref.set(startedRef, true)
-        yield* PubSub.publish(startSignal, void 0)
-      }),
+      start: () =>
+        Effect.gen(function* () {
+          if (yield* Ref.get(startedRef)) {
+            return
+          }
+          yield* Ref.set(startedRef, true)
+          yield* PubSub.publish(startSignal, void 0)
+        }),
     })
   }),
 ).pipe(

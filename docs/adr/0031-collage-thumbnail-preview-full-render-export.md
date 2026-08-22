@@ -16,7 +16,7 @@ Previews must be instant and free: thumbnails are already persisted per Edit and
 
 ### Consequences
 
-- A saved collage's export always reflects the referenced Edits' *current* chains — regrade an Edit and the next collage export picks it up, while the stored record (ids + layout) never goes stale.
+- A saved collage's export always reflects the referenced Edits' _current_ chains — regrade an Edit and the next collage export picks it up, while the stored record (ids + layout) never goes stale.
 - Export is O(N · chain) GPU work done serially at press time; acceptable for contact-sheet sizes and invisible outside the explicit export action.
 - A third exporting surface is now additive: define a snapshot command that fills the shared frame slot, embed `ExportDialog.Model` in the screen model, and delegate — no dialog plumbing to re-derive.
 - Tile rendering borrows the GPU session through `Effect.scoped` + `acquireRelease`, so decoded sources, squared bitmaps, and the offscreen canvas are closed on success and failure alike; tile composition assumes every tile arrives cell-sized (failed tiles are skipped up front, not cropped mid-compose).

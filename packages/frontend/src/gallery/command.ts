@@ -84,7 +84,8 @@ export const MeasureCollageThumbs = Command.define('MeasureCollageThumbs', {
   },
   execute: ({ thumbs }) =>
     Effect.gen(function* MeasureCollageThumbs() {
-      const sizes: { readonly editId: EditId; readonly width: number; readonly height: number }[] = []
+      const sizes: { readonly editId: EditId; readonly width: number; readonly height: number }[] =
+        []
       for (const { id, thumbnail } of thumbs) {
         // SAFETY: the store hands back image bytes over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
         // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
@@ -126,15 +127,16 @@ export const DeleteCollage = Command.define('DeleteCollage', {
 
 export const DeleteEdit = Command.define('DeleteEdit', {
   args: { id: EditIdSchema },
-  execute: ({ id }) => Effect.gen(function* () {
-    const store = yield* EditStore
-    yield* store.delete(id)
-    return EditDeleted()
-  }).pipe(
-    Effect.catchTag('StoreError', (err: StoreError) =>
-      Effect.succeed(DeleteFailed({ error: err })),
+  execute: ({ id }) =>
+    Effect.gen(function* () {
+      const store = yield* EditStore
+      yield* store.delete(id)
+      return EditDeleted()
+    }).pipe(
+      Effect.catchTag('StoreError', (err: StoreError) =>
+        Effect.succeed(DeleteFailed({ error: err })),
+      ),
     ),
-  ),
   messages: [EditDeleted, DeleteFailed],
 })
 

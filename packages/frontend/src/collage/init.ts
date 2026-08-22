@@ -26,9 +26,7 @@ type Resource = KeyValueStore | CollageStore | EditStore
 const toSelf = (message: ExportDialog.Message): CollageMessage =>
   GotCollageExportDialogMessage({ message })
 
-const settings = [
-  CommandModule.mapMessage(ExportDialog.LoadExportSettings(), toSelf),
-]
+const settings = [CommandModule.mapMessage(ExportDialog.LoadExportSettings(), toSelf)]
 
 export type InitReturn = readonly [
   Model,

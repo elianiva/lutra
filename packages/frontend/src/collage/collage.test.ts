@@ -71,7 +71,12 @@ const tileEditId = (n: number): EditId => {
 
 const collageWith = (
   tiles: readonly number[],
-  layout?: Partial<{ columns: number; gutter: number; frameRatio: number; background: 'dark' | 'light' }>,
+  layout?: Partial<{
+    columns: number
+    gutter: number
+    frameRatio: number
+    background: 'dark' | 'light'
+  }>,
 ): CollageRecord =>
   Collage.make({
     id,
@@ -81,7 +86,10 @@ const collageWith = (
   })
 
 const loadedWith = (...args: Parameters<typeof collageWith>): Model => {
-  const [model] = update(initialModel(), CollageLoaded({ collage: collageWith(...args), photos: [], dropped: 0 }))
+  const [model] = update(
+    initialModel(),
+    CollageLoaded({ collage: collageWith(...args), photos: [], dropped: 0 }),
+  )
   return model
 }
 
@@ -133,10 +141,16 @@ describe('collage submodel: load', () => {
   })
 
   it('ThumbsMeasured lands in the model for framing math', () => {
-    const [measured] = update(initialModel(), ThumbsMeasured({ sizes: [{ editId: tileEditId(1), width: 300, height: 200 }] }))
+    const [measured] = update(
+      initialModel(),
+      ThumbsMeasured({ sizes: [{ editId: tileEditId(1), width: 300, height: 200 }] }),
+    )
     expect(measured.sizes).toEqual([{ editId: tileEditId(1), width: 300, height: 200 }])
     // A re-measure replaces, not duplicates.
-    const [again] = update(measured, ThumbsMeasured({ sizes: [{ editId: tileEditId(1), width: 600, height: 400 }] }))
+    const [again] = update(
+      measured,
+      ThumbsMeasured({ sizes: [{ editId: tileEditId(1), width: 600, height: 400 }] }),
+    )
     expect(again.sizes).toEqual([{ editId: tileEditId(1), width: 600, height: 400 }])
   })
 
@@ -248,7 +262,11 @@ describe('collage submodel: arrange mode', () => {
     const [model, commands] = update(loaded, RemovedTile({ index: 1 }))
     expect(collageOf(model).tiles.map((t) => t.editId)).toEqual([tileEditId(7), tileEditId(9)])
     expect(commands.map((c) => c.name)).toEqual(['SaveCollage', 'ScheduleUndoExpiry'])
-    expect(model.undo?.tiles.map((t) => t.editId)).toEqual([tileEditId(7), tileEditId(8), tileEditId(9)])
+    expect(model.undo?.tiles.map((t) => t.editId)).toEqual([
+      tileEditId(7),
+      tileEditId(8),
+      tileEditId(9),
+    ])
     expect(model.undoLabel).toBe('Removed photo')
   })
 
@@ -260,7 +278,9 @@ describe('collage submodel: arrange mode', () => {
       config,
       given(model),
       sceneExpect(text('All photos removed.')).toExist(),
-      sceneExpect(text('Bring them back with Undo, or delete the collage from the menu.')).toExist(),
+      sceneExpect(
+        text('Bring them back with Undo, or delete the collage from the menu.'),
+      ).toExist(),
     )
   })
 
@@ -276,7 +296,11 @@ describe('collage submodel: arrange mode', () => {
     const loaded = loadedWith([7, 8, 9])
     const [removed] = update(loaded, RemovedTile({ index: 1 }))
     const [restored, commands] = update(removed, UndoPressed())
-    expect(collageOf(restored).tiles.map((t) => t.editId)).toEqual([tileEditId(7), tileEditId(8), tileEditId(9)])
+    expect(collageOf(restored).tiles.map((t) => t.editId)).toEqual([
+      tileEditId(7),
+      tileEditId(8),
+      tileEditId(9),
+    ])
     expect(restored.undo).toBe(null)
     expect(commands.map((c) => c.name)).toEqual(['SaveCollage'])
   })
@@ -331,24 +355,30 @@ describe('collage submodel: arrange mode', () => {
 
   it('a released drag without a target cancels cleanly', () => {
     const loaded = loadedWith([1, 2])
-    const [pending] = update(loaded, GotDragMessage({
-      message: DragAndDrop.PressedDraggable({
-        itemId: tileEditId(1),
-        containerId: 'tile-0',
-        index: 0,
-        screenX: 0,
-        screenY: 0,
+    const [pending] = update(
+      loaded,
+      GotDragMessage({
+        message: DragAndDrop.PressedDraggable({
+          itemId: tileEditId(1),
+          containerId: 'tile-0',
+          index: 0,
+          screenX: 0,
+          screenY: 0,
+        }),
       }),
-    }))
-    const [dragging] = update(pending, GotDragMessage({
-      message: DragAndDrop.MovedPointer({
-        screenX: 500,
-        screenY: 0,
-        clientX: 500,
-        clientY: 0,
-        maybeDropTarget: Option.none(),
+    )
+    const [dragging] = update(
+      pending,
+      GotDragMessage({
+        message: DragAndDrop.MovedPointer({
+          screenX: 500,
+          screenY: 0,
+          clientX: 500,
+          clientY: 0,
+          maybeDropTarget: Option.none(),
+        }),
       }),
-    }))
+    )
     const [done] = update(dragging, GotDragMessage({ message: DragAndDrop.ReleasedPointer() }))
     expect(collageOf(done).tiles.map((t) => t.editId)).toEqual([tileEditId(1), tileEditId(2)])
     expect(done.drag.dragState._tag).toBe('Idle')
@@ -375,7 +405,11 @@ describe('collage submodel: frame mode', () => {
   })
 
   it('PanStarted seeds a draft; PanMoved pans within bounds; PanEnded commits', () => {
-    const base = { ...loadedWith([1, 2]), mode: 'frame' as const, cellPx: { width: 100, height: 100 } }
+    const base = {
+      ...loadedWith([1, 2]),
+      mode: 'frame' as const,
+      cellPx: { width: 100, height: 100 },
+    }
     // A wide photo overflows horizontally, so panning has room.
     const sized = {
       ...base,
@@ -402,7 +436,11 @@ describe('collage submodel: frame mode', () => {
   })
 
   it('WheelZoomed drafts the zoom and commits once the wheel goes quiet', () => {
-    const base = { ...loadedWith([1, 2]), mode: 'frame' as const, cellPx: { width: 100, height: 100 } }
+    const base = {
+      ...loadedWith([1, 2]),
+      mode: 'frame' as const,
+      cellPx: { width: 100, height: 100 },
+    }
     const [zoomed] = update(base, WheelZoomed({ index: 0, deltaY: -100 }))
     expect(zoomed.framingDraft?.framing.zoom).toBeGreaterThan(1)
     const seq = zoomed.zoomSeq
@@ -484,9 +522,15 @@ describe('collage submodel: export', () => {
       click(text('Export')),
       sceneExpect(text('Encoding…')).toExist(),
       Command.expectHas(ExportDialog.PrepareExport),
-      Command.resolve(ExportDialog.PrepareExport, ExportDialog.EncodePrepared({ sizeBytes: 4096, url: 'blob:collage-1' })),
+      Command.resolve(
+        ExportDialog.PrepareExport,
+        ExportDialog.EncodePrepared({ sizeBytes: 4096, url: 'blob:collage-1' }),
+      ),
       Command.expectHas(ExportDialog.ExportDownload),
-      Command.resolve(ExportDialog.ExportDownload, ExportDialog.Downloaded({ url: 'blob:collage-1' })),
+      Command.resolve(
+        ExportDialog.ExportDownload,
+        ExportDialog.Downloaded({ url: 'blob:collage-1' }),
+      ),
       sceneExpect(text('Downloaded', { exact: false })).toExist(),
       sceneExpect(text('4.0 KB', { exact: false })).toExist(),
       // The dialog stays open after a download.
@@ -503,8 +547,14 @@ describe('collage submodel: export', () => {
       ...openDialog,
       Command.resolve(SnapshotCollageExport, CollageExportSnapshotted({ failedTiles: 0 })),
       click(text('Export')),
-      Command.resolve(ExportDialog.PrepareExport, ExportDialog.EncodePrepared({ sizeBytes: 4096, url: 'blob:collage-1' })),
-      Command.resolve(ExportDialog.ExportDownload, ExportDialog.Downloaded({ url: 'blob:collage-1' })),
+      Command.resolve(
+        ExportDialog.PrepareExport,
+        ExportDialog.EncodePrepared({ sizeBytes: 4096, url: 'blob:collage-1' }),
+      ),
+      Command.resolve(
+        ExportDialog.ExportDownload,
+        ExportDialog.Downloaded({ url: 'blob:collage-1' }),
+      ),
       // Cancel closes: the composed frame drops and the url is revoked.
       click(text('Cancel')),
       Command.resolve(Dialog.CloseDialog, Dialog.CompletedCloseDialog()),
@@ -530,10 +580,7 @@ describe('collage submodel: export', () => {
 describe('collage export: update-level guards', () => {
   it('a compose that lands while the dialog is closed is dropped', () => {
     // No ExportRequested has opened the dialog.
-    const [model, commands] = update(
-      initialModel(),
-      CollageExportSnapshotted({ failedTiles: 0 }),
-    )
+    const [model, commands] = update(initialModel(), CollageExportSnapshotted({ failedTiles: 0 }))
     expect(model.exportDialog.ready).toBe(false)
     expect(commands).toEqual([])
   })

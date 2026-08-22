@@ -29,9 +29,7 @@ export const LoadFailed = Message.m('LoadFailed', { error: StoreError })
 export const CollageMissing = Message.m('CollageMissing')
 /** The referenced thumbnails' pixel sizes landed — framing math needs aspects. */
 export const ThumbsMeasured = Message.m('ThumbsMeasured', {
-  sizes: S.Array(
-    S.Struct({ editId: EditIdSchema, width: S.Number, height: S.Number }),
-  ),
+  sizes: S.Array(S.Struct({ editId: EditIdSchema, width: S.Number, height: S.Number })),
 })
 
 // ---- layout (each change auto-saves, docs/adr/0030) ----

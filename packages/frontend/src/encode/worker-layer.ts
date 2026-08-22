@@ -64,14 +64,15 @@ export const ImageEncoderWorkerLive = Layer.effect(
     }
 
     return ImageEncoder.of({
-      encode: ({ image, settings }) => Effect.gen(function* () {
-        const id = yield* Ref.getAndUpdate(nextIdRef, (n) => n + 1)
-        const deferred = yield* Deferred.make<Uint8Array, EncodeError>()
-        yield* Ref.update(pendingRef, (pending) => new Map(pending).set(id, deferred))
-        const request: EncodeRequest = { id, image, settings }
-        worker.postMessage(request)
-        return yield* Deferred.await(deferred)
-      }),
+      encode: ({ image, settings }) =>
+        Effect.gen(function* () {
+          const id = yield* Ref.getAndUpdate(nextIdRef, (n) => n + 1)
+          const deferred = yield* Deferred.make<Uint8Array, EncodeError>()
+          yield* Ref.update(pendingRef, (pending) => new Map(pending).set(id, deferred))
+          const request: EncodeRequest = { id, image, settings }
+          worker.postMessage(request)
+          return yield* Deferred.await(deferred)
+        }),
     })
   }),
 )

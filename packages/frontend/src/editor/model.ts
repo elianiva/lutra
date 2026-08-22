@@ -1,11 +1,7 @@
 import { Schema } from 'effect'
 import { RenderHandle } from '../gpu/backend'
 import { SourceImage, CompareMode, Catalog, SaveError } from './message'
-import {
-  LayerIdSchema,
-  LutIdSchema,
-  Layer,
-} from '@lutra/engine'
+import { LayerIdSchema, LutIdSchema, Layer } from '@lutra/engine'
 import { EditIdSchema } from '@lutra/store'
 import * as ExportDialog from '../export-dialog'
 import { EditorPhase, editorMachine } from './phase'

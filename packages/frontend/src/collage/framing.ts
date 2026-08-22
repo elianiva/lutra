@@ -133,12 +133,7 @@ export const zoomed = (
   factor: number,
   imageAspect: number,
   cellAspect: number,
-): TileFraming =>
-  clampFraming(
-    { ...framing, zoom: framing.zoom * factor },
-    imageAspect,
-    cellAspect,
-  )
+): TileFraming => clampFraming({ ...framing, zoom: framing.zoom * factor }, imageAspect, cellAspect)
 
 /** True when a framing is indistinguishable from the untouched default. */
 export const isDefaultFraming = (framing: TileFraming): boolean =>

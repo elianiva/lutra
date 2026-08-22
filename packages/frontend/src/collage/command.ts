@@ -66,7 +66,9 @@ export const LoadCollage = Command.define('LoadCollage', {
         dropped,
       })
     }).pipe(
-      Effect.catchTag('StoreError', (err: StoreError) => Effect.succeed(LoadFailed({ error: err }))),
+      Effect.catchTag('StoreError', (err: StoreError) =>
+        Effect.succeed(LoadFailed({ error: err })),
+      ),
     ),
   messages: [CollageLoaded, CollageMissing, LoadFailed],
 })
@@ -120,7 +122,9 @@ export const SaveCollage = Command.define('SaveCollage', {
       yield* store.save(collage)
       return CollageSaved()
     }).pipe(
-      Effect.catchTag('StoreError', (err: StoreError) => Effect.succeed(SaveFailed({ error: err }))),
+      Effect.catchTag('StoreError', (err: StoreError) =>
+        Effect.succeed(SaveFailed({ error: err })),
+      ),
     ),
   messages: [CollageSaved, SaveFailed],
 })
@@ -143,8 +147,7 @@ export const ScheduleUndoExpiry = Command.define('ScheduleUndoExpiry', {
  */
 export const ScheduleZoomCommit = Command.define('ScheduleZoomCommit', {
   args: { seq: S.Number },
-  execute: ({ seq }) =>
-    Effect.sleep(Duration.millis(600)).pipe(Effect.as(ZoomSettled({ seq }))),
+  execute: ({ seq }) => Effect.sleep(Duration.millis(600)).pipe(Effect.as(ZoomSettled({ seq }))),
   messages: [ZoomSettled],
 })
 

@@ -78,19 +78,12 @@ export const exportDialogView = <P>(
     },
   })
 
-const header = <P>(
-  h: HtmlBuilder<P>,
-  model: Model,
-  title: ReadonlyArray<ChildAttribute>,
-) =>
+const header = <P>(h: HtmlBuilder<P>, model: Model, title: ReadonlyArray<ChildAttribute>) =>
   h.div(
     [h.Class('flex items-baseline justify-between border-b border-border px-4 py-3')],
     [
       h.h2([...title, h.Class('text-sm font-semibold tracking-[0.14em]')], ['EXPORT']),
-      h.span(
-        [h.Class('text-[10px] uppercase tracking-[0.14em] text-muted')],
-        [filenameFor(model)],
-      ),
+      h.span([h.Class('text-[10px] uppercase tracking-[0.14em] text-muted')], [filenameFor(model)]),
     ],
   )
 
@@ -112,9 +105,10 @@ const footer = <P>(
   h.div(
     [h.Class('flex justify-end gap-2 border-t border-border px-4 py-3')],
     [
-      h.button([...closeButton, h.Class('px-3 py-1.5 text-xs text-muted hover:text-ink')], [
-        'Cancel',
-      ]),
+      h.button(
+        [...closeButton, h.Class('px-3 py-1.5 text-xs text-muted hover:text-ink')],
+        ['Cancel'],
+      ),
       h.button(
         [
           h.OnClick(toParent(EncodeRequested())),

@@ -98,8 +98,9 @@ export const LutStoreLive = Layer.effect(
     )
 
     return LutStore.of({
-      getCatalog: () => Effect.gen(function* () {
-        const cached = yield* Ref.get(catalogRef)
+      getCatalog: () =>
+        Effect.gen(function* () {
+          const cached = yield* Ref.get(catalogRef)
           if (Option.isSome(cached)) {
             return yield* cached.value
           }
@@ -111,11 +112,12 @@ export const LutStoreLive = Layer.effect(
             Effect.tapError(() => Ref.set(catalogRef, Option.none())),
           )
           yield* Ref.set(catalogRef, Option.some(effect))
-        return yield* effect
-      }),
+          return yield* effect
+        }),
 
-      getCube: (lutId) => Effect.gen(function* () {
-        const cached = yield* Ref.get(cubeCacheRef).pipe(Effect.map((cache) => cache.get(lutId)))
+      getCube: (lutId) =>
+        Effect.gen(function* () {
+          const cached = yield* Ref.get(cubeCacheRef).pipe(Effect.map((cache) => cache.get(lutId)))
           if (cached) {
             return yield* cached
           }
@@ -135,8 +137,8 @@ export const LutStoreLive = Layer.effect(
             next.set(lutId, effect)
             return next
           })
-        return yield* effect
-      }),
+          return yield* effect
+        }),
     })
   }),
 )

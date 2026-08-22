@@ -5,11 +5,7 @@ import { Dialog } from '@foldkit/ui'
 import { initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
-import {
-  GotSettingsDialogMessage,
-  SettingsRequested,
-  ToggledInfiniteCanvas,
-} from './message'
+import { GotSettingsDialogMessage, SettingsRequested, ToggledInfiniteCanvas } from './message'
 
 const config = {
   update,
@@ -93,10 +89,7 @@ describe('gallery: settings dialog', () => {
 
   it('delegates dialog messages to Dialog.update', () => {
     const [opened] = update(initialModel(), SettingsRequested())
-    const [closed] = update(
-      opened,
-      GotSettingsDialogMessage({ message: Dialog.RequestedClose() }),
-    )
+    const [closed] = update(opened, GotSettingsDialogMessage({ message: Dialog.RequestedClose() }))
     vitestExpect(closed.settingsDialog.isOpen).toBe(false)
   })
 })
