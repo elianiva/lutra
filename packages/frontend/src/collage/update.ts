@@ -333,6 +333,10 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         if (!model.pan || !model.framingDraft || !model.cellPx) {
           return [model, [], Option.none()]
         }
+        // rAF coalescing may deliver duplicate positions; skip no-op.
+        if (screenX === model.pan.screenX && screenY === model.pan.screenY) {
+          return [model, [], Option.none()]
+        }
         const collage = collageOf(model)
         const tile = collage?.tiles[model.pan.index]
         if (!collage || !tile) {
@@ -342,12 +346,26 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         const cellAspect = model.cellPx.width / Math.max(1, model.cellPx.height)
         const dx = (screenX - model.pan.screenX) / model.cellPx.width
         const dy = (screenY - model.pan.screenY) / model.cellPx.height
+        // Sub-pixel jitter that won't change clamped framing — still update pan
+        // so the next delta is measured from the latest pointer, but don't
+        // trigger a view diff.
+        if (Math.abs(dx) < 1e-4 && Math.abs(dy) < 1e-4) {
+          return [
+            { ...model, pan: { index: model.pan.index, screenX, screenY } },
+            [],
+            Option.none(),
+          ]
+        }
         const framing = panned(model.framingDraft.framing, imageAspect, cellAspect, dx, dy)
+        const nextPan = { index: model.pan.index, screenX, screenY }
+        if (sameFraming(framing, model.framingDraft.framing)) {
+          return [{ ...model, pan: nextPan }, [], Option.none()]
+        }
         return [
           {
             ...model,
             framingDraft: { index: model.pan.index, framing },
-            pan: { index: model.pan.index, screenX, screenY },
+            pan: nextPan,
           },
           [],
           Option.none(),

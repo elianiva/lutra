@@ -63,7 +63,7 @@ export const PanEnded = Message.m('PanEnded')
 export const WheelZoomed = Message.m('WheelZoomed', { index: S.Number, deltaY: S.Number })
 /** The wheel went quiet — the drafted zoom commits and auto-saves. */
 export const ZoomSettled = Message.m('ZoomSettled', { seq: S.Number })
-/** Reset one tile's framing to cover-centered (button or double-click). */
+/** Reset one tile's framing to cover-centered (the tile's reset button). */
 export const ResetFraming = Message.m('ResetFraming', { index: S.Number })
 /** One preview cell's CSS-pixel size was measured (ResizeObserver). */
 export const CellMeasured = Message.m('CellMeasured', {

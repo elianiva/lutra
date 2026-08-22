@@ -26,7 +26,7 @@ import {
 } from './message'
 import type { CollageMessage } from './message'
 import type { Model } from './model'
-import type { Collage, TileFraming } from '@lutra/store'
+import type { Collage, EditId, TileFraming } from '@lutra/store'
 import { photoUrl } from '../photo-url'
 import { icon } from '../components/icon'
 import { cellSize } from './compose'
@@ -160,7 +160,7 @@ const ghostView = (
       const dragged = Option.match(DragAndDrop.maybeDraggedItemId(drag), {
         onNone: () => null,
         // SAFETY: EditId brand is string at runtime; DragAndDrop stores it as string
-        onSome: (id) => photoById.get(id as unknown as import('@lutra/store').EditId) ?? null,
+        onSome: (id) => photoById.get(id as unknown as EditId) ?? null,
       })
       const draggedUrl = dragged && photoUrl(dragged.id, dragged.source)
       if (!dragged || !draggedUrl) return null
@@ -445,7 +445,10 @@ const gridView = (
   sizes: Model['sizes'],
   h: HtmlBuilder<CollageMessage>,
 ): Html => {
+  // Maps for O(1) lookups during per-tile render — avoids linear find per tile
+  // on every rAF-throttled PanMoved. Created once per grid render, not per cell.
   const photoById = new Map(photos.map((p) => [p.id, p]))
+  const sizeById = new Map(sizes.map((s) => [s.editId as string, s]))
   return h.div(
     [
       h.DataAttribute('collage-grid', `${columns}`),
@@ -466,7 +469,7 @@ const gridView = (
         mode,
         drag,
         photoById,
-        sizes,
+        sizeById,
         h,
       ])!,
     ),
@@ -474,14 +477,14 @@ const gridView = (
 }
 
 const tileCellView = (
-  editId: import('@lutra/store').EditId,
+  editId: EditId,
   index: number,
   framing: TileFraming,
   cellAspect: number,
   mode: Model['mode'],
   drag: Model['drag'],
   photoById: Map<string, Model['photos'][number]>,
-  sizes: Model['sizes'],
+  sizeById: Map<string, Model['sizes'][number]>,
   h: HtmlBuilder<CollageMessage>,
 ): Html => {
   // SAFETY: EditId brand is string at runtime
@@ -502,13 +505,17 @@ const tileCellView = (
     'relative overflow-hidden',
     ...(dropTarget !== null ? ['ring-2 ring-accent'] : []),
     ...(draggedHere ? ['opacity-40'] : []),
-    ...(!arrange ? ['cursor-grab select-none'] : []),
+    ...(!arrange ? ['cursor-grab select-none touch-none'] : []),
   ].join(' ')
   const cellAttrs: Attribute<CollageMessage>[] = [
     h.Key(editId),
     h.DataAttribute('collage-cell', `${index}`),
     h.DataAttribute('collage-tile', `${index}`),
-    h.Style({ aspectRatio: String(cellAspect) }),
+    h.Style(
+      arrange
+        ? { aspectRatio: String(cellAspect) }
+        : { aspectRatio: String(cellAspect), touchAction: 'none' },
+    ),
     ...DragAndDrop.droppable(`tile-${index}`, `Photo slot ${index + 1}`),
     h.Class(cellClass),
   ]
@@ -517,7 +524,11 @@ const tileCellView = (
       h.OnPointerDown((_pointerType, button, screenX, screenY) =>
         button === 0 ? Option.some(PanStarted({ index, screenX, screenY })) : Option.none(),
       ),
-      h.OnDoubleClick(ResetFraming({ index })),
+      // No OnDoubleClick(ResetFraming) here: browsers synthesize click/dblclick
+      // from down+up on the same element even after a long drag, so ending one
+      // pan and quickly re-grabbing fired a spurious reset — the photo appeared
+      // to snap back to center (docs/adr/0019 chose button-only reset for the
+      // same reason). The tile's reset button covers the affordance.
     )
   }
   return h.div(cellAttrs, [
@@ -546,7 +557,7 @@ const tileCellView = (
               [h.Class('flex h-full w-full items-center justify-center text-xs text-muted')],
               ['No photo'],
             )
-          : framedPhotoCached(h, url, editId, framing, cellAspect, sizes),
+          : framedPhotoCached(h, url, editId, framing, cellAspect, sizeById),
         arrange
           ? h.button(
               [
@@ -589,25 +600,39 @@ const tileCellView = (
 const framedPhotoCached = (
   h: HtmlBuilder<CollageMessage>,
   url: string,
-  editId: import('@lutra/store').EditId,
+  editId: EditId,
   framing: TileFraming,
   cellAspect: number,
-  sizes: Model['sizes'],
+  sizeById: Map<string, Model['sizes'][number]>,
 ): Html => {
-  const size = sizes.find((s) => s.editId === editId)
+  const size = sizeById.get(editId as string)
   const imageAspect = !size || size.width <= 0 || size.height <= 0 ? null : size.width / size.height
   if (imageAspect === null)
-    return h.img([h.Src(url), h.Alt(''), h.Class('h-full w-full object-cover')])
+    return h.img([
+      h.Src(url),
+      h.Alt(''),
+      h.Attribute('decoding', 'async'),
+      h.Attribute('draggable', 'false'),
+      h.Class('h-full w-full object-cover'),
+    ])
   const p = placement(framing, imageAspect, cellAspect)
   return h.img([
     h.Src(url),
     h.Alt(''),
-    h.Class('absolute max-w-none'),
+    h.Attribute('decoding', 'async'),
+    h.Attribute('draggable', 'false'),
+    h.Class('absolute max-w-none select-none pointer-events-none'),
     h.Style({
       width: `${p.width * 100}%`,
       height: `${p.height * 100}%`,
       left: `${p.left * 100}%`,
       top: `${p.top * 100}%`,
+      // Promote to compositor layer; hint the browser that these properties
+      // animate on every rAF during a pan drag. `contain: strict` isolates
+      // layout so a single tile's transform doesn't invalidate siblings.
+      willChange: 'left, top, width, height',
+      transform: 'translateZ(0)',
+      contain: 'strict',
     }),
   ])
 }

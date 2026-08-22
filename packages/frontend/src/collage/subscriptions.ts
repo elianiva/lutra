@@ -31,6 +31,12 @@ const own = Subscription.make<Model, CollageMessage>()((entry) => ({
   // can fire between two renders, and a view closure would gate each one on
   // stale model state. Document-level events flow while a pan gesture is
   // live; update ignores them when no gesture is.
+  //
+  // High-frequency pointer moves are coalesced to at most one PanMoved per
+  // animation frame via rAF batching and PointerEvent.getCoalescedEvents()
+  // — without this, every native pointermove (120+ Hz) would trigger a full
+  // VDOM diff, causing the 300ms setTimeout violations seen during framing
+  // drags. rAF batching keeps the update/view/patch cycle at 60Hz max.
   panTracking: entry(
     { panActive: S.Literals(['idle', 'active']) },
     {
@@ -39,19 +45,54 @@ const own = Subscription.make<Model, CollageMessage>()((entry) => ({
       }),
       dependenciesToStream: ({ panActive }: { panActive: 'idle' | 'active' }) =>
         Stream.when(
-          Subscription.fromEventFilterMap({
-            target: (): EventTarget => document,
-            type: 'pointermove',
-            toMessage: (event: PointerEvent): Option.Option<CollageMessage> =>
-              Option.some(PanMoved({ screenX: event.screenX, screenY: event.screenY })),
-          }).pipe(
-            Stream.merge(
-              Subscription.fromEventFilterMap({
-                target: (): EventTarget => document,
-                type: 'pointerup',
-                toMessage: (): Option.Option<CollageMessage> => Option.some(PanEnded()),
-              }),
-            ),
+          Stream.callback<CollageMessage>((queue) =>
+            Effect.gen(function* () {
+              let pending: { screenX: number; screenY: number } | null = null
+              let pendingUp = false
+              let raf = 0
+              const flush = () => {
+                raf = 0
+                if (pending) {
+                  const move = pending
+                  pending = null
+                  Queue.offerUnsafe(queue, PanMoved(move))
+                }
+                if (pendingUp) {
+                  pendingUp = false
+                  Queue.offerUnsafe(queue, PanEnded())
+                }
+              }
+              const onMove = (event: PointerEvent) => {
+                // SAFETY: getCoalescedEvents is a standard PointerEvent API missing from older lib.dom; intersect to access it optionally.
+                const anyEvent = event as PointerEvent & {
+                  getCoalescedEvents?: () => PointerEvent[]
+                }
+                const coalesced = anyEvent.getCoalescedEvents?.()
+                const source = coalesced?.at(-1) ?? event
+                pending = { screenX: source.screenX, screenY: source.screenY }
+                if (raf === 0) raf = requestAnimationFrame(flush)
+              }
+              const onUp = () => {
+                pendingUp = true
+                if (raf === 0) raf = requestAnimationFrame(flush)
+              }
+              yield* Effect.acquireRelease(
+                Effect.sync(() => {
+                  document.addEventListener('pointermove', onMove)
+                  document.addEventListener('pointerup', onUp)
+                  document.addEventListener('pointercancel', onUp)
+                  return { onMove, onUp }
+                }),
+                ({ onMove, onUp }) =>
+                  Effect.sync(() => {
+                    document.removeEventListener('pointermove', onMove)
+                    document.removeEventListener('pointerup', onUp)
+                    document.removeEventListener('pointercancel', onUp)
+                    if (raf !== 0) cancelAnimationFrame(raf)
+                  }),
+              )
+              return yield* Effect.never
+            }),
           ),
           Effect.sync(() => panActive === 'active'),
         ),
@@ -92,9 +133,21 @@ const own = Subscription.make<Model, CollageMessage>()((entry) => ({
         Stream.when(
           Stream.callback<CollageMessage>((queue) =>
             Effect.gen(function* watchCell() {
+              let observer: ResizeObserver | null = null
+              let raf = 0
+              let observedEl: Element | null = null
+              const resync = () => {
+                const el = document.querySelector('[data-collage-cell]')
+                if (el !== observedEl) {
+                  if (observedEl && observer) observer.unobserve(observedEl)
+                  observedEl = el
+                  if (el && observer) observer.observe(el)
+                }
+                raf = requestAnimationFrame(resync)
+              }
               yield* Effect.acquireRelease(
                 Effect.sync(() => {
-                  const observer = new ResizeObserver((entries) => {
+                  observer = new ResizeObserver((entries) => {
                     const rect = entries[0]?.contentRect
                     if (rect && rect.width > 0 && rect.height > 0) {
                       Queue.offerUnsafe(
@@ -103,14 +156,14 @@ const own = Subscription.make<Model, CollageMessage>()((entry) => ({
                       )
                     }
                   })
-                  // Cells are uniform; observing any one measures them all.
-                  const el = document.querySelector('[data-collage-cell]')
-                  if (el) {
-                    observer.observe(el)
-                  }
-                  return observer
+                  raf = requestAnimationFrame(resync)
+                  return { observer }
                 }),
-                (observer) => Effect.sync(() => observer.disconnect()),
+                ({ observer }) =>
+                  Effect.sync(() => {
+                    cancelAnimationFrame(raf)
+                    observer.disconnect()
+                  }),
               )
               return yield* Effect.never
             }),
