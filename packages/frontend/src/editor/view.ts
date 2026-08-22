@@ -51,12 +51,13 @@ const toolPanelView = (
   catalog: Model['catalog'],
   catalogError: Model['catalogError'],
   phase: Model['phase'],
+  hoveredTool: Model['hoveredTool'],
   toolsOpen: boolean,
   h: HtmlBuilder<EditorMessage>,
 ): Html => {
   // oxlint-disable-next-line no-unsafe-type-assertion
   // SAFETY: narrow slice for lazy memoization — only fields the view island reads
-  const m = { chain, catalog, catalogError, phase } as unknown as Model
+  const m = { chain, catalog, catalogError, phase, hoveredTool } as unknown as Model
   return toolPanel(h, m, toolsOpen)
 }
 const canvasStageView = (
@@ -178,6 +179,7 @@ const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
             model.catalog,
             model.catalogError,
             model.phase,
+            model.hoveredTool,
             model.mobileSheet === 'tools',
             h,
           ]),

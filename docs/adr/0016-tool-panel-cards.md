@@ -2,6 +2,8 @@
 
 The left **Adjustments** panel shows each adjustment as an **always-visible card**: icon + label on one line, a plain-language two-line description ("what it does" / "when to use it") below, and a muted ×N badge when the tool is already in the edit chain. The panel widens 240px → 288px, the LUT card leads the picker, and its description slot doubles as the LUT library load status (the caption from the gallery/tool-panel freebie, absorbed; its other half — gallery delete confirm — is docs/adr/0022).
 
+**Status**: partially superseded — D3 was reversed on 2026-08-23 by the Photoshop-style icon rail with a custom hover tooltip (see "Supersession" at the end of D3).
+
 ## Why
 
 The panel was a bare list of icon + label — a first-time user could not tell what an adjustment does or when to reach for it. The audience assumption is that the app must be usable by someone with no editing experience, and the product philosophy (a deliberately small palette that gently pushes away from runaway editing, CONTEXT.md) makes the _selection moment_ the only moment a novice needs guidance — exactly where the panel sits. The strong alternative — per-photo preview thumbnails on every card — was rejected for now: it is a rendering feature (11 extra thumbnails per photo, per-tool hero values, invalidation), not a UI pass; the text carries the teaching job and the card layout leaves a natural slot for a thumbnail later.
@@ -18,6 +20,8 @@ Each card carries two short lines: what the tool does (physical) and when to use
 
 ### D3 — Always-visible text, `w-72`, bordered rows
 
+> **Superseded (2026-08-23)** — see "Supersession" below.
+
 Descriptions are never hidden behind hover or tooltip — a novice must not have to discover an interaction to get the help. The panel widens `w-60` → `w-72`; the card list scrolls under the pinned "Adjustments" header (the same pattern as the LUT bar's tab column). Style stays on-brand: hard corners, `border-b` rows, flat panels — no floating rounded cards. The card's whole surface is the click target (the draft flow is unchanged) and the `aria-label="Add <label> adjustment"` convention is preserved.
 
 ### D4 — The LUT card leads the picker and carries the catalog status
@@ -32,3 +36,7 @@ Descriptions are never hidden behind hover or tooltip — a novice must not have
 - Plan 06's §2 (LUT tool caption) is fully absorbed here; plan 06 §1 (gallery delete confirm) is unchanged and still pending.
 - The badge counts hidden layers too — they are still in the edit, and the count is deliberately naive.
 - If per-photo previews ever land, they drop into the description block's existing slot; the message/command/model surface is untouched by this change.
+
+#### Supersession of D3 (2026-08-23)
+
+D3's "never hidden behind hover" was reversed: the desktop panel is now a **Photoshop-style icon rail** (`lg:w-14`) — one icon-only button per tool, no header text, the canvas regaining ~232px of width. The copy moves into a **custom hover tooltip**: the model carries one presentation-only field (`hoveredTool`, set/cleared by the card's mouse/focus handlers via `HoveredToolChanged`), and the hovered card renders its label + two-line copy as an absolutely-positioned panel beside the rail (hidden below `lg`, where touch has no hover and the mobile sheet still prints the copy on the card). Screen-reader access keeps the unchanged `aria-label="Add <label> adjustment"`. D3's rationale (novices need guidance at the selection moment) still holds where hover doesn't exist. While the catalog loads/fails, the LUT card's tooltip reports the status ("Loading LUTs…" / "LUTs unavailable" + the error message) instead of the copy; its button reads disabled via `aria-disabled` rather than a real `disabled`, so the pointer handlers — and therefore the status tooltip — keep working, while the phase machine's gate dead-ends the click. D1's ×N badge stays, now absolutely pinned to the button's top-right corner so it works for both the wide mobile card and the narrow rail. D2 and D4 are otherwise unchanged; scene tests lock both the copy and the new tooltip contract.

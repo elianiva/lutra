@@ -25,7 +25,7 @@ import type { ImageEncoder, LayerId, LutId } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import type { EditStore } from '@lutra/store'
 import type { Model } from './model'
-import { GotExportDialogMessage, EditCreated } from './message'
+import { GotExportDialogMessage, HoveredToolChanged, EditCreated } from './message'
 import type { EditorMessage, EditorOutMessage } from './message'
 
 export type UpdateReturn = readonly [
@@ -940,6 +940,8 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         ]
       },
       GotExportDialogMessage: ({ message }) => delegateToExportDialog(model, phase, message),
+      // Which tool card the custom tooltip shows for — presentation-only.
+      HoveredToolChanged: ({ type }) => [{ ...model, hoveredTool: type }, [], Option.none()],
       // The readback landed; readiness and late-result guards live in the
       // machine. A failure surfaces as the dialog's status line.
       ExportSnapshotted: () => delegateToExportDialog(model, phase, ExportDialog.FrameReady()),
@@ -950,7 +952,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
 }
 
 const toExportDialogMessage = (message: ExportDialog.Message): EditorMessage =>
-  GotExportDialogMessage({ message })
+  GotExportDialogMessage({ message})
 
 /** Step the shared export-dialog machine and lift its results into the editor. */
 const delegateToExportDialog = (

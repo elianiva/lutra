@@ -4,10 +4,12 @@ import {
   Mount,
   click,
   given,
+  hover,
   inside,
   role,
   scene,
   label,
+  selector,
   testId,
   text,
   expect as sceneExpect,
@@ -138,6 +140,20 @@ describe('tool panel cards', () => {
       sceneExpect(text('Add a touch of analog imperfection.')).toExist(),
       sceneExpect(text('Adds punch to textures and fine detail.')).toExist(),
       sceneExpect(text('Make surfaces pop, or go softer and dreamy.')).toExist(),
+      // Desktop is an icon rail: hovering a card opens its custom tooltip
+      // with the copy (the visible block above is the mobile sheet's).
+      hover(role('button', { name: 'Add Exposure adjustment' })),
+      inside(
+        testId('tool-tooltip'),
+        sceneExpect(text('Brightens or darkens the whole photo.')).toExist(),
+      ),
+      // Moving off the card closes it.
+      hover(role('button', { name: 'Add Contrast adjustment' })),
+      sceneExpect(selector('[data-testid="tool-tooltip"]')).toExist(),
+      inside(
+        testId('tool-tooltip'),
+        sceneExpect(text("Fix a photo that's too dark or too bright.")).toBeAbsent(),
+      ),
       // With the catalog loaded, the LUT card shows its copy and is enabled.
       sceneExpect(text('Applies the look of a classic film stock.')).toExist(),
       sceneExpect(text('Give your photo instant analog character.')).toExist(),
@@ -193,7 +209,7 @@ describe('tool panel cards', () => {
     )
   })
 
-  it('the LUT card shows the failure caption with the error as its title', () => {
+  it('the LUT card shows the failure caption in its tooltip', () => {
     scene(
       sceneConfig,
       given({
@@ -203,9 +219,10 @@ describe('tool panel cards', () => {
       }),
       ...stageMounts,
       sceneExpect(text('LUTs unavailable')).toExist(),
-      sceneExpect(role('button', { name: 'Add LUT adjustment' })).toHaveAttr(
-        'title',
-        'Failed to load luts/film_luts.json: HTTP 500',
+      hover(role('button', { name: 'Add LUT adjustment' })),
+      inside(
+        testId('tool-tooltip'),
+        sceneExpect(text('Failed to load luts/film_luts.json: HTTP 500')).toExist(),
       ),
       sceneExpect(role('button', { name: 'Add LUT adjustment' })).toBeDisabled(),
       Command.expectNone(),

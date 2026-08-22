@@ -370,6 +370,13 @@ export const GotExportDialogMessage = Message.m('GotExportDialogMessage', {
   message: ExportDialog.Message,
 })
 
+// The tool rail's custom hover tooltip: one fact carries which tool card is
+// currently hovered or keyboard-focused (null = none). The panel renders
+// straight from this field — no submodel, no show-delay machinery.
+export const HoveredToolChanged = Message.m('HoveredToolChanged', {
+  type: S.NullOr(S.Literals(LAYER_TYPES)),
+})
+
 /**
  * The GPU readback landed. The pixels stay in the shared export-dialog
  * frame slot — megabytes of ImageData never ride through the model; only
@@ -449,6 +456,7 @@ export const EditorMessage = S.Union([
   CanvasRegistered,
   ExportRequested,
   GotExportDialogMessage,
+  HoveredToolChanged,
   ExportSnapshotted,
   ExportSnapshotFailed,
   SaveRequested,

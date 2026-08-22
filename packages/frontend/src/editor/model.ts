@@ -1,7 +1,7 @@
 import { Schema } from 'effect'
 import { RenderHandle } from '../gpu/backend'
 import { SourceImage, CompareMode, Catalog, SaveError } from './message'
-import { LayerIdSchema, LutIdSchema, Layer } from '@lutra/engine'
+import { LayerIdSchema, LutIdSchema, Layer, LAYER_TYPES } from '@lutra/engine'
 import { EditIdSchema } from '@lutra/store'
 import * as ExportDialog from '../export-dialog'
 import { EditorPhase, editorMachine } from './phase'
@@ -148,6 +148,11 @@ export const Model = Schema.Struct({
   // The shared export-dialog machine (docs/adr/0031): settings, encode
   // flow, and the frame slot's readiness flag.
   exportDialog: ExportDialog.Model,
+  // ---- tool panel tooltip ----
+  // The tool card currently under the pointer (or keyboard focus) — the
+  // desktop icon rail prints that card's copy as a custom tooltip panel.
+  // Presentation-only; null = no card hovered.
+  hoveredTool: Schema.NullOr(Schema.Literals(LAYER_TYPES)),
 })
 
 export type Model = typeof Model.Type
@@ -189,4 +194,5 @@ export const initialModel = (): Model => ({
     height: 0,
     width: 0,
   },
+  hoveredTool: null,
 })
