@@ -1,9 +1,15 @@
 import { Match as M, Option } from 'effect'
 import { Command } from 'foldkit'
 import { Dialog } from '@foldkit/ui'
-import type { EditStore, CollageStore } from '@lutra/store'
+import type { EditStore, CollageStore, EditSummary } from '@lutra/store'
 import type { GalleryMessage, GalleryOutMessage } from './message'
-import { CreatedCollage, OpenedCollage, OpenedEdit, GotSettingsDialogMessage } from './message'
+import {
+  CreatedCollage,
+  OpenedCollage,
+  OpenedEdit,
+  GotSettingsDialogMessage,
+  PhotoCreateError,
+} from './message'
 import { CreateCollage, DeleteCollage, DeleteEdit, ListCollages, ListEdits, OpenPhoto } from './command'
 import type { Model } from './model'
 import { collageList, editList } from './model'
@@ -15,6 +21,26 @@ export type UpdateReturn = readonly [
 ]
 
 /**
+ * Apply a fresh Edit-summary listing to the model: the grid succeeds with it
+ * (notice cleared) and the collage selection is pruned to edits that still
+ * exist — a tile deleted elsewhere must not join a new collage as a dangling
+ * ref. Shared by the boot-time listing and the multi-photo open.
+ */
+const withSummaries = (model: Model, summaries: readonly EditSummary[]): Model => ({
+  ...model,
+  grid: editList.Success({ data: summaries }),
+  notice: null,
+  selection: model.selection.filter((id) => summaries.some((s) => s.id === id)),
+})
+
+/** The reason a pick couldn't become an Edit, for the notice banner. */
+const describeFailure = (error: Option.Option<typeof PhotoCreateError.Type>): string =>
+  Option.match(error, {
+    onNone: () => 'unknown error',
+    onSome: (failure) => failure.message,
+  })
+
+/**
  * The Gallery Submodel's update loop (docs/adr/0009). Returns the
  * `[Model, Commands, Option<OutMessage>]` 3-tuple: the OutMessage is how the
  * gallery tells the root "open this edit" — the root owns navigation. Most
@@ -24,18 +50,7 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
   M.value(message).pipe(
     M.withReturnType<UpdateReturn>(),
     M.tags({
-      EditsListed: ({ summaries }) => [
-        {
-          ...model,
-          grid: editList.Success({ data: summaries }),
-          notice: null,
-          // Prune the collage selection to edits that still exist — a tile
-          // deleted elsewhere must not join a new collage as a dangling ref.
-          selection: model.selection.filter((id) => summaries.some((s) => s.id === id)),
-        },
-        [],
-        Option.none(),
-      ],
+      EditsListed: ({ summaries }) => [withSummaries(model, summaries), [], Option.none()],
       ListFailed: ({ error }) => [
         { ...model, grid: editList.Failure({ error }) },
         [],
@@ -109,14 +124,32 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
         Option.none(),
       ],
 
-      // ---- open a photo (new edit) ----
+      // ---- open photo(s) (new edits) ----
       OpenPhotoRequested: () => [model, [OpenPhoto()], Option.none()],
       PhotoPickCancelled: () => [model, [], Option.none()],
-      // A new Edit persisted: surface it upward — the root pushes the editor
-      // URL, exactly as if the user had clicked the tile.
+      // A single new Edit persisted: surface it upward — the root pushes the
+      // editor URL, exactly as if the user had clicked the tile.
       PhotoCreated: ({ id }) => [model, [], Option.some(OpenedEdit({ id }))],
       PhotoCreateFailed: ({ error }) => [
         { ...model, notice: `Could not open photo: ${error.message}` },
+        [],
+        Option.none(),
+      ],
+      // Several photos opened at once (docs/adr/0032): stay here — no editor
+      // navigation; the user edits later by clicking a tile. The command's
+      // listing rides in the message so the grid refreshes right now (a
+      // follow-up ListEdits would land after this arm and wipe the failure
+      // report); when that listing itself failed the grid keeps its state.
+      PhotosAdded: ({ added, failed, error, summaries }) => [
+        {
+          ...(Option.isSome(summaries) ? withSummaries(model, summaries.value) : model),
+          notice:
+            failed === 0
+              ? null
+              : added === 0
+                ? `Could not open photo: ${describeFailure(error)}`
+                : `Added ${added} photos, ${failed} could not be opened: ${describeFailure(error)}`,
+        },
         [],
         Option.none(),
       ],

@@ -10,7 +10,8 @@ import {
   scene,
   text,
 } from 'foldkit/scene'
-import { EditId, StoreError } from '@lutra/store'
+import { EditId, EditSummary, StoreError } from '@lutra/store'
+import type { EditSummary as EditSummaryRecord } from '@lutra/store'
 import { initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
@@ -20,8 +21,11 @@ import {
   PhotoCreated,
   PhotoPickCancelled,
   PhotoCreateFailed,
+  PhotosAdded,
+  PhotoCreateError,
   OpenedEdit,
 } from './message'
+import { ImageDecodeError } from '../errors'
 
 const config = {
   update,
@@ -78,5 +82,104 @@ describe('gallery: open a photo (new edit)', () => {
   it('OpenPhotoRequested dispatches the OpenPhoto command', () => {
     const [, commands] = update(initialModel(), OpenPhotoRequested())
     expect(commands.map((c) => c.name)).toEqual(['OpenPhoto'])
+  })
+})
+
+const summary = (id: EditId): EditSummaryRecord =>
+  EditSummary.make({
+    byteLength: 10,
+    chain: [],
+    id,
+    savedAt: 1_700_000_000_000,
+    thumbnail: new Uint8Array([1]),
+  })
+
+const otherId = EditId('22222222-2222-4222-8222-222222222222')
+
+const added = (overrides: {
+  added?: number
+  failed?: number
+  error?: Option.Option<typeof PhotoCreateError.Type>
+  summaries?: Option.Option<readonly EditSummaryRecord[]>
+} = {}) =>
+  PhotosAdded({
+    added: 0,
+    failed: 0,
+    error: Option.none(),
+    summaries: Option.some([]),
+    ...overrides,
+  })
+
+describe('gallery: opening several photos at once', () => {
+  // The native file picker can't run in the harness — resolve the command
+  // manually, exactly like the single-pick scenes above.
+  it('a batch stays on the gallery: nobody navigates', () => {
+    scene(
+      config,
+      given(initialModel()),
+      click(text('Open photo')),
+      Command.resolve(
+        OpenPhoto,
+        added({
+          added: 2,
+          summaries: Option.some([summary(id), summary(otherId)]),
+        }),
+      ),
+      expectNoOutMessage(),
+    )
+  })
+
+  it('a batch refreshes the grid in place and reports nothing when all landed', () => {
+    const [model, commands, out] = update(
+      initialModel(),
+      added({ added: 2, summaries: Option.some([summary(id), summary(otherId)]) }),
+    )
+    expect(model.grid._tag).toBe('Success')
+    if (model.grid._tag === 'Success') {
+      expect(model.grid.data.map((s) => s.id)).toEqual([id, otherId])
+    }
+    expect(model.notice).toBe(null)
+    expect(commands).toEqual([])
+    expect(Option.isNone(out)).toBe(true)
+  })
+
+  it('a partial failure reports what landed and what did not', () => {
+    const [model] = update(
+      initialModel(),
+      added({
+        added: 2,
+        failed: 1,
+        error: Option.some(new ImageDecodeError({ message: 'decode failed' })),
+        summaries: Option.some([summary(id), summary(otherId)]),
+      }),
+    )
+    expect(model.notice).toBe(
+      'Added 2 photos, 1 could not be opened: decode failed',
+    )
+    // The successful picks still show up.
+    if (model.grid._tag === 'Success') {
+      expect(model.grid.data.map((s) => s.id)).toEqual([id, otherId])
+    }
+  })
+
+  it('a fully failed batch reads like the single-pick failure', () => {
+    const [model] = update(
+      initialModel(),
+      added({
+        failed: 3,
+        error: Option.some(new StoreError({ message: 'quota' })),
+        summaries: Option.some([]),
+      }),
+    )
+    expect(model.notice).toBe('Could not open photo: quota')
+  })
+
+  it('a failed post-save listing keeps the current grid but still reports', () => {
+    const [model] = update(
+      initialModel(),
+      added({ added: 1, failed: 1, error: Option.none(), summaries: Option.none() }),
+    )
+    expect(model.grid._tag).toBe('Idle')
+    expect(model.notice).toContain('could not be opened')
   })
 })

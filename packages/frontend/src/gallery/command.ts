@@ -1,4 +1,4 @@
-import { DateTime, Effect, Option, Schema as S } from 'effect'
+import { Array, DateTime, Effect, Schema as S } from 'effect'
 import { Command, File as FoldkitFile } from 'foldkit'
 import type { StoreError } from '@lutra/store'
 import {
@@ -8,6 +8,7 @@ import {
   EditStore,
   EditIdSchema,
   Edit,
+  EditId,
   newCollageId,
   newEditId,
   defaultCollageLayout,
@@ -21,6 +22,7 @@ import {
   PhotoCreated,
   PhotoCreateFailed,
   PhotoPickCancelled,
+  PhotosAdded,
   CollageCreated,
   CollageCreateFailed,
   CollagesListed,
@@ -168,22 +170,15 @@ const thumbnailBytes = (
   })
 
 /**
- * The gallery's "open a photo" flow (mirrors the mobile main menu): open the
- * native file picker, create a self-contained Edit for the picked photo
- * (fresh uuid, empty chain, source + thumbnail bytes, now), persist it, and
- * surface the new id as `PhotoCreated`. The root navigates the editor onto
- * it. A dismissed picker is a no-op; any failure surfaces as
- * `PhotoCreateFailed` so the gallery can show it instead of silently
- * dropping the photo.
+ * Turn one picked photo into a persisted self-contained Edit: read its bytes,
+ * encode the seed thumbnail, and save it under a fresh uuid. Self-contained
+ * so the single-pick and batch paths share it; failures stay on the error
+ * channel for the caller to shape (docs/adr/0032).
  */
-export const OpenPhoto = Command.define('OpenPhoto', {
-  execute: Effect.gen(function* () {
-    const picked = yield* FoldkitFile.select(IMAGE_TYPES)
-    if (Option.isNone(picked)) {
-      return PhotoPickCancelled()
-    }
-    const file = picked.value
-
+const createEdit = (
+  file: File,
+): Effect.Effect<EditId, ImageDecodeError | ThumbnailEncodeError | StoreError, EditStore> =>
+  Effect.gen(function* () {
     const source = yield* readBytes(file)
     const thumbnail = yield* thumbnailBytes(file)
 
@@ -198,7 +193,55 @@ export const OpenPhoto = Command.define('OpenPhoto', {
         thumbnail,
       }),
     )
-    return PhotoCreated({ id })
+    return id
+  })
+
+/**
+ * The gallery's "open a photo" flow, extended to multiple picks
+ * (docs/adr/0032). Opens the native file picker with multi-select on and
+ * turns every picked photo into a self-contained Edit (fresh uuid, empty
+ * chain, source + thumbnail bytes, now), mirroring the mobile main menu.
+ *
+ * A dismissed picker is a no-op. A single pick keeps the classic flow:
+ * persist, then surface `PhotoCreated` — the root navigates the editor onto
+ * it. Several picks at once stay on the gallery instead: the command lists
+ * the store fresh and returns `PhotosAdded` carrying that listing plus the
+ * failure tally (one bad file never loses the rest of the batch), so the
+ * grid updates without any navigation. Any single-pick failure surfaces as
+ * `PhotoCreateFailed` so the gallery can show it instead of silently
+ * dropping the photo.
+ */
+export const OpenPhoto = Command.define('OpenPhoto', {
+  execute: Effect.gen(function* () {
+    const files = yield* FoldkitFile.selectMultiple(IMAGE_TYPES)
+    if (files.length === 0) {
+      return PhotoPickCancelled()
+    }
+
+    // A single pick keeps the classic flow: straight into the editor on the
+    // new Edit, failures surfacing through the catch arms below unchanged.
+    if (files.length === 1) {
+      const [file] = files
+      if (file === undefined) {
+        return PhotoPickCancelled()
+      }
+      const id = yield* createEdit(file)
+      return PhotoCreated({ id })
+    }
+
+    // Several picks at once: every photo becomes its own Edit — one bad file
+    // never loses the batch — and nobody navigates. The listing rides along
+    // in the message so the grid refreshes the moment the result lands (a
+    // follow-up ListEdits would land after the notice and wipe it).
+    const [failures, createdIds] = yield* Effect.partition(files, createEdit)
+    const store = yield* EditStore
+    const summaries = yield* Effect.option(store.list())
+    return PhotosAdded({
+      added: createdIds.length,
+      failed: failures.length,
+      error: Array.head(failures),
+      summaries,
+    })
   }).pipe(
     Effect.catchTag('StoreError', (err: StoreError) =>
       Effect.succeed(PhotoCreateFailed({ error: err })),
@@ -210,7 +253,7 @@ export const OpenPhoto = Command.define('OpenPhoto', {
       Effect.succeed(PhotoCreateFailed({ error: err })),
     ),
   ),
-  messages: [PhotoCreated, PhotoPickCancelled, PhotoCreateFailed],
+  messages: [PhotoCreated, PhotoPickCancelled, PhotoCreateFailed, PhotosAdded],
 })
 
 /**

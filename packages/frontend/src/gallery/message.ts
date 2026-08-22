@@ -31,14 +31,29 @@ export const ToggledSelection = Message.m('ToggledSelection', { id: EditIdSchema
 export const CreateCollageRequested = Message.m('CreateCollageRequested')
 
 // ---- open a photo (new edit) ----
-/** The user pressed "Open photo": fire the native file picker and create a new Edit. */
+/** The user pressed "Open photo": fire the native file picker (multiple
+ *  selection allowed) and create a new Edit per picked photo. */
 export const OpenPhotoRequested = Message.m('OpenPhotoRequested')
 /** The picker was dismissed without a selection — a no-op. */
 export const PhotoPickCancelled = Message.m('PhotoPickCancelled')
+/** Everything that can fail turning a picked photo into a persisted Edit. */
+export const PhotoCreateError = S.Union([ImageDecodeError, ThumbnailEncodeError, StoreError])
 /** A new Edit was persisted; the root navigates the editor onto it. */
 export const PhotoCreated = Message.m('PhotoCreated', { id: EditIdSchema })
 export const PhotoCreateFailed = Message.m('PhotoCreateFailed', {
-  error: S.Union([ImageDecodeError, ThumbnailEncodeError, StoreError]),
+  error: PhotoCreateError,
+})
+/** Several photos were opened at once (multi-file pick): each pick became its
+ *  own Edit and the gallery stays put — no editor navigation; the user edits
+ *  later by clicking a tile. `summaries` carries the post-save listing so the
+ *  grid refreshes in place (None when that listing itself failed — the grid
+ *  keeps its previous state). `failed` counts picks that couldn't become
+ *  Edits, with the first failure as `error`. */
+export const PhotosAdded = Message.m('PhotosAdded', {
+  added: S.Number,
+  failed: S.Number,
+  error: S.Option(PhotoCreateError),
+  summaries: S.Option(S.Array(EditSummary)),
 })
 
 // ---- collage section (docs/adr/0030): list + open + delete ----
@@ -93,6 +108,7 @@ export const GalleryMessage = S.Union([
   PhotoPickCancelled,
   PhotoCreated,
   PhotoCreateFailed,
+  PhotosAdded,
   CollageCreated,
   CollageCreateFailed,
   CollagesListed,
