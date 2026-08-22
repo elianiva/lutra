@@ -1,13 +1,14 @@
 import { DateTime } from 'effect'
 import { Submodel, AsyncData } from 'foldkit'
 import type { HtmlBuilder } from 'foldkit/html'
+import { Check, Undo2, X } from 'lucide'
 import {
   ClickedEdit,
   CollageDeleteConfirmCancelled,
   CollageDeleteRequested,
   CollageOpenRequested,
   CreateCollageRequested,
-  DeleteRequested,
+  DeleteConfirmRequested,
   OpenPhotoRequested,
   RefreshRequested,
   SettingsRequested,
@@ -18,6 +19,7 @@ import type { GalleryMessage } from './message'
 import type { Model } from './model'
 import type { Collage as CollageRecord, EditSummary, EditId, StoreError } from '@lutra/store'
 import { settingsDialogView } from './settings-dialog'
+import { deleteDialogView } from './delete-dialog'
 
 /**
  * The Gallery Submodel's view (docs/adr/0009). Branded via `defineView` so it
@@ -44,6 +46,7 @@ export const view = Submodel.defineView<Model, GalleryMessage>((model, h) => {
         ],
       ),
       settingsDialogView(h, model),
+      deleteDialogView(h, model),
     ],
   )
 })
@@ -162,6 +165,13 @@ const errorState = (h: HtmlBuilder<GalleryMessage>, error: string) =>
     ],
   )
 
+/** Overlay controls (select, delete, caption) stay invisible until the
+ *  pointer rests on the card or focus moves into it — instantly, no
+ *  transition. Focus uses `:focus-visible` (not plain focus) so a mouse
+ *  click that lands on a control doesn't latch the overlays open after the
+ *  pointer leaves; tabbing in still reveals them for keyboard users. */
+const hoverReveal = 'opacity-0 group-hover:opacity-100 group-has-focus-visible:opacity-100'
+
 const gridTiles = (
   h: HtmlBuilder<GalleryMessage>,
   summaries: readonly EditSummary[],
@@ -193,9 +203,11 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary, selected: bo
         ],
         [tileThumb(h, summary)],
       ),
-      // The collage-select control (docs/adr/0030): a persistent overlay
-      // like the delete control — no separate "select mode" to enter or
-      // leave; the header CTA appears at two or more.
+      // The collage-select control (docs/adr/0030): an overlay like the
+      // delete control — no separate "select mode" to enter or leave; the
+      // header CTA appears at two or more. Hidden until hover/focus like
+      // the rest of the tile's overlays — except once selected, where it
+      // stays put so the picked state remains visible without hover.
       h.button(
         [
           h.OnClick(ToggledSelection({ id: summary.id })),
@@ -204,19 +216,21 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary, selected: bo
           ),
           h.DataAttribute('select-edit-id', summary.id),
           h.Class(
-            `absolute left-1 top-1 z-10 grid size-7 place-items-center rounded-full border text-[10px] ${
+            `absolute left-1 top-1 z-10 grid size-7 place-items-center rounded-full border ${
               selected
                 ? 'border-accent bg-accent text-ink'
-                : 'border-white/60 bg-black/40 text-white/80 hover:text-white'
+                : `border-white/60 bg-black/40 text-white/80 hover:text-white ${hoverReveal}`
             }`,
           ),
         ],
-        [selected ? '✓' : ''],
+        selected ? [icon(h, Check, 'Selected')] : [],
       ),
+      // Caption + delete ✕: hidden until hover/focus (the ✕ opens the
+      // delete-confirmation dialog, ADR-0022 superseded).
       h.div(
         [
           h.Class(
-            'absolute bottom-0 left-0 right-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent px-2 py-1',
+            `absolute bottom-0 left-0 right-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent px-2 py-1 ${hoverReveal}`,
           ),
         ],
         [
@@ -229,16 +243,16 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary, selected: bo
             [
               h.button(
                 [
-                  h.OnClick(DeleteRequested({ id: summary.id })),
+                  h.OnClick(DeleteConfirmRequested({ id: summary.id })),
                   h.AriaLabel('Delete saved edit'),
                   // size-7: a finger-sized hit target on touch screens
-                  // (docs/adr/0024-mobile-ui) — the glyph stays small.
+                  // (docs/adr/0024-mobile-ui).
                   h.Class(
-                    'relative z-10 grid size-7 place-items-center text-[10px] text-white/80 hover:text-white',
+                    'relative z-10 grid size-7 place-items-center text-white/80 hover:text-white',
                   ),
                   h.DataAttribute('delete-edit-id', summary.id),
                 ],
-                ['✕'],
+                [icon(h, X, 'Delete saved edit')],
               ),
             ],
           ),
@@ -249,6 +263,7 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary, selected: bo
 
 /** Memoize bytes→object URL per summary id via the shared cache. */
 import { thumbnailUrl } from '../thumbnail-url'
+import { icon } from '../components/icon'
 const tileThumb = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) => {
   const url = thumbnailUrl(summary.id, summary.thumbnail)
   return url
@@ -326,7 +341,10 @@ const collageCard = (h: HtmlBuilder<GalleryMessage>, collage: CollageRecord, mod
       h.div(
         [
           h.Class(
-            'absolute bottom-0 left-0 right-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent px-2 py-1',
+            `absolute bottom-0 left-0 right-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent px-2 py-1 ${
+              // The armed confirm must stay reachable without hover.
+              confirming ? 'opacity-100' : hoverReveal
+            }`,
           ),
         ],
         [
@@ -344,24 +362,24 @@ const collageCard = (h: HtmlBuilder<GalleryMessage>, collage: CollageRecord, mod
             [h.Class('relative z-10 flex items-center gap-1')],
             confirming
               ? [
-                  // ADR-0022's two-step inline confirm: red confirm + cancel.
+                  // ADR-0022's two-step inline confirm: red confirm + undo.
                   h.button(
                     [
                       h.OnClick(CollageDeleteRequested({ id: collage.id })),
                       h.AriaLabel('Confirm deleting this collage'),
                       h.DataAttribute('confirm-delete-collage-id', collage.id),
-                      h.Class('grid size-7 place-items-center text-[10px] text-red-400 hover:text-red-300'),
+                      h.Class('grid size-7 place-items-center text-red-400 hover:text-red-300'),
                     ],
-                    ['✕'],
+                    [icon(h, X, 'Confirm deleting this collage')],
                   ),
                   h.button(
                     [
                       h.OnClick(CollageDeleteConfirmCancelled()),
                       h.AriaLabel('Cancel deleting this collage'),
                       h.DataAttribute('cancel-delete-collage-id', collage.id),
-                      h.Class('grid size-7 place-items-center text-[10px] text-white/80 hover:text-white'),
+                      h.Class('grid size-7 place-items-center text-white/80 hover:text-white'),
                     ],
-                    ['✗'],
+                    [icon(h, Undo2, 'Cancel deleting this collage')],
                   ),
                 ]
               : [
@@ -370,9 +388,9 @@ const collageCard = (h: HtmlBuilder<GalleryMessage>, collage: CollageRecord, mod
                       h.OnClick(ToggledCollageDeleteConfirm({ id: collage.id })),
                       h.AriaLabel('Delete this collage'),
                       h.DataAttribute('delete-collage-id', collage.id),
-                      h.Class('grid size-7 place-items-center text-[10px] text-white/80 hover:text-white'),
+                      h.Class('grid size-7 place-items-center text-white/80 hover:text-white'),
                     ],
-                    ['✕'],
+                    [icon(h, X, 'Delete this collage')],
                   ),
                 ],
           ),

@@ -8,6 +8,7 @@ import {
   OpenedCollage,
   OpenedEdit,
   GotSettingsDialogMessage,
+  GotDeleteDialogMessage,
   PhotoCreateError,
 } from './message'
 import { CreateCollage, DeleteCollage, DeleteEdit, ListCollages, ListEdits, OpenPhoto } from './command'
@@ -61,7 +62,26 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
       // A tile clicked: surface the fact upward and let the root navigate.
       ClickedEdit: ({ id }) => [model, [], Option.some(OpenedEdit({ id }))],
 
-      DeleteRequested: ({ id }) => [model, [DeleteEdit({ id })], Option.none()],
+      // A tile's ✕: arm the pending delete and open the confirmation
+      // dialog (ADR-0022, superseded to a dialog).
+      DeleteConfirmRequested: ({ id }) => {
+        const [deleteDialog, dialogCommands] = Dialog.open(model.deleteDialog)
+        return [
+          { ...model, pendingDelete: id, deleteDialog },
+          Command.mapMessages(dialogCommands, toDeleteDialogMessage),
+          Option.none(),
+        ]
+      },
+      // Confirmed in the dialog: fire the store delete and dismiss the
+      // dialog right away — a failure re-surfaces through the notice.
+      DeleteRequested: ({ id }) => {
+        const [deleteDialog, dialogCommands] = Dialog.close(model.deleteDialog)
+        return [
+          { ...model, pendingDelete: null, deleteDialog },
+          [DeleteEdit({ id }), ...Command.mapMessages(dialogCommands, toDeleteDialogMessage)],
+          Option.none(),
+        ]
+      },
       EditDeleted: () => [model, [ListEdits()], Option.none()],
       DeleteFailed: ({ error }) => [
         { ...model, notice: `Delete failed: ${error.message}` },
@@ -171,6 +191,21 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
           Option.none(),
         ]
       },
+      // Delete-dialog delegation. Every dismissal path (Esc, backdrop click,
+      // the Cancel button) arrives as `RequestedClose`, which also disarms
+      // the pending delete so a reopened dialog never confirms a stale id.
+      GotDeleteDialogMessage: ({ message }) => {
+        const [dialog, dialogCommands] = Dialog.update(model.deleteDialog, message)
+        return [
+          {
+            ...model,
+            deleteDialog: dialog,
+            ...(message._tag === 'RequestedClose' ? { pendingDelete: null } : {}),
+          },
+          Command.mapMessages(dialogCommands, toDeleteDialogMessage),
+          Option.none(),
+        ]
+      },
       // Experimental toggles are UI-only for now — the flag flips and
       // nothing else in the app reads it.
       ToggledInfiniteCanvas: ({ isEnabled }) => [
@@ -184,3 +219,6 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
 
 const toSettingsDialogMessage = (message: Dialog.Message): GalleryMessage =>
   GotSettingsDialogMessage({ message })
+
+const toDeleteDialogMessage = (message: Dialog.Message): GalleryMessage =>
+  GotDeleteDialogMessage({ message })

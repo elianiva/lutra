@@ -20,6 +20,10 @@ export const RefreshRequested = Message.m('RefreshRequested')
 // ---- tile actions ----
 /** A tile was clicked. The update emits the `OpenedEdit` OutMessage for the root. */
 export const ClickedEdit = Message.m('ClickedEdit', { id: EditIdSchema })
+/** A tile's ✕ was tapped: open the delete-confirmation dialog for that edit
+ *  (ADR-0022, superseded to a dialog). */
+export const DeleteConfirmRequested = Message.m('DeleteConfirmRequested', { id: EditIdSchema })
+/** The deletion was confirmed in the dialog: delete the Edit record. */
 export const DeleteRequested = Message.m('DeleteRequested', { id: EditIdSchema })
 export const EditDeleted = Message.m('EditDeleted')
 export const DeleteFailed = Message.m('DeleteFailed', { error: StoreError })
@@ -90,6 +94,11 @@ export const GotSettingsDialogMessage = Message.m('GotSettingsDialogMessage', {
   message: Dialog.Message,
 })
 
+// Same pattern for the delete-confirmation dialog (ADR-0022, superseded).
+export const GotDeleteDialogMessage = Message.m('GotDeleteDialogMessage', {
+  message: Dialog.Message,
+})
+
 /** An experimental toggle flipped (the new checked state). UI-only for now —
  *  nothing consumes the flag yet. */
 export const ToggledInfiniteCanvas = Message.m('ToggledInfiniteCanvas', { isEnabled: S.Boolean })
@@ -99,6 +108,7 @@ export const GalleryMessage = S.Union([
   ListFailed,
   RefreshRequested,
   ClickedEdit,
+  DeleteConfirmRequested,
   DeleteRequested,
   EditDeleted,
   DeleteFailed,
@@ -121,6 +131,7 @@ export const GalleryMessage = S.Union([
   CollageDeleteFailed,
   SettingsRequested,
   GotSettingsDialogMessage,
+  GotDeleteDialogMessage,
   ToggledInfiniteCanvas,
 ])
 export type GalleryMessage = typeof GalleryMessage.Type

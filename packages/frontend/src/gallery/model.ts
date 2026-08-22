@@ -33,8 +33,14 @@ export const Model = S.Struct({
   collages: CollageList.schema,
   // ADR-0022's inline two-step delete confirm, per collage card.
   confirmingCollageDelete: S.NullOr(CollageIdSchema),
+  // The Edit id awaiting delete confirmation in the modal dialog (ADR-0022,
+  // superseded to a dialog): null when no deletion is pending.
+  pendingDelete: S.NullOr(EditIdSchema),
   // The settings dialog submodel (@foldkit/ui): open/close/animation state.
   settingsDialog: Dialog.Model,
+  // The delete-confirmation dialog submodel (@foldkit/ui), opened by a
+  // tile's ✕ (ADR-0022, superseded to a dialog).
+  deleteDialog: Dialog.Model,
   // The Experimental section's flags. UI-only for now — nothing reads them
   // yet; wiring them up changes app behavior and comes later.
   experimental: S.Struct({
@@ -51,7 +57,9 @@ export const initialModel = (): Model => ({
   selection: [],
   collages: CollageList.Idle(),
   confirmingCollageDelete: null,
+  pendingDelete: null,
   settingsDialog: Dialog.init({ id: 'gallery-settings-dialog' }),
+  deleteDialog: Dialog.init({ id: 'gallery-delete-dialog' }),
   experimental: {
     infiniteCanvas: false,
   },
