@@ -1,8 +1,14 @@
-import { Schema as S } from 'effect'
-import { AsyncData } from 'foldkit'
-import { DragAndDrop } from '@foldkit/ui'
-import { Collage, CollageTile, EditIdSchema, StoreError, TileFraming } from '@lutra/store'
-import * as ExportDialog from '../export-dialog'
+import { Schema as S } from "effect";
+import { AsyncData } from "foldkit";
+import { DragAndDrop } from "@foldkit/ui";
+import {
+  Collage,
+  CollageTile,
+  EditIdSchema,
+  StoreError,
+  TileFraming,
+} from "@lutra/store";
+import * as ExportDialog from "../export-dialog";
 
 /**
  * The Collage Submodel's model (docs/adr/0009, 0030, 0033): the loaded
@@ -14,48 +20,50 @@ import * as ExportDialog from '../export-dialog'
  * the record is always the truth; only in-flight gestures hold unsaved state.
  */
 /** The loaded collage, held as AsyncData (a missing id lands as a failure). */
-export const LoadedCollage = AsyncData.Schema(Collage, StoreError)
+export const LoadedCollage = AsyncData.Schema(Collage, StoreError);
 /** The schema's typed constructors (`LoadedCollage.Success` etc.). */
-export const loadedCollage = LoadedCollage
+export const loadedCollage = LoadedCollage;
 
 /**
  * Layout control bounds — the record stores plain numbers; this screen
- * clamps columns/gutter/frameRatio to its control ranges on every mutation
- * edge.
+ * clamps columns/rows/gutter/frameRatio to its control ranges on every
+ * mutation edge.
  */
 export const LAYOUT_BOUNDS = {
-  minColumns: 2,
+  minColumns: 1,
   maxColumns: 6,
+  minRows: 1,
+  maxRows: 6,
   minGutter: 0,
   maxGutter: 32,
   /** Custom W:H clamps here — wide enough for any share target, narrow
    * enough that cells stay usable. */
   minFrameRatio: 0.5,
   maxFrameRatio: 3,
-} as const
+} as const;
 
 export const clamp = (value: number, min: number, max: number) =>
-  Math.min(max, Math.max(min, value))
+  Math.min(max, Math.max(min, value));
 
 /** One HD source photo for the collage preview (full-resolution bytes). */
 export const CollagePhoto = S.Struct({
   id: EditIdSchema,
   source: S.Uint8Array,
-})
-export type CollagePhoto = typeof CollagePhoto.Type
+});
+export type CollagePhoto = typeof CollagePhoto.Type;
 
 /** The measured pixel size of one source photo (for aspect math). */
 export const ThumbSize = S.Struct({
   editId: EditIdSchema,
   width: S.Number,
   height: S.Number,
-})
+});
 
 /**
  * The Arrange/Frame mode toggle (docs/adr/0033): one gesture surface, two
  * meanings — dragging reorders photos in Arrange and pans them in Frame.
  */
-export const ScreenMode = S.Literals(['arrange', 'frame'])
+export const ScreenMode = S.Literals(["arrange", "frame"]);
 
 export const Model = S.Struct({
   collage: LoadedCollage.schema,
@@ -72,7 +80,9 @@ export const Model = S.Struct({
   /** A framing gesture in flight: which tile, and its next framing. */
   framingDraft: S.NullOr(S.Struct({ index: S.Number, framing: TileFraming })),
   /** The live pan gesture: which tile, and the last pointer screen point. */
-  pan: S.NullOr(S.Struct({ index: S.Number, screenX: S.Number, screenY: S.Number })),
+  pan: S.NullOr(
+    S.Struct({ index: S.Number, screenX: S.Number, screenY: S.Number }),
+  ),
   /**
    * One-slot undo (docs/adr/0033): the tiles array as it was before the last
    * destructive tile op, with a sequence token so a stale expiry timer can't
@@ -88,16 +98,16 @@ export const Model = S.Struct({
   cellPx: S.NullOr(S.Struct({ width: S.Number, height: S.Number })),
   // The shared export-dialog machine (docs/adr/0031).
   exportDialog: ExportDialog.Model,
-})
-export type Model = typeof Model.Type
+});
+export type Model = typeof Model.Type;
 
 export const initialModel = (): Model => ({
   collage: LoadedCollage.Idle(),
   photos: [],
   sizes: [],
   notice: null,
-  mode: 'arrange',
-  drag: DragAndDrop.init({ id: 'collage-grid', orientation: 'Horizontal' }),
+  mode: "arrange",
+  drag: DragAndDrop.init({ id: "collage-grid", orientation: "Horizontal" }),
   framingDraft: null,
   pan: null,
   undo: null,
@@ -106,5 +116,8 @@ export const initialModel = (): Model => ({
   zoomSeq: 0,
   userEmptied: false,
   cellPx: null,
-  exportDialog: ExportDialog.init({ id: 'collage-export-dialog', fileStem: 'lutra-collage' }),
-})
+  exportDialog: ExportDialog.init({
+    id: "collage-export-dialog",
+    fileStem: "lutra-collage",
+  }),
+});
