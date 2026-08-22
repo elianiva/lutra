@@ -16,6 +16,7 @@ import {
   qualitySection,
   resolutionSection,
 } from '../export-dialog-sections'
+import { peekEditorExportFrame } from './export-frame'
 
 /**
  * The export dialog: format, quality (lossy formats only), resolution scale,
@@ -81,7 +82,7 @@ export const exportDialogView = (h: HtmlBuilder<EditorMessage>, model: Model) =>
                         qualitySection(h, model.exportSettings, (quality) =>
                           ChangedExportQuality({ quality }),
                         ),
-                        resolutionSection(h, model.exportSettings, model.exportImage ?? null, (scale) =>
+                        resolutionSection(h, model.exportSettings, peekEditorExportFrame(), (scale) =>
                           ChangedExportScale({ scale }),
                         ),
                         statusSection(h, model),
@@ -100,7 +101,7 @@ export const exportDialogView = (h: HtmlBuilder<EditorMessage>, model: Model) =>
                         h.button(
                           [
                             h.OnClick(ExportDownloadRequested()),
-                            h.Disabled(!model.exportImage || model.exportEncoding),
+                            h.Disabled(!model.exportReady || model.exportEncoding),
                             h.Class(
                               'bg-accent px-4 py-1.5 text-xs text-ink hover:opacity-90 disabled:opacity-30',
                             ),

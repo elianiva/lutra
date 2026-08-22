@@ -4,7 +4,7 @@ import * as Persistence from 'effect/unstable/persistence/KeyValueStore'
 import type { StoreError } from '@lutra/store'
 import { Edit, EditStore, EditIdSchema, newEditId } from '@lutra/store'
 import {
-  type EncodeError,
+  EncodeError,
   type GpuError,
   createLayer,
   createRenderRequest,
@@ -426,18 +426,21 @@ export const ReadHistogram = Command.define('ReadHistogram', {
 
 /** Settings persistence is shared with the collage's export dialog (docs/adr/0031). */
 import { loadExportSettings, saveExportSettings } from '../export-settings'
+import { setEditorExportFrame, peekEditorExportFrame } from './export-frame'
 
 /**
  * Read the frame identified by `handle` back from the GPU once, when the
- * export dialog opens. The ImageData is cached in the model for the dialog's
- * lifetime so pressing Export again re-encodes without another readback.
+ * export dialog opens. The ImageData lands in the export-frame cache for
+ * the dialog's lifetime so pressing Export again re-encodes without another
+ * readback — it never rides through the model (docs/adr/0031).
  */
 export const SnapshotForExport = Command.define('SnapshotForExport', {
   args: { handle: Schema.instanceOf(RenderHandle) },
   execute: ({ handle }) => Effect.gen(function* () {
     const backend = yield* GpuBackend
     const image = yield* backend.snapshot(handle)
-    return ExportSnapshotted({ image })
+    setEditorExportFrame(image)
+    return ExportSnapshotted()
   }).pipe(
       Effect.catchTag('GpuError', (err: GpuError) =>
         Effect.succeed(ExportSnapshotFailed({ error: err })),
@@ -454,11 +457,16 @@ export const SnapshotForExport = Command.define('SnapshotForExport', {
  */
 export const PrepareExport = Command.define('PrepareExport', {
   args: {
-    image: Schema.instanceOf(ImageData),
     previousUrl: Schema.NullOr(Schema.String),
     settings: ExportSettings,
   },
-  execute: ({ image, settings, previousUrl }) => Effect.gen(function* () {
+  execute: ({ settings, previousUrl }) => Effect.gen(function* () {
+    const image = peekEditorExportFrame()
+    if (!image) {
+      return ExportEncodeFailed({
+        error: new EncodeError({ message: 'no cached frame to encode' }),
+      })
+    }
     if (previousUrl) {
       yield* Effect.sync(() => {
         URL.revokeObjectURL(previousUrl)

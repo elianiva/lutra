@@ -30,6 +30,7 @@ import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import type { EditStore } from '@lutra/store'
 import type { Model } from './model'
 import { GotExportDialogMessage, EditCreated } from './message'
+import { clearEditorExportFrame } from './export-frame'
 import type { EditorMessage, EditorOutMessage } from './message'
 
 export type UpdateReturn = readonly [
@@ -950,12 +951,13 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         // On close: drop the cached frame and revoke the blob URL. The
         // settings stay — they persist across sessions.
         if (Option.isSome(out) && out.value._tag === 'Closed') {
+          clearEditorExportFrame()
           next = {
             ...next,
             exportDownloaded: false,
             exportEncoding: false,
             exportError: null,
-            exportImage: null,
+            exportReady: false,
             exportSize: null,
             exportUrl: null,
           }
@@ -965,14 +967,15 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         }
         return [next, commands, Option.none()]
       },
-      // The frame landed and is cached for the dialog's lifetime. If the
-      // dialog closed before the readback completed, drop the frame —
-      // nothing to encode from.
-      ExportSnapshotted: ({ image }) => {
+      // The frame landed in the export-frame cache for the dialog's
+      // lifetime. If the dialog closed before the readback completed, drop
+      // the cached frame — nothing to encode from.
+      ExportSnapshotted: () => {
         if (!model.exportDialog.isOpen) {
+          clearEditorExportFrame()
           return [model, [], Option.none()]
         }
-        return [{ ...model, exportError: null, exportImage: image, phase }, [], Option.none()]
+        return [{ ...model, exportError: null, exportReady: true, phase }, [], Option.none()]
       },
       ExportSnapshotFailed: ({ error }) => [
         { ...model, exportError: error, phase },
@@ -1019,7 +1022,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       ],
       ExportDownloadRequested: () => {
         // The encode runs here, on Export press — not on settings change.
-        if (!model.exportImage || model.exportEncoding) {
+        if (!model.exportReady || model.exportEncoding) {
           return [model, [], Option.none()]
         }
         return startEncode(model)
@@ -1060,7 +1063,7 @@ const settingsChanged = (model: Model, settings: ExportSettings): UpdateReturn =
  * lands after the dialog closed is revoked in ExportPrepared.
  */
 const startEncode = (model: Model): UpdateReturn => {
-  if (!model.exportImage) {
+  if (!model.exportReady) {
     return [model, [], Option.none()]
   }
   return [
@@ -1074,7 +1077,6 @@ const startEncode = (model: Model): UpdateReturn => {
     },
     [
       PrepareExport({
-        image: model.exportImage,
         previousUrl: model.exportUrl,
         settings: model.exportSettings,
       }),

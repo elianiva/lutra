@@ -155,10 +155,11 @@ export const Model = Schema.Struct({
   exportDialog: Dialog.Model,
   // The export settings (format/quality/scale); persisted across sessions.
   exportSettings: ExportSettings,
-  // The frame to export, read back from the GPU when the dialog opens and
-  // cached for the dialog's lifetime — pressing Export encodes from it
-  // without another readback.
-  exportImage: Schema.NullOr(Schema.instanceOf(ImageData)),
+  // True while a frame read back from the GPU is cached for the open
+  // dialog — pressing Export encodes from it without another readback.
+  // The pixels live in the export-frame cache, never in the model
+  // (docs/adr/0031).
+  exportReady: Schema.Boolean,
   // True while an export encode is running (the Export button is disabled
   // and the dialog shows "Encoding…").
   exportEncoding: Schema.Boolean,
@@ -189,7 +190,7 @@ export const initialModel = (): Model => ({
   exportDownloaded: false,
   exportEncoding: false,
   exportError: null,
-  exportImage: null,
+  exportReady: false,
   exportSettings: defaultExportSettings(),
   exportSize: null,
   exportUrl: null,

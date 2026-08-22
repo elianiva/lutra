@@ -1,22 +1,11 @@
+import { createExportFrameCache } from '../export-frame'
+
 /**
- * The composed export frame lives OUTSIDE the TEA model (docs/adr/0031):
- * a full-resolution ImageData is megabytes of pixels, and routing it
- * through Messages/Model makes every model log, diff, or devtools snapshot
- * enumerate millions of array cells. The model holds only an `exportReady`
- * flag; this module owns the pixels for the dialog's lifetime — exactly the
- * seam `thumbnail-url.ts` uses for thumbnail blobs.
+ * The collage's composed export frame (docs/adr/0031). The pixels bypass
+ * the model entirely — see the shared factory for why.
  */
-let frame: ImageData | null = null
+const cache = createExportFrameCache()
 
-/** Cache the composed frame (called by the compose command's result path). */
-export const setExportFrame = (image: ImageData): void => {
-  frame = image
-}
-
-/** The composed frame, if one is cached for the open dialog. */
-export const peekExportFrame = (): ImageData | null => frame
-
-/** Drop the cached frame (dialog closed, stale result). */
-export const clearExportFrame = (): void => {
-  frame = null
-}
+export const setExportFrame = cache.set
+export const peekExportFrame = cache.peek
+export const clearExportFrame = cache.clear

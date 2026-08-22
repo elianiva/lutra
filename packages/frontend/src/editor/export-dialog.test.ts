@@ -9,6 +9,7 @@ import { Idle } from './phase'
 import { PanZoom, RegisterCanvas } from './canvas-stage'
 import { RenderHandle } from '../gpu/backend'
 import { EncodeError } from '@lutra/engine'
+import { setEditorExportFrame } from './export-frame'
 import {
   SnapshotForExport,
   PrepareExport,
@@ -49,6 +50,9 @@ const loadedModel = () => ({
 
 /** A 200×150 export frame, as the snapshot readback produces it. */
 const exportImage = new ImageData(200, 150)
+// The dialog's size line reads the export-frame cache (the pixels never
+// ride through the model); tests that assert it seed the cache directly.
+setEditorExportFrame(exportImage)
 
 const mountLoadedStage = [
   Mount.resolve(PanZoom, ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
@@ -82,7 +86,7 @@ describe('Export dialog', () => {
       Command.expectHas(SnapshotForExport),
 
       // The snapshot lands and is cached — no encode yet.
-      Command.resolve(SnapshotForExport, ExportSnapshotted({ image: exportImage })),
+      Command.resolve(SnapshotForExport, ExportSnapshotted()),
       Command.expectNone(),
 
       // Pressing Export starts the encode and shows the loading state.
@@ -111,7 +115,7 @@ describe('Export dialog', () => {
       ...mountLoadedStage,
       click(selector('[aria-label^="Export"]')),
       ...openDialog,
-      Command.resolve(SnapshotForExport, ExportSnapshotted({ image: exportImage })),
+      Command.resolve(SnapshotForExport, ExportSnapshotted()),
       // PNG and 100% are the persisted defaults; their cells are filled.
       expect(text('PNG')).toHaveClass('bg-accent'),
       expect(text('100%')).toHaveClass('bg-accent'),
@@ -141,7 +145,7 @@ describe('Export dialog', () => {
       ...mountLoadedStage,
       click(selector('[aria-label^="Export"]')),
       ...openDialog,
-      Command.resolve(SnapshotForExport, ExportSnapshotted({ image: exportImage })),
+      Command.resolve(SnapshotForExport, ExportSnapshotted()),
       // PNG: no quality knob.
       expect(text('Quality')).not.toExist(),
 
@@ -176,7 +180,7 @@ describe('Export dialog', () => {
       ...mountLoadedStage,
       click(selector('[aria-label^="Export"]')),
       ...openDialog,
-      Command.resolve(SnapshotForExport, ExportSnapshotted({ image: exportImage })),
+      Command.resolve(SnapshotForExport, ExportSnapshotted()),
       click(text('Export')),
       Command.resolve(
         PrepareExport,
@@ -200,7 +204,7 @@ describe('Export dialog', () => {
       ...mountLoadedStage,
       click(selector('[aria-label^="Export"]')),
       ...openDialog,
-      Command.resolve(SnapshotForExport, ExportSnapshotted({ image: exportImage })),
+      Command.resolve(SnapshotForExport, ExportSnapshotted()),
       click(text('Export')),
       Command.resolve(PrepareExport, ExportPrepared({ sizeBytes: 4096, url: 'blob:export-1' })),
       Command.resolve(ExportDownload, ExportDownloaded({ url: 'blob:export-1' })),
@@ -238,8 +242,8 @@ describe('Export dialog', () => {
     ;[model] = update(model, GotExportDialogMessage({ message: Dialog.CompletedCloseDialog() }))
     vitestExpect(model.exportDialog.isOpen).toBe(false)
 
-    const [after, commands] = update(model, ExportSnapshotted({ image: exportImage }))
-    vitestExpect(after.exportImage).toBeNull()
+    const [after, commands] = update(model, ExportSnapshotted())
+    vitestExpect(after.exportReady).toBe(false)
     vitestExpect(commands).toHaveLength(0)
   })
 
@@ -247,7 +251,7 @@ describe('Export dialog', () => {
     // The Export button blocks double-presses while encoding, but the dialog
     // can close mid-encode. A late result must not trigger a download.
     let [model] = update(loadedModel(), ExportRequestedMessage())
-    ;[model] = update(model, ExportSnapshotted({ image: exportImage }))
+    ;[model] = update(model, ExportSnapshotted())
     ;[model] = update(model, ExportDownloadRequestedMessage())
     vitestExpect(model.exportEncoding).toBe(true)
 

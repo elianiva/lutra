@@ -390,9 +390,12 @@ export const ChangedExportScale = Message.m('ChangedExportScale', {
 
 // The frame to export, read back from the GPU once per dialog open (the
 // dialog encodes from this cache when the user presses Export).
-export const ExportSnapshotted = Message.m('ExportSnapshotted', {
-  image: S.instanceOf(ImageData),
-})
+/**
+ * The GPU readback landed. The pixels stay in the editor's export-frame
+ * cache — megabytes of ImageData never ride through the model; only the
+ * readiness flag does (docs/adr/0031).
+ */
+export const ExportSnapshotted = Message.m('ExportSnapshotted', {})
 export const ExportSnapshotFailed = Message.m('ExportSnapshotFailed', {
   error: GpuError,
 })
