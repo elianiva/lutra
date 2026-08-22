@@ -12,6 +12,7 @@ import {
   Collage,
   CollageId,
   defaultCollageLayout,
+  defaultTileFraming,
   EditId,
   EditSummary,
 } from '@lutra/store'
@@ -19,11 +20,13 @@ import type { Collage as CollageRecord, EditSummary as EditSummaryRecord } from 
 import { initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
-import { DeleteCollage, ListCollages } from './command'
+import { DeleteCollage, ListCollages, MeasureCollageThumbs } from './command'
 import {
   CollageDeleteConfirmCancelled,
   CollageDeleteRequested,
   CollageDeleted,
+  CollagesListed,
+  CollageThumbsMeasured,
   ToggledCollageDeleteConfirm,
 } from './message'
 
@@ -56,7 +59,7 @@ const collage = (id: CollageId, tileIds: readonly EditId[]): CollageRecord =>
     id,
     savedAt: 1_700_000_000_000,
     layout: defaultCollageLayout(),
-    tiles: tileIds.map((editId) => ({ editId })),
+    tiles: tileIds.map((editId) => ({ editId, framing: defaultTileFraming() })),
   })
 
 /** A model with a loaded edits grid and a loaded collages list. */
@@ -140,6 +143,42 @@ describe('gallery: collages section', () => {
     const [afterDelete, followUps] = update(armed, CollageDeleted())
     expect(afterDelete.confirmingCollageDelete).toBe(null)
     expect(followUps.map((c) => c.name)).toEqual([ListCollages.name])
+  })
+
+  it('a custom-framed tile triggers thumbnail measurement; a default one does not', () => {
+    const custom = Collage.make({
+      id: collageId(1),
+      savedAt: 1,
+      layout: defaultCollageLayout(),
+      tiles: [
+        { editId: editId(1), framing: { zoom: 2, focusX: 0.5, focusY: 0.5 } },
+        { editId: editId(2), framing: defaultTileFraming() },
+      ],
+    })
+    const plain = collage(collageId(2), [editId(1), editId(2)])
+
+    // Only the custom-framed tile's summary is sent off to be measured.
+    const [model, commands] = update(loadedWith(custom, plain), CollagesListed({ collages: [custom, plain] }))
+    expect(model.collages._tag).toBe('Success')
+    expect(commands.map((c) => c.name)).toEqual([MeasureCollageThumbs.name])
+    const measure = commands[0]!
+    // The Command type erases args to a record; read the declared field by key.
+    const args = measure.args ?? {}
+    expect(args['thumbs']).toEqual([
+      { id: editId(1), thumbnail: summary(editId(1)).thumbnail },
+    ])
+
+    // All-default collages cost nothing.
+    const [, none] = update(loadedWith(plain), CollagesListed({ collages: [plain] }))
+    expect(none).toEqual([])
+  })
+
+  it('CollageThumbsMeasured lands in the model for the mini-preview mirror', () => {
+    const [model] = update(
+      loadedWith(),
+      CollageThumbsMeasured({ sizes: [{ editId: editId(1), width: 400, height: 100 }] }),
+    )
+    expect(model.collageThumbSizes).toEqual([{ editId: editId(1), width: 400, height: 100 }])
   })
 })
 

@@ -1,4 +1,4 @@
-import { Array, DateTime, Effect, Schema as S } from 'effect'
+import { Array, DateTime, Effect, Option, Schema as S } from 'effect'
 import { Command, File as FoldkitFile } from 'foldkit'
 import type { StoreError } from '@lutra/store'
 import {
@@ -12,6 +12,7 @@ import {
   newCollageId,
   newEditId,
   defaultCollageLayout,
+  defaultTileFraming,
 } from '@lutra/store'
 import { ImageDecodeError, ThumbnailEncodeError } from '../errors'
 import {
@@ -27,6 +28,7 @@ import {
   CollageCreateFailed,
   CollagesListed,
   CollageListFailed,
+  CollageThumbsMeasured,
   CollageDeleted,
   CollageDeleteFailed,
 } from './message'
@@ -68,6 +70,37 @@ export const ListCollages = Command.define('ListCollages', {
     ),
   ),
   messages: [CollagesListed, CollageListFailed],
+})
+
+/**
+ * Decode the custom-framed collage tiles' thumbnails to learn their pixel
+ * sizes (docs/adr/0033) — the mini-previews mirror each tile's framing,
+ * which needs its aspect. Default-framed tiles never reach here (they render
+ * as cover); a failed decode just leaves that tile covered.
+ */
+export const MeasureCollageThumbs = Command.define('MeasureCollageThumbs', {
+  args: {
+    thumbs: S.Array(S.Struct({ id: EditIdSchema, thumbnail: S.Uint8Array })),
+  },
+  execute: ({ thumbs }) =>
+    Effect.gen(function* MeasureCollageThumbs() {
+      const sizes: { readonly editId: EditId; readonly width: number; readonly height: number }[] = []
+      for (const { id, thumbnail } of thumbs) {
+        // SAFETY: the store hands back image bytes over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
+        // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
+        const bytes = thumbnail as BlobPart
+        const decoded = yield* Effect.option(
+          Effect.tryPromise(() => createImageBitmap(new Blob([bytes]))),
+        )
+        if (Option.isNone(decoded)) {
+          continue
+        }
+        sizes.push({ editId: id, width: decoded.value.width, height: decoded.value.height })
+        yield* Effect.sync(() => decoded.value.close())
+      }
+      return CollageThumbsMeasured({ sizes })
+    }),
+  messages: [CollageThumbsMeasured],
 })
 
 /**
@@ -275,7 +308,7 @@ export const CreateCollage = Command.define('CreateCollage', {
           id,
           savedAt: DateTime.nowUnsafe().epochMilliseconds,
           layout: defaultCollageLayout(),
-          tiles: editIds.map((editId) => ({ editId })),
+          tiles: editIds.map((editId) => ({ editId, framing: defaultTileFraming() })),
         }),
       )
       return CollageCreated({ id })

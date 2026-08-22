@@ -1,31 +1,52 @@
+import { Option } from 'effect'
 import { Submodel, AsyncData } from 'foldkit'
-import type { HtmlBuilder } from 'foldkit/html'
+import type { Attribute, HtmlBuilder } from 'foldkit/html'
+import { DragAndDrop } from '@foldkit/ui'
+import { Download, RotateCcw, X } from 'lucide'
 import {
   BackRequested,
   ChangedColumns,
+  ChangedFrameRatio,
   ChangedGutter,
   ExportRequested,
   GotCollageExportDialogMessage,
-  MovedTile,
+  GotDragMessage,
+  ModeChanged,
+  PanStarted,
   RemovedTile,
+  ResetFraming,
   ToggledBackground,
+  UndoPressed,
 } from './message'
-import * as ExportDialog from '../export-dialog'
 import type { CollageMessage } from './message'
 import type { Model } from './model'
-import { LAYOUT_BOUNDS } from './model'
-import type { Collage, EditSummary } from '@lutra/store'
-import { thumbnailUrl } from '../thumbnail-url'
+import type { Collage, TileFraming } from '@lutra/store'
+import { photoUrl } from '../photo-url'
 import { icon } from '../components/icon'
-import { Download } from 'lucide'
+import { cellSize } from './compose'
+import { placement } from './framing'
+import * as ExportDialog from '../export-dialog'
 
 /**
- * The Collage Submodel's view (docs/adr/0009, 0030): the fixed-grid preview
- * — each tile drawn from its referenced Edit's stored thumbnail, fitted to
- * the viewport — with layout controls (columns, gutter, background), per-tile
- * remove and move controls, and back navigation. Stepper controls emit raw
- * ±1/±8 intents; clamping to `LAYOUT_BOUNDS` happens once, in update.
+ * The Collage Submodel's view (docs/adr/0009, 0030, 0033): the fixed-grid
+ * preview — each tile drawn from its referenced Edit's full-resolution
+ * source through its tile framing — with frame-ratio / columns / gutter /
+ * background controls, an Arrange/Frame mode toggle (drag-and-drop reorder
+ * vs pan/zoom framing), per-tile remove (Arrange) and reset-framing (Frame),
+ * an undo toast, and back navigation. Stepper controls emit raw intents;
+ * clamping happens once, in update.
  */
+
+/** The share-target presets (docs/adr/0033); custom W:H covers the rest. */
+const FRAME_PRESETS: readonly { label: string; value: number }[] = [
+  { label: '1:1', value: 1 },
+  { label: '4:5', value: 4 / 5 },
+  { label: '9:16', value: 9 / 16 },
+  { label: '16:9', value: 16 / 9 },
+]
+
+const matchesPreset = (ratio: number, value: number) => Math.abs(ratio - value) < 1e-9
+
 export const view = Submodel.defineView<Model, CollageMessage>((model, h) => {
   return h.div(
     [h.Class('relative flex h-full flex-col bg-bg text-ink')],
@@ -33,6 +54,8 @@ export const view = Submodel.defineView<Model, CollageMessage>((model, h) => {
       header(h),
       notice(model.notice, h),
       h.main([h.Class('flex min-h-0 flex-1 flex-col overflow-auto')], [body(h, model)]),
+      undoToast(h, model),
+      ghost(h, model),
       ExportDialog.exportDialogView(h, model.exportDialog, (message) =>
         GotCollageExportDialogMessage({ message }),
       ),
@@ -76,6 +99,70 @@ const notice = (message: string | null, h: HtmlBuilder<CollageMessage>) =>
     ? null
     : h.div([h.Class('border-b border-border bg-panel px-4 py-1 text-xs text-accent')], [message])
 
+// ---- undo toast ----
+
+const undoToast = (h: HtmlBuilder<CollageMessage>, model: Model) => {
+  const { undo, undoLabel } = model
+  if (undo === null || undoLabel === null) {
+    return null
+  }
+  return h.div(
+    [
+      h.DataAttribute('undo-toast', 'true'),
+      h.Class(
+        'absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded border border-border bg-panel px-3 py-1.5 text-xs shadow-lg',
+      ),
+    ],
+    [
+      h.span([h.Class('text-muted')], [undoLabel]),
+      h.button(
+        [
+          h.OnClick(UndoPressed()),
+          h.AriaLabel(`Undo: ${undoLabel.toLowerCase()}`),
+          h.DataAttribute('undo-button', 'true'),
+          h.Class('rounded bg-accent px-2 py-0.5 text-ink hover:opacity-80'),
+        ],
+        ['Undo'],
+      ),
+    ],
+  )
+}
+
+// ---- the drag ghost ----
+
+const photoMap = (model: Model): Map<string, (typeof model.photos)[number]> =>
+  new Map(model.photos.map((p) => [p.id, p]))
+
+const ghost = (h: HtmlBuilder<CollageMessage>, model: Model) =>
+  Option.match(DragAndDrop.ghostStyle(model.drag), {
+    onNone: () => null,
+    onSome: (style) => {
+      const photoById = photoMap(model)
+      const dragged = Option.match(DragAndDrop.maybeDraggedItemId(model.drag), {
+        onNone: () => null,
+        onSome: (id) => photoById.get(id) ?? null,
+      })
+      const draggedUrl = dragged && photoUrl(dragged.id, dragged.source)
+      if (!dragged || !draggedUrl) {
+        return null
+      }
+      return h.div(
+        [
+          h.Style(style),
+          h.Class('-translate-x-1/2 -translate-y-1/2 overflow-hidden rounded border border-accent'),
+        ],
+        [
+          h.div(
+            [h.Class('h-20 w-20')],
+            [h.img([h.Src(draggedUrl), h.Alt(''), h.Class('h-full w-full object-cover')])],
+          ),
+        ],
+      )
+    },
+  })
+
+// ---- body ----
+
 const body = (h: HtmlBuilder<CollageMessage>, model: Model) =>
   AsyncData.match(model.collage, {
     onFailure: (error) => failureState(h, error.message),
@@ -85,10 +172,10 @@ const body = (h: HtmlBuilder<CollageMessage>, model: Model) =>
     onStale: () => spinner(h),
     onSuccess: (collage) =>
       collage.tiles.length === 0
-        ? emptyState(h)
+        ? emptyState(h, model.userEmptied)
         : h.div(
             [h.Class('flex min-h-0 flex-1 flex-col gap-4 p-4')],
-            [controls(h, collage), grid(h, model, collage)],
+            [controls(h, model, collage), grid(h, model, collage)],
           ),
   })
 
@@ -101,10 +188,20 @@ const failureState = (h: HtmlBuilder<CollageMessage>, message: string) =>
     [h.p([], [`Could not open this collage: ${message}`])],
   )
 
-const emptyState = (h: HtmlBuilder<CollageMessage>) =>
+const emptyState = (h: HtmlBuilder<CollageMessage>, emptiedByUser: boolean) =>
   h.div(
     [h.Class('flex flex-1 flex-col items-center justify-center gap-2 text-sm text-muted')],
-    [h.p([], ['Every photo in this collage is gone.'])],
+    [
+      h.p([], [emptiedByUser ? 'All photos removed.' : 'Every photo in this collage is gone.']),
+      h.p(
+        [h.Class('text-xs')],
+        [
+          emptiedByUser
+            ? 'Bring them back with Undo, or delete the collage from the menu.'
+            : 'Their edits were deleted.',
+        ],
+      ),
+    ],
   )
 
 // ---- layout controls ----
@@ -127,14 +224,105 @@ const stepperButton = (
     [label],
   )
 
-const controls = (h: HtmlBuilder<CollageMessage>, collage: Collage) => {
+const controlLabel = (h: HtmlBuilder<CollageMessage>, text: string) =>
+  h.span([h.Class('text-[10px] uppercase tracking-[0.14em]')], [text])
+
+/** The ratio's normalized W:H pair — the shorter side is 1. */
+const ratioPair = (ratio: number): [number, number] =>
+  ratio >= 1 ? [Math.round(ratio * 100) / 100, 1] : [1, Math.round((1 / ratio) * 100) / 100]
+
+const frameRatioControl = (h: HtmlBuilder<CollageMessage>, collage: Collage) => {
+  const ratio = collage.layout.frameRatio
+  const [w, hh] = ratioPair(ratio)
   return h.div(
+    [h.Class('flex items-center gap-2'), h.DataAttribute('control', 'frame-ratio')],
+    [
+      controlLabel(h, 'Frame'),
+      h.div(
+        [h.Class('flex border border-border')],
+        FRAME_PRESETS.map(({ label, value }, i) =>
+          h.button(
+            [
+              h.OnClick(ChangedFrameRatio({ frameRatio: value })),
+              h.AriaLabel(`Frame ratio ${label}`),
+              h.DataAttribute('frame-preset', label),
+              h.AriaPressed(String(matchesPreset(ratio, value))),
+              h.Class(
+                `px-2 py-0.5 text-xs ${i < FRAME_PRESETS.length - 1 ? 'border-r border-border' : ''} ${
+                  matchesPreset(ratio, value) ? 'bg-accent text-ink' : 'text-muted hover:text-ink'
+                }`,
+              ),
+            ],
+            [label],
+          ),
+        ),
+      ),
+      h.div(
+        [h.Class('flex items-center gap-1'), h.DataAttribute('custom-frame-ratio', 'true')],
+        [
+          ratioInput(h, w, 'frame-ratio-w', (value) => value / Math.max(0.01, hh)),
+          h.span([], [':']),
+          ratioInput(h, hh, 'frame-ratio-h', (value) => Math.max(0.01, w) / Math.max(0.01, value)),
+        ],
+      ),
+    ],
+  )
+}
+
+const ratioInput = (
+  h: HtmlBuilder<CollageMessage>,
+  value: number,
+  testId: string,
+  toRatio: (value: number) => number,
+) =>
+  h.input([
+    h.Type('number'),
+    h.AriaLabel(`Custom frame ratio ${testId.endsWith('w') ? 'width' : 'height'}`),
+    h.DataAttribute(testId, 'true'),
+    h.Step('0.1'),
+    h.Min('0.1'),
+    h.Class(
+      'w-12 rounded border border-border bg-transparent px-1 py-0.5 text-center text-xs tnum text-ink',
+    ),
+    h.Value(String(value)),
+    h.OnInput((raw) => {
+      const parsed = Number(raw)
+      return ChangedFrameRatio({
+        frameRatio: Number.isFinite(parsed) && parsed > 0 ? toRatio(parsed) : value,
+      })
+    }),
+  ])
+
+const modeToggle = (h: HtmlBuilder<CollageMessage>, model: Model) =>
+  h.div(
+    [h.Class('flex border border-border'), h.DataAttribute('control', 'mode')],
+    (['arrange', 'frame'] as const).map((mode, i) =>
+      h.button(
+        [
+          h.OnClick(ModeChanged({ mode })),
+          h.AriaLabel(mode === 'arrange' ? 'Arrange photos' : 'Frame photos'),
+          h.DataAttribute('mode-button', mode),
+          h.AriaPressed(String(model.mode === mode)),
+          h.Class(
+            `px-2 py-0.5 text-xs capitalize ${i === 0 ? 'border-r border-border' : ''} ${
+              model.mode === mode ? 'bg-accent text-ink' : 'text-muted hover:text-ink'
+            }`,
+          ),
+        ],
+        [mode],
+      ),
+    ),
+  )
+
+const controls = (h: HtmlBuilder<CollageMessage>, model: Model, collage: Collage) =>
+  h.div(
     [h.Class('flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted')],
     [
+      frameRatioControl(h, collage),
       h.div(
         [h.Class('flex items-center gap-2'), h.DataAttribute('control', 'columns')],
         [
-          h.span([], ['Columns']),
+          controlLabel(h, 'Columns'),
           stepperButton(
             h,
             '−',
@@ -153,7 +341,7 @@ const controls = (h: HtmlBuilder<CollageMessage>, collage: Collage) => {
       h.div(
         [h.Class('flex items-center gap-2'), h.DataAttribute('control', 'gutter')],
         [
-          h.span([], ['Gutter']),
+          controlLabel(h, 'Gutter'),
           stepperButton(
             h,
             '−',
@@ -180,15 +368,17 @@ const controls = (h: HtmlBuilder<CollageMessage>, collage: Collage) => {
         ],
         [`Background: ${collage.layout.background}`],
       ),
+      modeToggle(h, model),
     ],
   )
-}
-
-// ---- the preview grid ----
 
 const grid = (h: HtmlBuilder<CollageMessage>, model: Model, collage: Collage) => {
   const columns = Math.round(collage.layout.columns)
-  const thumbById = new Map<string, EditSummary>(model.thumbs.map((t) => [t.id, t]))
+  const gutter = Math.round(collage.layout.gutter)
+
+  // Only the cells' shape matters at preview scale; the pixel basis does not.
+  const cell = cellSize(collage.layout, collage.tiles.length, 1000)
+  const cellAspect = cell.width / cell.height
   const background = collage.layout.background === 'dark' ? 'bg-black' : 'bg-white'
   return h.div(
     [
@@ -196,78 +386,177 @@ const grid = (h: HtmlBuilder<CollageMessage>, model: Model, collage: Collage) =>
       h.Style({
         display: 'grid',
         gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-        gap: `${Math.round(collage.layout.gutter)}px`,
-        padding: `${Math.round(collage.layout.gutter)}px`,
+        gap: `${gutter}px`,
+        padding: `${gutter}px`,
       }),
-      h.Class(`mx-auto w-fit max-w-full ${background}`),
+      h.Class(`overflow-hidden mx-auto max-h-[48rem] max-w-[40rem] w-full ${background}`),
     ],
     collage.tiles.map((tile, index) =>
-      tileCell(h, tile.editId, index, collage.tiles.length, thumbById),
+      tileCell(
+        h,
+        model,
+        tile.editId,
+        index,
+        model.framingDraft?.index === index ? model.framingDraft.framing : tile.framing,
+        cellAspect,
+      ),
     ),
   )
 }
 
-const tileCell = (
-  h: HtmlBuilder<CollageMessage>,
-  editId: string,
-  index: number,
-  total: number,
-  thumbById: Map<string, EditSummary>,
-) => {
-  const summary = thumbById.get(editId)
-  const url = summary === undefined ? null : thumbnailUrl(summary.id, summary.thumbnail)
-  return h.div(
-    [
-      h.DataAttribute('collage-tile', `${index}`),
-      h.DataAttribute('tile-edit-id', editId),
-      h.Class('relative aspect-square overflow-hidden'),
-    ],
-    [
-      url
-        ? h.img([h.Src(url), h.Alt(''), h.Class('h-full w-full object-cover')])
-        : h.div(
-            [h.Class('flex h-full w-full items-center justify-center text-xs text-muted')],
-            ['No thumb'],
-          ),
-      // Per-tile remove + move overlays, same overlay pattern as the
-      // gallery's select/delete controls. Move spans the whole reading order
-      // — crossing rows is expected — bounded by the array ends.
-      h.div(
-        [
-          h.Class(
-            'absolute inset-x-0 bottom-0 z-10 flex justify-between bg-gradient-to-t from-black/70 to-transparent px-1 py-0.5',
-          ),
-        ],
-        [
-          h.div(
-            [h.Class('flex gap-0.5')],
-            [
-              ...(index > 0
-                ? [overlayButton(h, '◀', `Move photo ${index} earlier`, MovedTile({ from: index, to: index - 1 }))]
-                : []),
-              ...(index < total - 1
-                ? [overlayButton(h, '▶', `Move photo ${index} later`, MovedTile({ from: index, to: index + 1 }))]
-                : []),
-            ],
-          ),
-          overlayButton(h, '✕', `Remove photo ${index}`, RemovedTile({ index })),
-        ],
-      ),
-    ],
-  )
+const aspectOfPhoto = (model: Model, editId: string): number | null => {
+  const size = model.sizes.find((s) => s.editId === editId)
+  return !size || size.width <= 0 || size.height <= 0 ? null : size.width / size.height
 }
 
-const overlayButton = (
+const tileCell = (
   h: HtmlBuilder<CollageMessage>,
-  glyph: string,
-  ariaLabel: string,
-  onClick: CollageMessage,
-) =>
-  h.button(
-    [
-      h.OnClick(onClick),
-      h.AriaLabel(ariaLabel),
-      h.Class('relative z-10 grid size-7 place-items-center text-[10px] text-white/80 hover:text-white'),
-    ],
-    [glyph],
-  )
+  model: Model,
+  editId: string,
+  index: number,
+  framing: TileFraming,
+  cellAspect: number,
+) => {
+  const photo = photoMap(model).get(editId)
+  const url = photo === undefined ? null : photoUrl(photo.id, photo.source)
+  const arrange = model.mode === 'arrange'
+
+  // The DnD machine's drop target for this cell, if the pointer (or the
+  // keyboard caret) is hovering it.
+  const dropTarget = Option.match(DragAndDrop.maybeDropTarget(model.drag), {
+    onNone: () => null,
+    onSome: (t) => (t.containerId === `tile-${index}` ? t : null),
+  })
+  const draggedHere =
+    DragAndDrop.isDragging(model.drag) &&
+    Option.match(DragAndDrop.maybeDraggedItemId(model.drag), {
+      onNone: () => false,
+      onSome: (id) => id === editId,
+    })
+
+  const cellClass = [
+    'relative overflow-hidden',
+    ...(dropTarget !== null ? ['ring-2 ring-accent'] : []),
+    ...(draggedHere ? ['opacity-40'] : []),
+    ...(!arrange ? ['cursor-grab select-none'] : []),
+  ].join(' ')
+  const cellAttrs: Attribute<CollageMessage>[] = [
+    h.DataAttribute('collage-cell', `${index}`),
+    h.DataAttribute('collage-tile', `${index}`),
+    h.Style({ aspectRatio: String(cellAspect) }),
+    // Droppable: the DnD machine resolves drops against these containers.
+    ...DragAndDrop.droppable(`tile-${index}`, `Photo slot ${index + 1}`),
+    h.Class(cellClass),
+  ]
+
+  if (!arrange) {
+    cellAttrs.push(
+      h.OnPointerDown((_pointerType, button, screenX, screenY) =>
+        button === 0 ? Option.some(PanStarted({ index, screenX, screenY })) : Option.none(),
+      ),
+      h.OnDoubleClick(ResetFraming({ index })),
+    )
+  }
+
+  return h.div(cellAttrs, [
+    h.div(
+      [
+        ...(arrange
+          ? [
+              ...DragAndDrop.draggable(
+                {
+                  model: model.drag,
+                  toParentMessage: (message) => GotDragMessage({ message }),
+                  itemId: editId,
+                  containerId: `tile-${index}`,
+                  index,
+                },
+                h,
+              ),
+              ...DragAndDrop.sortable(editId),
+            ]
+          : []),
+        h.Class('relative h-full w-full'),
+      ],
+      [
+        url === null || photo === undefined
+          ? h.div(
+              [h.Class('flex h-full w-full items-center justify-center text-xs text-muted')],
+              ['No photo'],
+            )
+          : framedPhoto(h, url, model, editId, framing, cellAspect),
+        // Mode-appropriate corner action: remove in Arrange, reset in Frame.
+        arrange
+          ? h.button(
+              [
+                h.OnClick(RemovedTile({ index })),
+                h.AriaLabel(`Remove photo ${index + 1}`),
+                h.DataAttribute('remove-tile', `${index}`),
+                h.Class(
+                  'absolute right-0 top-0 z-10 grid size-7 place-items-center bg-black/50 text-[10px] text-white/80 hover:text-white',
+                ),
+              ],
+              [icon(h, X, `Remove photo ${index + 1}`, 12)],
+            )
+          : h.button(
+              [
+                h.OnClick(ResetFraming({ index })),
+                h.AriaLabel(`Reset framing of photo ${index + 1}`),
+                h.DataAttribute('reset-framing', `${index}`),
+                h.Class(
+                  'absolute right-0 top-0 z-10 grid size-7 place-items-center bg-black/50 text-white/80 hover:text-white',
+                ),
+              ],
+              [icon(h, RotateCcw, `Reset framing of photo ${index + 1}`, 12)],
+            ),
+        // Insertion indicator while this cell is the drop target: leading
+        // edge when the drop lands before it, trailing edge when after.
+        dropTarget !== null
+          ? h.div(
+              [
+                h.DataAttribute('drop-indicator', `${dropTarget.index}`),
+                h.Class(
+                  `absolute z-10 w-1 bg-accent ${
+                    dropTarget.index === 0 ? 'left-0 top-0 h-full' : 'bottom-0 right-0 h-full'
+                  }`,
+                ),
+              ],
+              [],
+            )
+          : null,
+      ],
+    ),
+  ])
+}
+
+/**
+ * One tile's full-resolution source, drawn through its framing. Percentages
+ * of the cell — the same placement math export uses. Until the photo's
+ * aspect has been measured (a beat after load), the photo falls back to
+ * cover so nothing flashes mispositioned.
+ */
+const framedPhoto = (
+  h: HtmlBuilder<CollageMessage>,
+  url: string,
+  model: Model,
+  editId: string,
+  framing: TileFraming,
+  cellAspect: number,
+) => {
+  const imageAspect = aspectOfPhoto(model, editId)
+  if (imageAspect === null) {
+    return h.img([h.Src(url), h.Alt(''), h.Class('h-full w-full object-cover')])
+  }
+  const p = placement(framing, imageAspect, cellAspect)
+  return h.img([
+    h.Src(url),
+    h.Alt(''),
+    h.Class('absolute max-w-none'),
+    h.Style({
+      width: `${p.width * 100}%`,
+      height: `${p.height * 100}%`,
+      left: `${p.left * 100}%`,
+      top: `${p.top * 100}%`,
+    }),
+  ])
+}

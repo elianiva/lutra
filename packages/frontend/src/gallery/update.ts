@@ -11,9 +11,10 @@ import {
   GotDeleteDialogMessage,
   PhotoCreateError,
 } from './message'
-import { CreateCollage, DeleteCollage, DeleteEdit, ListCollages, ListEdits, OpenPhoto } from './command'
+import { CreateCollage, DeleteCollage, DeleteEdit, ListCollages, ListEdits, MeasureCollageThumbs, OpenPhoto } from './command'
 import type { Model } from './model'
 import { collageList, editList } from './model'
+import { isDefaultFraming } from '../collage/framing'
 
 export type UpdateReturn = readonly [
   Model,
@@ -108,8 +109,34 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
       ],
 
       // ---- collage section (docs/adr/0030): list + open + delete ----
-      CollagesListed: ({ collages }) => [
-        { ...model, collages: collageList.Success({ data: collages }) },
+      CollagesListed: ({ collages }) => {
+        // Custom-framed tiles need their thumbnails' aspects before the
+        // mini-previews can mirror the framing (docs/adr/0033); the grid's
+        // summaries carry the bytes. Default-framed tiles stay cover.
+        const byId = new Map(
+          model.grid._tag === 'Success' ? model.grid.data.map((s) => [s.id, s] as const) : [],
+        )
+        const custom = new Set(
+          collages.flatMap((c) => c.tiles.filter((t) => !isDefaultFraming(t.framing)).map((t) => t.editId)),
+        )
+        const thumbs = [...custom].flatMap((id) => {
+          const summary = byId.get(id)
+          return summary ? [{ id: summary.id, thumbnail: summary.thumbnail }] : []
+        })
+        return [
+          { ...model, collages: collageList.Success({ data: collages }) },
+          thumbs.length > 0 ? [MeasureCollageThumbs({ thumbs })] : [],
+          Option.none(),
+        ]
+      },
+      CollageThumbsMeasured: ({ sizes }): UpdateReturn => [
+        {
+          ...model,
+          collageThumbSizes: [
+            ...model.collageThumbSizes.filter((s) => !sizes.some((n) => n.editId === s.editId)),
+            ...sizes,
+          ],
+        },
         [],
         Option.none(),
       ],
@@ -196,11 +223,14 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
       // the pending delete so a reopened dialog never confirms a stale id.
       GotDeleteDialogMessage: ({ message }) => {
         const [dialog, dialogCommands] = Dialog.update(model.deleteDialog, message)
+        // Clear the armed delete only when the dialog actually closed; a
+        // conditional spread would hide the omission behind an empty object.
+        const next =
+          message._tag === 'RequestedClose' ? { ...model, pendingDelete: null } : model
         return [
           {
-            ...model,
+            ...next,
             deleteDialog: dialog,
-            ...(message._tag === 'RequestedClose' ? { pendingDelete: null } : {}),
           },
           Command.mapMessages(dialogCommands, toDeleteDialogMessage),
           Option.none(),

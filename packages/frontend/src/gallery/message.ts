@@ -64,6 +64,10 @@ export const PhotosAdded = Message.m('PhotosAdded', {
 /** A fresh list of collages landed from the CollageStore (a ListCollages result). */
 export const CollagesListed = Message.m('CollagesListed', { collages: S.Array(Collage) })
 export const CollageListFailed = Message.m('CollageListFailed', { error: StoreError })
+/** The custom-framed collage tiles' thumbnail pixel sizes landed (docs/adr/0033). */
+export const CollageThumbsMeasured = Message.m('CollageThumbsMeasured', {
+  sizes: S.Array(S.Struct({ editId: EditIdSchema, width: S.Number, height: S.Number })),
+})
 /** A collage card was clicked; the update emits the `OpenedCollage` OutMessage. */
 export const CollageOpenRequested = Message.m('CollageOpenRequested', { id: CollageIdSchema })
 /** A collage card's ✕ was tapped: enter or leave the two-step confirm (docs/adr/0022). */
@@ -123,6 +127,7 @@ export const GalleryMessage = S.Union([
   CollageCreateFailed,
   CollagesListed,
   CollageListFailed,
+  CollageThumbsMeasured,
   CollageOpenRequested,
   ToggledCollageDeleteConfirm,
   CollageDeleteConfirmCancelled,

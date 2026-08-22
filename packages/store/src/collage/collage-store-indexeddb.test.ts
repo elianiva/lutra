@@ -2,7 +2,12 @@ import { describe, expect, it, afterEach } from 'vitest'
 import * as fc from 'fast-check'
 import { Effect, Option } from 'effect'
 import { CollageId } from './collage-id'
-import { Collage, defaultCollageLayout, type CollageTile } from './collage'
+import {
+  Collage,
+  defaultCollageLayout,
+  defaultTileFraming,
+  type CollageTile,
+} from './collage'
 import {
   CollageStore,
   CollageStoreIndexedDb,
@@ -13,7 +18,10 @@ import {
 
 type CollageRecord = typeof Collage.Type
 
-const tile = (editId: string): CollageTile => ({ editId: EditId(editId) })
+const tile = (editId: string): CollageTile => ({
+  editId: EditId(editId),
+  framing: defaultTileFraming(),
+})
 
 const collage = (id: string, savedAt: number): CollageRecord =>
   Collage.make({
@@ -80,6 +88,7 @@ const collageArb = fc
     savedAt: fc.integer({ max: 10_000, min: 0 }),
     columns: fc.integer({ max: 6, min: 2 }),
     gutter: fc.integer({ max: 32, min: 0 }),
+    frameRatio: fc.double({ min: 0.5, max: 3, noNaN: true }),
     background: fc.constantFrom<'dark' | 'light'>('dark', 'light'),
     tiles: fc
       .array(fc.uuid(), { maxLength: 9, minLength: 1 })
@@ -92,8 +101,8 @@ const collageArb = fc
       layout: {
         background: r.background,
         columns: r.columns,
+        frameRatio: r.frameRatio,
         gutter: r.gutter,
-        tileAspect: 1,
       },
       tiles: r.tiles,
     }),
@@ -234,6 +243,48 @@ describe('CollageStoreIndexedDb (IndexedDB local backend)', () => {
       }),
     )
     expect(await run(list())).toEqual([])
+  })
+
+  it('a pre-framing record decodes with default framing and a square frame ratio (docs/adr/0033)', async () => {
+    // What an install from before docs/adr/0033 has on disk: no `framing`
+    // on tiles, a square-only `tileAspect` instead of `frameRatio`.
+    const legacyRow = {
+      id: '33333333-3333-4333-8333-333333333333',
+      savedAt: 3,
+      layout: { background: 'dark', columns: 3, gutter: 8, tileAspect: 1 },
+      tiles: [{ editId: '11111111-1111-4111-8111-111111111111' }],
+    }
+    await new Promise<void>((resolve, reject) => {
+      const open = indexedDB.open('lutra')
+      open.onsuccess = () => {
+        const db = open.result
+        try {
+          const tx = db.transaction('collages', 'readwrite')
+          tx.objectStore('collages').put(legacyRow)
+          tx.oncomplete = () => {
+            db.close()
+            resolve()
+          }
+          tx.onerror = () => {
+            db.close()
+            reject(tx.error)
+          }
+        } catch (error) {
+          db.close()
+          reject(error)
+        }
+      }
+      open.onerror = () => reject(open.error)
+    })
+
+    const loaded = await run(load(CollageId(legacyRow.id)))
+    expect(loaded).not.toEqual(Option.none())
+    const record = loaded.pipe(Option.getOrThrow)
+    expect(record.layout).toEqual({ background: 'dark', columns: 3, frameRatio: 1, gutter: 8 })
+    expect(record.tiles[0]).toEqual({
+      editId: EditId('11111111-1111-4111-8111-111111111111'),
+      framing: defaultTileFraming(),
+    })
   })
 
   it('rejects a malformed Collage id at the storage boundary', async () => {

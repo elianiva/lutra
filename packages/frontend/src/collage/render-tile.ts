@@ -1,10 +1,13 @@
 import { Effect } from 'effect'
+import type { TileFraming } from '@lutra/store'
 import { createRenderRequest } from '@lutra/engine'
 import { ENGINE_REGISTRY } from '../editor/layer-meta'
 import type { Layer, RenderRequest } from '@lutra/engine'
 import { GpuBackend } from '../gpu/backend'
 import type { LutStore } from '../luts/store'
 import { resolveLuts } from '../luts/resolve'
+import type { CellSize } from './compose'
+import { placement } from './framing'
 
 /** One rendered tile: the pixels, or a marker that this photo failed. */
 export interface TileRender {
@@ -14,12 +17,15 @@ export interface TileRender {
 }
 
 /**
- * Render one Edit's full chain to a square tile of `cellSize` px
- * (docs/adr/0031): the source bytes are decoded, center-cropped to a square,
- * downscaled to the cell size, then run through the engine's normal render
- * path on a detached canvas — `GpuBackend.execute` runs the chain at the
+ * Render one Edit's full chain into a framed tile of `cell` px (docs/adr/0031,
+ * 0033): the source bytes are decoded, drawn through the tile's framing
+ * (zoom + focus) onto a detached cell-sized canvas, then run through the
+ * engine's normal render path — `GpuBackend.execute` runs the chain at the
  * request bitmap's resolution and never touches the DOM, so the editor's
  * session (a different route) is simply rebuilt when the user returns.
+ *
+ * The framing draw is the same placement math the preview uses (framing.ts),
+ * so what the user framed is exactly what composes.
  *
  * A single broken photo must not sink the whole export, so every failure
  * collapses into `ok: false` — the composer fills the cell with background
@@ -28,45 +34,63 @@ export interface TileRender {
 export const renderEditTile = ({
   source,
   chain,
-  cellSize,
+  framing,
+  cell,
 }: {
   readonly source: Uint8Array
   readonly chain: readonly Layer[]
-  readonly cellSize: number
+  readonly framing: TileFraming
+  readonly cell: CellSize
 }): Effect.Effect<TileRender, never, GpuBackend | LutStore> =>
-  Effect.matchEager(renderTileInner(source, chain, cellSize), {
-    onFailure: () => failedTile(cellSize),
-    onSuccess: (tile) => tile,
+  // v4 note: matchEager's handlers are pure; logging needs matchEffect.
+  Effect.matchEffect(renderTileInner(source, chain, framing, cell), {
+    // Surface why a photo dropped rather than failing silently — a blank
+    // cell with no trace is undebuggable.
+    onFailure: (error) =>
+      Effect.map(
+        Effect.logError('[collage] tile render failed — exporting a blank cell', error),
+        () => failedTile(cell),
+      ),
+    onSuccess: (tile) => Effect.succeed(tile),
   })
 
 const renderTileInner = (
   source: Uint8Array,
   chain: readonly Layer[],
-  cellSize: number,
+  framing: TileFraming,
+  cell: CellSize,
 ): Effect.Effect<TileRender, unknown, GpuBackend | LutStore> =>
   Effect.scoped(
     Effect.gen(function* renderTileInner() {
       // SAFETY: the store hands back image bytes over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
       // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
       const blob = new Blob([source as BlobPart])
-      // Both bitmaps are scope-owned: they close on success AND on every
-      // failure path, instead of leaking when a later step throws.
+      // Scope-owned: closed on success AND on every failure path, instead of
+      // leaking when a later step throws.
       const decoded = yield* Effect.acquireRelease(
         Effect.tryPromise(() => createImageBitmap(blob)),
         (bitmap) => Effect.sync(() => bitmap.close()),
       )
 
-      // Center-crop to a square, then downscale to the cell size in one step.
-      const side = Math.min(decoded.width, decoded.height)
-      const sx = (decoded.width - side) / 2
-      const sy = (decoded.height - side) / 2
-      const square = yield* Effect.acquireRelease(
-        Effect.tryPromise(() =>
-          createImageBitmap(decoded, sx, sy, side, side, {
-            resizeWidth: cellSize,
-            resizeHeight: cellSize,
-          }),
-        ),
+      // Draw the framed crop at cell resolution: the same placement the
+      // preview shows, sampled from the full-resolution decode.
+      const canvas = document.createElement('canvas')
+      canvas.width = cell.width
+      canvas.height = cell.height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        return yield* Effect.fail(new Error('2D context unavailable'))
+      }
+      const p = placement(framing, decoded.width / decoded.height, cell.width / cell.height)
+      ctx.drawImage(
+        decoded,
+        p.left * cell.width,
+        p.top * cell.height,
+        p.width * cell.width,
+        p.height * cell.height,
+      )
+      const framed = yield* Effect.acquireRelease(
+        Effect.promise(() => createImageBitmap(canvas)),
         (bitmap) => Effect.sync(() => bitmap.close()),
       )
 
@@ -74,16 +98,13 @@ const renderTileInner = (
       const request: RenderRequest = yield* createRenderRequest(
         [...chain],
         ENGINE_REGISTRY,
-        square,
+        framed,
         // Grain animates per frame; an export is a still — frame 0.
         0,
         luts,
       )
 
       const backend = yield* GpuBackend
-      const canvas = document.createElement('canvas')
-      canvas.width = cellSize
-      canvas.height = cellSize
       const handle = yield* backend.execute(request, canvas, OFF_PRESENT)
       const image = yield* backend.snapshot(handle)
       return { image, ok: true } satisfies TileRender
@@ -94,7 +115,11 @@ const renderTileInner = (
 const OFF_PRESENT = { mode: 'off', splitAt: 0, showBefore: false } as const
 
 /** A blank cell-size frame — what a failed photo leaves behind. */
-const failedTile = (cellSize: number): TileRender => ({
-  image: new ImageData(new Uint8ClampedArray(cellSize * cellSize * 4), cellSize, cellSize),
+const failedTile = (cell: CellSize): TileRender => ({
+  image: new ImageData(
+    new Uint8ClampedArray(cell.width * cell.height * 4),
+    cell.width,
+    cell.height,
+  ),
   ok: false,
 })

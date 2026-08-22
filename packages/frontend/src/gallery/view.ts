@@ -264,6 +264,8 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary, selected: bo
 /** Memoize bytes→object URL per summary id via the shared cache. */
 import { thumbnailUrl } from '../thumbnail-url'
 import { icon } from '../components/icon'
+import { cellSize } from '../collage/compose'
+import { isDefaultFraming, placement } from '../collage/framing'
 const tileThumb = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) => {
   const url = thumbnailUrl(summary.id, summary.thumbnail)
   return url
@@ -336,7 +338,7 @@ const collageCard = (h: HtmlBuilder<GalleryMessage>, collage: CollageRecord, mod
           h.DataAttribute('open-collage-id', collage.id),
           h.Class('absolute inset-0'),
         ],
-        [miniPreview(h, collage, byId)],
+        [miniPreview(h, collage, byId, model.collageThumbSizes)],
       ),
       h.div(
         [
@@ -400,13 +402,20 @@ const collageCard = (h: HtmlBuilder<GalleryMessage>, collage: CollageRecord, mod
   )
 }
 
-/** The CSS-grid mini-preview: layout-faithful, thumbnails cover-cropped. */
+/**
+ * The CSS-grid mini-preview: layout-faithful (frame ratio included), and
+ * tiles with custom framing mirror it through the same placement math the
+ * collage screen and export use; default-framed tiles stay cover-cropped.
+ */
 const miniPreview = (
   h: HtmlBuilder<GalleryMessage>,
   collage: CollageRecord,
   byId: Map<EditId, EditSummary>,
-) =>
-  h.div(
+  sizes: Model['collageThumbSizes'],
+) => {
+  const cell = cellSize(collage.layout, Math.max(1, collage.tiles.length), 1000)
+  const cellAspect = cell.width / cell.height
+  return h.div(
     [
       h.Class('flex h-full w-full items-center justify-center p-1'),
       h.Style({
@@ -426,10 +435,42 @@ const miniPreview = (
         collage.tiles.map((tileRef) => {
           const summary = byId.get(tileRef.editId)
           const url = summary ? thumbnailUrl(summary.id, summary.thumbnail) : null
-          return url
-            ? h.img([h.Src(url), h.Alt(''), h.Class('h-full w-full object-cover')], )
-            : h.div([h.Class('h-full w-full bg-neutral-700')], [])
+          if (!url) {
+            return h.div([h.Class('h-full w-full bg-neutral-700')], [])
+          }
+          // Mirror only what diverges from the default: measured custom
+          // framings place the thumbnail by percentage; everything else —
+          // and anything unmeasured — stays a plain cover crop.
+          if (isDefaultFraming(tileRef.framing)) {
+            return h.img([h.Src(url), h.Alt(''), h.Class('h-full w-full object-cover')])
+          }
+          const size = sizes.find((s) => s.editId === tileRef.editId)
+          if (!size || size.width <= 0 || size.height <= 0) {
+            return h.img([h.Src(url), h.Alt(''), h.Class('h-full w-full object-cover')])
+          }
+          const p = placement(
+            tileRef.framing,
+            size.width / size.height,
+            cellAspect,
+          )
+          return h.div(
+            [h.Class('relative h-full w-full overflow-hidden')],
+            [
+              h.img([
+                h.Src(url),
+                h.Alt(''),
+                h.Class('absolute max-w-none'),
+                h.Style({
+                  width: `${p.width * 100}%`,
+                  height: `${p.height * 100}%`,
+                  left: `${p.left * 100}%`,
+                  top: `${p.top * 100}%`,
+                }),
+              ]),
+            ],
+          )
         }),
       ),
     ],
   )
+}

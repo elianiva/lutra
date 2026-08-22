@@ -20,13 +20,16 @@ export {
   CollageBackground,
   CollageLayout,
   CollageTile,
+  TileFraming,
   defaultCollageLayout,
+  defaultTileFraming,
 } from './collage/collage'
 export type {
   Collage as CollageType,
   CollageBackground as CollageBackgroundType,
   CollageLayout as CollageLayoutType,
   CollageTile as CollageTileType,
+  TileFraming as TileFramingType,
 } from './collage/collage'
 
 // The contracts + backends

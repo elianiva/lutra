@@ -31,6 +31,12 @@ export const Model = S.Struct({
   selection: S.Array(EditIdSchema),
   // The saved-collages section under the edits grid (docs/adr/0030).
   collages: CollageList.schema,
+  // Measured thumbnail pixel sizes for collage tiles whose framing is
+  // custom (docs/adr/0033) — the mini-previews mirror the framing, which
+  // needs each photo's aspect. Default-framed tiles stay object-cover.
+  collageThumbSizes: S.Array(
+    S.Struct({ editId: EditIdSchema, width: S.Number, height: S.Number }),
+  ),
   // ADR-0022's inline two-step delete confirm, per collage card.
   confirmingCollageDelete: S.NullOr(CollageIdSchema),
   // The Edit id awaiting delete confirmation in the modal dialog (ADR-0022,
@@ -56,6 +62,7 @@ export const initialModel = (): Model => ({
   notice: null,
   selection: [],
   collages: CollageList.Idle(),
+  collageThumbSizes: [],
   confirmingCollageDelete: null,
   pendingDelete: null,
   settingsDialog: Dialog.init({ id: 'gallery-settings-dialog' }),

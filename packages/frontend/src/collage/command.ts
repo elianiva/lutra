@@ -1,4 +1,5 @@
 import { Effect, Option, Schema as S } from 'effect'
+import { Duration } from 'effect'
 import { Command } from 'foldkit'
 import { pushUrl } from 'foldkit/navigation'
 import {
@@ -6,11 +7,13 @@ import {
   CollageIdSchema,
   CollageLayout,
   CollageStore as CollageStoreTag,
+  CollageTile,
   EditIdSchema,
   EditStore,
 } from '@lutra/store'
 import type { EditId, StoreError } from '@lutra/store'
 import {
+  CellMeasured,
   CollageExportSnapshotFailed,
   CollageExportSnapshotted,
   CollageLoaded,
@@ -19,17 +22,20 @@ import {
   LoadFailed,
   NavigatedBack,
   SaveFailed,
+  ThumbsMeasured,
+  UndoExpired,
+  ZoomSettled,
 } from './message'
 import { renderEditTile } from './render-tile'
-import { CELL_SIZE, composeGrid } from './compose'
+import { cellSize, composeGrid } from './compose'
 import { setFrame } from '../export-dialog'
 
 /**
  * Load one collage by id and resolve its references (docs/adr/0030): tiles
  * whose Edit no longer exists are dropped from the loaded copy — never
  * persisted until the next auto-save — and counted in `dropped` so the
- * screen can show a notice. The referenced edits' summaries ride along as
- * `thumbs` (preview bytes for the surviving tiles).
+ * screen can show a notice. The referenced edits' full source bytes ride
+ * along as `photos` (HD preview bytes for the surviving tiles).
  */
 export const LoadCollage = Command.define('LoadCollage', {
   args: { id: CollageIdSchema },
@@ -41,21 +47,64 @@ export const LoadCollage = Command.define('LoadCollage', {
         return CollageMissing()
       }
       const edits = yield* EditStore
-      const summaries = yield* edits.list()
-      const alive = new Set<EditId>(summaries.map((s) => s.id))
       const record = loaded.value
-      const kept = record.tiles.filter((tile) => alive.has(tile.editId))
-      const dropped = record.tiles.length - kept.length
-      const thumbIds = new Set(kept.map((t) => t.editId))
+      const kept: CollageTile[] = []
+      const photos: { id: EditId; source: Uint8Array }[] = []
+      let dropped = 0
+      for (const tile of record.tiles) {
+        const maybe = yield* edits.load(tile.editId)
+        if (Option.isSome(maybe)) {
+          kept.push(tile)
+          photos.push({ id: maybe.value.id, source: maybe.value.source })
+        } else {
+          dropped += 1
+        }
+      }
       return CollageLoaded({
         collage: { ...record, tiles: kept },
-        thumbs: summaries.filter((s) => thumbIds.has(s.id)),
+        photos,
         dropped,
       })
     }).pipe(
       Effect.catchTag('StoreError', (err: StoreError) => Effect.succeed(LoadFailed({ error: err }))),
     ),
   messages: [CollageLoaded, CollageMissing, LoadFailed],
+})
+
+/**
+ * Decode each referenced source photo once to learn its pixel size
+ * (docs/adr/0033) — the framing placement math needs every photo's aspect.
+ * Source bytes preserve the full-resolution aspect; a source that fails to
+ * decode simply keeps the cover fallback; no error surfaces.
+ */
+export const MeasureThumbs = Command.define('MeasureThumbs', {
+  args: {
+    photos: S.Array(S.Struct({ id: EditIdSchema, source: S.Uint8Array })),
+  },
+  execute: ({ photos }) =>
+    Effect.gen(function* MeasureThumbs() {
+      const sizes: {
+        readonly editId: EditId
+        readonly width: number
+        readonly height: number
+      }[] = []
+      for (const { id, source } of photos) {
+        // SAFETY: the store hands back image bytes over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
+        // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
+        const bytes = source as BlobPart
+        const decoded = yield* Effect.option(
+          Effect.tryPromise(() => createImageBitmap(new Blob([bytes]))),
+        )
+        if (Option.isNone(decoded)) {
+          continue
+        }
+        const bitmap = decoded.value
+        sizes.push({ editId: id, width: bitmap.width, height: bitmap.height })
+        yield* Effect.sync(() => bitmap.close())
+      }
+      return ThumbsMeasured({ sizes })
+    }),
+  messages: [ThumbsMeasured],
 })
 
 /**
@@ -77,6 +126,39 @@ export const SaveCollage = Command.define('SaveCollage', {
 })
 
 /**
+ * The undo toast's fuse (docs/adr/0033): when it burns out the undo slot
+ * clears — unless a newer gesture has already replaced the slot, which the
+ * sequence token guards.
+ */
+export const ScheduleUndoExpiry = Command.define('ScheduleUndoExpiry', {
+  args: { seq: S.Number },
+  execute: ({ seq }) => Effect.sleep(Duration.seconds(5)).pipe(Effect.as(UndoExpired({ seq }))),
+  messages: [UndoExpired],
+})
+
+/**
+ * A wheel-zoom gesture's quiet period (docs/adr/0033): after the last tick,
+ * the drafted framing commits and auto-saves. Re-armed (with a new seq) by
+ * every tick, so only the final one lands.
+ */
+export const ScheduleZoomCommit = Command.define('ScheduleZoomCommit', {
+  args: { seq: S.Number },
+  execute: ({ seq }) =>
+    Effect.sleep(Duration.millis(600)).pipe(Effect.as(ZoomSettled({ seq }))),
+  messages: [ZoomSettled],
+})
+
+/**
+ * One preview cell's CSS-pixel size was measured; the model only cares about
+ * changes. Observability of the ResizeObserver — no side effect.
+ */
+export const ReportCellSize = Command.define('ReportCellSize', {
+  args: { width: S.Number, height: S.Number },
+  execute: ({ width, height }) => Effect.succeed(CellMeasured({ width, height })),
+  messages: [CellMeasured],
+})
+
+/**
  * Back to the main menu. The URL change triggers a `ChangedRoute`, which
  * moves the gallery into place — this Command is just the side effect that
  * starts it.
@@ -87,39 +169,41 @@ export const NavigateMenu = Command.define('NavigateMenu', {
 })
 
 /**
- * Compose the export frame once per dialog open (docs/adr/0031): load every
- * referenced Edit in full (source bytes + chain), render each chain to its
- * square cell through the GPU, and draw the grid at the shared machine's
- * `CELL_SIZE`. The composed ImageData is slotted for the dialog's lifetime
- * — pressing Export re-encodes without re-rendering. A tile whose Edit
+ * Compose the export frame once per dialog open (docs/adr/0031, 0033): load
+ * every referenced Edit in full (source bytes + chain), render each chain at
+ * its cell size — through the tile's framing — via the GPU, and draw the
+ * grid. The composed ImageData is slotted for the dialog's lifetime —
+ * pressing Export re-encodes without re-rendering. A tile whose Edit
  * vanished mid-flow, or whose render failed, leaves its cell as background;
  * `failedTiles` counts them so the screen can say so.
  */
 export const SnapshotCollageExport = Command.define('SnapshotCollageExport', {
-  args: { editIds: S.Array(EditIdSchema), layout: CollageLayout },
-  execute: ({ editIds, layout }) =>
+  args: { tiles: S.Array(CollageTile), layout: CollageLayout },
+  execute: ({ tiles, layout }) =>
     Effect.gen(function* SnapshotCollageExport() {
       const edits = yield* EditStore
-      const tiles: ImageData[] = []
+      const cell = cellSize(layout, tiles.length)
+      const images: ImageData[] = []
       let failedTiles = 0
-      for (const id of editIds) {
-        const loaded = yield* edits.load(id)
+      for (const tile of tiles) {
+        const loaded = yield* edits.load(tile.editId)
         if (Option.isNone(loaded)) {
           failedTiles += 1
           continue
         }
         const edit = loaded.value
-        const tile = yield* renderEditTile({
-          cellSize: CELL_SIZE,
+        const rendered = yield* renderEditTile({
+          cell,
           chain: edit.chain,
+          framing: tile.framing,
           source: edit.source,
         })
-        if (!tile.ok) {
+        if (!rendered.ok) {
           failedTiles += 1
         }
-        tiles.push(tile.image)
+        images.push(rendered.image)
       }
-      const image = composeGrid(tiles, layout)
+      const image = composeGrid(images, layout)
       // The pixels bypass the model entirely (see export-dialog/frame.ts).
       setFrame(image)
       return CollageExportSnapshotted({ failedTiles })

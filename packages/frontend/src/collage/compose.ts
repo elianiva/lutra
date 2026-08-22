@@ -1,21 +1,31 @@
 import type { CollageLayout } from '@lutra/store'
 
 /**
- * The collage's grid geometry and composition (docs/adr/0031): pure rect
- * math plus one 2D-canvas draw step. Cells are square, laid out in reading
- * order with a uniform gutter — including the outer edge — on the layout's
- * background. The last row's unused cells stay background.
+ * The collage's grid geometry and composition (docs/adr/0031, 0033): pure
+ * rect math plus one 2D-canvas draw step.
+ *
+ * Geometry flows from the **frame** inward: the layout's frame ratio shapes
+ * the composed frame (its short edge pinned to {@link FRAME_SHORT_EDGE}),
+ * and cells divide that frame minus the uniform gutter — so a 4:5 preset
+ * really does export 4:5, gutters and partial last rows included. Cells are
+ * laid out in reading order; the last row's unused cells stay background.
  */
 
-/** Export composes at fixed square cells before the scale preset (docs/adr/0031). */
-export const CELL_SIZE = 1024
+/**
+ * The composed frame's short edge at export resolution, before the scale
+ * preset (docs/adr/0031). Sized so a default grid lands in the same output
+ * ballpark as the pre-framing square-cell renderer.
+ */
+export const FRAME_SHORT_EDGE = 2048
 
-export interface CellRect {
-  readonly x: number
-  readonly y: number
-  /** Always `CELL_SIZE` — tiles center-crop into the square cell. */
+export interface CellSize {
   readonly width: number
   readonly height: number
+}
+
+export interface CellRect extends CellSize {
+  readonly x: number
+  readonly y: number
 }
 
 export interface GridGeometry {
@@ -24,25 +34,63 @@ export interface GridGeometry {
   readonly cells: readonly CellRect[]
 }
 
-/** Pure geometry for `count` tiles in a fixed grid — unit-tested in compose.test.ts. */
-export const gridRects = (
-  layout: Pick<CollageLayout, 'columns' | 'gutter'>,
+const rowCount = (count: number, columns: number): number =>
+  Math.max(1, Math.ceil(Math.max(0, count) / columns))
+
+/**
+ * The composed frame's pixel size for `count` tiles: the frame ratio shapes
+ * it, the short edge pins the scale. A nonsensical ratio falls back to
+ * square.
+ */
+export const frameSize = (
+  layout: Pick<CollageLayout, 'frameRatio'>,
+  basis: number = FRAME_SHORT_EDGE,
+): CellSize => {
+  const ratio = Number.isFinite(layout.frameRatio) && layout.frameRatio > 0 ? layout.frameRatio : 1
+  return ratio >= 1
+    ? { width: Math.round(basis * ratio), height: Math.round(basis) }
+    : { width: Math.round(basis * ratio), height: Math.round(basis) }
+}
+
+/** One cell's pixel size: the frame minus its gutters, divided evenly. */
+export const cellSize = (
+  layout: Pick<CollageLayout, 'columns' | 'gutter' | 'frameRatio'>,
   count: number,
-  cellSize = CELL_SIZE,
+  basis?: number,
+): CellSize => {
+  const columns = Math.max(1, Math.round(layout.columns))
+  const gutter = Math.max(0, Math.round(layout.gutter))
+  const { width, height } = frameSize(layout, basis)
+  return {
+    width: Math.max(1, Math.round((width - (columns + 1) * gutter) / columns)),
+    height: Math.max(1, Math.round((height - (rowCount(count, columns) + 1) * gutter) / rowCount(count, columns))),
+  }
+}
+
+/**
+ * Pure geometry for `count` tiles in a fixed grid — unit-tested in
+ * compose.test.ts. The whole frame measures within a pixel of the frame
+ * ratio's promise; cells divide it evenly.
+ */
+export const gridRects = (
+  layout: Pick<CollageLayout, 'columns' | 'gutter' | 'frameRatio'>,
+  count: number,
+  basis?: number,
 ): GridGeometry => {
   const columns = Math.max(1, Math.round(layout.columns))
   const gutter = Math.max(0, Math.round(layout.gutter))
-  const rows = Math.max(1, Math.ceil(count / columns))
-  const width = columns * cellSize + (columns + 1) * gutter
-  const height = rows * cellSize + (rows + 1) * gutter
+  const cell = cellSize(layout, count, basis)
+  const rows = rowCount(count, columns)
+  const width = columns * cell.width + (columns + 1) * gutter
+  const height = rows * cell.height + (rows + 1) * gutter
   const cells = Array.from({ length: count }, (_, i) => {
     const col = i % columns
     const row = Math.floor(i / columns)
     return {
-      x: gutter + col * (cellSize + gutter),
-      y: gutter + row * (cellSize + gutter),
-      width: cellSize,
-      height: cellSize,
+      x: gutter + col * (cell.width + gutter),
+      y: gutter + row * (cell.height + gutter),
+      width: cell.width,
+      height: cell.height,
     }
   })
   return { width, height, cells }
@@ -50,7 +98,7 @@ export const gridRects = (
 
 /**
  * Draw the rendered tiles onto the composed canvas: each tile copies
- * pixel-perfect into its square cell over the layout's background. Tiles are
+ * pixel-perfect into its cell over the layout's background. Tiles are
  * rendered (or blank-filled) exactly at the cell size, so there is no
  * resampling and no mismatch path. Returns the full composed frame as
  * ImageData, ready for the engine encoder.
@@ -58,9 +106,9 @@ export const gridRects = (
 export const composeGrid = (
   tiles: readonly ImageData[],
   layout: CollageLayout,
-  cellSize = CELL_SIZE,
+  basis?: number,
 ): ImageData => {
-  const { width, height, cells } = gridRects(layout, tiles.length, cellSize)
+  const { width, height, cells } = gridRects(layout, tiles.length, basis)
   const canvas = new OffscreenCanvas(width, height)
   const ctx = canvas.getContext('2d')
   if (!ctx) {
@@ -70,8 +118,8 @@ export const composeGrid = (
   ctx.fillRect(0, 0, width, height)
   // cells has exactly `tiles.length` entries by construction.
   tiles.forEach((tile, i) => {
-    const cell = cells[i]!
-    ctx.putImageData(tile, cell.x, cell.y)
+    const rect = cells[i]!
+    ctx.putImageData(tile, rect.x, rect.y)
   })
   return ctx.getImageData(0, 0, width, height)
 }

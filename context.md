@@ -116,12 +116,20 @@ _Avoid_: "thumbnail card" (it's the record, not the visual card), "saved-edit ti
 The timestamp stored on an **Edit** that orders the **main menu**. Because the local IndexedDB table is keyed by **Edit id** and not ordered by time, `list()` sorts summaries by `savedAt` in memory (a future sqlite/cloud backend may order server-side instead — docs/adr/0007).
 
 **Collage**:
-A gallery-side record arranging several **Edits** into one shareable image: a stable UUID, its **savedAt**, a fixed-grid layout, and an ordered set of **Collage tiles**. A Collage owns no pixels — it references Edits **by id**: previews draw each tile's stored thumbnail, and export re-renders each referenced Edit's chain (docs/adr/0030, 0031). Created persist-first from a multi-select in the **main menu**; layout changes auto-save; there is no Save/Save as. Listed in the main menu's **Collages** section, ordered by **savedAt**.
+A gallery-side record arranging several **Edits** into one shareable image: a stable UUID, its **savedAt**, a fixed-grid layout with a **frame ratio**, and an ordered set of **Collage tiles**. A Collage owns no pixels — it references Edits **by id**: previews draw each tile's stored thumbnail, and export re-renders each referenced Edit's chain (docs/adr/0030, 0031). Created persist-first from a multi-select in the **main menu**; layout changes auto-save; there is no Save/Save as. Listed in the main menu's **Collages** section, ordered by **savedAt**.
 _Avoid_: "moodboard" (implies freeform placement; the layout is a fixed grid), "Contact sheet" (names the grid layout style, not the record), "collage layer" (a collage contains no adjustment layers).
 
 **Collage tile**:
-One placed **Edit** within a **Collage**: the referenced **Edit id** — position is the tile's array index in reading order. Tiles support remove and reorder only; there is no add-after-creation in v1. An Edit deleted after being placed is dropped from the Collage on load, with a notice; saving persists the cleaned set.
+One placed **Edit** within a **Collage**: the referenced **Edit id**, plus that tile's **tile framing** — position is the tile's array index in reading order. Tiles support remove, reorder, and reframing only; there is no add-after-creation in v1. An Edit deleted after being placed is dropped from the Collage on load, with a notice; saving persists the cleaned set.
 _Avoid_: "cell" (the cell is the layout slot; the tile is the placed Edit).
+
+**Frame ratio**:
+The composed collage frame's width:height — chosen from presets (`1:1`, `4:5`, `9:16`, `16:9`) or a custom W:H entry. Cell shapes derive from the frame ratio together with columns and gutter; they are not set independently.
+_Avoid_: "aspect ratio" unqualified (ambiguous between the frame and the cell), "canvas size" (the frame ratio is a shape, not a resolution).
+
+**Tile framing**:
+The part of a referenced Edit's image that one Collage tile shows: a zoom and pan over the photo, persisted on the tile and applied identically by the collage screen preview, the main menu's mini-previews, and export. Zoom ranges from fit (whole photo visible, background bars) up to 4× cover; the default is cover — the smallest zoom that fills the cell — so tiles without explicit framing look unchanged. Framing never alters the Edit's pixels; it is a view transform, not a crop.
+_Avoid_: "crop" (implies pixels are cut away), "fit mode" (dissolved into the framing zoom range).
 
 **Store error**:
 The tagged error type a failed **Edit store** operation raises (a genuine failure — quota, blocked access, corruption — not a missing record, which `load` reports as `Option.None`). Its purpose is to give the frontend a channel to surface failures (in the **main menu** or **Options screen**) and to let future sync distinguish local from server failure.
@@ -250,7 +258,7 @@ The gallery screen at `/` (the app's entry point). Shows saved **edits** as a gr
 _Avoid_: "Gallery" (ambiguous with the image-processing sense of the word), "landing page".
 
 **Collage screen**:
-The screen at `/collage/<collage id>`, reached from **Create collage** or a **Collages**-section tile. Renders the fixed-grid preview — each **Collage tile** drawn from its referenced **Edit**'s stored thumbnail, fitted to the viewport — with layout controls (columns, gutter, background), per-tile remove and move controls, an export button reusing the export dialog, and back navigation to the **main menu**. Layout changes auto-save; references whose Edit was deleted are dropped on load with a notice.
+The screen at `/collage/<collage id>`, reached from **Create collage** or a **Collages**-section tile. Renders the fixed-grid preview — each **Collage tile** drawn from its referenced **Edit**'s stored thumbnail through its **tile framing**, fitted to the viewport — with an Arrange/Frame mode toggle (Arrange: drag-and-drop reorder with an insertion gap; Frame: drag pans and wheel zooms the tile's framing), layout controls (frame ratio, columns, gutter, background), per-tile remove with an undo toast, an export button reusing the export dialog, and back navigation to the **main menu**. Layout changes auto-save; references whose Edit was deleted are dropped on load with a notice.
 _Avoid_: "collage editor" (nothing is edited but the arrangement).
 
 **Attached edit**:
