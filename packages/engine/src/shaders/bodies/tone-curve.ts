@@ -1,6 +1,6 @@
 import type { BodyRenderer } from '../types'
 
-// Tone curve (docs/adr/0028): a monotone cubic Hermite spline mapping
+// Tone curve (docs/adr/0003-adjustment-layers): a monotone cubic Hermite spline mapping
 // through 5 control points (p0..p4, x-ordered), applied per channel.
 //
 // The curve operates on sRGB-encoded values — the widget's coordinates are

@@ -6,7 +6,7 @@ import { AppMessage, RootMessage } from './message'
 import { subscriptions as collageSubscriptions } from '../collage/subscriptions'
 import type { CollageMessage } from '../collage/message'
 import type { Model } from './model' /**
- * The root's subscriptions (docs/adr/0015): the two bridges that feed the
+ * The root's subscriptions (docs/adr/0007-offline): the two bridges that feed the
  * offline slice from the outside world.
  *
  * - `offlineFill`: the fill's per-file PubSub → root messages. The fill
@@ -52,7 +52,7 @@ export const subscriptions = Subscription.aggregate<Model, AppMessage, OfflineFi
       ).pipe(Stream.map((event): AppMessage => fillEventToMessage(event))),
     ),
   })),
-  // The collage screen's gesture listeners (docs/adr/0033): the drag-and-drop
+  // The collage screen's gesture listeners (docs/adr/0009-collage): the drag-and-drop
   // machine's document-level pointer/keyboard bridges plus its wheel-zoom and
   // cell-size observers, lifted across the GotCollageMessage boundary.
   Subscription.lift(collageSubscriptions)({

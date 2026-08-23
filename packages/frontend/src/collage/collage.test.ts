@@ -179,7 +179,7 @@ describe('collage submodel: layout auto-saves', () => {
     expect(collageOf(low).layout.columns).toBe(1)
   })
 
-  it('ChangedRows clamps to 1–6 and queues a save (docs/adr/0035)', () => {
+  it('ChangedRows clamps to 1–6 and queues a save (docs/adr/0009-collage)', () => {
     const loaded = loadedWith([1, 2, 3], { columns: 3, rows: 2 })
     const [high, highCommands] = update(loaded, CollageMessage.ChangedRows({ rows: 99 }))
     expect(collageOf(high).layout.rows).toBe(6)
@@ -188,7 +188,7 @@ describe('collage submodel: layout auto-saves', () => {
     expect(collageOf(low).layout.rows).toBe(1)
   })
 
-  it('an explicit M×N grid renders its spare capacity as background cells (docs/adr/0035)', () => {
+  it('an explicit M×N grid renders its spare capacity as background cells (docs/adr/0009-collage)', () => {
     const loaded = loadedWith([1], { columns: 2, rows: 2 })
     scene(
       config,

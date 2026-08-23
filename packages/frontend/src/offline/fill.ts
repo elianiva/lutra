@@ -7,7 +7,7 @@ import type { FillEvent, FillFile } from './messages'
 
 // The offline fill (CONTEXT.md "Offline fill"): the background process that
 // mirrors the vendored LUT library into Cache Storage so the app works
-// without a connection. Page-driven by design (docs/adr/0015): the fill
+// without a connection. Page-driven by design (docs/adr/0007-offline): the fill
 // runs as a fiber in a service layer, publishing per-file events into a
 // PubSub; a root subscription bridges those events into the message loop
 // (per-LUT rows, the progress card, the "Offline ready" toast all read the

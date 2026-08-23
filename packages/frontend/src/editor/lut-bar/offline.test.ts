@@ -23,7 +23,7 @@ import { SaveLutRecents, RenderChain, ReadHistogram } from '../command'
 import type { Catalog } from '../message'
 import type { Model } from '../model'
 
-// The LUT bar's offline library behavior (docs/adr/0015): while the device
+// The LUT bar's offline library behavior (docs/adr/0007-offline): while the device
 // is offline, an undownloaded cube's row is dimmed with a "not downloaded"
 // badge and its click becomes the connect-once notice instead of a commit;
 // a downloaded cube commits as usual — offline is exactly the point.

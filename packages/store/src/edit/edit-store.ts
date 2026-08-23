@@ -8,7 +8,7 @@ import type { StoreError } from './store-error'
 /**
  * The swappable storage backend for {@link Edit}s. Aggregate-level and
  * self-contained: each Edit is one record, backend-agnostic by design
- * (docs/adr/0007, 0008). A local IndexedDB implementation and a future
+ * (docs/adr/0005-storage). A local IndexedDB implementation and a future
  * online/cloud implementation both satisfy this contract; the frontend
  * depends only on the service type.
  */
@@ -27,7 +27,7 @@ export interface EditStoreContract {
 
 /**
  * The {@link Edit} storage service. Implementations are swappable behind this
- * boundary: IndexedDB `EditStoreLive` (v1, docs/adr/0007) and a future
+ * boundary: IndexedDB `EditStoreLive` (v1, docs/adr/0005-storage) and a future
  * server/cloud backend. The frontend consumes only this service type.
  */
 export class EditStore extends Context.Service<EditStore, EditStoreContract>()('EditStore') {}

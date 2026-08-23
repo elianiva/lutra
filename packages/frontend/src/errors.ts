@@ -6,7 +6,7 @@ import { Schema } from 'effect'
 // with a `message` and an optional `cause`, so failures can cross the
 // foldkit message boundary as validated values and be caught by tag.
 //
-// Posture (docs/adr/0010): these are recoverable failures — they sit on the
+// Posture (docs/adr/0006-frontend-architecture): these are recoverable failures — they sit on the
 // Effect error channel of commands. Defects (programmer errors) are tagged
 // throws instead, e.g. `MountElementError`.
 

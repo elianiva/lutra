@@ -196,7 +196,7 @@ describe('editor: top bar save controls', () => {
       ...settleCanvasMounts,
       sceneExpect(text('Save')).toExist(),
       // The button's accessible name comes from its aria-label (the visible
-      // label is a CSS-hidable span — docs/adr/0024-mobile-ui).
+      // label is a CSS-hidable span — docs/adr/0010-editor-ui.md).
       sceneExpect(role('button', { name: 'Save as a new edit' })).toExist(),
       click(text('Save')),
       // The button flips to Saving… while the command is in flight.

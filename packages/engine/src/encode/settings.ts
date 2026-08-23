@@ -13,7 +13,7 @@ export type ExportQuality = typeof ExportQuality.Type
 /**
  * The resolution presets the export dialog offers, in display order. A
  * literal union, not a free number: export is a preset scale of the rendered
- * frame, never an upscale (see docs/adr/0005-export-post-scales-rendered-frame.md).
+ * frame, never an upscale (see docs/adr/0004-export.md).
  */
 export const EXPORT_SCALES = [1, 0.75, 0.5, 0.25] as const
 export const ExportScale = Schema.Literals(EXPORT_SCALES)

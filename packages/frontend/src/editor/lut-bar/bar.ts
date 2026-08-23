@@ -12,7 +12,7 @@ import { tab } from './tab'
 import { thumb } from './thumb'
 import { stateFor } from '../../offline/model'
 
-// memoization (ADR 0034)
+// memoization (ADR 0006)
 // The bar's catalog grouping (`groupByCategory`) over ~300 entries and the
 // thumb strip's `visibleEntries` + per-thumb `thumb()` calls are the heaviest
 // pure work in the editor. A hover `PreviewedLut` should not recompute the
@@ -215,7 +215,7 @@ const barView = (
 }
 
 /**
- * The bottom LUT bar (docs/adr/0012): category tabs on the left, a
+ * The bottom LUT bar (docs/adr/0002-lut-library): category tabs on the left, a
  * hover-to-preview / click-to-commit thumbnail filmstrip on the right, and a
  * name line above the strip. Replaces the drawer's accordion picker — the
  * drawer's LUT rows keep summary + strength slider, and a chevron on those

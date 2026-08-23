@@ -9,16 +9,16 @@ import { settingsDialogView } from './settings-dialog'
 import { deleteDialogView } from './delete-dialog'
 
 /**
- * The Gallery Submodel's view (docs/adr/0009). Branded via `defineView` so it
+ * The Gallery Submodel's view (docs/adr/0006-frontend-architecture). Branded via `defineView` so it
  * embeds under the root through `h.submodel`, with `h` typed to the Gallery's
  * own Message union. Renders the grid of Edit summaries ordered by `savedAt`.
  *
  * Thumbnails: `EditSummary.thumbnail` is encoded bytes. A per-summary object
  * URL is created from the bytes and memoized by id. The lifecycle (revoking
  * on unmount / delete) is refined in the editor save-flow slice per the
- * thumbnail contract (docs/adr/0007).
+ * thumbnail contract (docs/adr/0005-storage).
  */
-// memoization (ADR 0034)
+// memoization (ADR 0006)
 const lazyHeader = createLazy()
 const lazyNotice = createLazy()
 const lazyTile = createKeyedLazy()
@@ -87,7 +87,7 @@ const header = (h: HtmlBuilder<GalleryMessage>, selectedCount: number) =>
         [h.Class('flex items-center gap-2')],
         [
           // "Create collage" appears once two or more edits are selected
-          // (docs/adr/0030): below that there is nothing to arrange.
+          // (docs/adr/0009-collage): below that there is nothing to arrange.
           ...(selectedCount >= 2
             ? [
                 h.button(
@@ -229,7 +229,7 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary, selected: bo
         ],
         [tileThumb(h, summary)],
       ),
-      // The collage-select control (docs/adr/0030): an overlay like the
+      // The collage-select control (docs/adr/0009-collage): an overlay like the
       // delete control — no separate "select mode" to enter or leave; the
       // header CTA appears at two or more. Hidden until hover/focus like
       // the rest of the tile's overlays — except once selected, where it
@@ -250,7 +250,7 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary, selected: bo
         selected ? [icon(h, Check, 'Selected')] : [],
       ),
       // Caption + delete ✕: hidden until hover/focus (the ✕ opens the
-      // delete-confirmation dialog, ADR-0022 superseded).
+      // delete-confirmation dialog, ADR-0010 superseded).
       h.div(
         [
           h.Class(
@@ -274,7 +274,7 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary, selected: bo
                   h.OnClick(GalleryMessage.DeleteConfirmRequested({ id: summary.id })),
                   h.AriaLabel('Delete saved edit'),
                   // size-7: a finger-sized hit target on touch screens
-                  // (docs/adr/0024-mobile-ui).
+                  // (docs/adr/0010-editor-ui.md).
                   h.Class(
                     'relative z-10 grid size-7 place-items-center text-white/80 hover:text-white',
                   ),
@@ -301,7 +301,7 @@ const tileThumb = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) => {
     : h.div([h.Class('flex h-full w-full items-center justify-center text-muted')], ['No thumb'])
 }
 
-// Collages section (docs/adr/0030)
+// Collages section (docs/adr/0009-collage)
 
 /**
  * The saved-collages strip beneath the edits grid. Each card composes a live
@@ -414,7 +414,7 @@ const collageCard = (h: HtmlBuilder<GalleryMessage>, collage: CollageRecord, mod
             [h.Class('relative z-10 flex items-center gap-1')],
             confirming
               ? [
-                  // ADR-0022's two-step inline confirm: red confirm + undo.
+                  // ADR-0010's two-step inline confirm: red confirm + undo.
                   h.button(
                     [
                       h.OnClick(GalleryMessage.CollageDeleteRequested({ id: collage.id })),
@@ -466,7 +466,7 @@ const miniPreview = (
   const cell = cellSize(collage.layout, Math.max(1, collage.tiles.length), 1000)
   const cellAspect = cell.width / cell.height
   // Mirror the screen's explicit M×N grid: spare capacity renders as
-  // background cells (docs/adr/0035).
+  // background cells (docs/adr/0009-collage).
   const columns = Math.max(1, Math.round(collage.layout.columns))
   const rows = effectiveRowCount(collage.layout, collage.tiles.length)
   const empties = Array.from(

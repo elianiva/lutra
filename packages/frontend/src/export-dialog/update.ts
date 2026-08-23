@@ -25,7 +25,7 @@ export const open = (model: Model): UpdateReturn => {
 }
 
 /**
- * The shared export-dialog machine's update (docs/adr/0031) — one
+ * The shared export-dialog machine's update (docs/adr/0004-export) — one
  * implementation of the flow the editor and the collage screens previously
  * each carried. Close cleanup is internal: the frame slot is dropped,
  * result flags reset, and a held blob URL revoked.

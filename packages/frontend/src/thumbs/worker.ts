@@ -4,13 +4,13 @@ import type { LutCube } from '@lutra/engine'
 // The LUT-thumbnail worker. The main thread posts `{ id, image, cube }`; the
 // worker applies the cube to the (already downscaled) photo with the engine's
 // CPU sampler — the pure-JS mirror of the WGSL LUT pass, exact for a LUT-only
-// chain (docs/adr/0013) — encodes a small JPEG, and replies `{ id, bytes }`
+// chain (docs/adr/0002-lut-library) — encodes a small JPEG, and replies `{ id, bytes }`
 // (buffer transferred) or `{ id, error }`. Like the encode worker, the thumb
 // worker holds no state: the image is structured-cloned per request, which is
 // cheap at 200×200 (160KB).
 //
 // The JPEG step reuses the engine's `encodeImage` with export settings — the
-// jSquash codecs stay engine-owned (docs/adr/0006).
+// jSquash codecs stay engine-owned (docs/adr/0004-export).
 
 export interface LutThumbRequest {
   readonly id: number

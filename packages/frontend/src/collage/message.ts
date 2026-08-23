@@ -6,7 +6,7 @@ import { Collage, EditIdSchema, StoreError } from '@lutra/store'
 import { CollagePhoto } from './model'
 
 /**
- * The Collage Submodel's message union (docs/adr/0009, 0033). Internal to the
+ * The Collage Submodel's message union (docs/adr/0006-frontend-architecture, docs/adr/0009-collage). Internal to the
  * collage — the root sees them wrapped as `GotCollageMessage`. The collage
  * surfaces no navigation facts to the root: its back button and the
  * bare-route redirect push URLs through commands directly.
@@ -29,31 +29,31 @@ export const CollageMessage = defineMessageUnion({
     sizes: S.Array(S.Struct({ editId: EditIdSchema, width: S.Number, height: S.Number })),
   },
 
-  // layout (each change auto-saves, docs/adr/0030)
+  // layout (each change auto-saves, docs/adr/0009-collage)
   ChangedColumns: {
     columns: S.Number,
   },
-  /** The grid's explicit row count (docs/adr/0035) — an M×N grid, not count-derived. */
+  /** The grid's explicit row count (docs/adr/0009-collage) — an M×N grid, not count-derived. */
   ChangedRows: { rows: S.Number },
   ChangedGutter: { gutter: S.Number },
-  /** The composed frame's width:height (docs/adr/0033), from a preset or custom W:H. */
+  /** The composed frame's width:height (docs/adr/0009-collage), from a preset or custom W:H. */
   ChangedFrameRatio: {
     frameRatio: S.Number,
   },
   ToggledBackground: {},
 
-  /** The Arrange/Frame toggle moved (docs/adr/0033). Leaving Frame commits any in-flight framing gesture. */
+  /** The Arrange/Frame toggle moved (docs/adr/0009-collage). Leaving Frame commits any in-flight framing gesture. */
   ModeChanged: {
     mode: S.Literals(['arrange', 'frame']),
   },
 
-  // arrangement (auto-saves on every mutation, docs/adr/0030)
+  // arrangement (auto-saves on every mutation, docs/adr/0009-collage)
   RemovedTile: { index: S.Number },
   GotDragMessage: {
     message: DragAndDrop.Message,
   },
 
-  // tile framing (docs/adr/0033)
+  // tile framing (docs/adr/0009-collage)
   PanStarted: {
     index: S.Number,
     screenX: S.Number,
@@ -77,7 +77,7 @@ export const CollageMessage = defineMessageUnion({
     height: S.Number,
   },
 
-  // undo (docs/adr/0033)
+  // undo (docs/adr/0009-collage)
   UndoPressed: {},
   /** The toast expired without an undo; the slot clears (sequence-guarded). */
   UndoExpired: { seq: S.Number },
@@ -88,7 +88,7 @@ export const CollageMessage = defineMessageUnion({
   BackRequested: {},
   NavigatedBack: {},
 
-  // export (docs/adr/0031)
+  // export (docs/adr/0009-collage)
   ExportRequested: {},
   /**
    * The composed grid landed in the export-dialog's frame slot — all tiles

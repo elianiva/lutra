@@ -4,7 +4,7 @@ import type { OfflinePhase } from './machine'
 import type { AppMessage } from '../root/message'
 import { OfflineMessage } from './messages'
 
-// The offline fill machine's transition table (docs/adr/0015), asserted the
+// The offline fill machine's transition table (docs/adr/0007-offline), asserted the
 // same way the editor phase machine is (phase.test.ts): the states a message
 // can land in are exactly the edges below, and messages with no edge are
 // ignored — that absence IS the blocking (a Ready fill ignores everything; a

@@ -4,7 +4,7 @@ import { Dialog } from '@foldkit/ui'
 import { ExportFormat, ExportQuality, ExportScale, ExportSettings } from '@lutra/engine'
 
 /**
- * The shared export dialog machine's messages (docs/adr/0031). The owning
+ * The shared export dialog machine's messages (docs/adr/0004-export). The owning
  * screen wraps them as `GotExportDialogMessage` at its own boundary and
  * feeds snapshot outcomes in through `FrameReady` / `FrameFailed`.
  */

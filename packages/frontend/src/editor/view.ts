@@ -15,7 +15,7 @@ import * as ExportDialog from '../export-dialog'
 import { EditorMessage } from './message'
 import { icon } from '../components/icon'
 
-// lazy islands (ADR 0034)
+// lazy islands (ADR 0006)
 // Editor has ~28 Model fields but only a handful change per message.
 // Each island is memoized by its slice's reference (editor uses `evo`,
 // so unchanged keys keep ===). This keeps a slider drag at ~16ms instead
@@ -28,7 +28,7 @@ const lazyLutBar = createLazy()
 const lazyMobileTabBar = createLazy()
 const lazyExportDialog = createLazy()
 
-// Module-scope view helpers — stable fn refs for lazy (ADR 0034).
+// Module-scope view helpers — stable fn refs for lazy (ADR 0006).
 // Each helper takes only the slice refs the island actually reads, so a
 // `ScaledCanvas` burst (scale/offset) doesn't invalidate `toolPanel` which
 // only cares about chain/catalog/phase. Helpers synthesize a narrow Model
@@ -157,7 +157,7 @@ const exportDialogView = (dialog: Model['exportDialog'], h: HtmlBuilder<EditorMe
   )
 
 /**
- * The Editor submodel's view (docs/adr/0009). Branded via `defineView` so it
+ * The Editor submodel's view (docs/adr/0006-frontend-architecture). Branded via `defineView` so it
  * embeds under the root through `h.submodel`, and its `h` is typed to the
  * Editor's own Message union — every handler this view builds dispatches
  * through the Editor boundary (wrapped up as `GotEditorMessage` by the root).

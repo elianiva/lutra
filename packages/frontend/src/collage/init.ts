@@ -11,11 +11,11 @@ import { LoadCollage } from './command'
 
 /**
  * The Collage Submodel's boot state, called by the root's `init` for the
- * cold load (docs/adr/0009). Seeds the collage slice and returns the boot
+ * cold load (docs/adr/0006-frontend-architecture). Seeds the collage slice and returns the boot
  * Command the CollageRoute arm calls for — a `LoadCollage` fetch when the
  * initial URL addresses a collage. The bare `/collage` form carries a null
  * id and is redirected home by the root, so it fires nothing. The shared
- * export-dialog's persisted settings restore on every boot (docs/adr/0031).
+ * export-dialog's persisted settings restore on every boot (docs/adr/0004-export).
  *
  * All Submodels are initialized on every cold load (they hold persistent
  * cross-route state); only the active route's commands fire here.

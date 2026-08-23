@@ -1,4 +1,4 @@
-// The Collage Submodel (docs/adr/0009, docs/adr/0030): a screen owning one
+// The Collage Submodel (docs/adr/0006-frontend-architecture, docs/adr/0009-collage): a screen owning one
 // saved Collage — its fixed-grid preview, layout controls, and export —
 // behind a `GotCollageMessage` boundary at the root. The root embeds `view`,
 // delegates `GotCollageMessage` to `update`, cold-loads via `init(route)`

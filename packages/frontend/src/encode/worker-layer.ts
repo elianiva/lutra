@@ -7,7 +7,7 @@ import type { EncodeRequest, EncodeResponse } from './worker'
  * off the main thread (a 12MP AVIF encode takes seconds); the worker is
  * created once and terminated with the layer. The worker itself imports the
  * engine's pure encode — the codec knowledge stays in the engine (see
- * docs/adr/0006).
+ * docs/adr/0004-export).
  */
 export const ImageEncoderWorkerLive = Layer.effect(
   ImageEncoder,

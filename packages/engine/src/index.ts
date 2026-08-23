@@ -47,7 +47,7 @@ export type { RenderRequest } from './render'
 export { parseCube, LutParseError } from './luts/cube'
 export type { LutCube } from './luts/cube'
 
-// The pure-JS mirror of the WGSL LUT pass body (docs/adr/0013): per-photo
+// The pure-JS mirror of the WGSL LUT pass body (docs/adr/0002-lut-library): per-photo
 // filmstrip previews render through this in the thumb worker, where the GPU
 // pipeline is not available. Exact match for a LUT-only chain (sRGB in,
 // sRGB out — no colorspace boundary).
@@ -81,7 +81,7 @@ export {
 
 // The engine owns the encoder contract (`ImageEncoder` service) and the
 // jSquash implementation; the frontend provides a worker-backed layer for
-// the app (docs/adr/0006).
+// the app (docs/adr/0004-export).
 export {
   EXPORT_FORMATS,
   ExportFormat,

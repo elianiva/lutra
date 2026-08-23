@@ -8,7 +8,7 @@ import { fmtBytes, formatSection, qualitySection, resolutionSection } from './se
 import { peekFrame } from './frame'
 
 /**
- * The shared export dialog view (docs/adr/0031): the format / quality /
+ * The shared export dialog view (docs/adr/0004-export): the format / quality /
  * resolution sections with the status line and `<stem>.<format>` filename.
  * Encoding runs only when Export is pressed — the frame is snapshotted once
  * when the dialog opens, then re-encoded per press. The owning screen
@@ -37,7 +37,7 @@ export const exportDialogView = <P>(
                 h.div(
                   [
                     ...panel,
-                    // Full-width on phones (docs/adr/0024-mobile-ui): the fixed 420px
+                    // Full-width on phones (docs/adr/0010-editor-ui.md): the fixed 420px
                     // panel would overflow a ~360px viewport. Capped in
                     // height with an internal scroll so a landscape phone
                     // can still reach the Export button.

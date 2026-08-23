@@ -7,7 +7,7 @@ import { CollageStore } from './collage-store'
 import type { StoreError } from '../edit/store-error'
 
 /**
- * The IndexedDB local backend for {@link Collage}s (docs/adr/0030). One row
+ * The IndexedDB local backend for {@link Collage}s (docs/adr/0009-collage). One row
  * per Collage in the `collages` object store, keyed by id; the menu section's
  * list is the whole table scanned and sorted newest-first (see `tableCrud`).
  *

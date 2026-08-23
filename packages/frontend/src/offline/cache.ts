@@ -6,7 +6,7 @@ import { Context, Effect, Layer, Schema } from 'effect'
 // name is shared with the SW by construction (scripts/build-sw.ts injects
 // the same literal into the built sw.js). Because the fill is diff-based
 // against this cache, nothing here is ever purged by the SW: the library
-// survives service-worker swaps (docs/adr/0015).
+// survives service-worker swaps (docs/adr/0007-offline).
 
 /** The Cache Storage name holding the offline library. Injected into the
  *  service worker at build time by scripts/build-sw.ts — keep the literal

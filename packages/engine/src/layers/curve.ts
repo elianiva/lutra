@@ -1,7 +1,7 @@
 import { FieldKey } from '../brands'
 import type { Layer } from './schemas'
 
-// Tone curve helpers (docs/adr/0028): the Tone Curve layer is a fixed set
+// Tone curve helpers (docs/adr/0003-adjustment-layers): the Tone Curve layer is a fixed set
 // of 5 control points — the black and white anchors plus three interior
 // points — each with an x (input tone) and y (output tone) in [0, 1]. The
 // shader maps every input tone through the piecewise-linear curve the

@@ -1,4 +1,4 @@
-// The persistence seam (docs/adr/0007, 0008, 0030). Owns the Edit / Collage
+// The persistence seam (docs/adr/0005-storage, docs/adr/0009-collage). Owns the Edit / Collage
 // schemas, the swappable EditStore / CollageStore contracts, and backend
 // implementations. A future server/account-side store lands here too.
 

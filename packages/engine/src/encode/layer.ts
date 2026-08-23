@@ -5,7 +5,7 @@ import { EncodeError, ImageEncoder } from './service'
 /**
  * The jSquash-backed encoder: the default implementation of `ImageEncoder`.
  * Runs the encode inline in the calling context; the frontend provides a
- * worker-backed layer for the app (see docs/adr/0006).
+ * worker-backed layer for the app (see docs/adr/0004-export).
  */
 export const ImageEncoderLive = Layer.succeed(
   ImageEncoder,

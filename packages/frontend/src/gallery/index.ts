@@ -1,4 +1,4 @@
-// The Gallery Submodel (docs/adr/0009): a thin screen owning the grid of
+// The Gallery Submodel (docs/adr/0006-frontend-architecture): a thin screen owning the grid of
 // saved Edit summaries and the open/delete actions, behind a
 // `GotGalleryMessage` boundary at the root. The root embeds `view`, delegates
 // `GotGalleryMessage` to `update`, cold-loads via `init(route)` (fires

@@ -1,7 +1,7 @@
 import type { CollageLayout } from '@lutra/store'
 
 /**
- * The collage's grid geometry and composition (docs/adr/0031, 0033): pure
+ * The collage's grid geometry and composition (docs/adr/0009-collage): pure
  * rect math plus one 2D-canvas draw step.
  *
  * Geometry flows from the **frame** inward: the layout's frame ratio shapes
@@ -9,12 +9,12 @@ import type { CollageLayout } from '@lutra/store'
  * and cells divide that frame minus the uniform gutter — so a 4:5 preset
  * really does export 4:5, gutters and partial last rows included. Cells are
  * laid out in reading order; unused cells — a partial last row or an explicit
- * M×N grid's spare capacity (docs/adr/0035) — stay background.
+ * M×N grid's spare capacity (docs/adr/0009-collage) — stay background.
  */
 
 /**
  * The composed frame's short edge at export resolution, before the scale
- * preset (docs/adr/0031). Sized so a default grid lands in the same output
+ * preset (docs/adr/0009-collage). Sized so a default grid lands in the same output
  * ballpark as the pre-framing square-cell renderer.
  */
 export const FRAME_SHORT_EDGE = 2048
@@ -39,7 +39,7 @@ const rowCount = (count: number, columns: number): number =>
   Math.max(1, Math.ceil(Math.max(0, count) / columns))
 
 /**
- * The **effective** row count (docs/adr/0035): the layout's explicit rows,
+ * The **effective** row count (docs/adr/0009-collage): the layout's explicit rows,
  * but never fewer than the tiles demand — legacy records (`rows` decoding to
  * 1) derive rows exactly as before, an explicit M×N is honored whenever its
  * capacity suffices, and surplus photos grow the grid instead of vanishing.
@@ -117,7 +117,7 @@ export const gridRects = (
  * pixel-perfect into its cell over the layout's background. Tiles are
  * rendered (or blank-filled) exactly at the cell size, so there is no
  * resampling and no mismatch path. Cells beyond the tiles (an explicit M×N
- * grid with spare capacity, docs/adr/0035) stay background. Returns the full
+ * grid with spare capacity, docs/adr/0009-collage) stay background. Returns the full
  * composed frame as ImageData, ready for the engine encoder.
  */
 export const composeGrid = (

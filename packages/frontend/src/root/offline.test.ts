@@ -9,7 +9,7 @@ import { Filling, Paused, Ready, QuotaError, Idle } from '../offline/machine'
 import { OfflineMessage } from '../offline/messages'
 import { LutId } from '@lutra/engine'
 
-// The root's offline slice (docs/adr/0015): the machine steps here, the
+// The root's offline slice (docs/adr/0007-offline): the machine steps here, the
 // counters live here, and the per-file facts delegate into the editor
 // Submodel — asserted end to end through the root's update.
 

@@ -80,7 +80,7 @@ describe('cellSize / gridRects', () => {
   })
 })
 
-describe('effectiveRowCount (docs/adr/0035)', () => {
+describe('effectiveRowCount (docs/adr/0009-collage)', () => {
   it('legacy rows (defaulting to 1) derive from the tile count as before', () => {
     expect(effectiveRowCount(layoutWith({ columns: 3 }), 7)).toBe(3)
     expect(effectiveRowCount(layoutWith({ columns: 2 }), 5)).toBe(3)

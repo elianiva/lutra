@@ -36,7 +36,7 @@ const collageOf = (model: Model): Collage | null =>
 
 /**
  * Mutate the loaded collage's arrangement and queue an auto-save
- * (docs/adr/0030). Arrangement messages with no edge while nothing is loaded
+ * (docs/adr/0009-collage). Arrangement messages with no edge while nothing is loaded
  * are ignored — that IS the blocking, with no scattered guards.
  */
 const mutate = (model: Model, f: (collage: Collage) => Collage): UpdateReturn => {
@@ -53,7 +53,7 @@ const mutate = (model: Model, f: (collage: Collage) => Collage): UpdateReturn =>
 }
 
 /**
- * A destructive **tile** mutation (docs/adr/0033): like {@link mutate}, plus
+ * A destructive **tile** mutation (docs/adr/0009-collage): like {@link mutate}, plus
  * a one-slot undo of the previous tiles array whose expiry timer is armed
  * with a sequence token.
  */
@@ -86,7 +86,7 @@ const mutateWithUndo = (
 }
 
 /**
- * Commit the in-flight framing gesture (docs/adr/0033): the drafted framing
+ * Commit the in-flight framing gesture (docs/adr/0009-collage): the drafted framing
  * lands on its tile with an undo snapshot and an auto-save. A no-op when no
  * gesture is live or the draft equals the persisted framing.
  */
@@ -158,7 +158,7 @@ const toDragMessage = (message: DragAndDrop.Message): CollageMessage =>
   CollageMessage.GotDragMessage({ message })
 
 /**
- * The Collage Submodel's update loop (docs/adr/0009): the same
+ * The Collage Submodel's update loop (docs/adr/0006-frontend-architecture): the same
  * `[Model, Commands, Option<OutMessage>]` 3-tuple shape as the gallery and
  * editor. The collage surfaces no OutMessage facts, so the third slot is
  * always `Option.none()`.
@@ -186,7 +186,7 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
             undoLabel: null,
             userEmptied: false,
           },
-          // Aspect measurement rides the load (docs/adr/0033).
+          // Aspect measurement rides the load (docs/adr/0009-collage).
           [MeasureThumbs({ photos })],
           Option.none(),
         ]
@@ -287,7 +287,7 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         return [emptied ? { ...nextModel, userEmptied: true } : nextModel, commands, Option.none()]
       },
 
-      // drag-and-drop reorder (docs/adr/0033)
+      // drag-and-drop reorder (docs/adr/0009-collage)
       GotDragMessage: ({ message }) => {
         const [drag, dragCommands, out] = DragAndDrop.update(model.drag, message)
         const base: UpdateReturn = [
@@ -316,7 +316,7 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
           : base
       },
 
-      // tile framing (docs/adr/0033)
+      // tile framing (docs/adr/0009-collage)
       PanStarted: ({ index, screenX, screenY }) => {
         const collage = collageOf(model)
         if (!collage || model.mode !== 'frame') {
@@ -427,7 +427,7 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         return [same ? model : { ...model, cellPx: { width, height } }, [], Option.none()]
       },
 
-      // undo (docs/adr/0033)
+      // undo (docs/adr/0009-collage)
       UndoPressed: () => {
         const collage = collageOf(model)
         if (!collage || !model.undo) {
@@ -458,7 +458,7 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         Option.none(),
       ],
 
-      // export (docs/adr/0031: compose on open, encode on press)
+      // export (docs/adr/0009-collage: compose on open, encode on press)
       ExportRequested: () => {
         const collage = collageOf(model)
         if (!collage) {

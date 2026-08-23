@@ -500,8 +500,9 @@
 
       <p>
         The hash function is integer-only — <code>u32</code> multiplies and xor-shifts, no
-        transcendentals — per ADR-0025. The quintic easing (<code>t³ · (t · (6t − 15) + 10)</code>)
-        produces smoother interpolation than the cubic alternative, which matters at coarse grain
+        transcendentals — per docs/adr/0001-rendering-engine. The quintic easing (<code
+          >t³ · (t · (6t − 15) + 10)</code
+        >) produces smoother interpolation than the cubic alternative, which matters at coarse grain
         sizes where grid artifacts would otherwise show.
       </p>
 

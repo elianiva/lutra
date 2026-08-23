@@ -10,7 +10,7 @@ import { LutraDbSchema } from './db'
 import { StoreError } from './edit/store-error'
 
 /**
- * Shared scaffolding for the local IndexedDB store backends (docs/adr/0007,
+ * Shared scaffolding for the local IndexedDB store backends (docs/adr/0005-storage,
  * 0008, 0030): typed CRUD effects for a schema-backed table, and the fused
  * ready-to-provide Layer that degrades to a rejecting store when the database
  * cannot be opened. The per-store files keep only their contract assembly.

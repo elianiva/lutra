@@ -3,7 +3,7 @@ import { Brand, Schema } from 'effect'
 /**
  * A brand + schema for the identifier of a {@link Collage} — a UUID.
  *
- * Same posture as an `EditId` (docs/adr/0030): a stable, externally-visible
+ * Same posture as an `EditId` (docs/adr/0009-collage): a stable, externally-visible
  * key appearing in the URL (`/collage/<uuid>`) and as the primary key of the
  * storage backend, so it is format-validated — a malformed uuid fails the
  * whole decode. A corrupt id inside a saved Collage is corruption, not a

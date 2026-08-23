@@ -147,7 +147,7 @@ class ListCommand implements fc.AsyncCommand<Model, void> {
 describe('CollageStoreIndexedDb (IndexedDB local backend)', () => {
   it('migrates an existing v1 database: the collages store appears and edits survive', async () => {
     // Build a v1-shaped "lutra" database by hand — what an install from
-    // before docs/adr/0030 has on disk — holding one encoded Edit row.
+    // before docs/adr/0009-collage has on disk — holding one encoded Edit row.
     const editRow = {
       id: '11111111-1111-4111-8111-111111111111',
       savedAt: 5,
@@ -240,8 +240,8 @@ describe('CollageStoreIndexedDb (IndexedDB local backend)', () => {
     expect(await run(list())).toEqual([])
   })
 
-  it('a pre-framing record decodes with default framing and a square frame ratio (docs/adr/0033)', async () => {
-    // What an install from before docs/adr/0033 has on disk: no `framing`
+  it('a pre-framing record decodes with default framing and a square frame ratio (docs/adr/0009-collage)', async () => {
+    // What an install from before docs/adr/0009-collage has on disk: no `framing`
     // on tiles, a square-only `tileAspect` instead of `frameRatio`.
     const legacyRow = {
       id: '33333333-3333-4333-8333-333333333333',
@@ -275,7 +275,7 @@ describe('CollageStoreIndexedDb (IndexedDB local backend)', () => {
     const loaded = await run(load(CollageId(legacyRow.id)))
     expect(loaded).not.toEqual(Option.none())
     const record = loaded.pipe(Option.getOrThrow)
-    // `rows` decodes to 1 (docs/adr/0035) — consumers derive the effective
+    // `rows` decodes to 1 (docs/adr/0009-collage) — consumers derive the effective
     // row count from the tile count, so legacy records render unchanged.
     expect(record.layout).toEqual({
       background: 'dark',

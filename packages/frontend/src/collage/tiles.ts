@@ -1,5 +1,5 @@
 /**
- * Tile-array operations for the collage (docs/adr/0030). Position IS the
+ * Tile-array operations for the collage (docs/adr/0009-collage). Position IS the
  * array index in reading order, so remove and reorder are plain array ops —
  * the same splice semantics as the editor chain's `ReorderedLayer`, pinned
  * by property tests in `tiles.test.ts`.

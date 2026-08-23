@@ -55,7 +55,7 @@ const loaded = () => ({
 const settled = (model: Model): Model =>
   update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
 
-// update flow (docs/adr/0024-mobile-ui)
+// update flow (docs/adr/0010-editor-ui.md)
 
 describe('mobile bottom sheets', () => {
   it('starts closed', () => {

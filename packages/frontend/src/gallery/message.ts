@@ -5,7 +5,7 @@ import { EditSummary, EditIdSchema, StoreError, CollageIdSchema, Collage } from 
 import { ImageDecodeError, ThumbnailEncodeError } from '../errors'
 
 /**
- * The Gallery Submodel's message union (docs/adr/0009). These are internal to
+ * The Gallery Submodel's message union (docs/adr/0006-frontend-architecture). These are internal to
  * the gallery — the root sees them wrapped as `GotGalleryMessage`. The
  * gallery surfaces the facts the root cares about (a tile was opened) via an
  * `OutMessage` (`OpenedEdit`), not through its Messages.
@@ -25,7 +25,7 @@ export const GalleryMessage = defineMessageUnion({
   EditDeleted: {},
   DeleteFailed: { error: StoreError },
 
-  // collage selection (docs/adr/0030)
+  // collage selection (docs/adr/0009-collage)
   ToggledSelection: { id: EditIdSchema },
   CreateCollageRequested: {},
 
@@ -48,7 +48,7 @@ export const GalleryMessage = defineMessageUnion({
     summaries: S.Option(S.Array(EditSummary)),
   },
 
-  // collage section (docs/adr/0030): list + open + delete
+  // collage section (docs/adr/0009-collage): list + open + delete
   CollagesListed: { collages: S.Array(Collage) },
   CollageListFailed: { error: StoreError },
   CollageThumbsMeasured: {
@@ -63,7 +63,7 @@ export const GalleryMessage = defineMessageUnion({
   CollageDeleted: {},
   CollageDeleteFailed: { error: StoreError },
 
-  // create a collage (persist-first, docs/adr/0030)
+  // create a collage (persist-first, docs/adr/0009-collage)
   CollageCreated: { id: CollageIdSchema },
   CollageCreateFailed: { error: StoreError },
 
@@ -84,7 +84,7 @@ export const GalleryMessage = defineMessageUnion({
 export type GalleryMessage = typeof GalleryMessage.Type
 
 /**
- * The facts the gallery surfaces to the root (docs/adr/0009). Narrow and
+ * The facts the gallery surfaces to the root (docs/adr/0006-frontend-architecture). Narrow and
  * semantic: the root owns navigation, so "open this edit" and "open this
  * collage" are the only facts the gallery emits. The root reacts by pushing
  * the corresponding URL.

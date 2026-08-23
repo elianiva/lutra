@@ -300,7 +300,7 @@ export const RenderChain = Command.define('RenderChain', {
     draft: Schema.NullOr(Layer),
     bitmap: Schema.instanceOf(ImageBitmap),
     stamp: Schema.Number,
-    // The compare presentation state (docs/adr/0011): the render's final
+    // The compare presentation state (docs/adr/0010-editor-ui): the render's final
     // blit applies the current mode and split position.
     present: PresentState,
   },
@@ -344,7 +344,7 @@ export const RenderChain = Command.define('RenderChain', {
 
 /**
  * Re-present the last rendered frame with a new compare presentation state
- * — the blit-only counterpart to RenderChain (docs/adr/0011). Presentation
+ * — the blit-only counterpart to RenderChain (docs/adr/0010-editor-ui). Presentation
  * changes (mode flip, divider drag) never re-run the chain; this command
  * costs one fullscreen triangle. Dispatched by ChangedCompareMode and
  * ChangedSplitPosition; the model's lastRender, bins, and renderedStamp are
@@ -397,14 +397,14 @@ export const ReadHistogram = Command.define('ReadHistogram', {
   messages: [EditorMessage.HistogramComputed, EditorMessage.HistogramFailed],
 })
 
-/** Settings persistence is shared with the collage's export dialog (docs/adr/0031). */
+/** Settings persistence is shared with the collage's export dialog (docs/adr/0004-export). */
 import { setFrame } from '../export-dialog'
 
 /**
  * Read the frame identified by `handle` back from the GPU once, when the
  * export dialog opens. The ImageData lands in the shared export-dialog
  * frame slot for the dialog's lifetime so pressing Export again re-encodes
- * without another readback — it never rides through the model (docs/adr/0031).
+ * without another readback — it never rides through the model (docs/adr/0004-export).
  */
 export const SnapshotForExport = Command.define('SnapshotForExport', {
   args: { handle: Schema.instanceOf(RenderHandle) },
@@ -422,7 +422,7 @@ export const SnapshotForExport = Command.define('SnapshotForExport', {
   messages: [EditorMessage.ExportSnapshotted, EditorMessage.ExportSnapshotFailed],
 })
 
-// LUT recents (the bar's Recents tab, docs/adr/0012)
+// LUT recents (the bar's Recents tab, docs/adr/0002-lut-library)
 
 const LUT_RECENTS_KEY = 'lutRecents'
 
@@ -453,13 +453,13 @@ export const SaveLutRecents = Command.define('SaveLutRecents', {
   messages: [EditorMessage.LutRecentsSaved],
 })
 
-// per-photo LUT thumbnails (filmstrip previews, docs/adr/0013)
+// per-photo LUT thumbnails (filmstrip previews, docs/adr/0002-lut-library)
 
 /**
  * Render one per-photo LUT thumbnail: resolve the cube (memoized by the
  * LUT store) and apply it in the thumb worker pool (CPU sampler + JPEG
  * encode). The photo's 200×200 downscale happens once per photo inside the
- * thumbnailer layer (docs/adr/0013), so a group visit costs a single
+ * thumbnailer layer (docs/adr/0002-lut-library), so a group visit costs a single
  * canvas-2D op. Every non-success path — cube fetch, downscale, worker
  * render, encode — becomes `LutThumbFailed`, so the bar silently keeps the
  * vendored generic jpg. The message carries the photo the preview belongs

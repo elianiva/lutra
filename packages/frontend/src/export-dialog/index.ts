@@ -1,4 +1,4 @@
-// The shared export dialog machine (docs/adr/0031): one implementation of
+// The shared export dialog machine (docs/adr/0004-export): one implementation of
 // the format/quality/scale dialog, the encode-on-press flow, and the frame
 // slot — consumed by the editor (`lutra-edit.<fmt>`) and the collage
 // (`lutra-collage.<fmt>`) screens. The owning screen supplies its snapshot

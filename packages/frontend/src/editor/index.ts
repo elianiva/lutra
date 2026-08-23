@@ -1,4 +1,4 @@
-// The Editor Submodel (docs/adr/0009): owns the editor's Model, Message
+// The Editor Submodel (docs/adr/0006-frontend-architecture): owns the editor's Model, Message
 // union, update, Commands, phase machine, and view behind a `GotEditorMessage`
 // boundary at the root. The root embeds `view`, delegates `GotEditorMessage`
 // to `update`, cold-loads via `init(route)`, and notifies route changes via

@@ -436,8 +436,9 @@
       <p>
         Lutra <em>vendors</em> 296 film-emulation cubes — ships copies of them inside the app,
         rather than downloading them from a third party at runtime — from the G'MIC film presets
-        (<code>YahiaAngelo/Film-Luts</code>, mirrored at a pinned commit; docs/adr/0004). They are
-        static assets in <code>packages/frontend/public/luts/</code>, split across nine categories:
+        (<code>YahiaAngelo/Film-Luts</code>, mirrored at a pinned commit;
+        docs/adr/0002-lut-library). They are static assets in
+        <code>packages/frontend/public/luts/</code>, split across nine categories:
       </p>
 
       <table>
@@ -666,11 +667,11 @@ color = mix(color, lutColor, l0_amount);</code></pre>
       <p>
         The LUT layer is the deliberate exception, and the reason is upstream:
         <strong>G'MIC's film presets are authored against sRGB-encoded values</strong>, because sRGB
-        is G'MIC's working space (docs/adr/0003). Apply a film cube to linear values and the film
-        curves land in the wrong place — the toe and shoulder shift, the strength of every cast
-        changes. So the LUT pass inverts the usual boundaries: it decodes its linear input
-        <em>to</em> sRGB before the body and re-encodes <em>from</em> sRGB after, like the other
-        passes do in reverse.
+        is G'MIC's working space (docs/adr/0001-rendering-engine). Apply a film cube to linear
+        values and the film curves land in the wrong place — the toe and shoulder shift, the
+        strength of every cast changes. So the LUT pass inverts the usual boundaries: it decodes its
+        linear input <em>to</em> sRGB before the body and re-encodes <em>from</em> sRGB after, like
+        the other passes do in reverse.
       </p>
 
       <p>
@@ -688,8 +689,8 @@ color = mix(color, lutColor, l0_amount);</code></pre>
 
       <p>
         The filmstrip at the bottom of the editor shows the <em>user's</em> photo under every LUT
-        they browse — 296 previews of the current image, one per cube (docs/adr/0013). Rendering
-        those through the GPU pipeline would mean a new offscreen render path sharing the
+        they browse — 296 previews of the current image, one per cube (docs/adr/0002-lut-library).
+        Rendering those through the GPU pipeline would mean a new offscreen render path sharing the
         interactive device queue, or a second WebGPU device in a worker (a browser-support gamble).
         The LUT body's simplicity makes a third path obvious: <code>applyLutCpu</code> in the engine
         (<code>src/luts/apply.ts</code>) — the WGSL body above, translated line-for-line to
@@ -844,8 +845,8 @@ color = mix(color, lutColor, l0_amount);</code></pre>
       <p>
         The bar's thumbnails used to be one generic stock photo graded with each LUT — the same
         preview for every user, for every photo. The bar's whole job is &ldquo;see it on
-        <em>your</em> photo&rdquo; (docs/adr/0012), so the previews are now generated per photo, per
-        LUT (&sect;5, docs/adr/0013):
+        <em>your</em> photo&rdquo; (docs/adr/0002-lut-library), so the previews are now generated
+        per photo, per LUT (&sect;5, docs/adr/0002-lut-library):
       </p>
 
       <div class="flow">
@@ -955,15 +956,15 @@ color = mix(color, lutColor, l0_amount);</code></pre>
         <tr>
           <td>Library</td>
           <td>296 cubes, 9 categories</td>
-          <td>vendored from G'MIC film presets (docs/adr/0004)</td>
+          <td>vendored from G'MIC film presets (docs/adr/0002-lut-library)</td>
         </tr>
       </table>
 
       <footer class="fineprint">
         <p class="sans">
           Lutra &mdash; a color-grading app for film simulation. The LUT layer's design decisions:
-          docs/adr/0003 (sRGB application), docs/adr/0004 (vendored library), docs/adr/0012 (the
-          bar), docs/adr/0013 (per-photo previews). The surrounding render pipeline is documented in
+          docs/adr/0001-rendering-engine (sRGB application) and docs/adr/0002-lut-library (vendored
+          library, the bar, per-photo previews). The surrounding render pipeline is documented in
           <code>docs/architecture.html</code>.
         </p>
       </footer>

@@ -24,7 +24,7 @@ type Resource =
 
 /**
  * The Editor Submodel's boot state, called by the root's `init` for the cold
- * load (docs/adr/0009). It seeds the editor and returns the boot Commands the
+ * load (docs/adr/0006-frontend-architecture). It seeds the editor and returns the boot Commands the
  * EditorRoute calls for: the LUT catalog fetch, the persisted export settings
  * and LUT recents restore (the LUT tool stays disabled until the catalog
  * lands), plus — when the route attaches an Edit (`/edit/:id`) — the

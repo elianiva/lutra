@@ -10,7 +10,7 @@ import type { EditStoreContract } from './edit-store'
 import type { StoreError } from './store-error'
 
 /**
- * The IndexedDB local backend for {@link Edit}s (docs/adr/0007, 0008). One
+ * The IndexedDB local backend for {@link Edit}s (docs/adr/0005-storage). One
  * row per Edit in the `edits` object store, keyed by id; the gallery list is
  * the whole table scanned and projected to summaries, newest-first (see
  * `tableCrud`).

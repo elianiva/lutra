@@ -11,7 +11,7 @@ import { EditIdSchema } from './edit-id'
  *
  * Thumbnails render as object URLs the frontend converts from the stored
  * bytes; a future URL-serving cloud backend may return them by URL instead,
- * and the render contract is unchanged (docs/adr/0007).
+ * and the render contract is unchanged (docs/adr/0005-storage).
  */
 export const EditSummary = S.Struct({
   /** Encoded thumbnail size in bytes (per-edit storage metering). */

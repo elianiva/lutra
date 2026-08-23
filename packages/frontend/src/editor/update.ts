@@ -40,7 +40,7 @@ export type UpdateReturn = readonly [
 const ensureFieldIndex = (index: Record<LayerId, number>, layerId: LayerId) =>
   index[layerId] === undefined ? { ...index, [layerId]: 0 } : index
 
-/** The compare presentation state (docs/adr/0011) the blit needs: the mode,
+/** The compare presentation state (docs/adr/0010-editor-ui) the blit needs: the mode,
  *  the split position in image space, and the toggle side. Carried by every
  *  RenderChain (the render's final blit) and by PresentFrame (blit-only). */
 const presentState = (model: Model) => ({
@@ -55,7 +55,7 @@ const presentState = (model: Model) => ({
  *  with the newest state when it completes (see the RenderedFrame handler),
  *  which keeps the GPU queue from backing up during slider drags.
  *
- *  A bar hover preview (docs/adr/0012) swaps the active LUT target's lutId
+ *  A bar hover preview (docs/adr/0002-lut-library) swaps the active LUT target's lutId
  *  at render time — the draft or the focused chain LUT layer — without
  *  touching the chain or the machine (the draft's lutId stays machine-owned).
  *  Belt-and-suspenders: when no LUT target exists the preview is simply not
@@ -135,7 +135,7 @@ const startSave = (model: Model, fork: boolean): UpdateReturn => {
 
 /** Most-recently-applied lutIds, newest first, deduped, capped at 12. The
  *  bar is the only caller (its click commits); the `catalog[0]` auto-default
- *  in SelectedTool never bumps (docs/adr/0012 D6). */
+ *  in SelectedTool never bumps (docs/adr/0002-lut-library D6). */
 const RECENTS_CAP = 12
 const bumpRecents = (model: Model, lutId: LutId): Model => ({
   ...model,
@@ -143,7 +143,7 @@ const bumpRecents = (model: Model, lutId: LutId): Model => ({
 })
 
 /**
- * The per-photo LUT thumbnails (docs/adr/0013) generate lazily, per visible
+ * The per-photo LUT thumbnails (docs/adr/0002-lut-library) generate lazily, per visible
  * group: one `GenerateLutThumb` per filmstrip entry that has no preview
  * yet. Fired on tab select and on bar-open (the LUT-draft auto-open and the
  * chevron), so the visible strip fills in without ever prefetching groups
@@ -166,7 +166,7 @@ const generateThumbCommands = (
 }
 
 /**
- * The persistence-during-preview rule (docs/adr/0012 D7): save and export
+ * The persistence-during-preview rule (docs/adr/0002-lut-library D7): save and export
  * snapshot from `model.lastRender` (thumbnail / export frame), which would
  * otherwise capture the hovered look. While a bar preview is active, the
  * click dismisses the preview instead of acting — the next click proceeds.
@@ -216,7 +216,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
   return Match.value(message).pipe(
     Match.withReturnType<UpdateReturn>(),
     Match.tagsExhaustive({
-      // mobile bottom sheets (docs/adr/0024-mobile-ui)
+      // mobile bottom sheets (docs/adr/0010-editor-ui.md)
       // Toggle the tapped sheet: tapping the active tab closes it, tapping
       // the other switches. Desktop never reads this — the panels render
       // side-by-side there regardless (the sheet classes are `lg:`-scoped).
@@ -243,7 +243,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       ],
       CatalogFailed: ({ error }) => [{ ...model, catalogError: error, phase }, [], Option.none()],
 
-      // offline library (the LUT bar's per-row states, docs/adr/0015)
+      // offline library (the LUT bar's per-row states, docs/adr/0007-offline)
       // Root-delegated facts; the editor machine has no edges for them, so
       // the phase passes through untouched. A cube file's fetch began: the
       // bar row shows its spinner.
@@ -309,7 +309,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           return [model, [], Option.none()]
         }
         // A new photo invalidates the previous one's per-photo LUT previews
-        // (docs/adr/0013): clear the map and revoke the old blob URLs.
+        // (docs/adr/0002-lut-library): clear the map and revoke the old blob URLs.
         const urls = Object.values(model.lutThumbs)
         const [next, commands] = renderNow({
           ...model,
@@ -320,7 +320,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           saveStatus: { _tag: 'idle' },
           lutThumbs: {},
           // A new photo is a new context: close the mobile sheets so the
-          // canvas is the first thing on screen (docs/adr/0024-mobile-ui).
+          // canvas is the first thing on screen (docs/adr/0010-editor-ui.md).
           mobileSheet: null,
         })
         return [
@@ -340,7 +340,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       // the machine ignores the clear and the resets are no-ops.
       ClearedImage: () => {
         // The image is gone: its per-photo LUT previews are dead too —
-        // clear the map and revoke the blob URLs (docs/adr/0013).
+        // clear the map and revoke the blob URLs (docs/adr/0002-lut-library).
         const urls = Object.values(model.lutThumbs)
         return [
           {
@@ -361,7 +361,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             // A cleared image has no LUT target — a stale hover preview must
             // not leak into a future render.
             previewLut: null,
-            // The mobile sheets close with the image (docs/adr/0024-mobile-ui).
+            // The mobile sheets close with the image (docs/adr/0010-editor-ui.md).
             mobileSheet: null,
             attachedEdit: null,
             saveStatus: { _tag: 'idle' },
@@ -383,7 +383,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           return [model, [], Option.none()]
         }
         // A new photo invalidates the previous one's per-photo LUT previews
-        // (docs/adr/0013): clear the map and revoke the old blob URLs.
+        // (docs/adr/0002-lut-library): clear the map and revoke the old blob URLs.
         const urls = Object.values(model.lutThumbs)
         const [next, commands] = renderNow({
           ...model,
@@ -400,7 +400,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           // mode itself persists across images).
           compareSplitAt: 0.5,
           // And closes the mobile sheets — the canvas is the first thing
-          // on screen (docs/adr/0024-mobile-ui).
+          // on screen (docs/adr/0010-editor-ui.md).
           mobileSheet: null,
           attachedEdit: { id, source },
           saveStatus: { _tag: 'idle' },
@@ -431,7 +431,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       },
 
       // Save/export while a bar preview is active dismisses the preview
-      // instead of acting (docs/adr/0012 D7) — the thumbnail and the export
+      // instead of acting (docs/adr/0002-lut-library D7) — the thumbnail and the export
       // frame snapshot `model.lastRender`, which would otherwise capture the
       // hovered look. The next click proceeds.
       SaveRequested: () => dismissPreviewOr({ ...model, phase }, () => startSave(model, false)),
@@ -520,7 +520,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           }
         }
         // The bar just auto-opened: the visible group's per-photo thumbs
-        // start generating (docs/adr/0013) — one command per missing LUT.
+        // start generating (docs/adr/0002-lut-library) — one command per missing LUT.
         const rendered = {
           ...next,
           activeFieldIndex: ensureFieldIndex(model.activeFieldIndex, layer.id),
@@ -593,7 +593,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         const open = !model.lutBarOpen
         // Closing also clears the hover preview; opening has nothing to
         // clear (a closed bar cannot be hovered). Opening starts the
-        // visible group's per-photo thumbs (docs/adr/0013).
+        // visible group's per-photo thumbs (docs/adr/0002-lut-library).
         const next = {
           ...model,
           lutBarOpen: open,
@@ -603,7 +603,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         return [next, open ? generateThumbCommands(next) : [], Option.none()]
       },
 
-      // LUT bar (bottom filmstrip picker, docs/adr/0012)
+      // LUT bar (bottom filmstrip picker, docs/adr/0002-lut-library)
       // Hover enter/leave on a bar thumb. Presentation-only: sets the
       // previewed lutId and re-renders; the committed chain/draft is
       // untouched. null restores the committed look. The same-value guard
@@ -621,7 +621,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         return renderNow({ ...model, offlineLutNotice: null, phase, previewLut: lutId })
       },
       // Tab click: presentation-only (no render), but the newly visible
-      // group's per-photo thumbs start generating (docs/adr/0013) — a
+      // group's per-photo thumbs start generating (docs/adr/0002-lut-library) — a
       // revisit after a failure retries the missing LUTs.
       SelectedLutTab: ({ tab }) => {
         const next = { ...model, lutTab: tab, offlineLutNotice: null, phase }
@@ -635,7 +635,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       ],
       LutRecentsSaved: () => [model, [], Option.none()],
 
-      // per-photo LUT thumbnails (filmstrip previews, docs/adr/0013)
+      // per-photo LUT thumbnails (filmstrip previews, docs/adr/0002-lut-library)
       // A thumb landed. One that belongs to a previous photo (the bitmap
       // changed while the worker was rendering) is revoked and dropped —
       // the map only ever holds the current photo's previews.
@@ -664,7 +664,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           return [model, [], Option.none()]
         }
         // Selecting a layer opens its sliders: on mobile the sheet follows
-        // to the layer drawer (docs/adr/0024-mobile-ui).
+        // to the layer drawer (docs/adr/0010-editor-ui.md).
         return [
           { ...model, lutBarOpen: false, mobileSheet: 'layers', phase, previewLut: null },
           [],
@@ -784,7 +784,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         Option.none(),
       ],
 
-      // tone curve widget (docs/adr/0028)
+      // tone curve widget (docs/adr/0003-adjustment-layers)
       // A chain-layer drag is a plain data op (the machine has no edge from
       // Selected — the chain lives in the model, not the phase); a draft
       // drag goes through the machine's Drafting edge and only re-renders
@@ -836,7 +836,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       MovedLayerReorder: () => [model, [], Option.none()],
 
       // compare (before/after viewing)
-      // Presentation-only state (docs/adr/0011): mode and split changes
+      // Presentation-only state (docs/adr/0010-editor-ui): mode and split changes
       // dispatch the blit-only PresentFrame, never a chain render — the
       // graded side keeps showing the last rendered frame.
       ChangedCompareMode: ({ mode }) => {

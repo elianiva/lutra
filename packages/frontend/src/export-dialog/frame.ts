@@ -1,5 +1,5 @@
 /**
- * The export frame slot (docs/adr/0031): one composed/snapshotted export
+ * The export frame slot (docs/adr/0004-export): one composed/snapshotted export
  * frame, owned by the shared export-dialog machine. The pixels live OUTSIDE
  * the TEA model — a full-resolution ImageData is megabytes of pixels, and
  * routing them through Messages/Model makes every model log, diff, or

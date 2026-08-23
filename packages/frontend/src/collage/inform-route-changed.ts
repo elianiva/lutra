@@ -21,11 +21,11 @@ const toSelf = (message: ExportDialog.Message): CollageMessage =>
 const settings = [Command.mapMessage(ExportDialog.LoadExportSettings(), toSelf)]
 
 /**
- * Route changed into or out of the collage (docs/adr/0009). Arriving at a
+ * Route changed into or out of the collage (docs/adr/0006-frontend-architecture). Arriving at a
  * collage re-fetches the record — reload and in-app navigation behave
  * identically, and auto-save means there is no unsaved local state to
  * protect — and restores the persisted export settings (shared with the
- * editor's dialog, docs/adr/0031). Leaving (or the bare `/collage`
+ * editor's dialog, docs/adr/0004-export). Leaving (or the bare `/collage`
  * redirect) only restores the settings.
  */
 export const informRouteChanged = (model: Model, route: AppRoute): InformReturn =>

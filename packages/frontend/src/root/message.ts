@@ -6,7 +6,7 @@ import * as Editor from '../editor/message'
 import * as Collage from '../collage/message'
 import { OfflineMessage } from '../offline/messages'
 
-// The root orchestrated Submodel Messages (docs/adr/0009): routing facts the
+// The root orchestrated Submodel Messages (docs/adr/0006-frontend-architecture): routing facts the
 // root owns (`ChangedRoute`, `Navigated`) plus the `Got*Message` wrappers that
 // lift a child Submodel's Message into the root's message universe. The
 // wrappers carry routing, not payload — any domain payload lives inside the
@@ -27,7 +27,7 @@ export type RootMessage = typeof RootMessage.Type
 /**
  * The application's full message universe: everything the root's update
  * handles — the root-owned routing/wrappers plus the offline slice
- * (docs/adr/0015). The root owns the fill machine, so its Messages sit in
+ * (docs/adr/0007-offline). The root owns the fill machine, so its Messages sit in
  * the root loop unwrapped rather than behind a `Got*Message`.
  */
 export const AppMessage = S.Union([RootMessage, OfflineMessage])

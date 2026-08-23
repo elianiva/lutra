@@ -7,14 +7,14 @@ import { curvePointsOf, isCurveNeutral } from '@lutra/engine'
 import type { Layer } from '@lutra/engine'
 import { EditorMessage } from './message'
 
-// The Tone Curve widget (docs/adr/0028): the drawer's curve editor for a
+// The Tone Curve widget (docs/adr/0003-adjustment-layers): the drawer's curve editor for a
 // toneCurve draft or focused chain layer. A square-ish SVG plot in unit
 // space (0..1 both axes, y up) draws the identity diagonal as a dashed
 // reference, the piecewise-linear curve through the layer's 5 control
 // points (the exact polyline the shader evaluates — WYSIWYG), and one
 // draggable handle per point. A reset button appears next to the label
 // while the curve diverges from identity (the slider-reset convention,
-// docs/adr/0019, applied to the curve as a whole).
+// docs/adr/0010-editor-ui, applied to the curve as a whole).
 
 /** Content margin in viewBox units — the corner handles (anchors at the
  *  curve's ends) would otherwise clip against the svg bounds. */
@@ -183,7 +183,7 @@ export const toneCurveWidget = (h: HtmlBuilder<EditorMessage>, layer: Layer) => 
         [h.Class('flex items-baseline justify-between')],
         [
           h.span([h.Class('text-[10px] uppercase tracking-[0.14em] text-muted')], ['Tone curve']),
-          // The reset affordance (docs/adr/0019): visible only while the curve
+          // The reset affordance (docs/adr/0010-editor-ui): visible only while the curve
           // diverges from identity — its presence is the discoverability.
           ...(neutral
             ? []

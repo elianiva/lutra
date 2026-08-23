@@ -18,7 +18,7 @@ import { cellSize, composeGrid } from './compose'
 import { setFrame } from '../export-dialog'
 
 /**
- * Load one collage by id and resolve its references (docs/adr/0030): tiles
+ * Load one collage by id and resolve its references (docs/adr/0009-collage): tiles
  * whose Edit no longer exists are dropped from the loaded copy — never
  * persisted until the next auto-save — and counted in `dropped` so the
  * screen can show a notice. The referenced edits' full source bytes ride
@@ -66,7 +66,7 @@ export const LoadCollage = Command.define('LoadCollage', {
 
 /**
  * Decode each referenced source photo once to learn its pixel size
- * (docs/adr/0033) — the framing placement math needs every photo's aspect.
+ * (docs/adr/0009-collage) — the framing placement math needs every photo's aspect.
  * Source bytes preserve the full-resolution aspect; a source that fails to
  * decode simply keeps the cover fallback; no error surfaces.
  */
@@ -101,7 +101,7 @@ export const MeasureThumbs = Command.define('MeasureThumbs', {
 })
 
 /**
- * Auto-save the mutated record (docs/adr/0030). The record is ids + layout
+ * Auto-save the mutated record (docs/adr/0009-collage). The record is ids + layout
  * numbers — hundreds of bytes — so every arrangement change persists
  * immediately; there is no draft and no Save button to lose work.
  */
@@ -121,7 +121,7 @@ export const SaveCollage = Command.define('SaveCollage', {
 })
 
 /**
- * The undo toast's fuse (docs/adr/0033): when it burns out the undo slot
+ * The undo toast's fuse (docs/adr/0009-collage): when it burns out the undo slot
  * clears — unless a newer gesture has already replaced the slot, which the
  * sequence token guards.
  */
@@ -133,7 +133,7 @@ export const ScheduleUndoExpiry = Command.define('ScheduleUndoExpiry', {
 })
 
 /**
- * A wheel-zoom gesture's quiet period (docs/adr/0033): after the last tick,
+ * A wheel-zoom gesture's quiet period (docs/adr/0009-collage): after the last tick,
  * the drafted framing commits and auto-saves. Re-armed (with a new seq) by
  * every tick, so only the final one lands.
  */
@@ -165,7 +165,7 @@ export const NavigateMenu = Command.define('NavigateMenu', {
 })
 
 /**
- * Compose the export frame once per dialog open (docs/adr/0031, 0033): load
+ * Compose the export frame once per dialog open (docs/adr/0009-collage): load
  * every referenced Edit in full (source bytes + chain), render each chain at
  * its cell size — through the tile's framing — via the GPU, and draw the
  * grid. The composed ImageData is slotted for the dialog's lifetime —

@@ -67,7 +67,7 @@ export const SaturationLayer = Schema.Struct({
 })
 export type SaturationLayer = typeof SaturationLayer.Type
 
-// The Color Mixer (Lightroom-style HSL panel, docs/adr/0027): eight hue
+// The Color Mixer (Lightroom-style HSL panel, docs/adr/0003-adjustment-layers): eight hue
 // ranges (red, orange, yellow, green, aqua, blue, purple, magenta), each
 // with hue / saturation / luminance adjustments — 24 numeric fields, one
 // uniform slot each. Field naming is `{color}{Channel}`: redHue,
@@ -148,7 +148,7 @@ export const ClarityLayer = Schema.Struct({
 })
 export type ClarityLayer = typeof ClarityLayer.Type
 
-// The Tone Curve (docs/adr/0028): 5 fixed control points — the black and
+// The Tone Curve (docs/adr/0003-adjustment-layers): 5 fixed control points — the black and
 // white anchors plus three interior points — each with an x (input tone)
 // and y (output tone) in [0, 1], stored as one numeric field per axis
 // (`p0x`, `p0y`, …, `p4x`, `p4y`) so the layer rides the registry's plain

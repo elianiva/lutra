@@ -19,7 +19,7 @@ import { placement } from './framing'
 import * as ExportDialog from '../export-dialog'
 
 /**
- * The Collage Submodel's view (docs/adr/0009, 0030, 0033, 0035): the
+ * The Collage Submodel's view (docs/adr/0006-frontend-architecture, docs/adr/0009-collage): the
  * fixed-grid preview — each tile drawn from its referenced Edit's
  * full-resolution source through its tile framing, with frame-ratio /
  * columns / rows / gutter / background controls (an explicit M×N grid whose
@@ -29,7 +29,7 @@ import * as ExportDialog from '../export-dialog'
  * clamping happens once, in update.
  */
 
-/** The share-target presets (docs/adr/0033); custom W:H covers the rest. */
+/** The share-target presets (docs/adr/0009-collage); custom W:H covers the rest. */
 const FRAME_PRESETS: readonly { label: string; value: number }[] = [
   { label: '1:1', value: 1 },
   { label: '4:5', value: 4 / 5 },
@@ -39,7 +39,7 @@ const FRAME_PRESETS: readonly { label: string; value: number }[] = [
 
 const matchesPreset = (ratio: number, value: number) => Math.abs(ratio - value) < 1e-9
 
-// lazy islands (ADR 0034)
+// lazy islands (ADR 0006)
 const lazyControls = createLazy()
 const lazyGrid = createLazy()
 const lazyCell = createKeyedLazy()
@@ -457,7 +457,7 @@ const gridView = (
   const photoById = new Map(photos.map((p) => [p.id, p]))
   const sizeById = new Map(sizes.map((s) => [s.editId as string, s]))
   // An explicit M×N grid renders its spare capacity as background cells
-  // (docs/adr/0035) — non-interactive placeholders past the last tile.
+  // (docs/adr/0009-collage) — non-interactive placeholders past the last tile.
   const capacity = columns * rows
   const empties = Array.from({ length: Math.max(0, capacity - tiles.length) }, (_, i) =>
     h.div(
@@ -552,7 +552,7 @@ const tileCellView = (
       // No OnDoubleClick(ResetFraming) here: browsers synthesize click/dblclick
       // from down+up on the same element even after a long drag, so ending one
       // pan and quickly re-grabbing fired a spurious reset — the photo appeared
-      // to snap back to center (docs/adr/0019 chose button-only reset for the
+      // to snap back to center (docs/adr/0010-editor-ui chose button-only reset for the
       // same reason). The tile's reset button covers the affordance.
     )
   }

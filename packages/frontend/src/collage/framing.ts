@@ -1,7 +1,7 @@
 import { defaultTileFraming, type TileFraming } from '@lutra/store'
 
 /**
- * Tile-framing math (docs/adr/0033): the pure geometry that maps a tile's
+ * Tile-framing math (docs/adr/0009-collage): the pure geometry that maps a tile's
  * persisted `{ zoom, focusX, focusY }` onto a rectangular cell, shared by
  * every consumer — the collage screen preview (CSS percentages), the main
  * menu's mini-preview (the same percentages), and export (canvas draw

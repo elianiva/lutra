@@ -2,7 +2,7 @@ import { IndexedDbTable } from '@effect/platform-browser'
 import { Collage } from './collage'
 
 /**
- * The IndexedDB object store holding Collage records (docs/adr/0030).
+ * The IndexedDB object store holding Collage records (docs/adr/0009-collage).
  *
  * One row per Collage, keyed by the Collage uuid (`keyPath: 'id'`). The row
  * schema is the `Collage` schema itself — the record is ids + layout numbers

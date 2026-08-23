@@ -23,7 +23,7 @@ export interface ImageEncoderContract {
  * The export encoder. The engine defines the contract; the implementation
  * is swappable behind this service — jSquash wasm codecs (the default
  * layer), native encoders, or a server round-trip (see
- * docs/adr/0006-image-encoder-engine-service.md).
+ * docs/adr/0004-export.md).
  */
 export class ImageEncoder extends Context.Service<ImageEncoder, ImageEncoderContract>()(
   'ImageEncoder',

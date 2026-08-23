@@ -3,7 +3,7 @@ import { Route } from 'foldkit'
 import { CollageIdSchema, EditIdSchema } from '@lutra/store'
 
 // The app is three screens behind three route arms, each owned by a Submodel
-// (docs/adr/0009): the Gallery (the main menu, `/`), the Editor
+// (docs/adr/0006-frontend-architecture): the Gallery (the main menu, `/`), the Editor
 // (`/edit/:editId`, opened from a gallery tile), and the Collage screen
 // (`/collage/:collageId`, opened from "Create collage" or a Collages tile).
 //

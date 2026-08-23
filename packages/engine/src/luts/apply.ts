@@ -2,7 +2,7 @@ import type { LutCube } from './cube'
 
 // CPU-side LUT application — the pure-JS mirror of the WGSL LUT pass body
 // (shaders/bodies/lut.ts). The bar's per-photo preview thumbnails run
-// through this in the thumb worker (docs/adr/0013) instead of the GPU
+// through this in the thumb worker (docs/adr/0002-lut-library) instead of the GPU
 // pipeline: a LUT-only chain compiles to a single pass with no colorspace
 // boundary (sRGB source in, sRGB display out — the round-trip is skipped at
 // both ends), so the body is exactly "trilinear-sample the cube, mix by

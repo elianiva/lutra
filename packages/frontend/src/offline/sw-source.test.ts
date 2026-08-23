@@ -5,7 +5,7 @@ import { generateSwSource, shellCacheName } from '../../../../scripts/build-sw'
 import { LUT_CACHE_NAME } from './cache'
 
 // The service worker and the page share facts that must never drift
-// (docs/adr/0015): the offline library's cache name, the precache injection
+// (docs/adr/0007-offline): the offline library's cache name, the precache injection
 // mechanism, and the shell cache name (a hash of the precache manifest — the
 // deploy-unique versioning that keeps old hashed assets from accumulating
 // across releases). The build script injects the tokens at build time; these

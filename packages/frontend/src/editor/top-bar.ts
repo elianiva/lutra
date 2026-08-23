@@ -9,7 +9,7 @@ import type { Model } from './model'
  * Top bar: LUTRA wordmark left; right side: the save flow (Save, Save as,
  * and the last save's status), export, and clear.
  *
- * On phones (docs/adr/0024-mobile-ui) the wordmark and Save stay, while Save as and
+ * On phones (docs/adr/0010-editor-ui.md) the wordmark and Save stay, while Save as and
  * New collapse to icon-only buttons (`sm` restores the text) — the whole
  * action row must fit a ~360px viewport next to the wordmark.
  *

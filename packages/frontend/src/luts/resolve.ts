@@ -7,7 +7,7 @@ import { LutStore } from './store'
  * Resolve every LUT layer's cube through the LUT store, handing the
  * id→cube map to a render request (the engine bakes sizes into the shader
  * and the GPU backend uploads textures from it). Shared by the editor's
- * render chain and the collage's tile renderer (docs/adr/0031) — one
+ * render chain and the collage's tile renderer (docs/adr/0009-collage) — one
  * convention for cube resolution.
  */
 export const resolveLuts = (

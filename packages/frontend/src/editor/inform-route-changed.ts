@@ -23,7 +23,7 @@ type Resource =
 
 /**
  * The parent's hook for a route change that resolves to the Editor. Per the
- * `inform*` convention (docs/adr/0009, informingSubmodels.md): the root owns
+ * `inform*` convention (docs/adr/0006-frontend-architecture, informingSubmodels.md): the root owns
  * the route; the Editor derives its state from it. The root calls this
  * instead of dispatching an Editor Message.
  *
@@ -32,7 +32,7 @@ type Resource =
  * carries an `editId` — arriving from the gallery after an open-photo flow
  * (or from a reload) hydrates the editor from the stored Edit. Arriving
  * without an id (gallery route) leaves the editor as-is; it is persistent
- * cross-route state per ADR 0009.
+ * cross-route state per ADR 0006.
  */
 export type RouteChangedReturn = readonly [
   Model,

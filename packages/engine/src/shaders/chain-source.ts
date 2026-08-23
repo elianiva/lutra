@@ -266,7 +266,7 @@ interface LutPassOptions {
 /**
  * A LUT layer as a compute pass. The LUT body operates on sRGB-encoded
  * values (the vendored film cubes are authored in sRGB space — see
- * docs/adr/0003-lut-srgb-application.md), so this pass inverts the usual
+ * docs/adr/0001-rendering-engine.md), so this pass inverts the usual
  * color-space boundaries: it decodes its linear input to sRGB before the
  * body and re-encodes the result back to linear after, unless one of the
  * two ends is already sRGB (source input / display output).

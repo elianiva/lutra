@@ -102,14 +102,14 @@ export interface LayerUi {
   /**
    * Plain-language "what it does" line for the tool panel card — written
    * from the shader body's actual behavior, never generic photo-editing
-   * semantics (docs/adr/0016-tool-panel-cards).
+   * semantics (docs/adr/0010-editor-ui.md).
    */
   readonly description: string
-  /** "When to use it" line for the tool panel card (docs/adr/0016-tool-panel-cards). */
+  /** "When to use it" line for the tool panel card (docs/adr/0010-editor-ui.md). */
   readonly when: string
 }
 
-// The Color Mixer's 8 hue ranges (docs/adr/0027): UI order, the field-key
+// The Color Mixer's 8 hue ranges (docs/adr/0003-adjustment-layers): UI order, the field-key
 // prefix on the layer, the display name, and the pure-hue CSS color of the
 // range's center on the hue wheel — the same centers the shader classifies
 // with, so a swatch's color is exactly the color its range governs.
@@ -341,7 +341,7 @@ export const lutName = (
 }
 
 export const LAYER_TYPES_ORDER: readonly LayerType[] = [
-  // The app's signature feature leads the picker (docs/adr/0016-tool-panel-cards D5): the
+  // The app's signature feature leads the picker (docs/adr/0010-editor-ui.md D5): the
   // novice's most likely intent is "make my photo look like film", and the
   // LUT library is the fast path to it. Deliberate deviation from the
   // mobile reference ordering.

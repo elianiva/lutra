@@ -6,8 +6,8 @@ import type { Model } from './model'
 import { ScreenMode } from './model'
 
 /**
- * The Collage Submodel's subscriptions (docs/adr/0033), lifted into the
- * root's context (docs/adr/0009):
+ * The Collage Submodel's subscriptions (docs/adr/0009-collage), lifted into the
+ * root's context (docs/adr/0006-frontend-architecture):
  *
  * - `documentPointer` / `documentEscape` / `documentKeyboard` / `autoScroll`
  *   — the shared drag-and-drop machine's listeners, the reorder gesture's

@@ -4,7 +4,7 @@ import type { Model } from './model'
 import { GalleryMessage } from './message'
 
 /**
- * The image-deletion confirmation dialog (ADR-0022, superseded to a modal
+ * The image-deletion confirmation dialog (ADR-0010, superseded to a modal
  * dialog). Opened by a tile's ✕; confirming fires `DeleteRequested` — the
  * same message the unguarded flow used, so the store semantics are
  * unchanged. Dismissal paths (Cancel, Esc, backdrop) ride the Dialog

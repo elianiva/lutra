@@ -394,7 +394,7 @@ This is validated against real film scans (cinegrain) and the AV1 grain synthesi
 
 - **Crystal simulation** (Newson/Pierre model) — binary thresholding with polyhedral kernels, remaining-light depletion. Would be a "premium" mode.
 - **Per-frame temporal decorrelation beyond hash seeding** — real film grain changes every frame; our hash-seeded approach achieves this but doesn't model inter-frame correlation.
-- **Resolution-dependent grain scaling** — grain size is in pixel units, not physical units. ADR-0005 notes this.
+- **Resolution-dependent grain scaling** — grain size is in pixel units, not physical units. ADR-0004 notes this.
 
 ---
 

@@ -98,7 +98,7 @@ const stepOffline = (offline: Offline, message: AppMessage): Offline => {
   return { ...offline, phase: result.state }
 }
 
-/** Delegate an offline fact into the editor Submodel (docs/adr/0009: every
+/** Delegate an offline fact into the editor Submodel (docs/adr/0006-frontend-architecture: every
  *  child change flows through the child's update) — the LUT bar reads the
  *  per-LUT download states and the online flag from the editor model. The
  *  editor can surface nothing for these facts (no EditCreated), but the out
@@ -116,11 +116,11 @@ const delegateToEditor = (model: Model, editorMessage: EditorMessage): UpdateRet
 }
 
 /**
- * The root orchestrated update (docs/adr/0009). Routing facts (`ChangedRoute`,
+ * The root orchestrated update (docs/adr/0006-frontend-architecture). Routing facts (`ChangedRoute`,
  * `Navigated`) are handled here; a `Got*Message` delegates to the owning
  * Submodel's `update` and lifts the results. The root owns navigation, so it
  * reacts to the Gallery's `OpenedEdit` OutMessage by pushing the editor URL.
- * The offline messages (docs/adr/0015) are the one root-owned domain: the
+ * The offline messages (docs/adr/0007-offline) are the one root-owned domain: the
  * fill machine steps here, the counters live in the offline slice, and the
  * per-file/connectivity facts delegate into the editor.
  */
@@ -175,7 +175,7 @@ export const update = (model: Model, message: AppMessage): UpdateReturn =>
       },
       NavigatedTo: () => [model, []],
 
-      // offline library (docs/adr/0015)
+      // offline library (docs/adr/0007-offline)
       // The fill's bridged events: the root owns the machine and the
       // counters; cube-file facts delegate into the editor (the LUT bar's
       // per-row states). Every arm steps the machine first — messages with

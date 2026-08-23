@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-// The service worker (docs/adr/0015). Deliberately dumb: the app shell is
+// The service worker (docs/adr/0007-offline). Deliberately dumb: the app shell is
 // precached at install; the offline library (CONTEXT.md) is written by the
 // page's offline fill — this script only ever reads it, and runtime-caches
 // misses so real usage fills the cache ahead of the fill (cache-as-you-go).

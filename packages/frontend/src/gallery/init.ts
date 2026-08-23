@@ -8,7 +8,7 @@ import { ListCollages, ListEdits } from './command'
 
 /**
  * The Gallery Submodel's boot state, called by the root's `init` for the
- * cold load (docs/adr/0009). It seeds the gallery and returns the boot
+ * cold load (docs/adr/0006-frontend-architecture). It seeds the gallery and returns the boot
  * Command the GalleryRoute calls for — a `ListEdits` fetch when the initial
  * URL is the gallery with no summary in flight yet.
  *

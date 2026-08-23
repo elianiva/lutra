@@ -1,6 +1,6 @@
 import type { BodyRenderer } from '../types'
 
-// Film-emulation LUT application. The pass contract (docs/adr/0003) is that
+// Film-emulation LUT application. The pass contract (docs/adr/0001-rendering-engine) is that
 // `color` is sRGB-encoded here — the pass decodes linear light to sRGB on
 // the way in and re-encodes on the way out — so the body only samples and
 // mixes.

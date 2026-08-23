@@ -4,7 +4,7 @@ import { ExportSettings, defaultExportSettings } from '@lutra/engine'
 
 /**
  * Export-settings persistence, shared by the editor's and the collage's
- * export dialogs (docs/adr/0031): one KeyValueStore key, one schema — both
+ * export dialogs (docs/adr/0004-export): one KeyValueStore key, one schema — both
  * surfaces offer the same format/quality/scale choice and remember it.
  */
 

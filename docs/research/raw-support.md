@@ -1,6 +1,6 @@
 # Raw support — research (everything we know before implementing)
 
-Status: **Resolved** — every question below was decided in the 2026-02-19 grilling session; the decisions are recorded in §8 and the architecture rationale is docs/adr/0014. Terms marked with a **bold term** landed in `context.md`'s Language section. No code written yet — docs/adr/0014 owns the architecture; this document is the research reference behind it.
+Status: **Resolved** — every question below was decided in the 2026-02-19 grilling session; the decisions are recorded in §8 and the architecture rationale is docs/adr/0008-raw-decode. Terms marked with a **bold term** landed in `context.md`'s Language section. No code written yet — docs/adr/0008-raw-decode owns the architecture; this document is the research reference behind it.
 
 Scope: opening camera RAW files (CR2/CR3, NEF, ARW, RW2, ORF, PEF, SRW, RAF, DNG — including phone DNGs) in the web app, decoded **client-side, full resolution**, and graded through the existing WebGPU chain like any other source image. "Proper" means real demosaicing of the full-res sensor data with as-shot white balance and camera color matrix — not the embedded JPEG preview (which stays as a fast-path placeholder) and not the mobile app's platform transcode (which lands on the embedded thumbnail on Android).
 
@@ -27,7 +27,7 @@ Two structural facts matter for Lutra:
 
 ### 2.1 `libraw-wasm` — selected (as the base of our own build)
 
-npm `libraw-wasm` (github ybouane/LibRaw-Wasm, v1.6.0) — LibRaw **0.22.1** compiled with Emscripten 5.0.7, ISC-licensed wrapper around LibRaw (LGPL-2.1 / CDDL-1.0 dual, see §7). We cloned and inspected the source; **we now fork it and own the build** (§8/ADR 0014):
+npm `libraw-wasm` (github ybouane/LibRaw-Wasm, v1.6.0) — LibRaw **0.22.1** compiled with Emscripten 5.0.7, ISC-licensed wrapper around LibRaw (LGPL-2.1 / CDDL-1.0 dual, see §7). We cloned and inspected the source; **we now fork it and own the build** (§8/ADR 0008):
 
 - **Artifact**: 1.4 MB wasm (raw), worker-based, `INITIAL_MEMORY=256 MB` with `ALLOW_MEMORY_GROWTH`, built `-O3 -flto -ffast-math -msimd128` **with `--enable-openmp` + pthreads** — demosaic is SIMD + multithreaded in wasm.
 - **API** (all async, serialized per instance, transferables used):
@@ -99,7 +99,7 @@ Current flow, read from source:
 Changes (in implementation order):
 
 1. **Picker** — add RAW extensions (`.dng .cr2 .cr3 .nef .nrw .arw .rw2 .orf .raf .pef .srw .3fr .iiq .erf .mef .mrw .x3f .fff .raw`). `image/*` already covers some via MIME on Safari.
-2. **Decode service** — a new Effect Context service (like `GpuBackend` / `EditStore`): `RawDecoder { decode(bytes, settings) → DecodedRaw, preview(bytes) → jpeg, dispose() }` implemented in `packages/raw-decoder/` (the owned LibRaw build — §8/ADR 0014), with a worker implementation wrapping the wasm client. Route: sniff RAW (TIFF magic + extension set) → raw path; else `createImageBitmap` (unchanged). In the raw path, keep a live `LibRaw` instance (module init ~100s of ms; instance reuse matters) and `dispose()` on image clear.
+2. **Decode service** — a new Effect Context service (like `GpuBackend` / `EditStore`): `RawDecoder { decode(bytes, settings) → DecodedRaw, preview(bytes) → jpeg, dispose() }` implemented in `packages/raw-decoder/` (the owned LibRaw build — §8/ADR 0008), with a worker implementation wrapping the wasm client. Route: sniff RAW (TIFF magic + extension set) → raw path; else `createImageBitmap` (unchanged). In the raw path, keep a live `LibRaw` instance (module init ~100s of ms; instance reuse matters) and `dispose()` on image clear.
 3. **`SourceImage` extension** — decoded RAW arrives as `{ rgba16: Uint16Array, width, height }` (+ an 8-bit sRGB preview bitmap for thumbs/compare placeholders). The GPU session gains a second source path: `writeTexture` into an **rgba16unorm** texture (WebGPU has no RGB16UNorm; pad RGB→RGBA in the worker before transfer — 24 MP ≈ 192 MB, tens of ms). rgba16unorm is filterable, `textureLoad` returns 0..1 f32 — no shader change.
 4. **Loading phase** — the editor machine's `Loading` state already exists; full decode lands there (with the embedded JPEG as the placeholder and stage-based progress — decisions 5/8). No new phase needed.
 5. **Thumbs + gallery tiles** — the decode worker emits a ~1024 px sRGB8 preview **derived from the full decode** (decision 8); `LutThumbnailer` and `thumbnailBytes` consume that instead of the source bitmap for RAW files (their contracts stay bitmap-based — zero changes to the thumb worker itself). Gallery tile thumbnail for a RAW pick uses `thumbnailData()` (embedded JPEG) — instant; the full decode happens only when the editor opens.
@@ -136,7 +136,7 @@ Default WB: **as-shot** — the White Balance layer then adjusts _relative to as
 
 ## 8. Resolved decisions (2026-02-19 grilling session)
 
-Every open question was decided in one session; the architecture rationale is docs/adr/0014. **Note** flags future-reference items.
+Every open question was decided in one session; the architecture rationale is docs/adr/0008-raw-decode. **Note** flags future-reference items.
 
 | #   | Question                          | Decision                                                                                                                                                                                                                                                                                                                             |
 | --- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

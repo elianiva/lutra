@@ -647,7 +647,7 @@
         temperature.&rdquo; That is why an untouched RAW looks right the moment it decodes — the
         image matches what the camera previewed — and why the slider's zero point is meaningful
         rather than arbitrary. A Kelvin-based temperature model would change this contract; the
-        current one is deliberate (docs/adr/0014).
+        current one is deliberate (docs/adr/0008-raw-decode).
       </div>
 
       <h2>5 · From camera color to screen color</h2>
@@ -750,7 +750,7 @@
         compare blit) for a result that is visually identical in an sRGB-authored, 8-bit-export app
         — the sRGB curve is invertible, and 16-bit quantization is invisible in both directions. The
         linear working space remains a documented future step (it would matter for tone-mapped
-        highlight rolloff), but v1 deliberately chooses zero engine risk (docs/adr/0014).
+        highlight rolloff), but v1 deliberately chooses zero engine risk (docs/adr/0008-raw-decode).
       </div>
 
       <h3>6.1 · The previews: tiles, placeholders, and the LUT bar</h3>
@@ -759,15 +759,17 @@
         The one place the embedded JPEG's camera-rendering shows through is the
         <strong>LUT bar</strong> — the filmstrip of &ldquo;your photo under every LUT.&rdquo; Its
         thumbnails are generated from a small preview of the user's photo (LUT.html &sect;5,
-        docs/adr/0013), and for RAW files that preview must come from the <em>decode</em>, not the
-        embedded JPEG: the embedded JPEG carries the camera's tone curve (typically brighter), while
-        the decode is deliberately un-brightened (<code>noAutoBright</code> — the camera's recorded
-        levels, used as-is, so the Exposure layer owns brightness). A LUT thumb based on the
-        embedded JPEG would show the film look on a visibly brighter image than the editor actually
-        renders — the bar's whole promise is &ldquo;see it on your photo, as it will look.&rdquo; So
-        the decode worker derives a small (~1024&times;1024) sRGB preview from the full decode
-        itself, and the filmstrip consumes that. Gallery tiles and the loading placeholder, which
-        are placeholders by nature, use the embedded JPEG directly.
+        docs/adr/0002-lut-library), and for RAW files that preview must come from the
+        <em>decode</em>, not the embedded JPEG: the embedded JPEG carries the camera's tone curve
+        (typically brighter), while the decode is deliberately un-brightened (<code
+          >noAutoBright</code
+        >
+        — the camera's recorded levels, used as-is, so the Exposure layer owns brightness). A LUT
+        thumb based on the embedded JPEG would show the film look on a visibly brighter image than
+        the editor actually renders — the bar's whole promise is &ldquo;see it on your photo, as it
+        will look.&rdquo; So the decode worker derives a small (~1024&times;1024) sRGB preview from
+        the full decode itself, and the filmstrip consumes that. Gallery tiles and the loading
+        placeholder, which are placeholders by nature, use the embedded JPEG directly.
       </p>
 
       <h3>6.2 · The engine contract, in one sentence</h3>
@@ -804,7 +806,7 @@
         execute at near-native speed — and bundled with the app (~1.4&nbsp;MB, built with SIMD and
         multithreading enabled). The wasm build, the thin C++ wrapper around it, and the TypeScript
         client are <strong>ours</strong>: a fork of the LibRaw-Wasm project, rebuilt from source by
-        <code>bun run build:raw</code> (docs/adr/0014).
+        <code>bun run build:raw</code> (docs/adr/0008-raw-decode).
       </p>
 
       <p>Owning the build is a deliberate choice, and it buys three concrete things:</p>
@@ -928,7 +930,7 @@
 
       <p>
         The decode configuration, once (these are the actual settings the decoder is opened with —
-        docs/adr/0014):
+        docs/adr/0008-raw-decode):
       </p>
 
       <pre><code>useCameraWb: true        // as-shot white balance (&sect;4) — the untouched image
@@ -1007,7 +1009,7 @@ halfSize: false          // full resolution, always</code></pre>
       <footer class="fineprint">
         <p class="sans">
           Lutra &mdash; a color-grading app for film simulation. The RAW pipeline's design
-          decisions: docs/adr/0014; the full research trail:
+          decisions: docs/adr/0008-raw-decode; the full research trail:
           <code>docs/research/raw-support.md</code>. The surrounding render pipeline is documented
           in <code>docs/architecture.html</code>; the LUT layer and its filmstrip previews in
           <code>docs/LUT.html</code>. The vocabulary (&ldquo;RAW decode,&rdquo; &ldquo;embedded JPEG

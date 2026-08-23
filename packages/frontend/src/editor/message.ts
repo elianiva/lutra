@@ -21,14 +21,14 @@ import {
   ThumbnailEncodeError,
 } from '../errors'
 
-// The Editor is a foldkit Submodel (docs/adr/0009): it owns its own Model,
+// The Editor is a foldkit Submodel (docs/adr/0006-frontend-architecture): it owns its own Model,
 // Message, update, and Commands behind a `GotEditorMessage` boundary. These
 // Messages are all internal to the editor — routing (`ChangedRoute`,
 // `Navigated`) lives at the root, and the editor surfaces its domain facts
 // upward via an `OutMessage` when it needs to.
 
 // A failure message carries its tagged error, never a flattened string
-// (docs/adr/0010). The unions below name the failure sets; the model
+// (docs/adr/0006-frontend-architecture). The unions below name the failure sets; the model
 // reuses them (model.ts) so a stored failure stays typed end to end.
 
 /** Every error the editor can land in `source.error` (decode, load, render). */
@@ -73,7 +73,7 @@ const CatalogEntry = S.Struct({
 export const Catalog = S.Array(CatalogEntry)
 export type Catalog = typeof Catalog.Type
 
-// mobile (bottom sheets + tab bar, docs/adr/0024-mobile-ui)
+// mobile (bottom sheets + tab bar, docs/adr/0010-editor-ui.md)
 
 // The two mobile bottom sheets: the tool panel ('tools') and the layer
 // drawer ('layers'). Under the `lg` breakpoint both panels collapse into
@@ -90,7 +90,7 @@ export const CompareMode = S.Literals(['off', 'toggle', 'split', 'side-by-side']
 export type CompareMode = typeof CompareMode.Type
 
 // The presentation state the blit needs, carried by every render and by the
-// blit-only PresentFrame command (docs/adr/0011): the mode, the split
+// blit-only PresentFrame command (docs/adr/0010-editor-ui): the mode, the split
 // position in image space (0..1), and which side Toggle currently shows.
 export const PresentState = S.Struct({
   mode: CompareMode,
@@ -112,7 +112,7 @@ export const EditorMessage = defineMessageUnion({
     // The picked file's stored byte encoding — the Edit's source image. Read
     // at pick time so a later Save (which creates a new Edit for a fresh pick)
     // can persist it without holding the File (the store's carrier is bytes,
-    // docs/adr/0007).
+    // docs/adr/0005-storage).
     source: S.Uint8Array,
   },
   ImageFailedToDecode: {
@@ -141,7 +141,7 @@ export const EditorMessage = defineMessageUnion({
   CatalogLoaded: { catalog: Catalog },
   CatalogFailed: { error: LutLoadError },
   // offline library (the LUT bar's per-row download states)
-  // Root-owned facts delegated into the editor (docs/adr/0015): the root's
+  // Root-owned facts delegated into the editor (docs/adr/0007-offline): the root's
   // offline slice owns the fill machine and counters; these carry the per-LUT
   // states the LUT bar renders — a row's spinner while its cube is being
   // fetched, the dimmed "not downloaded" badge while offline, and the notice
@@ -210,7 +210,7 @@ export const EditorMessage = defineMessageUnion({
   },
   ToggledLutPicker: {},
 
-  // LUT bar (bottom filmstrip picker, docs/adr/0012)
+  // LUT bar (bottom filmstrip picker, docs/adr/0002-lut-library)
 
   PreviewedLut: {
     lutId: S.NullOr(LutIdSchema),
@@ -223,7 +223,7 @@ export const EditorMessage = defineMessageUnion({
   },
   LutRecentsSaved: {},
 
-  // per-photo LUT thumbnails (filmstrip previews, docs/adr/0013)
+  // per-photo LUT thumbnails (filmstrip previews, docs/adr/0002-lut-library)
 
   // `bitmap` is the photo the preview belongs to — the staleness guard, like
   // RenderedFrame's stamp: a thumb that lands after a new image loaded is
@@ -235,9 +235,9 @@ export const EditorMessage = defineMessageUnion({
   },
   // A per-photo LUT thumbnail failed (cube fetch, downscale, worker render, or
   // encode). The bar silently keeps the vendored generic jpg — previews are
-  // presentation-only, so failures are not user-visible (docs/adr/0013).
+  // presentation-only, so failures are not user-visible (docs/adr/0002-lut-library).
   // The bar silently keeps the vendored generic jpg — preview failures are
-  // never user-visible (docs/adr/0013).
+  // never user-visible (docs/adr/0002-lut-library).
   LutThumbFailed: { lutId: LutIdSchema },
   LutThumbsRevoked: {},
   CycledToggledField: { id: LayerIdSchema },
@@ -247,7 +247,7 @@ export const EditorMessage = defineMessageUnion({
     color: S.Number,
   },
 
-  // tone curve widget (docs/adr/0028)
+  // tone curve widget (docs/adr/0003-adjustment-layers)
 
   // The curve widget (editor/tone-curve.ts) emits pointer positions in unit
   // space (0..1, y up). The mount owns hit-testing and the drag session; the
@@ -303,7 +303,7 @@ export const EditorMessage = defineMessageUnion({
   // message exists so the mount stays observable (DevTools, Scene, replay).
   CanvasRegistered: {},
   ExportRequested: {},
-  // The shared export-dialog machine's messages arrive wrapped (docs/adr/0031);
+  // The shared export-dialog machine's messages arrive wrapped (docs/adr/0004-export);
   // update delegates to its update. Snapshot outcomes are fed in through
   // ExportSnapshotted / ExportSnapshotFailed below.
   GotExportDialogMessage: {
@@ -318,7 +318,7 @@ export const EditorMessage = defineMessageUnion({
   /**
    * The GPU readback landed. The pixels stay in the shared export-dialog
    * frame slot — megabytes of ImageData never ride through the model; only
-   * the readiness flag does (docs/adr/0031).
+   * the readiness flag does (docs/adr/0004-export).
    */
   ExportSnapshotted: {},
   ExportSnapshotFailed: {
@@ -340,7 +340,7 @@ export const EditorMessage = defineMessageUnion({
 export type EditorMessage = typeof EditorMessage.Type
 
 /**
- * The fact the editor surfaces to the root (docs/adr/0009). Narrow and
+ * The fact the editor surfaces to the root (docs/adr/0006-frontend-architecture). Narrow and
  * semantic, like the gallery's `OpenedEdit`: a Save created a NEW Edit (a
  * fresh-pick Save or a Save as) — the root pushes the `/edit/:id` URL so a
  * reload re-attaches the editor to the saved Edit. In-place saves (Save on

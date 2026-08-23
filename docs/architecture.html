@@ -677,8 +677,8 @@
         place: lifted blacks wash out further, the S-curves shift. So the LUT pass decodes its
         linear input to sRGB, applies the cube, mixes by strength, and re-encodes to linear —
         skipping the round-trip at the chain ends, where the source and display textures are already
-        sRGB (see docs/adr/0003). The strength mix happens in sRGB space, which is what &ldquo;50%
-        film look&rdquo; perceptually means.
+        sRGB (see docs/adr/0001-rendering-engine). The strength mix happens in sRGB space, which is
+        what &ldquo;50% film look&rdquo; perceptually means.
       </p>
 
       <h2>5 · Anatomy of a pass</h2>
@@ -1075,8 +1075,8 @@ color.b += cb * l0_chroma * l0_amount * 0.15 * weight;</code></pre>
         color shifts. Green is left clean. Five film-stock profiles (Subtle, Medium, Heavy, Vintage,
         Cinematic) pre-set the grain size, luminance peak, rolloff, and coarse/fine mix; the
         <code>amount</code> slider controls strength independently. The hash is integer-only
-        (ADR-0025), the frame seed animates the field, and grain is added in linear light so its
-        display-space size grows toward the blacks.
+        (docs/adr/0001-rendering-engine), the frame seed animates the field, and grain is added in
+        linear light so its display-space size grows toward the blacks.
       </p>
 
       <h3>

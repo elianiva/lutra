@@ -3,7 +3,7 @@ import { Command } from 'foldkit'
 import { OfflineFill } from '../offline/fill'
 import { OfflineMessage } from '../offline/messages'
 
-// The root's offline commands (docs/adr/0015): the fill's start (with the
+// The root's offline commands (docs/adr/0007-offline): the fill's start (with the
 // persist() request the offline library depends on — a granted origin is
 // never evicted) and the toast's auto-dismiss timer. Defined at the root
 // because the offline slice is root-owned; the gallery's strip and the

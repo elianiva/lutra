@@ -6,7 +6,7 @@ import { EditIdSchema } from './edit-id'
  * A gallery record: a stable UUID identifying one edit chain, the source
  * image it grades, and a thumbnail of the graded result. A self-contained
  * record — it owns its own source-image bytes copy, so it can be saved,
- * loaded, and uploaded as one unit (docs/adr/0007, 0008).
+ * loaded, and uploaded as one unit (docs/adr/0005-storage).
  *
  * The image payloads are `Uint8Array` bytes (the serialized PNG/JPEG encoding
  * of the source and the thumbnail), not `Blob`/`ImageBitmap` — bytes are the

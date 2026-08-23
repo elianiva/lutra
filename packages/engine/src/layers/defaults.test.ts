@@ -49,7 +49,7 @@ const DEFAULTS = {
   contrast: { amount: 0 },
   shadows: { amount: 0 },
   highlights: { amount: 0 },
-  // The Tone Curve's 5 identity points (docs/adr/0028): the diagonal.
+  // The Tone Curve's 5 identity points (docs/adr/0003-adjustment-layers): the diagonal.
   toneCurve: {
     p0x: 0,
     p0y: 0,

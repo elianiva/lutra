@@ -43,7 +43,7 @@ const describeFailure = (error: Option.Option<typeof PhotoCreateError.Type>): st
   })
 
 /**
- * The Gallery Submodel's update loop (docs/adr/0009). Returns the
+ * The Gallery Submodel's update loop (docs/adr/0006-frontend-architecture). Returns the
  * `[Model, Commands, Option<OutMessage>]` 3-tuple: the OutMessage is how the
  * gallery tells the root "open this edit" — the root owns navigation. Most
  * arms emit `Option.none()`.
@@ -64,7 +64,7 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
       ClickedEdit: ({ id }) => [model, [], Option.some(GalleryOutMessage.OpenedEdit({ id }))],
 
       // A tile's ✕: arm the pending delete and open the confirmation
-      // dialog (ADR-0022, superseded to a dialog).
+      // dialog (ADR-0010, superseded to a dialog).
       DeleteConfirmRequested: ({ id }) => {
         const [deleteDialog, dialogCommands] = Dialog.open(model.deleteDialog)
         return [
@@ -90,7 +90,7 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
         Option.none(),
       ],
 
-      // collage selection (docs/adr/0030)
+      // collage selection (docs/adr/0009-collage)
       ToggledSelection: ({ id }) => {
         const selected = model.selection.some((selected) => selected === id)
         const selection = selected
@@ -116,10 +116,10 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
         Option.none(),
       ],
 
-      // collage section (docs/adr/0030): list + open + delete
+      // collage section (docs/adr/0009-collage): list + open + delete
       CollagesListed: ({ collages }) => {
         // Custom-framed tiles need their thumbnails' aspects before the
-        // mini-previews can mirror the framing (docs/adr/0033); the grid's
+        // mini-previews can mirror the framing (docs/adr/0009-collage); the grid's
         // summaries carry the bytes. Default-framed tiles stay cover.
         const byId = new Map(
           model.grid._tag === 'Success' ? model.grid.data.map((s) => [s.id, s] as const) : [],
@@ -162,7 +162,7 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
         [],
         Option.some(GalleryOutMessage.OpenedCollage({ id })),
       ],
-      // ADR-0022's inline two-step confirm: first ✕ arms the card; arming a
+      // ADR-0010's inline two-step confirm: first ✕ arms the card; arming a
       // different card moves the state; ✗ or re-tap disarms.
       ToggledCollageDeleteConfirm: ({ id }) => [
         {
@@ -203,7 +203,7 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
         [],
         Option.none(),
       ],
-      // Several photos opened at once (docs/adr/0032): stay here — no editor
+      // Several photos opened at once (docs/adr/0010-editor-ui): stay here — no editor
       // navigation; the user edits later by clicking a tile. The command's
       // listing rides in the message so the grid refreshes right now (a
       // follow-up ListEdits would land after this arm and wipe the failure

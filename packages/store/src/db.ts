@@ -5,12 +5,12 @@ import { EditTable } from './edit/edit-table'
 
 /**
  * The `"lutra"` database schema — one migration chain owning every object
- * store (docs/adr/0007, 0030). The database name is configured at the Layer
+ * store (docs/adr/0005-storage, docs/adr/0009-collage). The database name is configured at the Layer
  * (`LutraDbSchema.layer('lutra')`).
  *
  * - **v1** creates the `edits` store (keyed by Edit id) and its `saved_at`
  *   index. Existing installs are already here.
- * - **v2** adds the `collages` store (docs/adr/0030): fresh installs run
+ * - **v2** adds the `collages` store (docs/adr/0009-collage): fresh installs run
  *   v0→v1→v2 back-to-back during their first open; existing v1 databases
  *   upgrade through the same chain, so both paths end in the same shape.
  *

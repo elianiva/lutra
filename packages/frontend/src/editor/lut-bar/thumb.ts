@@ -6,7 +6,7 @@ import type { LutDownloadState } from '../../offline/model'
 import { icon } from '../../components/icon'
 
 /**
- * One filmstrip thumb. `src` is the per-photo preview (docs/adr/0013) once
+ * One filmstrip thumb. `src` is the per-photo preview (docs/adr/0002-lut-library) once
  * it has rendered, else the vendored generic jpg — the placeholder and the
  * failure fallback, so a thumb always shows something.
  *
@@ -15,7 +15,7 @@ import { icon } from '../../components/icon'
  * especially at a glance while scrubbing). The badge is decorative — the
  * button's aria-pressed carries the state for screen readers.
  *
- * The offline library (docs/adr/0015) decorates the row: while the cube is
+ * The offline library (docs/adr/0007-offline) decorates the row: while the cube is
  * being fetched a spinner overlays the thumb; while the device is offline an
  * undownloaded cube is dimmed with a "not downloaded" badge and its click
  * routes to the distinct OfflineLutUnavailable notice instead of a commit

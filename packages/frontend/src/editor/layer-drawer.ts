@@ -53,7 +53,7 @@ const mixerSummary = (model: Model, layer: Layer) => {
 }
 
 /**
- * The 8 hue-range swatches (docs/adr/0027 D3): pure-hue dots at the same
+ * The 8 hue-range swatches (docs/adr/0003-adjustment-layers D3): pure-hue dots at the same
  * centers the shader classifies with; the active range gets the ring.
  * Tapping dispatches SelectedMixerColor — presentation-only, no render.
  */
@@ -139,7 +139,7 @@ const layerSliders = (
   )
 }
 
-// memoization (ADR 0034)
+// memoization (ADR 0006)
 const lazyDraft = createLazy()
 const lazyRow = createKeyedLazy()
 
@@ -176,7 +176,7 @@ const chainRowView = (
   chainRowImpl(h, layer, index, total, selected, lutBarOpen, catalog, activeField, activeMixer)
 
 /**
- * The right "Layers" sidebar (docs/adr/0024-mobile-ui): always visible as a side
+ * The right "Layers" sidebar (docs/adr/0010-editor-ui.md): always visible as a side
  * column at `lg`+, and a full-width bottom sheet below `lg` — `open` is the
  * mobile sheet state (visible only while its tab is active).
  */

@@ -8,7 +8,7 @@ import { Effect, Schema } from 'effect'
  * This is the single gate that decides whether the editor is reachable. The
  * root view renders an "unsupported" screen when `supported` is false, so a
  * no-WebGPU device gets a clear remediation message instead of a hard crash
- * (docs/adr/0029). The GPU `GpuBackend` resource is built lazily, so it never
+ * (docs/adr/0001-rendering-engine). The GPU `GpuBackend` resource is built lazily, so it never
  * touches the device at boot — the only thing that dies on a missing GPU is
  * the edit screen, which we replace with that message.
  */

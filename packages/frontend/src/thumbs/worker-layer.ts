@@ -4,7 +4,7 @@ import { ThumbnailEncodeError } from '../errors'
 import type { LutThumbRequest, LutThumbResponse } from './worker'
 
 /**
- * Worker-pool-backed per-photo LUT thumbnail renderer (docs/adr/0013): the
+ * Worker-pool-backed per-photo LUT thumbnail renderer (docs/adr/0002-lut-library): the
  * bar's filmstrip previews — the user's photo with one LUT applied at full
  * strength — are rendered off the main thread by the CPU sampler. A group
  * is 30–68 LUTs and each render is a synchronous sample plus a wasm JPEG

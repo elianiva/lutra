@@ -1,5 +1,5 @@
 // Vendors the Film-Luts mirror into `packages/frontend/public/luts/` as a
-// plain committed copy (see docs/adr/0004-vendored-lut-source.md).
+// plain committed copy (see docs/adr/0002-lut-library.md).
 //
 // Usage: bun scripts/vendor-luts.ts
 // Refresh: bump PINNED_COMMIT (git rev-parse HEAD of the upstream repo),

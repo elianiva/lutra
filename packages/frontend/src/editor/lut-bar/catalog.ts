@@ -40,7 +40,7 @@ export const effectiveTab = (
 /** The entries the bar's filmstrip shows for the given tab: the resolved
  *  recents while the Recents tab is active and non-empty, else the active
  *  group's entries ([] for a stale/unknown tab). The thumb-generation
- *  trigger derives its target set from this (docs/adr/0013), so generation
+ *  trigger derives its target set from this (docs/adr/0002-lut-library), so generation
  *  and render always agree on what is visible. */
 export const visibleEntries = (
   catalog: readonly LutCatalogEntry[],

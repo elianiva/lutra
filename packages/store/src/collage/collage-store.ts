@@ -6,7 +6,7 @@ import type { StoreError } from '../edit/store-error'
 
 /**
  * The swappable storage backend for {@link Collage}s — the same seam shape
- * as the EditStore (docs/adr/0030). A local IndexedDB implementation and a
+ * as the EditStore (docs/adr/0009-collage). A local IndexedDB implementation and a
  * future online/cloud implementation both satisfy this contract; the
  * frontend depends only on the service type.
  */
@@ -24,7 +24,7 @@ export interface CollageStoreContract {
 }
 
 /**
- * The {@link Collage} storage service (docs/adr/0030). Implementations are
+ * The {@link Collage} storage service (docs/adr/0009-collage). Implementations are
  * swappable behind this boundary: IndexedDB `CollageStoreLive` (v1) and a
  * future server/cloud backend.
  *

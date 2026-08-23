@@ -56,7 +56,7 @@ const FIELD_META = {
   // The Color Mixer: 24 fields (8 hue ranges × hue/saturation/luminance),
   // all normalized [-1, 1]. The shader maps hue to ±180° of rotation and
   // saturation/luminance to multiplicative/asymmetric lightness deltas
-  // (docs/adr/0027 D2).
+  // (docs/adr/0003-adjustment-layers D2).
   colorMixer: {
     aquaHue: { default: 0, max: 1, min: -1 },
     aquaLuminance: { default: 0, max: 1, min: -1 },
@@ -95,7 +95,7 @@ const FIELD_META = {
   },
   chromaticAberration: { amount: { default: 0, max: 1, min: -1 } },
   clarity: { amount: { default: 0, max: 1, min: -1 } },
-  // The Tone Curve's 5 control points (docs/adr/0028), one field per axis
+  // The Tone Curve's 5 control points (docs/adr/0003-adjustment-layers), one field per axis
   // (p0x..p4y), all in [0, 1]. The identity defaults come from the curve
   // module so the registry, the shader's reference, and the widget's reset
   // target can never drift apart.

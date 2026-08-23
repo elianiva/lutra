@@ -31,7 +31,7 @@ export class RenderHandle {
 }
 
 /**
- * The compare presentation state the blit applies (docs/adr/0011): which
+ * The compare presentation state the blit applies (docs/adr/0010-editor-ui): which
  * Compare mode is active, where the Split divider sits (image space, 0..1),
  * and which side Toggle shows. Mirrors the frontend's PresentState schema —
  * the backend stays a plain structural service, so the schema lives at the
@@ -67,7 +67,7 @@ export interface GpuBackendContract {
   ) => Effect.Effect<RenderHandle, GpuError>
   /**
    * Re-present the last rendered frame with a new compare presentation state
-   * — a blit-only pass that never re-runs the chain (docs/adr/0011). The
+   * — a blit-only pass that never re-runs the chain (docs/adr/0010-editor-ui). The
    * only GPU work is one fullscreen triangle, so divider drags and mode
    * flips stay cheap on large images. No-op when no frame has rendered for
    * the canvas yet.
@@ -114,7 +114,7 @@ export class GpuBackend extends Context.Service<GpuBackend, GpuBackendContract>(
  * the top-left and y pointing down — the same orientation as the compute
  * dstTex, so no flip is needed.
  *
- * Compare presentation (docs/adr/0011): the blit samples the display texture
+ * Compare presentation (docs/adr/0010-editor-ui): the blit samples the display texture
  * (dstTex) or the source image (srcTex) per `u_present` — mode 0 graded,
  * 1 source (Toggle showing before), 2 Split (source left of the divider,
  * graded right), 3 Side by side (source in the left half, graded in the
@@ -306,7 +306,7 @@ export const GpuBackendLive = Layer.effect(
     // forever, session rebuilds included.
     let readbackCursor = 0
 
-    // Device acquisition is deferred to first use (docs/adr/0029): the Layer
+    // Device acquisition is deferred to first use (docs/adr/0001-rendering-engine): the Layer
     // builds at boot whether or not a GPU is present, so the app never dies on
     // a no-WebGPU device. The root view gates the editor on `WebGpuCapability`,
     // so `getGpu` only runs once the device is known good. Acquisition failures
@@ -754,7 +754,7 @@ export const GpuBackendLive = Layer.effect(
 
     /**
      * Present the session's display texture onto the canvas swapchain,
-     * applying the compare presentation state (docs/adr/0011). The only GPU
+     * applying the compare presentation state (docs/adr/0010-editor-ui). The only GPU
      * work is one fullscreen triangle — presentation changes (mode flip,
      * divider drag) never touch the chain compute output, so they cost a
      * blit, not a re-render. Shared by `execute` (the render's final blit)
@@ -922,7 +922,7 @@ export const GpuBackendLive = Layer.effect(
           ),
         ),
 
-      // Blit-only re-present (docs/adr/0011): re-blit the last rendered
+      // Blit-only re-present (docs/adr/0010-editor-ui): re-blit the last rendered
       // frame with a new compare presentation state, without re-running the
       // chain. Uses the current session's textures as-is; no-op when no
       // session exists for the canvas (nothing has rendered yet).

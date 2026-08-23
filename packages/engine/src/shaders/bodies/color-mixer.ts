@@ -1,6 +1,6 @@
 import type { BodyRenderer } from '../types'
 
-// Color Mixer (Lightroom-style HSL panel, docs/adr/0027): eight hue
+// Color Mixer (Lightroom-style HSL panel, docs/adr/0003-adjustment-layers): eight hue
 // ranges, each with hue / saturation / luminance adjustments. The math
 // follows GIMP's hue-saturation operation (the best-documented
 // implementation of this UI):

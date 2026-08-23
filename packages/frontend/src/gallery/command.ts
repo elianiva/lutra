@@ -42,7 +42,7 @@ export const ListEdits = Command.define('ListEdits', {
  */
 /**
  * Fetch the saved collages for the main menu's Collages section
- * (docs/adr/0030): full records — the layout drives the mini-previews. The
+ * (docs/adr/0009-collage): full records — the layout drives the mini-previews. The
  * store orders newest-first.
  */
 export const ListCollages = Command.define('ListCollages', {
@@ -60,7 +60,7 @@ export const ListCollages = Command.define('ListCollages', {
 
 /**
  * Decode the custom-framed collage tiles' thumbnails to learn their pixel
- * sizes (docs/adr/0033) — the mini-previews mirror each tile's framing,
+ * sizes (docs/adr/0009-collage) — the mini-previews mirror each tile's framing,
  * which needs its aspect. Default-framed tiles never reach here (they render
  * as cover); a failed decode just leaves that tile covered.
  */
@@ -93,7 +93,7 @@ export const MeasureCollageThumbs = Command.define('MeasureCollageThumbs', {
 /**
  * Delete one collage by id (`CollageStore.delete`); the caller re-lists to
  * reflect the smaller section. Deleting a collage never touches its
- * referenced Edits (docs/adr/0030: composition by reference). A backend
+ * referenced Edits (docs/adr/0009-collage: composition by reference). A backend
  * failure surfaces as `CollageDeleteFailed`.
  */
 export const DeleteCollage = Command.define('DeleteCollage', {
@@ -194,7 +194,7 @@ const thumbnailBytes = (
  * Turn one picked photo into a persisted self-contained Edit: read its bytes,
  * encode the seed thumbnail, and save it under a fresh uuid. Self-contained
  * so the single-pick and batch paths share it; failures stay on the error
- * channel for the caller to shape (docs/adr/0032).
+ * channel for the caller to shape (docs/adr/0010-editor-ui).
  */
 const createEdit = (
   file: File,
@@ -219,7 +219,7 @@ const createEdit = (
 
 /**
  * The gallery's "open a photo" flow, extended to multiple picks
- * (docs/adr/0032). Opens the native file picker with multi-select on and
+ * (docs/adr/0010-editor-ui). Opens the native file picker with multi-select on and
  * turns every picked photo into a self-contained Edit (fresh uuid, empty
  * chain, source + thumbnail bytes, now), mirroring the mobile main menu.
  *
@@ -283,7 +283,7 @@ export const OpenPhoto = Command.define('OpenPhoto', {
 })
 
 /**
- * The gallery's "create collage" flow (docs/adr/0030): persist a new Collage
+ * The gallery's "create collage" flow (docs/adr/0009-collage): persist a new Collage
  * (fresh uuid, default layout, one tile per selected Edit in pick order) and
  * surface the id as `CollageCreated`. Persist-first, like opening a photo —
  * the record exists before the screen opens, and the root navigates onto it.

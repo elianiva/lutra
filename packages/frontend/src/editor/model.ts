@@ -81,12 +81,12 @@ export const Model = Schema.Struct({
   // Save flow bookkeeping (see SaveStatus above).
   saveStatus: SaveStatus,
   // Whether the bottom LUT bar is open (the filmstrip picker under the
-  // canvas — docs/adr/0012). The drawer's LUT rows keep summary + sliders
+  // canvas — docs/adr/0002-lut-library). The drawer's LUT rows keep summary + sliders
   // and carry a chevron toggle for this bar; the bar owns browsing.
   lutBarOpen: Schema.Boolean,
   // Hover preview: the lutId hovered in the bar. Presentation-only, applied
   // at render time to the active LUT target (the draft or the focused chain
-  // LUT layer) — never touches the chain or the machine (docs/adr/0011
+  // LUT layer) — never touches the chain or the machine (docs/adr/0010-editor-ui
   // spirit). Cleared on every bar-closing transition.
   previewLut: Schema.NullOr(LutIdSchema),
   // Active tab in the bar: 'recents' or a catalog category name. A stale
@@ -98,12 +98,12 @@ export const Model = Schema.Struct({
   // bar's Recents tab (hidden while empty).
   lutRecents: Schema.Array(LutIdSchema),
   // Per-photo LUT preview thumbnails: lutId → blob URL of the 200×200 JPEG
-  // rendered by the thumb worker (docs/adr/0013). Presentation-only — the
+  // rendered by the thumb worker (docs/adr/0002-lut-library). Presentation-only — the
   // bar's thumbs prefer these over the vendored generic jpg. Generated
   // lazily per visible group (tab select / bar open), cleared and revoked
   // when a new image loads.
   lutThumbs: Schema.Record(Schema.String, Schema.String),
-  // Per-LUT offline library states (docs/adr/0015): lutId → the cube's
+  // Per-LUT offline library states (docs/adr/0007-offline): lutId → the cube's
   // mirroring state, fed by the root's delegation of offline fill events.
   // Absence means "not downloaded" — while offline, the LUT bar dims those
   // rows and blocks commits with a distinct notice.
@@ -121,7 +121,7 @@ export const Model = Schema.Struct({
   compareMode: CompareMode,
   compareSplitAt: Schema.Number,
   compareToggleBefore: Schema.Boolean,
-  // Which bottom sheet is open on mobile (docs/adr/0024-mobile-ui): under the `lg`
+  // Which bottom sheet is open on mobile (docs/adr/0010-editor-ui.md): under the `lg`
   // breakpoint the tool panel and the layer drawer collapse into full-width
   // bottom sheets toggled by the mobile tab bar — this field tracks which
   // one is open (null = neither, the canvas gets the full screen). Inert on
@@ -144,7 +144,7 @@ export const Model = Schema.Struct({
   bins: Schema.NullOr(Schema.instanceOf(Uint32Array)),
   // Monotonic counter hashed into the render trigger stamp.
   revision: Schema.Number,
-  // The shared export-dialog machine (docs/adr/0031): settings, encode
+  // The shared export-dialog machine (docs/adr/0004-export): settings, encode
   // flow, and the frame slot's readiness flag.
   exportDialog: ExportDialog.Model,
   // The tool card currently under the pointer (or keyboard focus) — the

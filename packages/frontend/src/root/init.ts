@@ -33,7 +33,7 @@ type Resource =
 export type InitReturn = readonly [Model, readonly Command.Command<AppMessage, never, Resource>[]]
 
 /**
- * The root's cold-load `init` (docs/adr/0009, routing-and-navigation). Parses
+ * The root's cold-load `init` (docs/adr/0006-frontend-architecture, routing-and-navigation). Parses
  * the boot URL into a route, seeds BOTH Submodels (they hold persistent
  * cross-route state — a user can navigate between them without a reload), and
  * fires only the active route's boot Commands:
@@ -74,7 +74,7 @@ export const init = (capability: WebGpuCapability, url: Url.Url): InitReturn => 
       route,
       webgpu: capability,
     },
-    // The offline fill's boot auto-start (docs/adr/0015): unless the device
+    // The offline fill's boot auto-start (docs/adr/0007-offline): unless the device
     // asked for reduced data usage — then the card's manual start button
     // is the only path in, and `start` stays idempotent for both. The
     // persist() request rides along ungated (a bonus, not a precondition).

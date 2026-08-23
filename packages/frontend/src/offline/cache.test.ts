@@ -6,7 +6,7 @@ import { toLibraryPath } from './cache'
 // absolute request URLs, so keys() must strip the origin before the diff
 // compares against the library's /luts/… paths. The real Cache API is not
 // available under happy-dom — this pins the normalization instead
-// (docs/adr/0015).
+// (docs/adr/0007-offline).
 
 /** Any absolute URL the browser could store a request under. */
 const absoluteUrlArb = fc.webUrl()

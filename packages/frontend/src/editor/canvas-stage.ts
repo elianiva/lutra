@@ -29,7 +29,7 @@ export const asHtmlElement = (element: Element): HTMLElement => {
  *  the cursor; drag pans. The stage resizes re-fit only while the user hasn't
  *  touched the view (zoomed or panned) since the last fit.
  *
- *  Touch (docs/adr/0024-mobile-ui): the stage is `touch-none`, so pointer drags pan
+ *  Touch (docs/adr/0010-editor-ui.md): the stage is `touch-none`, so pointer drags pan
  *  without the browser hijacking the gesture; two fingers pinch-zoom about
  *  the midpoint, and a double-tap toggles between the fit and 2×.
  */
@@ -472,7 +472,7 @@ const COMPARE_MODES: readonly {
  * The Compare control (CONTEXT.md "Compare"): a segmented Off / Toggle /
  * Split / Side by side picker floating at the bottom-center of the canvas
  * stage. Presentation-only — selecting a mode dispatches PresentFrame,
- * never a chain render (docs/adr/0011). Dimmed until an image is loaded. In
+ * never a chain render (docs/adr/0010-editor-ui). Dimmed until an image is loaded. In
  * Toggle mode the segment doubles as the flip button (update flips the
  * side).
  */
@@ -595,7 +595,7 @@ const histogramView = (bins: Uint32Array | null, h: HtmlBuilder<EditorMessage>):
       ),
       // The SVG's viewBox scales with the box, so the same points render at
       // any size — the responsive box shrinks the overlay on phones
-      // (docs/adr/0024-mobile-ui), where 220px would collide with the Compare control.
+      // (docs/adr/0010-editor-ui.md), where 220px would collide with the Compare control.
     ],
     [
       h.svg(
@@ -643,7 +643,7 @@ const loadedStage = (h: HtmlBuilder<EditorMessage>, model: Model) => {
       // below is anchored to the stage origin and pan/zoom offsets are plain
       // stage coordinates (no flex centering to compensate for).
       // touch-none: the browser must not hijack touch gestures into
-      // scroll/zoom — pointer pan and pinch own the stage (docs/adr/0024-mobile-ui).
+      // scroll/zoom — pointer pan and pinch own the stage (docs/adr/0010-editor-ui.md).
       h.Class('absolute inset-0 touch-none'),
       h.OnMount(PanZoom({ imageHeight: src.height, imageWidth: contentWidth })),
     ],
@@ -695,7 +695,7 @@ const loadedStage = (h: HtmlBuilder<EditorMessage>, model: Model) => {
  *  rendered canvas with pan/zoom, and always the Compare control (dimmed
  *  without an image). Which stage shows is the phase machine's call
  *  (./phase.ts): Empty/Loading → upload zone, Error → error stage,
- *  order-1/min-h-0: in the mobile column layout (docs/adr/0024-mobile-ui) the stage
+ *  order-1/min-h-0: in the mobile column layout (docs/adr/0010-editor-ui.md) the stage
  *  is the flex-1 child above the bottom sheets; `lg:` restores the side
  *  column order. */
 export const canvasStage = (h: HtmlBuilder<EditorMessage>, model: Model) => {

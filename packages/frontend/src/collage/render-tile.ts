@@ -17,7 +17,7 @@ export interface TileRender {
 }
 
 /**
- * Render one Edit's full chain into a framed tile of `cell` px (docs/adr/0031,
+ * Render one Edit's full chain into a framed tile of `cell` px (docs/adr/0009-collage,
  * 0033): the source bytes are decoded, drawn through the tile's framing
  * (zoom + focus) onto a detached cell-sized canvas, then run through the
  * engine's normal render path — `GpuBackend.execute` runs the chain at the

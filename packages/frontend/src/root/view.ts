@@ -9,17 +9,17 @@ import * as Editor from '../editor'
 import * as Collage from '../collage'
 
 /**
- * The root's view (docs/adr/0009). Emits a whole-document shell and embeds
+ * The root's view (docs/adr/0006-frontend-architecture). Emits a whole-document shell and embeds
  * exactly one Submodel under the active route arm, each in its own slot, so
  * navigating gallery↔editor tears down one and builds the other fresh (route
  * view identity). The `toParentMessage` for each wraps every child Message in
  * the root's `Got*Message` so the child boundary stays intact.
  *
- * The offline UI (docs/adr/0015) is root-owned for the same reason it is
+ * The offline UI (docs/adr/0007-offline) is root-owned for the same reason it is
  * root-owned in the model: the progress card floats bottom-right on the main
  * menu, the toast is global, and both read the offline slice directly.
  */
-// lazy slots (ADR 0034)
+// lazy slots (ADR 0006)
 // Each slot preserves a cached VNode when its slice's reference is unchanged
 // (root uses `evo`, so unchanged keys keep ===). Builder `h` is singleton.
 const lazyUnsupported = createLazy()
@@ -210,7 +210,7 @@ export const view = (model: Model, h: HtmlBuilder<AppMessage>): Document => {
 
 // (readyToastView / offlineCardView defined above for lazy)
 
-// The offline progress card (docs/adr/0015): the fill's live state floats
+// The offline progress card (docs/adr/0007-offline): the fill's live state floats
 // bottom-right, out of the layout — the gallery no longer shifts when the
 // strip appears or disappears. Nothing renders once the library is ready
 // (the toast announced it) — and nothing renders in the editor; the fill is
@@ -221,7 +221,7 @@ const offlineCardImpl = (offline: Model['offline'], h: HtmlBuilder<AppMessage>) 
   const frame = (content: readonly Html[]) =>
     h.div(
       [
-        // inset-x-4 on phones (docs/adr/0024-mobile-ui): the card spans the viewport
+        // inset-x-4 on phones (docs/adr/0010-editor-ui.md): the card spans the viewport
         // width instead of floating in the corner; `md:` restores the
         // fixed-width corner float.
         h.Class(

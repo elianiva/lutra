@@ -7,7 +7,7 @@ import { Brand, Schema } from 'effect'
  * is a stable, externally-visible key: it appears in the URL
  * (`/edit/<uuid>`), in the gallery (the `EditSummary`), and as the primary
  * key of the storage backend. Because it crosses those boundaries it is
- * **format-validated**: a malformed uuid fails the whole decode (docs/adr/0007,
+ * **format-validated**: a malformed uuid fails the whole decode (docs/adr/0005-storage,
  * 0008, 0009). A corrupt id inside a saved Edit is corruption, not a
  * recoverable case.
  */

@@ -2,7 +2,7 @@
 // injects it (plus the shell cache name it implies and the shared LUT cache
 // name) into sw/sw.ts, and bundles the result. The service worker's precache
 // manifest can only exist at build time — the hashed asset names are a build
-// artifact (docs/adr/0015).
+// artifact (docs/adr/0007-offline).
 //
 // `generateSwSource` is exported pure for the SW-coupling test
 // (src/offline/sw-source.test.ts): the page's cache name and the SW's are
@@ -21,7 +21,7 @@ const dist = path.join(frontend, 'dist')
  *  manifest. The manifest changes whenever any hashed asset does, so every
  *  deploy installs into a fresh cache and activate purges the previous
  *  deploy's shell wholesale — old hashed assets never accumulate across
- *  releases (docs/adr/0015). Exported for the SW-coupling test. */
+ *  releases (docs/adr/0007-offline). Exported for the SW-coupling test. */
 export const shellCacheName = (precache: readonly string[]): string =>
   `lutra-shell-${createHash('sha256').update(JSON.stringify(precache)).digest('hex').slice(0, 8)}`
 
@@ -53,7 +53,7 @@ const run = async (): Promise<void> => {
   // The app shell: the document, the manifest, the icons (including the iOS
   // splash screens), and every hashed asset (JS/CSS/fonts/encode-wasm). NOT
   // /luts/* — the offline library is the page-driven fill's job
-  // (docs/adr/0015).
+  // (docs/adr/0007-offline).
   const precache = [
     '/index.html',
     '/manifest.webmanifest',

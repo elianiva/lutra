@@ -33,7 +33,7 @@ export const settingsDialogView = (h: HtmlBuilder<GalleryMessage>, model: Model)
                   [
                     ...panel,
                     // Full-width on phones, capped height with an internal
-                    // scroll (docs/adr/0024-mobile-ui) — same as the export dialog.
+                    // scroll (docs/adr/0010-editor-ui.md) — same as the export dialog.
                     h.Class(
                       'fixed left-1/2 top-1/2 z-[60] w-[min(420px,calc(100vw-2rem))] max-h-[85dvh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto border border-border bg-panel shadow-lg',
                     ),

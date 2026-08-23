@@ -4,7 +4,7 @@ import { Effect } from 'effect'
 import { Runtime } from 'foldkit'
 import { application } from './main'
 
-// The service worker (docs/adr/0015): prod-only — a SW in `vite dev` is a
+// The service worker (docs/adr/0007-offline): prod-only — a SW in `vite dev` is a
 // stale-cache footgun (you'd be debugging ghosts). `updateViaCache: 'none'`
 // bypasses the HTTP cache for the SW script itself, so a deploy's new sw.js
 // is picked up on the next navigation; the versioned shell cache + the

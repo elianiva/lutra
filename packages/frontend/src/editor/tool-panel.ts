@@ -8,12 +8,12 @@ import type { LayerType } from '@lutra/engine'
 
 /**
  * The left "Adjustments" panel: a Photoshop-style **icon rail** on desktop
- * (docs/adr/0016-tool-panel-cards D3, superseded 2026-08-23) — one icon-only
+ * (docs/adr/0010-editor-ui.md D3, superseded 2026-08-23) — one icon-only
  * button per tool; hovering (or keyboard-focusing) a card shows a custom
  * tooltip panel carrying the tool's copy ("what it does" / "when to use
  * it"). The open card is the model's `hoveredTool` field — no submodel, no
  * native `title`; the panel renders straight from the view. Below `lg` the
- * panel is still the full-width mobile bottom sheet (docs/adr/0024-mobile-
+ * panel is still the full-width mobile bottom sheet (docs/adr/0010-editor-ui.md
  * ui), where hover doesn't exist — there each button keeps its label +
  * visible two-line description and the tooltip panel is display:none. A
  * muted ×N badge pins to the button's top-right corner when the tool is
@@ -79,7 +79,7 @@ export const toolPanel = (h: HtmlBuilder<EditorMessage>, model: Model, open: boo
 const canPickTool = (phase: EditorPhase) => phase._tag === 'Idle' || phase._tag === 'Selected'
 
 /** How many committed chain layers of this type are in the edit — the
- *  card's "in your edit" badge (docs/adr/0016-tool-panel-cards D4). */
+ *  card's "in your edit" badge (docs/adr/0010-editor-ui.md D4). */
 export const chainCount = (model: Model, type: LayerType): number =>
   model.chain.filter((layer) => layer.type === type).length
 
@@ -146,7 +146,7 @@ const toolCardInner = (
           // "Already in your edit": a muted ×N pill pinned to the button's
           // top-right corner — works for both the wide mobile card and the
           // narrow desktop icon. Only when the tool is in the chain — a
-          // first-time user sees nothing (docs/adr/0016-tool-panel-cards D4).
+          // first-time user sees nothing (docs/adr/0010-editor-ui.md D4).
           ...(count > 0
             ? [
                 h.span(

@@ -2,12 +2,12 @@ import { IndexedDbTable } from '@effect/platform-browser'
 import { Edit } from './edit'
 
 /**
- * The single IndexedDB object store holding Edit records (docs/adr/0007).
+ * The single IndexedDB object store holding Edit records (docs/adr/0005-storage).
  *
  * Design notes:
  * - **One row per Edit**, keyed by the Edit uuid (`keyPath: 'id'`), with an index
  *   on `savedAt` for the gallery's time-ordered grid. This is the typed-table
- *   shape ADR 0007's *migration trigger* anticipated: a flat `KeyValueStore`
+ *   shape ADR 0005's *migration trigger* anticipated: a flat `KeyValueStore`
  *   (`layerIndexedDb`) cannot enumerate its keys, so it cannot implement the
  *   seam's `list()` — the moment the gallery needs the whole grid, a table
  *   with real row scans is required.
