@@ -10,20 +10,7 @@ import {
   formatPercentSigned,
   lutName,
 } from './layer-meta'
-import {
-  SelectedLayer,
-  RemovedLayer,
-  ToggledLayerVisibility,
-  UpdatedLayerParam,
-  UpdatedDraftParam,
-  ConfirmedDraft,
-  CancelledDraft,
-  CycledToggledField,
-  SelectedMixerColor,
-  ReorderedLayer,
-  ToggledLutPicker,
-} from './message'
-import type { EditorMessage } from './message'
+import { EditorMessage } from './message'
 import type { Model } from './model'
 import { toneCurveWidget } from './tone-curve'
 import { FieldKey, numField } from '@lutra/engine'
@@ -132,11 +119,13 @@ const layerSliders = (
   if (layer.type === 'colorMixer') {
     const color = activeMixerColorFor(model, layer.id)
     return [
-      mixerSwatches(h, color, (index) => SelectedMixerColor({ color: index, id: layer.id })),
+      mixerSwatches(h, color, (index) =>
+        EditorMessage.SelectedMixerColor({ color: index, id: layer.id }),
+      ),
       ...mixerSliders(h, layer, ui, color, (field, value) =>
         kind === 'draft'
-          ? UpdatedDraftParam({ field, value })
-          : UpdatedLayerParam({ field, id: layer.id, value }),
+          ? EditorMessage.UpdatedDraftParam({ field, value })
+          : EditorMessage.UpdatedLayerParam({ field, id: layer.id, value }),
       ),
     ]
   }
@@ -276,7 +265,7 @@ const draftRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer) => 
         [
           h.button(
             [
-              h.OnClick(CancelledDraft()),
+              h.OnClick(EditorMessage.CancelledDraft()),
               h.AriaLabel('Cancel draft'),
               h.Class('grid size-7 place-items-center text-muted hover:text-ink'),
             ],
@@ -284,7 +273,7 @@ const draftRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer) => 
           ),
           h.button(
             [
-              h.OnClick(ConfirmedDraft()),
+              h.OnClick(EditorMessage.ConfirmedDraft()),
               h.AriaLabel('Confirm draft'),
               h.Class('grid size-7 place-items-center bg-accent text-ink'),
             ],
@@ -306,7 +295,7 @@ const draftSlider = (
   const { min, max } = fieldBounds(layer.type, field)
   const value = num(layer, field)
   return sliderControl(h, fieldUi.label, fieldUi.format(value), min, max, value, (v) =>
-    UpdatedDraftParam({ field, value: v }),
+    EditorMessage.UpdatedDraftParam({ field, value: v }),
   )
 }
 
@@ -351,11 +340,14 @@ const chainRowImpl = (
     ],
     [
       h.div(
-        [h.Class('flex items-center gap-2 px-4 py-2'), h.OnClick(SelectedLayer({ id: layer.id }))],
+        [
+          h.Class('flex items-center gap-2 px-4 py-2'),
+          h.OnClick(EditorMessage.SelectedLayer({ id: layer.id })),
+        ],
         [
           h.button(
             [
-              h.OnClick(ToggledLayerVisibility({ id: layer.id })),
+              h.OnClick(EditorMessage.ToggledLayerVisibility({ id: layer.id })),
               h.AriaLabel(layer.visible ? 'Hide layer' : 'Show layer'),
               h.Class('grid size-6 place-items-center text-muted hover:text-ink'),
             ],
@@ -372,14 +364,14 @@ const chainRowImpl = (
             [
               ...(layer.type === 'lut' ? [lutBarToggleImpl(h, lutBarOpen)] : []),
               reorderButton(h, 'Move up', ArrowUp, index === total - 1, () =>
-                ReorderedLayer({ from: index, to: index + 1 }),
+                EditorMessage.ReorderedLayer({ from: index, to: index + 1 }),
               ),
               reorderButton(h, 'Move down', ArrowDown, index === 0, () =>
-                ReorderedLayer({ from: index, to: index - 1 }),
+                EditorMessage.ReorderedLayer({ from: index, to: index - 1 }),
               ),
               h.button(
                 [
-                  h.OnClick(RemovedLayer({ id: layer.id })),
+                  h.OnClick(EditorMessage.RemovedLayer({ id: layer.id })),
                   h.AriaLabel('Delete layer'),
                   h.Class('grid size-6 place-items-center text-muted hover:text-ink'),
                 ],
@@ -433,13 +425,13 @@ const chainSlider = (
       min,
       max,
       value,
-      (v) => UpdatedLayerParam({ field, id: layer.id, value: v }),
+      (v) => EditorMessage.UpdatedLayerParam({ field, id: layer.id, value: v }),
       ui.toggled,
-      () => CycledToggledField({ id: layer.id }),
+      () => EditorMessage.CycledToggledField({ id: layer.id }),
     )
   }
   return sliderControl(h, fieldUi.label, fieldUi.format(value), min, max, value, (v) =>
-    UpdatedLayerParam({ field, id: layer.id, value: v }),
+    EditorMessage.UpdatedLayerParam({ field, id: layer.id, value: v }),
   )
 }
 
@@ -467,7 +459,7 @@ const lutBarToggle = (h: HtmlBuilder<EditorMessage>, model: Model) =>
 const lutBarToggleImpl = (h: HtmlBuilder<EditorMessage>, open: boolean) =>
   h.button(
     [
-      h.OnClick(ToggledLutPicker()),
+      h.OnClick(EditorMessage.ToggledLutPicker()),
       h.AriaExpanded(open),
       h.AriaLabel('Toggle LUT bar'),
       h.Class('grid size-6 place-items-center text-muted hover:text-ink'),

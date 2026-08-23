@@ -1,8 +1,7 @@
 import type { HtmlBuilder } from 'foldkit/html'
 import { Dialog } from '@foldkit/ui'
 import type { Model } from './model'
-import type { GalleryMessage } from './message'
-import { DeleteRequested, GotDeleteDialogMessage } from './message'
+import { GalleryMessage } from './message'
 
 /**
  * The image-deletion confirmation dialog (ADR-0022, superseded to a modal
@@ -19,7 +18,7 @@ export const deleteDialogView = (h: HtmlBuilder<GalleryMessage>, model: Model) =
   h.submodel({
     model: model.deleteDialog,
     slotId: model.deleteDialog.id,
-    toParentMessage: (message) => GotDeleteDialogMessage({ message }),
+    toParentMessage: (message) => GalleryMessage.GotDeleteDialogMessage({ message }),
     view: Dialog.view,
     viewInputs: {
       toView: ({ dialog, backdrop, panel, title, description, closeButton, isVisible }) =>
@@ -79,7 +78,9 @@ export const deleteDialogView = (h: HtmlBuilder<GalleryMessage>, model: Model) =
                           : [
                               h.button(
                                 [
-                                  h.OnClick(DeleteRequested({ id: model.pendingDelete })),
+                                  h.OnClick(
+                                    GalleryMessage.DeleteRequested({ id: model.pendingDelete }),
+                                  ),
                                   h.AriaLabel('Confirm deleting this photo'),
                                   h.DataAttribute('confirm-delete', 'true'),
                                   h.Class(

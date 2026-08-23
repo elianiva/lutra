@@ -8,7 +8,7 @@ import { init } from './init'
 import { informRouteChanged } from './inform-route-changed'
 import { createLayerFor } from './command'
 import { selectTool } from './test-layer'
-import { EditLoaded, EditLoadFailed } from './message'
+import { EditorMessage } from './message'
 import { EditNotFoundError } from '../errors'
 import { Idle } from './phase'
 
@@ -44,7 +44,7 @@ describe('attached edit load (gallery → /edit/:id)', () => {
     const exposure = Effect.runSync(createLayerFor('exposure'))
     const [model, commands] = update(
       initialModel(),
-      EditLoaded({
+      EditorMessage.EditLoaded({
         bitmap: bitmap(),
         chain: [exposure],
         height: 480,
@@ -80,7 +80,7 @@ describe('attached edit load (gallery → /edit/:id)', () => {
     // …is discarded when EditLoaded lands (the machine edge Drafting → Idle).
     const [model] = update(
       drafting,
-      EditLoaded({
+      EditorMessage.EditLoaded({
         bitmap: bitmap(),
         chain: [],
         height: 480,
@@ -97,7 +97,7 @@ describe('attached edit load (gallery → /edit/:id)', () => {
   it('EditLoadFailed lands the error stage with the reason', () => {
     const [model, commands] = update(
       initialModel(),
-      EditLoadFailed({ error: new EditNotFoundError({ message: 'edit not found' }) }),
+      EditorMessage.EditLoadFailed({ error: new EditNotFoundError({ message: 'edit not found' }) }),
     )
     expect(model.phase._tag).toBe('Error')
     expect(model.source.error).toBeInstanceOf(EditNotFoundError)

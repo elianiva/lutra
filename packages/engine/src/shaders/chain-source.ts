@@ -9,7 +9,7 @@ import type { LayerType } from '../layers/schemas'
  * `generateChainSource` reports this on its Effect error channel so callers
  * can compose the failure without a synchronous throw.
  */
-export class MissingLutReferenceError extends Schema.TaggedErrorClass<MissingLutReferenceError>()(
+export class MissingLutReferenceError extends Schema.TaggedError<MissingLutReferenceError>()(
   'MissingLutReferenceError',
   {
     cause: Schema.optional(Schema.Unknown),

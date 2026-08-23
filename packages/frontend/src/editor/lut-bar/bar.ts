@@ -1,10 +1,9 @@
 import { Option, pipe } from 'effect'
 import { type Html, type HtmlBuilder, createLazy, createKeyedLazy } from 'foldkit/html'
 import type { LayerId, LutId } from '@lutra/engine'
-import type { EditorMessage } from '../message'
 import type { LutCatalogEntry } from '../../luts/store'
 import type { LutDownloadState } from '../../offline/model'
-import { ChangedDraftLut, ChangedLayerLut, OfflineLutUnavailable } from '../message'
+import { EditorMessage } from '../message'
 import { lutName } from '../layer-meta'
 import type { Model } from '../model'
 import { currentLutId, lutTarget } from './target'
@@ -139,12 +138,12 @@ const thumbView = (
     // We can't fully memoize the closure, but per-thumb memoization keeps it stable
     // until the thumb's own `current`/`downloadState`/`online` changes.
     if (!online && downloadState !== 'downloaded') {
-      return OfflineLutUnavailable({ lutId: entry.lut_file })
+      return EditorMessage.OfflineLutUnavailable({ lutId: entry.lut_file })
     }
     // SAFETY: commitId is LayerId when commitKind is 'layer' (barView guarantees targetId non-null)
     return commitKind === 'draft'
-      ? ChangedDraftLut({ lutId: entry.lut_file })
-      : ChangedLayerLut({ id: commitId as LayerId, lutId: entry.lut_file })
+      ? EditorMessage.ChangedDraftLut({ lutId: entry.lut_file })
+      : EditorMessage.ChangedLayerLut({ id: commitId as LayerId, lutId: entry.lut_file })
   })
 
 const barView = (

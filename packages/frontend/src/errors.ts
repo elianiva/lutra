@@ -2,7 +2,7 @@ import { Schema } from 'effect'
 
 // The frontend's domain errors (CONTEXT.md "Image decode error",
 // "Thumbnail encode error", plus the editor-internal states they name).
-// Every class follows the engine/store convention: a `Schema.TaggedErrorClass`
+// Every class follows the engine/store convention: a `Schema.TaggedError`
 // with a `message` and an optional `cause`, so failures can cross the
 // foldkit message boundary as validated values and be caught by tag.
 //
@@ -16,13 +16,10 @@ import { Schema } from 'effect'
  * bytes. One concept whether the browser API failed or the file is corrupt:
  * the user-visible failure is the same — the image cannot be opened.
  */
-export class ImageDecodeError extends Schema.TaggedErrorClass<ImageDecodeError>()(
-  'ImageDecodeError',
-  {
-    cause: Schema.optional(Schema.Unknown),
-    message: Schema.String,
-  },
-) {}
+export class ImageDecodeError extends Schema.TaggedError<ImageDecodeError>()('ImageDecodeError', {
+  cause: Schema.optional(Schema.Unknown),
+  message: Schema.String,
+}) {}
 
 /**
  * A thumbnail (the small JPEG of the graded result or the picked photo that
@@ -31,7 +28,7 @@ export class ImageDecodeError extends Schema.TaggedErrorClass<ImageDecodeError>(
  * export encoder's contract): thumbnails are downscaled by canvas 2D,
  * exports by the worker encoder.
  */
-export class ThumbnailEncodeError extends Schema.TaggedErrorClass<ThumbnailEncodeError>()(
+export class ThumbnailEncodeError extends Schema.TaggedError<ThumbnailEncodeError>()(
   'ThumbnailEncodeError',
   {
     cause: Schema.optional(Schema.Unknown),
@@ -45,7 +42,7 @@ export class ThumbnailEncodeError extends Schema.TaggedErrorClass<ThumbnailEncod
  * The app's own markup always satisfies this, so it is a defect — thrown,
  * not Effect-failed.
  */
-export class MountElementError extends Schema.TaggedErrorClass<MountElementError>()(
+export class MountElementError extends Schema.TaggedError<MountElementError>()(
   'MountElementError',
   {
     cause: Schema.optional(Schema.Unknown),
@@ -59,7 +56,7 @@ export class MountElementError extends Schema.TaggedErrorClass<MountElementError
  * on the next mutation; flipping this to a defect would change
  * user-visible behavior for a race that the pipeline already absorbs.
  */
-export class CanvasUnavailableError extends Schema.TaggedErrorClass<CanvasUnavailableError>()(
+export class CanvasUnavailableError extends Schema.TaggedError<CanvasUnavailableError>()(
   'CanvasUnavailableError',
   {
     cause: Schema.optional(Schema.Unknown),
@@ -72,7 +69,7 @@ export class CanvasUnavailableError extends Schema.TaggedErrorClass<CanvasUnavai
  * the engine registry. The command boundary keeps this typed failure out of
  * the synchronous phase transition.
  */
-export class LayerCreationError extends Schema.TaggedErrorClass<LayerCreationError>()(
+export class LayerCreationError extends Schema.TaggedError<LayerCreationError>()(
   'LayerCreationError',
   {
     cause: Schema.optional(Schema.Unknown),
@@ -86,7 +83,7 @@ export class LayerCreationError extends Schema.TaggedErrorClass<LayerCreationErr
  * the command synthesizes this when it resolves `None` into the load
  * failure the editor's phase machine understands.
  */
-export class EditNotFoundError extends Schema.TaggedErrorClass<EditNotFoundError>()(
+export class EditNotFoundError extends Schema.TaggedError<EditNotFoundError>()(
   'EditNotFoundError',
   {
     cause: Schema.optional(Schema.Unknown),
@@ -99,7 +96,7 @@ export class EditNotFoundError extends Schema.TaggedErrorClass<EditNotFoundError
  * a field the layer's UI metadata does not define. The metadata is static,
  * so this is a defect — thrown, not Effect-failed.
  */
-export class UnknownFieldError extends Schema.TaggedErrorClass<UnknownFieldError>()(
+export class UnknownFieldError extends Schema.TaggedError<UnknownFieldError>()(
   'UnknownFieldError',
   {
     cause: Schema.optional(Schema.Unknown),

@@ -3,15 +3,7 @@ import { Mount } from 'foldkit'
 import { type Html, type HtmlBuilder, createLazy } from 'foldkit/html'
 import { Eye, EyeOff, SquareSplitHorizontal, Columns2 } from 'lucide'
 import type { IconNode } from 'lucide'
-import {
-  FilePickRequested,
-  ScaledCanvas,
-  SelectedImageFile,
-  CanvasRegistered,
-  ChangedCompareMode,
-  ChangedSplitPosition,
-} from './message'
-import type { EditorMessage, CompareMode } from './message'
+import { EditorMessage, type CompareMode } from './message'
 import { Empty, ErrorState, hasImage, Loading } from './phase'
 import { canvasRef, registerCanvas } from '../gpu/canvas-ref'
 import { MountElementError } from '../errors'
@@ -44,11 +36,11 @@ export const asHtmlElement = (element: Element): HTMLElement => {
 export const PanZoom = Mount.defineStream(
   'PanZoom',
   { imageHeight: S.Number, imageWidth: S.Number },
-  ScaledCanvas,
+  EditorMessage.ScaledCanvas,
 )(
   ({ imageWidth, imageHeight }) =>
     (element) =>
-      Stream.callback<typeof ScaledCanvas.Type>((queue) =>
+      Stream.callback<typeof EditorMessage.ScaledCanvas.Type>((queue) =>
         Effect.gen(function* () {
           const stage = asHtmlElement(element)
           const state = {
@@ -78,7 +70,7 @@ export const PanZoom = Mount.defineStream(
           // Last single tap (time + position), for double-tap detection.
           let lastTap = { at: 0, x: 0, y: 0 }
           const emit = (scale: number, offsetX: number, offsetY: number) =>
-            Queue.offerUnsafe(queue, ScaledCanvas({ offsetX, offsetY, scale }))
+            Queue.offerUnsafe(queue, EditorMessage.ScaledCanvas({ offsetX, offsetY, scale }))
 
           /** Scale + offsets that center the content in the stage. */
           const fitToStage = () => {
@@ -338,13 +330,13 @@ export const PanZoom = Mount.defineStream(
  */
 export const RegisterCanvas = Mount.define(
   'RegisterCanvas',
-  CanvasRegistered,
+  EditorMessage.CanvasRegistered,
 )((element) =>
   Effect.gen(function* () {
     if (element instanceof HTMLCanvasElement) {
       yield* registerCanvas(canvasRef, element)
     }
-    return CanvasRegistered()
+    return EditorMessage.CanvasRegistered()
   }),
 )
 
@@ -360,14 +352,14 @@ export const RegisterCanvas = Mount.define(
  */
 export const CompareDivider = Mount.defineStream(
   'CompareDivider',
-  ChangedSplitPosition,
+  EditorMessage.ChangedSplitPosition,
 )((element) =>
-  Stream.callback<typeof ChangedSplitPosition.Type>((queue) =>
+  Stream.callback<typeof EditorMessage.ChangedSplitPosition.Type>((queue) =>
     Effect.gen(function* () {
       const divider = asHtmlElement(element)
       const container = divider.parentElement
       const emit = (position: number) =>
-        Queue.offerUnsafe(queue, ChangedSplitPosition({ position }))
+        Queue.offerUnsafe(queue, EditorMessage.ChangedSplitPosition({ position }))
 
       let dragging = false
 
@@ -505,7 +497,7 @@ const compareView = (mode: CompareMode, hasImage: boolean, h: HtmlBuilder<Editor
               : 'flex items-center gap-1.5 px-3 py-1.5 text-muted hover:bg-panel-alt hover:text-ink',
           ),
           h.Disabled(!hasImage),
-          h.OnClick(ChangedCompareMode({ mode: m })),
+          h.OnClick(EditorMessage.ChangedCompareMode({ mode: m })),
           h.AriaLabel(label),
           h.Title(label),
         ],
@@ -526,7 +518,7 @@ const emptyStage = (h: HtmlBuilder<EditorMessage>) =>
       h.AllowDrop(),
       h.OnDropFiles((files) => {
         const file = files[0]
-        return file ? SelectedImageFile({ file }) : FilePickRequested()
+        return file ? EditorMessage.SelectedImageFile({ file }) : EditorMessage.FilePickRequested()
       }),
     ],
     [
@@ -541,7 +533,7 @@ const emptyStage = (h: HtmlBuilder<EditorMessage>) =>
           h.button(
             [
               h.Class('cursor-pointer text-ink underline underline-offset-2'),
-              h.OnClick(FilePickRequested()),
+              h.OnClick(EditorMessage.FilePickRequested()),
             ],
             ['browse'],
           ),
@@ -559,7 +551,7 @@ const errorStage = (h: HtmlBuilder<EditorMessage>, error: string) =>
       h.button(
         [
           h.Class('cursor-pointer text-ink underline underline-offset-2'),
-          h.OnClick(FilePickRequested()),
+          h.OnClick(EditorMessage.FilePickRequested()),
         ],
         ['Try another'],
       ),

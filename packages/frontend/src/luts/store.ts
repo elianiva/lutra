@@ -23,7 +23,7 @@ export interface LutCatalogEntry {
  * Distinct from the engine's `LutParseError`, which passes through
  * un-wrapped: a load error means the bytes never arrived.
  */
-export class LutLoadError extends Schema.TaggedErrorClass<LutLoadError>()('LutLoadError', {
+export class LutLoadError extends Schema.TaggedError<LutLoadError>()('LutLoadError', {
   cause: Schema.optional(Schema.Unknown),
   message: Schema.String,
 }) {}

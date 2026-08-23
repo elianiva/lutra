@@ -1,6 +1,5 @@
 import type { HtmlBuilder } from 'foldkit/html'
-import type { EditorMessage } from '../message'
-import { SelectedLutTab } from '../message'
+import { EditorMessage } from '../message'
 
 export const tab = (
   h: HtmlBuilder<EditorMessage>,
@@ -11,7 +10,7 @@ export const tab = (
 ) =>
   h.button(
     [
-      h.OnClick(SelectedLutTab({ tab })),
+      h.OnClick(EditorMessage.SelectedLutTab({ tab })),
       h.AriaPressed(String(active)),
       h.AriaLabel(label),
       // Keyed by tab id: the Recents tab inserts at the top of the list

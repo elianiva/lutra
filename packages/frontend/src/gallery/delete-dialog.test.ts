@@ -8,13 +8,7 @@ import { initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
 import { DeleteEdit, ListEdits } from './command'
-import {
-  DeleteConfirmRequested,
-  DeleteFailed,
-  DeleteRequested,
-  EditDeleted,
-  GotDeleteDialogMessage,
-} from './message'
+import { GalleryMessage } from './message'
 
 const config = {
   update,
@@ -43,7 +37,7 @@ const loaded = {
 // Resolve the delete dialog's internal ShowDialog command.
 const openDialog = [
   Command.expectHas(Dialog.ShowDialog),
-  Command.resolve(Dialog.ShowDialog, Dialog.CompletedShowDialog()),
+  Command.resolve(Dialog.ShowDialog, Dialog.Message.CompletedShowDialog()),
 ]
 
 describe('gallery: delete-confirmation dialog', () => {
@@ -64,7 +58,7 @@ describe('gallery: delete-confirmation dialog', () => {
 
   it('arming the confirm sets pendingDelete and opens the dialog submodel', () => {
     const id = editId(1)
-    const [model, commands] = update(loaded, DeleteConfirmRequested({ id }))
+    const [model, commands] = update(loaded, GalleryMessage.DeleteConfirmRequested({ id }))
     vitestExpect(model.pendingDelete).toBe(id)
     vitestExpect(model.deleteDialog.isOpen).toBe(true)
     vitestExpect(commands.map((c) => c.name)).toEqual(['ShowDialog'])
@@ -79,38 +73,41 @@ describe('gallery: delete-confirmation dialog', () => {
 
       click(selector('[data-cancel-delete]')),
       Command.expectHas(Dialog.CloseDialog),
-      Command.resolve(Dialog.CloseDialog, Dialog.CompletedCloseDialog()),
+      Command.resolve(Dialog.CloseDialog, Dialog.Message.CompletedCloseDialog()),
       expect(text('DELETE PHOTO')).not.toExist(),
       Command.expectNone(),
     )
 
     // Every dismissal path arrives as RequestedClose — Esc and backdrop
     // clicks included — and must also clear the armed id.
-    const [armed] = update(loaded, DeleteConfirmRequested({ id: editId(1) }))
-    const [dismissed] = update(armed, GotDeleteDialogMessage({ message: Dialog.RequestedClose() }))
+    const [armed] = update(loaded, GalleryMessage.DeleteConfirmRequested({ id: editId(1) }))
+    const [dismissed] = update(
+      armed,
+      GalleryMessage.GotDeleteDialogMessage({ message: Dialog.Message.RequestedClose() }),
+    )
     vitestExpect(dismissed.pendingDelete).toBe(null)
     vitestExpect(dismissed.deleteDialog.isOpen).toBe(false)
   })
 
   it('confirming deletes via the store and closes the dialog; success re-lists', () => {
     const id = editId(1)
-    const [armed] = update(loaded, DeleteConfirmRequested({ id }))
+    const [armed] = update(loaded, GalleryMessage.DeleteConfirmRequested({ id }))
 
     // Confirm fires the store delete plus the dialog's own close command.
-    const [afterConfirm, commands] = update(armed, DeleteRequested({ id }))
+    const [afterConfirm, commands] = update(armed, GalleryMessage.DeleteRequested({ id }))
     vitestExpect(afterConfirm.pendingDelete).toBe(null)
     vitestExpect(afterConfirm.deleteDialog.isOpen).toBe(false)
     vitestExpect(commands.slice(0, 1).map((c) => c.name)).toEqual([DeleteEdit.name])
 
     // A successful store delete re-lists the grid.
-    const [, followUps] = update(afterConfirm, EditDeleted())
+    const [, followUps] = update(afterConfirm, GalleryMessage.EditDeleted())
     vitestExpect(followUps.map((c) => c.name)).toEqual([ListEdits.name])
   })
 
   it('a failed delete surfaces the notice banner', () => {
     const [failed] = update(
       loaded,
-      DeleteFailed({ error: new StoreError({ message: 'disk full' }) }),
+      GalleryMessage.DeleteFailed({ error: new StoreError({ message: 'disk full' }) }),
     )
     vitestExpect(failed.notice).toBe('Delete failed: disk full')
   })

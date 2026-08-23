@@ -10,8 +10,7 @@ import type { LutStore } from '../luts/store'
 import type { LutThumbnailer } from '../thumbs/worker-layer'
 import type { ImageEncoder } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
-import type { RootMessage } from './message'
-import { GotGalleryMessage, GotEditorMessage, GotCollageMessage, NavigatedTo } from './message'
+import { AppMessage, RootMessage } from './message'
 import type { Model } from './model'
 import { GalleryRoute, EditorRoute, CollageRoute, CollageHomeRoute } from '../route'
 import type { AppRoute } from '../route'
@@ -20,12 +19,7 @@ import * as Editor from '../editor'
 import * as Collage from '../collage'
 import { offlineMachine } from '../offline/machine'
 import type { Offline } from '../offline/model'
-import {
-  OfflineFileFetching,
-  OfflineFileDownloaded,
-  OfflineConnectivityChanged,
-} from '../editor/message'
-import type { EditorMessage } from '../editor/message'
+import { EditorMessage } from '../editor/message'
 import { StartOfflineFill, DismissOfflineToast } from './offline-command'
 import type { OfflineFill } from '../offline/fill'
 
@@ -40,26 +34,23 @@ type Resource =
   | LutThumbnailer
   | OfflineFill
 
-export type UpdateReturn = readonly [
-  Model,
-  readonly Command.Command<RootMessage, never, Resource>[],
-]
+export type UpdateReturn = readonly [Model, readonly Command.Command<AppMessage, never, Resource>[]]
 
 /** Push the editor URL for an Edit the user opened from the gallery. The URL
  *  change triggers a `ChangedRoute`, which moves the editor into place — this
  *  Command is just the side effect that starts it. */
 const NavigateToEdit = Command.define('NavigateToEdit', {
   args: { id: EditIdSchema },
-  execute: ({ id }) => pushUrl(`/edit/${id}`).pipe(Effect.as(NavigatedTo())),
-  messages: [NavigatedTo],
+  execute: ({ id }) => pushUrl(`/edit/${id}`).pipe(Effect.as(RootMessage.NavigatedTo())),
+  messages: [RootMessage.NavigatedTo],
 })
 
 /** Push the menu URL for a bare `/collage` (no id): collages are created
  *  persist-first from the gallery, so there is no "new collage" screen to
  *  show — the bare form is a redirect, not a destination. */
 const NavigateHome = Command.define('NavigateHome', {
-  execute: pushUrl('/').pipe(Effect.as(NavigatedTo())),
-  messages: [NavigatedTo],
+  execute: pushUrl('/').pipe(Effect.as(RootMessage.NavigatedTo())),
+  messages: [RootMessage.NavigatedTo],
 })
 
 /** Push the collage URL for a Collage the user created from the gallery. The
@@ -67,8 +58,8 @@ const NavigateHome = Command.define('NavigateHome', {
  *  place — this Command is just the side effect that starts it. */
 const NavigateToCollage = Command.define('NavigateToCollage', {
   args: { id: CollageIdSchema },
-  execute: ({ id }) => pushUrl(`/collage/${id}`).pipe(Effect.as(NavigatedTo())),
-  messages: [NavigatedTo],
+  execute: ({ id }) => pushUrl(`/collage/${id}`).pipe(Effect.as(RootMessage.NavigatedTo())),
+  messages: [RootMessage.NavigatedTo],
 })
 
 const withRoute = (model: Model, route: Model['route']) => evo(model, { route: (_) => route })
@@ -81,12 +72,12 @@ const applyRoute = (model: Model, route: AppRoute) =>
     Match.withReturnType<UpdateReturn>(),
     Match.when(S.is(GalleryRoute), (route) => {
       const [nextGallery, cmds] = Gallery.informRouteChanged(model.gallery, route)
-      const mapped = Command.mapMessages(cmds, (m) => GotGalleryMessage({ message: m }))
+      const mapped = Command.mapMessages(cmds, (m) => RootMessage.GotGalleryMessage({ message: m }))
       return [withRoute(evo(model, { gallery: (_) => nextGallery }), route), mapped]
     }),
     Match.when(S.is(EditorRoute), (route) => {
       const [nextEditor, cmds] = Editor.informRouteChanged(model.editor, route)
-      const mapped = Command.mapMessages(cmds, (m) => GotEditorMessage({ message: m }))
+      const mapped = Command.mapMessages(cmds, (m) => RootMessage.GotEditorMessage({ message: m }))
       return [withRoute(evo(model, { editor: (_) => nextEditor }), route), mapped]
     }),
     Match.when(S.is(CollageHomeRoute), (route) => {
@@ -95,14 +86,14 @@ const applyRoute = (model: Model, route: AppRoute) =>
     }),
     Match.when(S.is(CollageRoute), (route) => {
       const [nextCollage, cmds] = Collage.informRouteChanged(model.collage, route)
-      const mapped = Command.mapMessages(cmds, (m) => GotCollageMessage({ message: m }))
+      const mapped = Command.mapMessages(cmds, (m) => RootMessage.GotCollageMessage({ message: m }))
       return [withRoute(evo(model, { collage: (_) => nextCollage }), route), mapped]
     }),
     Match.orElse((route) => [withRoute(model, route), []]),
   )
 
 /** Step the offline machine with a landed message; carries the new phase. */
-const stepOffline = (offline: Offline, message: RootMessage): Offline => {
+const stepOffline = (offline: Offline, message: AppMessage): Offline => {
   const result = offlineMachine.step(offline.phase, message)
   return { ...offline, phase: result.state }
 }
@@ -114,7 +105,7 @@ const stepOffline = (offline: Offline, message: RootMessage): Offline => {
  *  channel is handled the same way as GotEditorMessage's for safety. */
 const delegateToEditor = (model: Model, editorMessage: EditorMessage): UpdateReturn => {
   const [nextEditor, cmds, out] = Editor.update(model.editor, editorMessage)
-  const mapped = Command.mapMessages(cmds, (m) => GotEditorMessage({ message: m }))
+  const mapped = Command.mapMessages(cmds, (m) => RootMessage.GotEditorMessage({ message: m }))
   return Option.match(out, {
     onNone: () => [evo(model, { editor: (_) => nextEditor }), mapped],
     onSome: ({ id }) => [
@@ -133,7 +124,7 @@ const delegateToEditor = (model: Model, editorMessage: EditorMessage): UpdateRet
  * fill machine steps here, the counters live in the offline slice, and the
  * per-file/connectivity facts delegate into the editor.
  */
-export const update = (model: Model, message: RootMessage): UpdateReturn =>
+export const update = (model: Model, message: AppMessage): UpdateReturn =>
   Match.value(message).pipe(
     Match.withReturnType<UpdateReturn>(),
     Match.tagsExhaustive({
@@ -141,7 +132,9 @@ export const update = (model: Model, message: RootMessage): UpdateReturn =>
       Navigated: () => [model, []],
       GotGalleryMessage: ({ message: galleryMessage }) => {
         const [nextGallery, cmds, out] = Gallery.update(model.gallery, galleryMessage)
-        const mapped = Command.mapMessages(cmds, (m) => GotGalleryMessage({ message: m }))
+        const mapped = Command.mapMessages(cmds, (m) =>
+          RootMessage.GotGalleryMessage({ message: m }),
+        )
         return Option.match(out, {
           onNone: () => [evo(model, { gallery: (_) => nextGallery }), mapped],
           onSome: (fact) =>
@@ -158,7 +151,9 @@ export const update = (model: Model, message: RootMessage): UpdateReturn =>
       },
       GotEditorMessage: ({ message: editorMessage }) => {
         const [nextEditor, cmds, out] = Editor.update(model.editor, editorMessage)
-        const mapped = Command.mapMessages(cmds, (m) => GotEditorMessage({ message: m }))
+        const mapped = Command.mapMessages(cmds, (m) =>
+          RootMessage.GotEditorMessage({ message: m }),
+        )
         return Option.match(out, {
           onNone: () => [evo(model, { editor: (_) => nextEditor }), mapped],
           // A save created a new Edit (fresh-pick Save or Save as): push the
@@ -173,7 +168,9 @@ export const update = (model: Model, message: RootMessage): UpdateReturn =>
       },
       GotCollageMessage: ({ message: collageMessage }) => {
         const [nextCollage, cmds] = Collage.update(model.collage, collageMessage)
-        const mapped = Command.mapMessages(cmds, (m) => GotCollageMessage({ message: m }))
+        const mapped = Command.mapMessages(cmds, (m) =>
+          RootMessage.GotCollageMessage({ message: m }),
+        )
         return [evo(model, { collage: (_) => nextCollage }), mapped]
       },
       NavigatedTo: () => [model, []],
@@ -194,7 +191,9 @@ export const update = (model: Model, message: RootMessage): UpdateReturn =>
       ],
       // A file fetch began; cube files mark their LUT row fetching.
       OfflineFileStarted: ({ lutId }) =>
-        lutId === null ? [model, []] : delegateToEditor(model, OfflineFileFetching({ lutId })),
+        lutId === null
+          ? [model, []]
+          : delegateToEditor(model, EditorMessage.OfflineFileFetching({ lutId })),
       // A file landed in the cache: bump the count; cube files mark their
       // LUT row downloaded.
       OfflineFileCompleted: ({ lutId }) => {
@@ -206,7 +205,7 @@ export const update = (model: Model, message: RootMessage): UpdateReturn =>
         })
         return lutId === null
           ? [withOffline, []]
-          : delegateToEditor(withOffline, OfflineFileDownloaded({ lutId }))
+          : delegateToEditor(withOffline, EditorMessage.OfflineFileDownloaded({ lutId }))
       },
       // A file gave up after its retries: no state change — absence in the
       // editor's download map means "not downloaded", and the next run's
@@ -237,7 +236,7 @@ export const update = (model: Model, message: RootMessage): UpdateReturn =>
         const withOffline = evo(model, {
           offline: (o) => ({ ...stepOffline(o, message), online }),
         })
-        return delegateToEditor(withOffline, OfflineConnectivityChanged({ online }))
+        return delegateToEditor(withOffline, EditorMessage.OfflineConnectivityChanged({ online }))
       },
       // The saveData gate's manual start button.
       OfflineFillRequested: () => [model, [StartOfflineFill({ requirePersist: false })]],

@@ -1,8 +1,7 @@
 import { type Html, type HtmlBuilder, createKeyedLazy } from 'foldkit/html'
 import { icon } from '../components/icon'
 import { LAYER_UI, LAYER_TYPES_ORDER } from './layer-meta'
-import { HoveredToolChanged, SelectedTool } from './message'
-import type { EditorMessage } from './message'
+import { EditorMessage } from './message'
 import type { Model } from './model'
 import type { EditorPhase } from './phase'
 import type { LayerType } from '@lutra/engine'
@@ -104,15 +103,15 @@ const toolCardInner = (
   const hovered = hoveredTool === type
   // One hover fact per card: entering (pointer or keyboard focus) names the
   // card; leaving clears it.
-  const show = HoveredToolChanged({ type })
-  const hide = HoveredToolChanged({ type: null })
+  const show = EditorMessage.HoveredToolChanged({ type })
+  const hide = EditorMessage.HoveredToolChanged({ type: null })
   return h.div(
     [h.Class('relative')],
     [
       h.button(
         [
           h.Key(type),
-          h.OnClick(SelectedTool({ type })),
+          h.OnClick(EditorMessage.SelectedTool({ type })),
           h.OnMouseEnter(show),
           h.OnMouseLeave(hide),
           h.OnFocus(show),

@@ -2,14 +2,7 @@ import { Effect, Schema as S } from 'effect'
 import { Command } from 'foldkit'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import { EncodeError, ImageEncoder, ExportSettings, mimeFor } from '@lutra/engine'
-import {
-  Downloaded,
-  EncodeFailed,
-  EncodePrepared,
-  SettingsLoaded,
-  SettingsSaved,
-  UrlRevoked,
-} from './message'
+import { ExportDialogMessage } from './message'
 import { peekFrame } from './frame'
 import { loadExportSettings, saveExportSettings } from '../export-settings'
 
@@ -36,7 +29,7 @@ export const PrepareExport = Command.define('PrepareExport', {
     Effect.gen(function* PrepareExport() {
       const image = peekFrame()
       if (!image) {
-        return EncodeFailed({ message: 'no cached frame to encode' })
+        return ExportDialogMessage.EncodeFailed({ message: 'no cached frame to encode' })
       }
       if (previousUrl) {
         yield* Effect.sync(() => {
@@ -49,13 +42,13 @@ export const PrepareExport = Command.define('PrepareExport', {
       // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
       const blob = new Blob([bytes as BlobPart], { type: mimeFor(settings.format) })
       const url = URL.createObjectURL(blob)
-      return EncodePrepared({ sizeBytes: bytes.byteLength, url })
+      return ExportDialogMessage.EncodePrepared({ sizeBytes: bytes.byteLength, url })
     }).pipe(
       Effect.catchTag('EncodeError', (err: EncodeError) =>
-        Effect.succeed(EncodeFailed({ message: err.message })),
+        Effect.succeed(ExportDialogMessage.EncodeFailed({ message: err.message })),
       ),
     ),
-  messages: [EncodePrepared, EncodeFailed],
+  messages: [ExportDialogMessage.EncodePrepared, ExportDialogMessage.EncodeFailed],
 })
 
 /** Trigger the browser download of the encoded blob (the url stays alive
@@ -68,9 +61,9 @@ export const ExportDownload = Command.define('ExportDownload', {
       a.href = url
       a.download = filename
       a.click()
-      return Downloaded({ url })
+      return ExportDialogMessage.Downloaded({ url })
     }),
-  messages: [Downloaded],
+  messages: [ExportDialogMessage.Downloaded],
 })
 
 /** Revoke a blob URL (dialog close, stale encode result). */
@@ -79,20 +72,22 @@ export const RevokeExportUrl = Command.define('RevokeExportUrl', {
   execute: ({ url }) =>
     Effect.sync(() => {
       URL.revokeObjectURL(url)
-    }).pipe(Effect.as(UrlRevoked())),
-  messages: [UrlRevoked],
+    }).pipe(Effect.as(ExportDialogMessage.UrlRevoked())),
+  messages: [ExportDialogMessage.UrlRevoked],
 })
 
 /** Restore persisted export settings (fired on boot and route changes). */
 export const LoadExportSettings = Command.define('LoadExportSettings', {
-  execute: Effect.map(loadExportSettings, (settings) => SettingsLoaded({ settings })),
-  messages: [SettingsLoaded],
+  execute: Effect.map(loadExportSettings, (settings) =>
+    ExportDialogMessage.SettingsLoaded({ settings }),
+  ),
+  messages: [ExportDialogMessage.SettingsLoaded],
 })
 
 /** Persist export settings (fired on every change; localStorage is cheap). */
 export const SaveExportSettings = Command.define('SaveExportSettings', {
   args: { settings: ExportSettings },
   execute: ({ settings }) =>
-    Effect.as(Effect.ignore(saveExportSettings(settings)), SettingsSaved()),
-  messages: [SettingsSaved],
+    Effect.as(Effect.ignore(saveExportSettings(settings)), ExportDialogMessage.SettingsSaved()),
+  messages: [ExportDialogMessage.SettingsSaved],
 })

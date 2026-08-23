@@ -20,7 +20,7 @@ export const LUT_CACHE_NAME = 'lutra-luts'
  * machine stays Idle, and the app keeps working online. Distinct from
  * quota: quota is transient and retryable, unavailability is not.
  */
-export class LutCacheError extends Schema.TaggedErrorClass<LutCacheError>()('LutCacheError', {
+export class LutCacheError extends Schema.TaggedError<LutCacheError>()('LutCacheError', {
   cause: Schema.optional(Schema.Unknown),
   /** 'quota' — the origin's storage is full (retryable after a persist()
    *  grant or user action). 'unavailable' — the Cache API itself threw

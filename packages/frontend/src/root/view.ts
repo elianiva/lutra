@@ -1,14 +1,8 @@
 import { type Document, type Html, type HtmlBuilder, createLazy } from 'foldkit/html'
 import { Match, Schema as S } from 'effect'
 import type { Model } from './model'
-import type { RootMessage } from './message'
-import {
-  GotGalleryMessage,
-  GotEditorMessage,
-  GotCollageMessage,
-  OfflineFillRequested,
-  OfflineReadyDismissed,
-} from './message'
+import { AppMessage, RootMessage } from './message'
+import { OfflineMessage } from '../offline/messages'
 import { GalleryRoute, EditorRoute, CollageRoute, CollageHomeRoute } from '../route'
 import * as Gallery from '../gallery'
 import * as Editor from '../editor'
@@ -34,16 +28,17 @@ const lazyOfflineCard = createLazy()
 const lazyActiveRoute = createLazy()
 
 const toGalleryParent = (
-  message: Parameters<typeof GotGalleryMessage>[0]['message'],
-): RootMessage => GotGalleryMessage({ message })
-const toEditorParent = (message: Parameters<typeof GotEditorMessage>[0]['message']): RootMessage =>
-  GotEditorMessage({ message })
+  message: Parameters<typeof RootMessage.GotGalleryMessage>[0]['message'],
+): RootMessage => RootMessage.GotGalleryMessage({ message })
+const toEditorParent = (
+  message: Parameters<typeof RootMessage.GotEditorMessage>[0]['message'],
+): RootMessage => RootMessage.GotEditorMessage({ message })
 const toCollageParent = (
-  message: Parameters<typeof GotCollageMessage>[0]['message'],
-): RootMessage => GotCollageMessage({ message })
+  message: Parameters<typeof RootMessage.GotCollageMessage>[0]['message'],
+): RootMessage => RootMessage.GotCollageMessage({ message })
 
 // Module-scope helpers for lazy — stable fn references (lazy compares fn === prevFn)
-const unsupportedScreenView = (webgpu: Model['webgpu'], h: HtmlBuilder<RootMessage>): Html =>
+const unsupportedScreenView = (webgpu: Model['webgpu'], h: HtmlBuilder<AppMessage>): Html =>
   h.div(
     [h.Class('flex h-full flex-col items-center justify-center bg-bg px-6 py-12 text-ink')],
     [
@@ -84,7 +79,7 @@ const unsupportedScreenView = (webgpu: Model['webgpu'], h: HtmlBuilder<RootMessa
     ],
   )
 
-const unsupportedScreen = (model: Model, h: HtmlBuilder<RootMessage>): Document => ({
+const unsupportedScreen = (model: Model, h: HtmlBuilder<AppMessage>): Document => ({
   body: h.div(
     [h.Class('flex h-full flex-col items-center justify-center bg-bg px-6 py-12 text-ink')],
     [
@@ -127,11 +122,11 @@ const unsupportedScreen = (model: Model, h: HtmlBuilder<RootMessage>): Document 
   title: 'Lutra',
 })
 
-const readyToastView = (ready: boolean, h: HtmlBuilder<RootMessage>): Html =>
+const readyToastView = (ready: boolean, h: HtmlBuilder<AppMessage>): Html =>
   ready
     ? h.div(
         [
-          h.OnClick(OfflineReadyDismissed()),
+          h.OnClick(OfflineMessage.OfflineReadyDismissed()),
           h.Class(
             'fixed inset-x-4 bottom-4 z-50 cursor-pointer border border-border bg-panel px-4 py-3 text-sm text-ink shadow-lg md:inset-x-auto md:right-4 md:w-64',
           ),
@@ -140,7 +135,7 @@ const readyToastView = (ready: boolean, h: HtmlBuilder<RootMessage>): Html =>
       )
     : null
 
-const offlineCardView = (offline: Model['offline'], h: HtmlBuilder<RootMessage>): Html =>
+const offlineCardView = (offline: Model['offline'], h: HtmlBuilder<AppMessage>): Html =>
   offlineCardImpl(offline, h)
 
 const activeRouteView = (
@@ -148,7 +143,7 @@ const activeRouteView = (
   gallery: Model['gallery'],
   editor: Model['editor'],
   collage: Model['collage'],
-  h: HtmlBuilder<RootMessage>,
+  h: HtmlBuilder<AppMessage>,
 ): Html =>
   Match.value(route).pipe(
     Match.withReturnType<Html>(),
@@ -180,7 +175,7 @@ const activeRouteView = (
     Match.orElse(() => notFound(h)),
   )
 
-export const view = (model: Model, h: HtmlBuilder<RootMessage>): Document => {
+export const view = (model: Model, h: HtmlBuilder<AppMessage>): Document => {
   if (!model.webgpu.supported) {
     return {
       body: lazyUnsupported(unsupportedScreenView, [model.webgpu, h])!,
@@ -220,7 +215,7 @@ export const view = (model: Model, h: HtmlBuilder<RootMessage>): Document => {
 // strip appears or disappears. Nothing renders once the library is ready
 // (the toast announced it) — and nothing renders in the editor; the fill is
 // housekeeping, the editor is for grading.
-const offlineCardImpl = (offline: Model['offline'], h: HtmlBuilder<RootMessage>) => {
+const offlineCardImpl = (offline: Model['offline'], h: HtmlBuilder<AppMessage>) => {
   // offline passed as slice for lazy === check
   const pct = offline.total > 0 ? Math.round((offline.downloaded / offline.total) * 100) : 0
   const frame = (content: readonly Html[]) =>
@@ -246,7 +241,7 @@ const offlineCardImpl = (offline: Model['offline'], h: HtmlBuilder<RootMessage>)
   const actionButton = (label: string, ariaLabel: string) =>
     h.button(
       [
-        h.OnClick(OfflineFillRequested()),
+        h.OnClick(OfflineMessage.OfflineFillRequested()),
         h.AriaLabel(ariaLabel),
         h.Class(
           'rounded border border-accent px-2 py-0.5 text-accent hover:border-ink hover:text-ink',
@@ -310,5 +305,5 @@ const offlineCardImpl = (offline: Model['offline'], h: HtmlBuilder<RootMessage>)
 
 // (activeRoute superseded by activeRouteView above)
 
-const notFound = (h: HtmlBuilder<RootMessage>) =>
+const notFound = (h: HtmlBuilder<AppMessage>) =>
   h.div([h.Class('flex flex-1 items-center justify-center text-sm text-muted')], ['Not found'])

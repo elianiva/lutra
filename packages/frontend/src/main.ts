@@ -1,11 +1,10 @@
 import { Effect, Layer } from 'effect'
 import type { Url } from 'foldkit'
 import { Runtime } from 'foldkit'
-import { overlay } from '@foldkit/devtools'
 import { BrowserKeyValueStore } from '@effect/platform-browser'
 import type { UrlRequest } from 'foldkit/navigation'
 import { CollageStoreIndexedDb, EditStoreIndexedDb } from '@lutra/store'
-import { ChangedRoute, Navigated, RootMessage } from './root/message'
+import { AppMessage, RootMessage } from './root/message'
 import { Model } from './root/model'
 import { init } from './root/init'
 import { update } from './root/update'
@@ -39,8 +38,10 @@ export const application = Runtime.makeApplication({
   Model,
   container: document.querySelector('#root'),
   devTools: {
-    Message: RootMessage,
-    overlay,
+    Message: AppMessage,
+    // The overlay itself is injected by @foldkit/vite-plugin before app
+    // startup (@foldkit/devtools is a devDependency, so production bundles
+    // carry no overlay code).
     // High-frequency UI gestures would flood the DevTools history and
     // retain a full RootModel snapshot per entry (linear memory with
     // Uint8Array/ImageBitmap inside). Exclude them so history stays
@@ -90,8 +91,8 @@ export const application = Runtime.makeApplication({
     ),
   ),
   routing: {
-    onUrlChange: (url: Url.Url) => ChangedRoute({ route: parseRoute(url) }),
-    onUrlRequest: (request: UrlRequest) => Navigated({ request }),
+    onUrlChange: (url: Url.Url) => RootMessage.ChangedRoute({ route: parseRoute(url) }),
+    onUrlRequest: (request: UrlRequest) => RootMessage.Navigated({ request }),
   },
   subscriptions,
   update,

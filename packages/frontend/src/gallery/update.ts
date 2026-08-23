@@ -2,15 +2,7 @@ import { Match as M, Option } from 'effect'
 import { Command } from 'foldkit'
 import { Dialog } from '@foldkit/ui'
 import type { EditStore, CollageStore, EditSummary } from '@lutra/store'
-import type { GalleryMessage, GalleryOutMessage } from './message'
-import {
-  CreatedCollage,
-  OpenedCollage,
-  OpenedEdit,
-  GotSettingsDialogMessage,
-  GotDeleteDialogMessage,
-  PhotoCreateError,
-} from './message'
+import { GalleryMessage, GalleryOutMessage, PhotoCreateError } from './message'
 import {
   CreateCollage,
   DeleteCollage,
@@ -69,7 +61,7 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
       RefreshRequested: () => [model, [ListEdits()], Option.none()],
 
       // A tile clicked: surface the fact upward and let the root navigate.
-      ClickedEdit: ({ id }) => [model, [], Option.some(OpenedEdit({ id }))],
+      ClickedEdit: ({ id }) => [model, [], Option.some(GalleryOutMessage.OpenedEdit({ id }))],
 
       // A tile's ✕: arm the pending delete and open the confirmation
       // dialog (ADR-0022, superseded to a dialog).
@@ -116,7 +108,7 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
       CollageCreated: ({ id }) => [
         { ...model, selection: [] },
         [],
-        Option.some(CreatedCollage({ id })),
+        Option.some(GalleryOutMessage.CreatedCollage({ id })),
       ],
       CollageCreateFailed: ({ error }) => [
         { ...model, notice: `Could not create the collage: ${error.message}` },
@@ -165,7 +157,11 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
       ],
       // A collage card clicked: surface the fact upward — the root pushes
       // `/collage/:id`, exactly as for a created collage.
-      CollageOpenRequested: ({ id }) => [model, [], Option.some(OpenedCollage({ id }))],
+      CollageOpenRequested: ({ id }) => [
+        model,
+        [],
+        Option.some(GalleryOutMessage.OpenedCollage({ id })),
+      ],
       // ADR-0022's inline two-step confirm: first ✕ arms the card; arming a
       // different card moves the state; ✗ or re-tap disarms.
       ToggledCollageDeleteConfirm: ({ id }) => [
@@ -202,7 +198,7 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
       PhotoPickCancelled: () => [model, [], Option.none()],
       // A single new Edit persisted: surface it upward — the root pushes the
       // editor URL, exactly as if the user had clicked the tile.
-      PhotoCreated: ({ id }) => [model, [], Option.some(OpenedEdit({ id }))],
+      PhotoCreated: ({ id }) => [model, [], Option.some(GalleryOutMessage.OpenedEdit({ id }))],
       PhotoCreateFailed: ({ error }) => [
         { ...model, notice: `Could not open photo: ${error.message}` },
         [],
@@ -273,7 +269,7 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
   )
 
 const toSettingsDialogMessage = (message: Dialog.Message): GalleryMessage =>
-  GotSettingsDialogMessage({ message })
+  GalleryMessage.GotSettingsDialogMessage({ message })
 
 const toDeleteDialogMessage = (message: Dialog.Message): GalleryMessage =>
-  GotDeleteDialogMessage({ message })
+  GalleryMessage.GotDeleteDialogMessage({ message })

@@ -18,19 +18,7 @@ import { update } from './update'
 import { view } from './view'
 import { Idle } from './phase'
 import { selectTool, createTestLayer } from './test-layer'
-import {
-  LayerCreated,
-  SelectedLayer,
-  ConfirmedDraft,
-  ClearedImage,
-  EditLoaded,
-  ImageDecoded,
-  ToggledMobileSheet,
-  RenderedFrame,
-  HistogramComputed,
-  ScaledCanvas,
-  CanvasRegistered,
-} from './message'
+import { EditorMessage } from './message'
 import { PanZoom, RegisterCanvas } from './canvas-stage'
 import { CreateLayer, RenderChain, ReadHistogram } from './command'
 import type { Catalog } from './message'
@@ -67,7 +55,7 @@ const loaded = () => ({
 /** Settle the in-flight render the way RenderedFrame does, so the next
  *  renderNow dispatches a fresh RenderChain (assertable in tests). */
 const settled = (model: Model): Model =>
-  update(model, RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
+  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
 
 // ---- update flow (docs/adr/0024-mobile-ui) ----
 
@@ -77,19 +65,19 @@ describe('mobile bottom sheets', () => {
   })
 
   it('ToggledMobileSheet opens the tapped sheet', () => {
-    const [model] = update(loaded(), ToggledMobileSheet({ sheet: 'tools' }))
+    const [model] = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'tools' }))
     expect(model.mobileSheet).toBe('tools')
   })
 
   it('tapping the active tab closes the sheet', () => {
-    const [opened] = update(loaded(), ToggledMobileSheet({ sheet: 'layers' }))
-    const [model] = update(opened, ToggledMobileSheet({ sheet: 'layers' }))
+    const [opened] = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
+    const [model] = update(opened, EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
     expect(model.mobileSheet).toBeNull()
   })
 
   it('tapping the other tab switches the sheet', () => {
-    const [opened] = update(loaded(), ToggledMobileSheet({ sheet: 'tools' }))
-    const [model] = update(opened, ToggledMobileSheet({ sheet: 'layers' }))
+    const [opened] = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'tools' }))
+    const [model] = update(opened, EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
     expect(model.mobileSheet).toBe('layers')
   })
 
@@ -101,20 +89,20 @@ describe('mobile bottom sheets', () => {
 
   it('selecting a layer opens the Layers sheet', () => {
     const [withDraft] = selectTool(loaded(), 'exposure')
-    const [committed] = update(withDraft, ConfirmedDraft())
+    const [committed] = update(withDraft, EditorMessage.ConfirmedDraft())
     const layer = committed.chain[0]
     if (!layer) {
       throw new Error('fixture: expected a committed layer')
     }
-    const [model] = update(committed, SelectedLayer({ id: layer.id }))
+    const [model] = update(committed, EditorMessage.SelectedLayer({ id: layer.id }))
     expect(model.mobileSheet).toBe('layers')
   })
 
   it('a new image closes the sheets', () => {
-    const [withSheet] = update(loaded(), ToggledMobileSheet({ sheet: 'layers' }))
+    const [withSheet] = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
     const [model] = update(
       withSheet,
-      ImageDecoded({
+      EditorMessage.ImageDecoded({
         bitmap: new MockImageBitmap(200, 150),
         height: 150,
         source: new Uint8Array([1]),
@@ -125,16 +113,16 @@ describe('mobile bottom sheets', () => {
   })
 
   it('ClearedImage closes the sheets', () => {
-    const [withSheet] = update(loaded(), ToggledMobileSheet({ sheet: 'layers' }))
-    const [model] = update(withSheet, ClearedImage())
+    const [withSheet] = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
+    const [model] = update(withSheet, EditorMessage.ClearedImage())
     expect(model.mobileSheet).toBeNull()
   })
 
   it('EditLoaded closes the sheets', () => {
-    const [withSheet] = update(loaded(), ToggledMobileSheet({ sheet: 'tools' }))
+    const [withSheet] = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'tools' }))
     const [model] = update(
       withSheet,
-      EditLoaded({
+      EditorMessage.EditLoaded({
         bitmap: new MockImageBitmap(200, 150),
         chain: [],
         height: 150,
@@ -152,13 +140,16 @@ describe('mobile bottom sheets', () => {
 const sceneConfig = { update, view } as const
 
 const stageMounts = [
-  Mount.resolve(PanZoom, ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
-  Mount.resolve(RegisterCanvas, CanvasRegistered()),
+  Mount.resolve(PanZoom, EditorMessage.ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
+  Mount.resolve(RegisterCanvas, EditorMessage.CanvasRegistered()),
 ]
 
 const resolveRender = () => [
-  Command.resolve(RenderChain, RenderedFrame({ handle: stubHandle(), stamp: 999 })),
-  Command.resolve(ReadHistogram, HistogramComputed({ bins: new Uint32Array(256), stamp: 999 })),
+  Command.resolve(RenderChain, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: 999 })),
+  Command.resolve(
+    ReadHistogram,
+    EditorMessage.HistogramComputed({ bins: new Uint32Array(256), stamp: 999 }),
+  ),
 ]
 
 describe('mobile tab bar view', () => {
@@ -207,7 +198,10 @@ describe('mobile tab bar view', () => {
       ...stageMounts,
       click(role('button', { name: 'Adjustments' })),
       click(role('button', { name: 'Add Exposure adjustment' })),
-      Command.resolve(CreateLayer, LayerCreated({ layer: createTestLayer('exposure') })),
+      Command.resolve(
+        CreateLayer,
+        EditorMessage.LayerCreated({ layer: createTestLayer('exposure') }),
+      ),
       ...resolveRender(),
       sceneExpect(role('button', { name: 'Adjustments' })).toHaveAttr('aria-pressed', 'false'),
       sceneExpect(role('button', { name: 'Layers' })).toHaveAttr('aria-pressed', 'true'),

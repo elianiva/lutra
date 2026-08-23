@@ -20,19 +20,7 @@ import { update } from './update'
 import { view } from './view'
 import { Idle } from './phase'
 import { selectTool } from './test-layer'
-import {
-  ConfirmedDraft,
-  CancelledDraft,
-  UpdatedDraftParam,
-  UpdatedLayerParam,
-  SelectedMixerColor,
-  RemovedLayer,
-  ClearedImage,
-  EditLoaded,
-  RenderedFrame,
-  ScaledCanvas,
-  CanvasRegistered,
-} from './message'
+import { EditorMessage } from './message'
 import { PanZoom, RegisterCanvas } from './canvas-stage'
 import { MIXER_COLORS } from './layer-meta'
 import type { Model } from './model'
@@ -54,13 +42,13 @@ const loaded = () => ({
 /** Settle the in-flight render the way RenderedFrame does, so the next
  *  renderNow dispatches a fresh RenderChain (assertable in tests). */
 const settled = (model: Model): Model =>
-  update(model, RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
+  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
 
 /** A Color Mixer draft (Drafting phase, no render in flight). */
 const mixerDraft = () => settled(selectTool(loaded(), 'colorMixer')[0])
 
 /** A committed Color Mixer layer (Selected phase, no render in flight). */
-const selectedMixer = () => settled(update(mixerDraft(), ConfirmedDraft())[0])
+const selectedMixer = () => settled(update(mixerDraft(), EditorMessage.ConfirmedDraft())[0])
 
 const draftLayer = (model: Model) => (model.phase._tag === 'Drafting' ? model.phase.layer : null)
 
@@ -90,7 +78,7 @@ describe('Color Mixer layer flow', () => {
     const [withDraft] = selectTool(loaded(), 'colorMixer')
     const [model] = update(
       withDraft,
-      UpdatedDraftParam({ field: FieldKey('blueSaturation'), value: 0.4 }),
+      EditorMessage.UpdatedDraftParam({ field: FieldKey('blueSaturation'), value: 0.4 }),
     )
     expect(model.phase._tag).toBe('Drafting')
     const layer = draftLayer(model)
@@ -104,17 +92,17 @@ describe('Color Mixer layer flow', () => {
     const id = draftId(withDraft)
     expect(id).toBeDefined()
     // Presentation-only: no render is dispatched for a swatch tap.
-    const [selected] = update(withDraft, SelectedMixerColor({ color: 5, id: id! }))
+    const [selected] = update(withDraft, EditorMessage.SelectedMixerColor({ color: 5, id: id! }))
     expect(selected.activeMixerColor[id!]).toBe(5)
-    const [clamped] = update(selected, SelectedMixerColor({ color: 99, id: id! }))
+    const [clamped] = update(selected, EditorMessage.SelectedMixerColor({ color: 99, id: id! }))
     expect(clamped.activeMixerColor[id!]).toBe(7)
   })
 
   it('keeps the active range selection across confirm (same layer id)', () => {
     const [withDraft] = selectTool(loaded(), 'colorMixer')
     const id = draftId(withDraft)
-    const [withColor] = update(withDraft, SelectedMixerColor({ color: 3, id: id! }))
-    const [model] = update(withColor, ConfirmedDraft())
+    const [withColor] = update(withDraft, EditorMessage.SelectedMixerColor({ color: 3, id: id! }))
+    const [model] = update(withColor, EditorMessage.ConfirmedDraft())
     expect(model.chain).toHaveLength(1)
     expect(model.chain[0]?.id).toBe(id)
     expect(model.activeMixerColor[id!]).toBe(3)
@@ -127,40 +115,43 @@ describe('Color Mixer layer flow', () => {
 
     const [updated] = update(
       model,
-      UpdatedLayerParam({ field: FieldKey('redHue'), id, value: 0.5 }),
+      EditorMessage.UpdatedLayerParam({ field: FieldKey('redHue'), id, value: 0.5 }),
     )
     expect(field(updated.chain[0]!, 'redHue')).toBe(0.5)
 
     model = updated
-    const [withColor] = update(model, SelectedMixerColor({ color: 6, id }))
+    const [withColor] = update(model, EditorMessage.SelectedMixerColor({ color: 6, id }))
     expect(withColor.activeMixerColor[id]).toBe(6)
   })
 
   it('clears the selection entry on cancel and on remove', () => {
     const [withDraft] = selectTool(loaded(), 'colorMixer')
     const id = draftId(withDraft)!
-    const [withColor] = update(withDraft, SelectedMixerColor({ color: 2, id }))
-    const [cancelled] = update(withColor, CancelledDraft())
+    const [withColor] = update(withDraft, EditorMessage.SelectedMixerColor({ color: 2, id }))
+    const [cancelled] = update(withColor, EditorMessage.CancelledDraft())
     expect(cancelled.activeMixerColor[id]).toBeUndefined()
 
-    const [withColor2] = update(withColor, ConfirmedDraft())
-    const [removed] = update(withColor2, RemovedLayer({ id }))
+    const [withColor2] = update(withColor, EditorMessage.ConfirmedDraft())
+    const [removed] = update(withColor2, EditorMessage.RemovedLayer({ id }))
     expect(removed.activeMixerColor[id]).toBeUndefined()
   })
 
   it('resets the selection map when the image clears or an edit loads', () => {
     const [withDraft] = selectTool(loaded(), 'colorMixer')
     const id = draftId(withDraft)!
-    const [withColor] = update(withDraft, SelectedMixerColor({ color: 4, id }))
+    const [withColor] = update(withDraft, EditorMessage.SelectedMixerColor({ color: 4, id }))
 
-    const [cleared] = update(withColor, ClearedImage())
+    const [cleared] = update(withColor, EditorMessage.ClearedImage())
     expect(cleared.activeMixerColor).toEqual({})
 
     const [loaded2] = selectTool(loaded(), 'colorMixer')
-    const [withColor2] = update(loaded2, SelectedMixerColor({ color: 1, id: draftId(loaded2)! }))
+    const [withColor2] = update(
+      loaded2,
+      EditorMessage.SelectedMixerColor({ color: 1, id: draftId(loaded2)! }),
+    )
     const [editLoaded] = update(
       withColor2,
-      EditLoaded({
+      EditorMessage.EditLoaded({
         bitmap: new MockImageBitmap(200, 150),
         chain: [],
         height: 150,
@@ -178,8 +169,8 @@ describe('Color Mixer layer flow', () => {
 const sceneConfig = { update, view } as const
 
 const stageMounts = [
-  Mount.resolve(PanZoom, ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
-  Mount.resolve(RegisterCanvas, CanvasRegistered()),
+  Mount.resolve(PanZoom, EditorMessage.ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
+  Mount.resolve(RegisterCanvas, EditorMessage.CanvasRegistered()),
 ]
 
 describe('Color Mixer view', () => {
@@ -223,7 +214,10 @@ describe('Color Mixer view', () => {
   it('switches the sliders to the tapped range', () => {
     // The draft has a red hue value set; the HUE slider shows +45° for it.
     const withDraft = settled(
-      update(mixerDraft(), UpdatedDraftParam({ field: FieldKey('redHue'), value: 0.5 }))[0],
+      update(
+        mixerDraft(),
+        EditorMessage.UpdatedDraftParam({ field: FieldKey('redHue'), value: 0.5 }),
+      )[0],
     )
     scene(
       sceneConfig,
@@ -244,7 +238,10 @@ describe('Color Mixer view', () => {
     const withMixer = selectedMixer()
     const { id } = withMixer.chain[0]!
     const withValue = settled(
-      update(withMixer, UpdatedLayerParam({ field: FieldKey('redHue'), id, value: 0.5 }))[0],
+      update(
+        withMixer,
+        EditorMessage.UpdatedLayerParam({ field: FieldKey('redHue'), id, value: 0.5 }),
+      )[0],
     )
     scene(
       sceneConfig,

@@ -25,8 +25,7 @@ import type { ImageEncoder, LayerId, LutId } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import type { EditStore } from '@lutra/store'
 import type { Model } from './model'
-import { GotExportDialogMessage, HoveredToolChanged, EditCreated } from './message'
-import type { EditorMessage, EditorOutMessage } from './message'
+import { EditorMessage, EditorOutMessage } from './message'
 
 export type UpdateReturn = readonly [
   Model,
@@ -451,7 +450,8 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         if (!attached) {
           return [model, [], Option.none()]
         }
-        const out = attached.id === id ? Option.none() : Option.some(EditCreated({ id }))
+        const out =
+          attached.id === id ? Option.none() : Option.some(EditorOutMessage.EditCreated({ id }))
         return [
           {
             ...model,
@@ -944,15 +944,20 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       HoveredToolChanged: ({ type }) => [{ ...model, hoveredTool: type }, [], Option.none()],
       // The readback landed; readiness and late-result guards live in the
       // machine. A failure surfaces as the dialog's status line.
-      ExportSnapshotted: () => delegateToExportDialog(model, phase, ExportDialog.FrameReady()),
+      ExportSnapshotted: () =>
+        delegateToExportDialog(model, phase, ExportDialog.Message.FrameReady()),
       ExportSnapshotFailed: ({ error }) =>
-        delegateToExportDialog(model, phase, ExportDialog.FrameFailed({ message: error.message })),
+        delegateToExportDialog(
+          model,
+          phase,
+          ExportDialog.Message.FrameFailed({ message: error.message }),
+        ),
     }),
   )
 }
 
 const toExportDialogMessage = (message: ExportDialog.Message): EditorMessage =>
-  GotExportDialogMessage({ message})
+  EditorMessage.GotExportDialogMessage({ message })
 
 /** Step the shared export-dialog machine and lift its results into the editor. */
 const delegateToExportDialog = (

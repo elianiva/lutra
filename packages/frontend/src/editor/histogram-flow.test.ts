@@ -5,13 +5,7 @@ import { initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
 import { Idle } from './phase'
-import {
-  RenderedFrame,
-  HistogramComputed,
-  ClearedImage,
-  ScaledCanvas,
-  CanvasRegistered,
-} from './message'
+import { EditorMessage } from './message'
 import { PanZoom, RegisterCanvas } from './canvas-stage'
 import { RenderHandle } from '../gpu/backend'
 
@@ -31,7 +25,7 @@ describe('histogram flow', () => {
   it('dispatches ReadHistogram for a rendered frame and stores the handle', () => {
     const [model, commands] = update(
       loadedModel(),
-      RenderedFrame({ handle: stubHandle(), stamp: 1 }),
+      EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: 1 }),
     )
     expect(model.renderedStamp).toBe(1)
     expect(model.lastRender).not.toBeNull()
@@ -41,20 +35,26 @@ describe('histogram flow', () => {
   })
 
   it('stores bins when the readback lands fresh', () => {
-    const [withFrame] = update(loadedModel(), RenderedFrame({ handle: stubHandle(), stamp: 1 }))
+    const [withFrame] = update(
+      loadedModel(),
+      EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: 1 }),
+    )
     const bins = new Uint32Array(256)
     bins[128] = 42
-    const [model] = update(withFrame, HistogramComputed({ bins, stamp: 1 }))
+    const [model] = update(withFrame, EditorMessage.HistogramComputed({ bins, stamp: 1 }))
     expect(model.bins).toBe(bins)
   })
 
   it('drops bins that landed after a newer mutation', () => {
-    const [withFrame] = update(loadedModel(), RenderedFrame({ handle: stubHandle(), stamp: 1 }))
+    const [withFrame] = update(
+      loadedModel(),
+      EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: 1 }),
+    )
     // A mutation bumped the revision to 2 while the readback was in flight.
     const newer = { ...withFrame, revision: 2 }
     const [model, commands] = update(
       newer,
-      HistogramComputed({ bins: new Uint32Array(256), stamp: 1 }),
+      EditorMessage.HistogramComputed({ bins: new Uint32Array(256), stamp: 1 }),
     )
     expect(model.bins).toBeNull()
     expect(commands).toHaveLength(0)
@@ -70,7 +70,10 @@ describe('histogram flow', () => {
       revision: 2,
       source: { bitmap: new MockImageBitmap(200, 150), error: null, height: 150, width: 200 },
     }
-    const [next, commands] = update(model, RenderedFrame({ handle: stubHandle(), stamp: 1 }))
+    const [next, commands] = update(
+      model,
+      EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: 1 }),
+    )
     expect(next.lastRender).toBeNull()
     expect(next.renderPending).toBe(true)
     expect(commands.some((c) => c.name === 'RenderChain')).toBe(true)
@@ -79,13 +82,16 @@ describe('histogram flow', () => {
   })
 
   it('resets bins when the image is cleared', () => {
-    const [withFrame] = update(loadedModel(), RenderedFrame({ handle: stubHandle(), stamp: 1 }))
+    const [withFrame] = update(
+      loadedModel(),
+      EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: 1 }),
+    )
     const [withBins] = update(
       withFrame,
-      HistogramComputed({ bins: new Uint32Array(256), stamp: 1 }),
+      EditorMessage.HistogramComputed({ bins: new Uint32Array(256), stamp: 1 }),
     )
     expect(withBins.bins).not.toBeNull()
-    const [cleared] = update(withBins, ClearedImage())
+    const [cleared] = update(withBins, EditorMessage.ClearedImage())
     expect(cleared.bins).toBeNull()
   })
 })
@@ -95,8 +101,8 @@ describe('histogram flow', () => {
 const sceneConfig = { update, view } as const
 
 const loadedStageMounts = [
-  Mount.resolve(PanZoom, ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
-  Mount.resolve(RegisterCanvas, CanvasRegistered()),
+  Mount.resolve(PanZoom, EditorMessage.ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
+  Mount.resolve(RegisterCanvas, EditorMessage.CanvasRegistered()),
 ]
 
 describe('histogram overlay view', () => {

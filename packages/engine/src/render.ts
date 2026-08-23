@@ -7,7 +7,7 @@ import type { LutCube } from './luts/cube'
 import { generateChainSource } from './shaders/chain-source'
 import type { ChainLayerInfo, ChainPass, ChainShader } from './shaders/chain-source'
 
-export class GpuError extends Schema.TaggedErrorClass<GpuError>()('GpuError', {
+export class GpuError extends Schema.TaggedError<GpuError>()('GpuError', {
   cause: Schema.optional(Schema.Unknown),
   message: Schema.String,
 }) {}

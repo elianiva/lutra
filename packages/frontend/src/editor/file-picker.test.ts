@@ -9,16 +9,7 @@ import { PanZoom, RegisterCanvas } from './canvas-stage'
 import { RenderHandle } from '../gpu/backend'
 import { ImageDecodeError } from '../errors'
 import { PickImageFile, DecodeImage, RenderChain, ReadHistogram } from './command'
-import {
-  FilePickCancelled,
-  SelectedImageFile,
-  ImageDecoded,
-  ImageFailedToDecode,
-  RenderedFrame,
-  HistogramComputed,
-  ScaledCanvas,
-  CanvasRegistered,
-} from './message'
+import { EditorMessage } from './message'
 
 /** A 1×1 transparent PNG as a File. Used to test the decode path. */
 const mockPngFile = new File(
@@ -129,7 +120,7 @@ describe('Upload zone (empty state)', () => {
       click(text('browse')),
       Command.expectHas(PickImageFile),
       // Resolve the command so the scene ends cleanly.
-      Command.resolve(PickImageFile, FilePickCancelled()),
+      Command.resolve(PickImageFile, EditorMessage.FilePickCancelled()),
       Command.expectNone(),
     )
   })
@@ -172,7 +163,7 @@ describe('Error state', () => {
       given(model),
       click(text('Try another')),
       Command.expectHas(PickImageFile),
-      Command.resolve(PickImageFile, FilePickCancelled()),
+      Command.resolve(PickImageFile, EditorMessage.FilePickCancelled()),
       Command.expectNone(),
     )
   })
@@ -185,12 +176,14 @@ describe('File picker command resolution', () => {
       given(initialModel()),
       click(text('browse')),
       Command.expectHas(PickImageFile),
-      Command.resolve(PickImageFile, SelectedImageFile({ file: mockPngFile })),
+      Command.resolve(PickImageFile, EditorMessage.SelectedImageFile({ file: mockPngFile })),
       Command.expectHas(DecodeImage),
       // Resolve DecodeImage to end cleanly
       Command.resolve(
         DecodeImage,
-        ImageFailedToDecode({ error: new ImageDecodeError({ message: 'Cancelled in test' }) }),
+        EditorMessage.ImageFailedToDecode({
+          error: new ImageDecodeError({ message: 'Cancelled in test' }),
+        }),
       ),
       Command.expectNone(),
     )
@@ -207,11 +200,16 @@ describe('Image decode flow', () => {
       given(initialModel()),
 
       click(text('browse')),
-      Command.resolve(PickImageFile, SelectedImageFile({ file: mockPngFile })),
+      Command.resolve(PickImageFile, EditorMessage.SelectedImageFile({ file: mockPngFile })),
 
       Command.resolve(
         DecodeImage,
-        ImageDecoded({ bitmap, height: 150, source: new Uint8Array([1]), width: 200 }),
+        EditorMessage.ImageDecoded({
+          bitmap,
+          height: 150,
+          source: new Uint8Array([1]),
+          width: 200,
+        }),
       ),
 
       // Empty chain → the passthrough render presents the source on the
@@ -222,7 +220,7 @@ describe('Image decode flow', () => {
       Command.expectHas(RenderChain),
       Command.resolve(
         RenderChain,
-        RenderedFrame({
+        EditorMessage.RenderedFrame({
           stamp: 1,
           // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
           handle: new RenderHandle({} as GPUTexture, 200, 150, {
@@ -232,12 +230,15 @@ describe('Image decode flow', () => {
           }),
         }),
       ),
-      Mount.resolve(PanZoom, ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
-      Mount.resolve(RegisterCanvas, CanvasRegistered()),
+      Mount.resolve(PanZoom, EditorMessage.ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
+      Mount.resolve(RegisterCanvas, EditorMessage.CanvasRegistered()),
       // The RenderedFrame handler dispatches ReadHistogram for the frame;
       // the scene resolves it so the session ends cleanly.
       Command.expectHas(ReadHistogram),
-      Command.resolve(ReadHistogram, HistogramComputed({ bins: new Uint32Array(256), stamp: 1 })),
+      Command.resolve(
+        ReadHistogram,
+        EditorMessage.HistogramComputed({ bins: new Uint32Array(256), stamp: 1 }),
+      ),
       expect(selector('#lutra-canvas')).toExist(),
       Command.expectNone(),
     )
@@ -249,12 +250,14 @@ describe('Image decode flow', () => {
       given(initialModel()),
 
       click(text('browse')),
-      Command.resolve(PickImageFile, SelectedImageFile({ file: mockPngFile })),
+      Command.resolve(PickImageFile, EditorMessage.SelectedImageFile({ file: mockPngFile })),
 
       // Resolve decode with failure
       Command.resolve(
         DecodeImage,
-        ImageFailedToDecode({ error: new ImageDecodeError({ message: 'Corrupt image file' }) }),
+        EditorMessage.ImageFailedToDecode({
+          error: new ImageDecodeError({ message: 'Corrupt image file' }),
+        }),
       ),
 
       expect(text('Failed to load image: Corrupt image file')).toExist(),

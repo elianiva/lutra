@@ -21,15 +21,7 @@ import { update } from './update'
 import { view } from './view'
 import { Idle } from './phase'
 import { selectTool } from './test-layer'
-import {
-  ConfirmedDraft,
-  CurvePointDragged,
-  CurveReset,
-  RenderedFrame,
-  HistogramComputed,
-  ScaledCanvas,
-  CanvasRegistered,
-} from './message'
+import { EditorMessage } from './message'
 import { PanZoom, RegisterCanvas } from './canvas-stage'
 import { CurveWidget } from './tone-curve'
 import { RenderChain, ReadHistogram } from './command'
@@ -52,20 +44,20 @@ const loaded = () => ({
 /** Settle the in-flight render the way RenderedFrame does, so the next
  *  renderNow dispatches a fresh RenderChain (assertable in tests). */
 const settled = (model: Model): Model =>
-  update(model, RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
+  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
 
 /** A Tone Curve draft (Drafting phase, no render in flight). */
 const curveDraft = () => settled(selectTool(loaded(), 'toneCurve')[0])
 
 /** A committed Tone Curve layer (Selected phase, no render in flight). */
-const selectedCurve = () => settled(update(curveDraft(), ConfirmedDraft())[0])
+const selectedCurve = () => settled(update(curveDraft(), EditorMessage.ConfirmedDraft())[0])
 
 const draftLayer = (model: Model) => (model.phase._tag === 'Drafting' ? model.phase.layer : null)
 
 const pointsOf = (model: Model, index = 0) => curvePointsOf(model.chain[index]!)
 
 const drag = (model: Model, index: number, x: number, y: number) =>
-  update(model, CurvePointDragged({ index, x, y }))
+  update(model, EditorMessage.CurvePointDragged({ index, x, y }))
 
 // ---- update flow ----
 
@@ -114,7 +106,7 @@ describe('Tone Curve layer flow', () => {
 
   it('confirm commits the moved curve to the chain', () => {
     const [withDraft] = drag(curveDraft(), 2, 0.5, 0.7)
-    const [model] = update(withDraft, ConfirmedDraft())
+    const [model] = update(withDraft, EditorMessage.ConfirmedDraft())
     expect(model.chain).toHaveLength(1)
     expect(pointsOf(model)[2]).toEqual({ x: 0.5, y: 0.7 })
   })
@@ -127,7 +119,7 @@ describe('Tone Curve layer flow', () => {
 
   it('reset returns the draft to the identity curve', () => {
     const [withDraft] = drag(curveDraft(), 2, 0.5, 0.7)
-    const [model] = update(withDraft, CurveReset())
+    const [model] = update(withDraft, EditorMessage.CurveReset())
     const layer = draftLayer(model)
     if (layer?.type === 'toneCurve') {
       expect(curvePointsOf(layer)).toEqual([
@@ -142,7 +134,7 @@ describe('Tone Curve layer flow', () => {
 
   it('reset returns the committed layer to the identity curve', () => {
     const [withDrag] = drag(selectedCurve(), 0, 0, 0.1)
-    const [model] = update(withDrag, CurveReset())
+    const [model] = update(withDrag, EditorMessage.CurveReset())
     expect(pointsOf(model)[0]).toEqual({ x: 0, y: 0 })
     expect(pointsOf(model)).toEqual([
       { x: 0, y: 0 },
@@ -162,13 +154,13 @@ describe('Tone Curve layer flow', () => {
 
     // A non-curve selection is not a drag target either.
     const [withExposure] = selectTool(loaded(), 'exposure')
-    const [confirmed] = update(withExposure, ConfirmedDraft())
+    const [confirmed] = update(withExposure, EditorMessage.ConfirmedDraft())
     const exposure = settled(confirmed)
     const [afterDrag, commands] = drag(exposure, 2, 0.5, 0.7)
     expect(afterDrag.chain[0]).toBe(exposure.chain[0])
     expect(commands).toHaveLength(0)
 
-    const [afterReset] = update(afterDrag, CurveReset())
+    const [afterReset] = update(afterDrag, EditorMessage.CurveReset())
     expect(afterReset.chain[0]).toBe(exposure.chain[0])
   })
 })
@@ -178,13 +170,16 @@ describe('Tone Curve layer flow', () => {
 const sceneConfig = { update, view } as const
 
 const stageMounts = [
-  Mount.resolve(PanZoom, ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
-  Mount.resolve(RegisterCanvas, CanvasRegistered()),
+  Mount.resolve(PanZoom, EditorMessage.ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
+  Mount.resolve(RegisterCanvas, EditorMessage.CanvasRegistered()),
 ]
 
 const resolveRender = () => [
-  Command.resolve(RenderChain, RenderedFrame({ handle: stubHandle(), stamp: 999 })),
-  Command.resolve(ReadHistogram, HistogramComputed({ bins: new Uint32Array(256), stamp: 999 })),
+  Command.resolve(RenderChain, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: 999 })),
+  Command.resolve(
+    ReadHistogram,
+    EditorMessage.HistogramComputed({ bins: new Uint32Array(256), stamp: 999 }),
+  ),
 ]
 
 describe('Tone Curve view', () => {
@@ -217,7 +212,7 @@ describe('Tone Curve view', () => {
       // (Resolving the mount with a drag of p2 to its identity position is
       // a no-op — the curve stays neutral; the render it fires is resolved
       // below.)
-      Mount.resolve(CurveWidget, CurvePointDragged({ index: 2, x: 0.5, y: 0.5 })),
+      Mount.resolve(CurveWidget, EditorMessage.CurvePointDragged({ index: 2, x: 0.5, y: 0.5 })),
       ...resolveRender(),
       sceneExpect(role('button', { name: 'Reset curve' })).toBeAbsent(),
       Command.expectNone(),
@@ -231,7 +226,7 @@ describe('Tone Curve view', () => {
       ...stageMounts,
       // The mount's drag emits unit-space positions; update clamps and
       // applies them (the point jumps to the grab position on down).
-      Mount.resolve(CurveWidget, CurvePointDragged({ index: 2, x: 0.5, y: 0.7 })),
+      Mount.resolve(CurveWidget, EditorMessage.CurvePointDragged({ index: 2, x: 0.5, y: 0.7 })),
       ...resolveRender(),
       // The handle moved up to y = 0.7 (viewBox y is down: 100 - 67.6).
       sceneExpect(selector('[data-curve-handle="2"]')).toHaveAttr('cx', '50'),
@@ -244,7 +239,7 @@ describe('Tone Curve view', () => {
 
   it('the reset button returns the curve to the diagonal', () => {
     const dragged = settled(
-      update(curveDraft(), CurvePointDragged({ index: 2, x: 0.5, y: 0.7 }))[0],
+      update(curveDraft(), EditorMessage.CurvePointDragged({ index: 2, x: 0.5, y: 0.7 }))[0],
     )
     scene(
       sceneConfig,
@@ -253,7 +248,7 @@ describe('Tone Curve view', () => {
       // Re-resolving the already-dragged point to the same position is a
       // no-op — the mount must be resolved, and this keeps the model as-is.
       // (The drag it fires re-renders; that render is resolved below.)
-      Mount.resolve(CurveWidget, CurvePointDragged({ index: 2, x: 0.5, y: 0.7 })),
+      Mount.resolve(CurveWidget, EditorMessage.CurvePointDragged({ index: 2, x: 0.5, y: 0.7 })),
       ...resolveRender(),
       sceneExpect(role('button', { name: 'Reset curve' })).toExist(),
       click(role('button', { name: 'Reset curve' })),
@@ -267,14 +262,14 @@ describe('Tone Curve view', () => {
 
   it('a committed curve shows the widget when selected, with the Custom summary', () => {
     const withDrag = settled(
-      update(selectedCurve(), CurvePointDragged({ index: 1, x: 0.3, y: 0.2 }))[0],
+      update(selectedCurve(), EditorMessage.CurvePointDragged({ index: 1, x: 0.3, y: 0.2 }))[0],
     )
     scene(
       sceneConfig,
       given(withDrag),
       ...stageMounts,
       // Resolving the mount with the same drag position keeps the curve as-is.
-      Mount.resolve(CurveWidget, CurvePointDragged({ index: 1, x: 0.3, y: 0.2 })),
+      Mount.resolve(CurveWidget, EditorMessage.CurvePointDragged({ index: 1, x: 0.3, y: 0.2 })),
       ...resolveRender(),
       // The row summary reflects the moved curve; the widget is open.
       sceneExpect(text('Custom')).toExist(),
@@ -292,7 +287,7 @@ describe('Tone Curve view', () => {
       // Resolve the mount with a drag of p2 to its identity position — the
       // curve is already neutral, so nothing changes (the render it fires
       // is resolved below).
-      Mount.resolve(CurveWidget, CurvePointDragged({ index: 2, x: 0.5, y: 0.5 })),
+      Mount.resolve(CurveWidget, EditorMessage.CurvePointDragged({ index: 2, x: 0.5, y: 0.5 })),
       ...resolveRender(),
       sceneExpect(text('Neutral')).toExist(),
       sceneExpect(role('button', { name: 'Reset curve' })).toBeAbsent(),

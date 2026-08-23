@@ -1,9 +1,8 @@
 import { Effect, Option, Queue, Schema as S, Stream } from 'effect'
 import { Subscription } from 'foldkit'
 import { DragAndDrop } from '@foldkit/ui'
-import { CellMeasured, GotDragMessage, PanEnded, PanMoved, WheelZoomed } from './message'
+import { CollageMessage } from './message'
 import type { Model } from './model'
-import type { CollageMessage } from './message'
 import { ScreenMode } from './model'
 
 /**
@@ -23,7 +22,8 @@ import { ScreenMode } from './model'
 
 const liftedDnd = Subscription.lift(DragAndDrop.subscriptions)({
   toChildModel: (model: Model) => model.drag,
-  toParentMessage: (message: DragAndDrop.Message): CollageMessage => GotDragMessage({ message }),
+  toParentMessage: (message: DragAndDrop.Message): CollageMessage =>
+    CollageMessage.GotDragMessage({ message }),
 })
 
 const own = Subscription.make<Model, CollageMessage>()((entry) => ({
@@ -55,11 +55,11 @@ const own = Subscription.make<Model, CollageMessage>()((entry) => ({
                 if (pending) {
                   const move = pending
                   pending = null
-                  Queue.offerUnsafe(queue, PanMoved(move))
+                  Queue.offerUnsafe(queue, CollageMessage.PanMoved(move))
                 }
                 if (pendingUp) {
                   pendingUp = false
-                  Queue.offerUnsafe(queue, PanEnded())
+                  Queue.offerUnsafe(queue, CollageMessage.PanEnded())
                 }
               }
               const onMove = (event: PointerEvent) => {
@@ -118,7 +118,7 @@ const own = Subscription.make<Model, CollageMessage>()((entry) => ({
                 return Option.none()
               }
               event.preventDefault()
-              return Option.some(WheelZoomed({ index, deltaY: event.deltaY }))
+              return Option.some(CollageMessage.WheelZoomed({ index, deltaY: event.deltaY }))
             },
           }),
           Effect.sync(() => mode === 'frame'),
@@ -152,7 +152,7 @@ const own = Subscription.make<Model, CollageMessage>()((entry) => ({
                     if (rect && rect.width > 0 && rect.height > 0) {
                       Queue.offerUnsafe(
                         queue,
-                        CellMeasured({ width: rect.width, height: rect.height }),
+                        CollageMessage.CellMeasured({ width: rect.width, height: rect.height }),
                       )
                     }
                   })

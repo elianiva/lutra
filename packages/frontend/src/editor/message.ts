@@ -1,5 +1,5 @@
 import { Schema as S } from 'effect'
-import { Message } from 'foldkit'
+import { defineMessageUnion } from 'foldkit/message'
 import * as ExportDialog from '../export-dialog'
 import { RenderHandle } from '../gpu/backend'
 import { EditIdSchema, StoreError } from '@lutra/store'
@@ -61,49 +61,6 @@ export const SourceImage = S.Struct({
 })
 export type SourceImage = typeof SourceImage.Type
 
-export const FilePickRequested = Message.m('FilePickRequested')
-export const FilePickCancelled = Message.m('FilePickCancelled')
-
-export const SelectedImageFile = Message.m('SelectedImageFile', {
-  file: S.instanceOf(File),
-})
-export const ImageDecoded = Message.m('ImageDecoded', {
-  bitmap: S.instanceOf(ImageBitmap),
-  width: S.Number,
-  height: S.Number,
-  // The picked file's stored byte encoding — the Edit's source image. Read
-  // at pick time so a later Save (which creates a new Edit for a fresh pick)
-  // can persist it without holding the File (the store's carrier is bytes,
-  // docs/adr/0007).
-  source: S.Uint8Array,
-})
-export const ImageFailedToDecode = Message.m('ImageFailedToDecode', {
-  error: ImageDecodeError,
-})
-export const ClearedImage = Message.m('ClearedImage')
-
-// ---- attached edit (opened from the gallery) ----
-
-// The Edit attached to this editor route (`/edit/:id`) finished loading: its
-// chain and its source image decoded from the stored bytes. Seeding happens
-// in update (source + chain + phase), exactly as a fresh `ImageDecoded`
-// would — an opened Edit is the existing Idle phase, never a new one
-// (CONTEXT.md "Attached edit").
-export const EditLoaded = Message.m('EditLoaded', {
-  // The attached Edit's identity + stored source bytes: the model keeps them
-  // so Save writes back through the same id (in place) or forks it
-  // (CONTEXT.md "Attached edit" — id + source bytes are model data).
-  id: EditIdSchema,
-  chain: S.Array(Layer),
-  bitmap: S.instanceOf(ImageBitmap),
-  width: S.Number,
-  height: S.Number,
-  source: S.Uint8Array,
-})
-export const EditLoadFailed = Message.m('EditLoadFailed', {
-  error: S.Union([EditNotFoundError, StoreError, ImageDecodeError]),
-})
-
 // ---- LUT library ----
 
 // The catalog shape from the vendored film_luts.json (schema mirrors the
@@ -119,44 +76,6 @@ const CatalogEntry = S.Struct({
 export const Catalog = S.Array(CatalogEntry)
 export type Catalog = typeof Catalog.Type
 
-export const CatalogLoaded = Message.m('CatalogLoaded', { catalog: Catalog })
-export const CatalogFailed = Message.m('CatalogFailed', { error: LutLoadError })
-
-// ---- offline library (the LUT bar's per-row download states) ----
-// Root-owned facts delegated into the editor (docs/adr/0015): the root's
-// offline slice owns the fill machine and counters; these carry the per-LUT
-// states the LUT bar renders — a row's spinner while its cube is being
-// fetched, the dimmed "not downloaded" badge while offline, and the notice
-// when the user tries to apply a cube that isn't cached yet.
-
-// A cube file's fetch began — the bar row shows its spinner.
-export const OfflineFileFetching = Message.m('OfflineFileFetching', {
-  lutId: LutIdSchema,
-})
-// A cube file landed in the offline library — the row is downloadable.
-export const OfflineFileDownloaded = Message.m('OfflineFileDownloaded', {
-  lutId: LutIdSchema,
-})
-// The browser's online state flipped — the bar dims undownloaded rows while
-// offline. Absence of a row in the download map means "not downloaded".
-export const OfflineConnectivityChanged = Message.m('OfflineConnectivityChanged', {
-  online: S.Boolean,
-})
-// The user clicked a bar row that isn't downloaded while offline: the bar
-// shows the distinct "connect once" notice instead of committing.
-export const OfflineLutUnavailable = Message.m('OfflineLutUnavailable', {
-  lutId: LutIdSchema,
-})
-
-// ---- canvas interaction ----
-
-export const ScaledCanvas = Message.m('ScaledCanvas', {
-  scale: S.Number,
-  // Pan offset in canvas pixels.
-  offsetX: S.Number,
-  offsetY: S.Number,
-})
-
 // ---- mobile (bottom sheets + tab bar, docs/adr/0024-mobile-ui) ----
 
 // The two mobile bottom sheets: the tool panel ('tools') and the layer
@@ -165,130 +84,6 @@ export const ScaledCanvas = Message.m('ScaledCanvas', {
 // toggles one open (tapping the active tab closes it). Inert on desktop.
 export const MobileSheet = S.Union([S.Literal('tools'), S.Literal('layers')])
 export type MobileSheet = typeof MobileSheet.Type
-
-export const ToggledMobileSheet = Message.m('ToggledMobileSheet', { sheet: MobileSheet })
-
-// ---- tool panel / draft lifecycle ----
-
-export const SelectedTool = Message.m('SelectedTool', {
-  // Literal union so handlers get a narrowed LayerType without casts.
-  type: S.Literals(LAYER_TYPES),
-})
-
-// Layer creation runs as a Command because the engine factory now exposes an
-// Effect. The phase machine waits in Creating until one of these messages
-// arrives, so a failed factory never throws through update.
-export const LayerCreated = Message.m('LayerCreated', { layer: Layer })
-export const LayerCreationFailed = Message.m('LayerCreationFailed', {
-  error: LayerCreationError,
-})
-
-export const ConfirmedDraft = Message.m('ConfirmedDraft')
-export const CancelledDraft = Message.m('CancelledDraft')
-export const UpdatedDraftParam = Message.m('UpdatedDraftParam', {
-  field: FieldKeySchema,
-  value: S.Number,
-})
-export const ChangedDraftLut = Message.m('ChangedDraftLut', { lutId: LutIdSchema })
-
-// ---- committed chain ----
-
-export const SelectedLayer = Message.m('SelectedLayer', { id: S.NullOr(LayerIdSchema) })
-export const RemovedLayer = Message.m('RemovedLayer', { id: LayerIdSchema })
-export const ReorderedLayer = Message.m('ReorderedLayer', {
-  from: S.Number,
-  to: S.Number,
-})
-export const ToggledLayerVisibility = Message.m('ToggledLayerVisibility', {
-  id: LayerIdSchema,
-})
-export const UpdatedLayerParam = Message.m('UpdatedLayerParam', {
-  field: FieldKeySchema,
-  id: LayerIdSchema,
-  value: S.Number,
-})
-export const ChangedLayerLut = Message.m('ChangedLayerLut', {
-  id: LayerIdSchema,
-  lutId: LutIdSchema,
-})
-export const ToggledLutPicker = Message.m('ToggledLutPicker')
-
-// ---- LUT bar (bottom filmstrip picker, docs/adr/0012) ----
-
-// Hover enter/leave on a bar thumb. Presentation-only: sets `previewLut`
-// and re-renders; the committed chain/draft is untouched. null restores
-// the committed look. The bar is the only dispatcher of
-// ChangedDraftLut / ChangedLayerLut — the drawer accordion picker is gone.
-export const PreviewedLut = Message.m('PreviewedLut', {
-  lutId: S.NullOr(LutIdSchema),
-})
-// Click on a category tab (or Recents). Presentation-only, no render.
-export const SelectedLutTab = Message.m('SelectedLutTab', {
-  tab: S.Union([S.Literal('recents'), S.String]),
-})
-// Recents restored from localStorage (boot-time, like the export settings load).
-export const LutRecentsLoaded = Message.m('LutRecentsLoaded', {
-  recents: S.Array(LutIdSchema),
-})
-// Ack for SaveLutRecents (observability, like the export settings save).
-export const LutRecentsSaved = Message.m('LutRecentsSaved')
-
-// ---- per-photo LUT thumbnails (filmstrip previews, docs/adr/0013) ----
-
-// A per-photo LUT thumbnail finished rendering in the thumb worker: lutId →
-// the blob URL of the 200×200 JPEG (the bar's thumb prefers it over the
-// vendored generic jpg). `bitmap` is the photo the preview belongs to — the
-// staleness guard, exactly like RenderedFrame's stamp: a thumb that lands
-// after a new image loaded is revoked and dropped (the model's map only
-// ever holds the current photo's thumbs).
-export const LutThumbGenerated = Message.m('LutThumbGenerated', {
-  bitmap: S.instanceOf(ImageBitmap),
-  lutId: LutIdSchema,
-  url: S.String,
-})
-// A per-photo LUT thumbnail failed (cube fetch, downscale, worker render, or
-// encode). The bar silently keeps the vendored generic jpg — previews are
-// presentation-only, so failures are not user-visible (docs/adr/0013).
-export const LutThumbFailed = Message.m('LutThumbFailed', { lutId: LutIdSchema })
-// Ack for RevokeLutThumbs (observability, like the export URL revoke ack).
-export const LutThumbsRevoked = Message.m('LutThumbsRevoked')
-
-/** For toggled layers (White Balance, Vignette): cycle the active field shown in the drawer. */
-export const CycledToggledField = Message.m('CycledToggledField', { id: LayerIdSchema })
-
-/** For Color Mixer layers: select which hue range the drawer shows — the
- *  range's three sliders replace the previous range's. Presentation-only
- *  (no render), exactly like CycledToggledField. */
-export const SelectedMixerColor = Message.m('SelectedMixerColor', {
-  id: LayerIdSchema,
-  // 0..7 into MIXER_COLORS; clamped in update.
-  color: S.Number,
-})
-
-// ---- tone curve widget (docs/adr/0028) ----
-
-// The curve widget (editor/tone-curve.ts) emits pointer positions in unit
-// space (0..1, y up). The mount owns hit-testing and the drag session; the
-// engine's moveCurvePoint clamps and applies the move (x stays between the
-// point's neighbors, y in [0, 1]) to the toneCurve draft — through the
-// machine's Drafting edge — or to the focused chain toneCurve layer. The
-// widget only renders while a toneCurve draft or selection exists, so the
-// target is unambiguous.
-export const CurvePointDragged = Message.m('CurvePointDragged', {
-  // 0..CURVE_POINT_COUNT - 1; rounded and clamped in the engine.
-  index: S.Number,
-  x: S.Number,
-  y: S.Number,
-})
-// The widget's reset button: every point back to the identity curve
-// (docs/adr/0019's one-gesture reset convention applied to the whole
-// curve). Draft drags go through the machine, chain layers are plain data.
-export const CurveReset = Message.m('CurveReset')
-
-// ---- layer drawer reorder (drag) ----
-
-export const StartedLayerReorder = Message.m('StartedLayerReorder', { id: LayerIdSchema })
-export const MovedLayerReorder = Message.m('MovedLayerReorder', { over: S.Number })
 
 // ---- compare (before/after viewing) ----
 
@@ -309,161 +104,301 @@ export const PresentState = S.Struct({
 })
 export type PresentState = typeof PresentState.Type
 
-// Selecting a compare mode. Selecting Toggle while already in Toggle flips
-// the view (the segment is the flip button); entering Toggle reveals the
-// source image first (CONTEXT.md "Compare"). Presentation-only — dispatches
-// PresentFrame, never a chain render.
-export const ChangedCompareMode = Message.m('ChangedCompareMode', { mode: CompareMode })
-// The divider was dragged (or double-clicked to reset): the split position
-// in image space, 0..1. Presentation-only, like ChangedCompareMode.
-export const ChangedSplitPosition = Message.m('ChangedSplitPosition', { position: S.Number })
-// Ack for the blit-only present command (observability, like
-// CanvasRegistered) — the frame was re-presented without re-rendering.
-export const FramePresented = Message.m('FramePresented')
+export const EditorMessage = defineMessageUnion({
+  FilePickRequested: {},
+  FilePickCancelled: {},
 
-// ---- rendering ----
+  SelectedImageFile: {
+    file: S.instanceOf(File),
+  },
+  ImageDecoded: {
+    bitmap: S.instanceOf(ImageBitmap),
+    width: S.Number,
+    height: S.Number,
+    // The picked file's stored byte encoding — the Edit's source image. Read
+    // at pick time so a later Save (which creates a new Edit for a fresh pick)
+    // can persist it without holding the File (the store's carrier is bytes,
+    // docs/adr/0007).
+    source: S.Uint8Array,
+  },
+  ImageFailedToDecode: {
+    error: ImageDecodeError,
+  },
+  ClearedImage: {},
 
-// The rendered frame is presented directly to the canvas by the GPU backend;
-// the message carries the model revision it was rendered for (so update can
-// drop — or re-trigger — renders that arrived after a newer mutation) and
-// the RenderHandle export snapshots from. The handle makes the backend's
-// data flow explicit: `snapshot` reads the frame the app handed it, never an
-// implicit "last session".
-export const RenderedFrame = Message.m('RenderedFrame', {
-  handle: S.instanceOf(RenderHandle),
-  stamp: S.Number,
+  // The Edit attached to this editor route (`/edit/:id`) finished loading: its
+  // chain and its source image decoded from the stored bytes. Seeding happens
+  // in update (source + chain + phase), exactly as a fresh `ImageDecoded`
+  // would — an opened Edit is the existing Idle phase, never a new one
+  // (CONTEXT.md "Attached edit").
+  EditLoaded: {
+    // The attached Edit's identity + stored source bytes: the model keeps them
+    // so Save writes back through the same id (in place) or forks it
+    // (CONTEXT.md "Attached edit" — id + source bytes are model data).
+    id: EditIdSchema,
+    chain: S.Array(Layer),
+    bitmap: S.instanceOf(ImageBitmap),
+    width: S.Number,
+    height: S.Number,
+    source: S.Uint8Array,
+  },
+  EditLoadFailed: {
+    error: S.Union([EditNotFoundError, StoreError, ImageDecodeError]),
+  },
+
+  CatalogLoaded: { catalog: Catalog },
+  CatalogFailed: { error: LutLoadError },
+
+  // ---- offline library (the LUT bar's per-row download states) ----
+  // Root-owned facts delegated into the editor (docs/adr/0015): the root's
+  // offline slice owns the fill machine and counters; these carry the per-LUT
+  // states the LUT bar renders — a row's spinner while its cube is being
+  // fetched, the dimmed "not downloaded" badge while offline, and the notice
+  // when the user tries to apply a cube that isn't cached yet.
+
+  // A cube file's fetch began — the bar row shows its spinner.
+  OfflineFileFetching: {
+    lutId: LutIdSchema,
+  },
+  // A cube file landed in the offline library — the row is downloadable.
+  OfflineFileDownloaded: {
+    lutId: LutIdSchema,
+  },
+  // The browser's online state flipped — the bar dims undownloaded rows while
+  // offline. Absence of a row in the download map means "not downloaded".
+  OfflineConnectivityChanged: {
+    online: S.Boolean,
+  },
+  // The user clicked a bar row that isn't downloaded while offline: the bar
+  // shows the distinct "connect once" notice instead of committing.
+  OfflineLutUnavailable: {
+    lutId: LutIdSchema,
+  },
+
+  ScaledCanvas: {
+    scale: S.Number,
+    // Pan offset in canvas pixels.
+    offsetX: S.Number,
+    offsetY: S.Number,
+  },
+
+  ToggledMobileSheet: { sheet: MobileSheet },
+
+  SelectedTool: {
+    // Literal union so handlers get a narrowed LayerType without casts.
+    type: S.Literals(LAYER_TYPES),
+  },
+
+  // Layer creation runs as a Command because the engine factory now exposes an
+  // Effect. The phase machine waits in Creating until one of these messages
+  // arrives, so a failed factory never throws through update.
+  LayerCreated: { layer: Layer },
+  LayerCreationFailed: {
+    error: LayerCreationError,
+  },
+
+  ConfirmedDraft: {},
+  CancelledDraft: {},
+  UpdatedDraftParam: {
+    field: FieldKeySchema,
+    value: S.Number,
+  },
+  ChangedDraftLut: { lutId: LutIdSchema },
+
+  // ---- committed chain ----
+
+  SelectedLayer: { id: S.NullOr(LayerIdSchema) },
+  RemovedLayer: { id: LayerIdSchema },
+  ReorderedLayer: {
+    from: S.Number,
+    to: S.Number,
+  },
+  ToggledLayerVisibility: {
+    id: LayerIdSchema,
+  },
+  UpdatedLayerParam: {
+    field: FieldKeySchema,
+    id: LayerIdSchema,
+    value: S.Number,
+  },
+  ChangedLayerLut: {
+    id: LayerIdSchema,
+    lutId: LutIdSchema,
+  },
+  ToggledLutPicker: {},
+
+  // ---- LUT bar (bottom filmstrip picker, docs/adr/0012) ----
+
+  // Hover enter/leave on a bar thumb. Presentation-only: sets `previewLut`
+  // and re-renders; the committed chain/draft is untouched. null restores
+  // the committed look. The bar is the only dispatcher of
+  // ChangedDraftLut / ChangedLayerLut — the drawer accordion picker is gone.
+  PreviewedLut: {
+    lutId: S.NullOr(LutIdSchema),
+  },
+  // Click on a category tab (or Recents). Presentation-only, no render.
+  SelectedLutTab: {
+    tab: S.Union([S.Literal('recents'), S.String]),
+  },
+  // Recents restored from localStorage (boot-time, like the export settings load).
+  LutRecentsLoaded: {
+    recents: S.Array(LutIdSchema),
+  },
+  // Ack for SaveLutRecents (observability, like the export settings save).
+  LutRecentsSaved: {},
+
+  // ---- per-photo LUT thumbnails (filmstrip previews, docs/adr/0013) ----
+
+  // A per-photo LUT thumbnail finished rendering in the thumb worker: lutId →
+  // the blob URL of the 200×200 JPEG (the bar's thumb prefers it over the
+  // vendored generic jpg). `bitmap` is the photo the preview belongs to — the
+  // staleness guard, exactly like RenderedFrame's stamp: a thumb that lands
+  // after a new image loaded is revoked and dropped (the model's map only
+  // ever holds the current photo's thumbs).
+  LutThumbGenerated: {
+    bitmap: S.instanceOf(ImageBitmap),
+    lutId: LutIdSchema,
+    url: S.String,
+  },
+  // A per-photo LUT thumbnail failed (cube fetch, downscale, worker render, or
+  // encode). The bar silently keeps the vendored generic jpg — previews are
+  // presentation-only, so failures are not user-visible (docs/adr/0013).
+  LutThumbFailed: { lutId: LutIdSchema },
+  // Ack for RevokeLutThumbs (observability, like the export URL revoke ack).
+  LutThumbsRevoked: {},
+
+  /** For toggled layers (White Balance, Vignette): cycle the active field shown in the drawer. */
+  CycledToggledField: { id: LayerIdSchema },
+
+  /** For Color Mixer layers: select which hue range the drawer shows — the
+   *  range's three sliders replace the previous range's. Presentation-only
+   *  (no render), exactly like CycledToggledField. */
+  SelectedMixerColor: {
+    id: LayerIdSchema,
+    // 0..7 into MIXER_COLORS; clamped in update.
+    color: S.Number,
+  },
+
+  // ---- tone curve widget (docs/adr/0028) ----
+
+  // The curve widget (editor/tone-curve.ts) emits pointer positions in unit
+  // space (0..1, y up). The mount owns hit-testing and the drag session; the
+  // engine's moveCurvePoint clamps and applies the move (x stays between the
+  // point's neighbors, y in [0, 1]) to the toneCurve draft — through the
+  // machine's Drafting edge — or to the focused chain toneCurve layer. The
+  // widget only renders while a toneCurve draft or selection exists, so the
+  // target is unambiguous.
+  CurvePointDragged: {
+    // 0..CURVE_POINT_COUNT - 1; rounded and clamped in the engine.
+    index: S.Number,
+    x: S.Number,
+    y: S.Number,
+  },
+  // The widget's reset button: every point back to the identity curve
+  // (docs/adr/0019's one-gesture reset convention applied to the whole
+  // curve). Draft drags go through the machine, chain layers are plain data.
+  CurveReset: {},
+
+  // ---- layer drawer reorder (drag) ----
+
+  StartedLayerReorder: { id: LayerIdSchema },
+  MovedLayerReorder: { over: S.Number },
+
+  // ---- compare (before/after viewing) ----
+
+  // Selecting a compare mode. Selecting Toggle while already in Toggle flips
+  // the view (the segment is the flip button); entering Toggle reveals the
+  // source image first (CONTEXT.md "Compare"). Presentation-only — dispatches
+  // PresentFrame, never a chain render.
+  ChangedCompareMode: { mode: CompareMode },
+  // The divider was dragged (or double-clicked to reset): the split position
+  // in image space, 0..1. Presentation-only, like ChangedCompareMode.
+  ChangedSplitPosition: { position: S.Number },
+  // Ack for the blit-only present command (observability, like
+  // CanvasRegistered) — the frame was re-presented without re-rendering.
+  FramePresented: {},
+
+  // ---- rendering ----
+
+  // The rendered frame is presented directly to the canvas by the GPU backend;
+  // the message carries the model revision it was rendered for (so update can
+  // drop — or re-trigger — renders that arrived after a newer mutation) and
+  // the RenderHandle export snapshots from. The handle makes the backend's
+  // data flow explicit: `snapshot` reads the frame the app handed it, never an
+  // implicit "last session".
+  RenderedFrame: {
+    handle: S.instanceOf(RenderHandle),
+    stamp: S.Number,
+  },
+  RenderFailed: {
+    error: S.Union([CanvasUnavailableError, GpuError, LutLoadError, LutParseError]),
+  },
+
+  // ---- histogram overlay ----
+
+  // The luminance histogram bins (256 u32 Rec.709 luma counts) of the frame
+  // just rendered, read back from the GPU asynchronously — the display path
+  // never waits on the readback. The stamp guards staleness exactly like
+  // RenderedFrame: bins that land after a newer mutation are dropped.
+  HistogramComputed: {
+    bins: S.instanceOf(Uint32Array),
+    stamp: S.Number,
+  },
+  // Bins readback failure — observability only (the frame itself is already
+  // on the canvas; a 1KB map cannot be retried or shown).
+  HistogramFailed: { error: GpuError },
+
+  // ---- canvas registration ----
+
+  // One-shot acknowledgment from the canvas mount: the side effect (registering
+  // the element in the CanvasRef service) already happened in the mount; this
+  // message exists so the mount stays observable (DevTools, Scene, replay).
+  CanvasRegistered: {},
+
+  // ---- export dialog ----
+
+  // Opens the export dialog instead of downloading immediately.
+  ExportRequested: {},
+
+  // The shared export-dialog machine's messages arrive wrapped (docs/adr/0031);
+  // update delegates to its update. Snapshot outcomes are fed in through
+  // ExportSnapshotted / ExportSnapshotFailed below.
+  GotExportDialogMessage: {
+    message: ExportDialog.Message,
+  },
+
+  // The tool rail's custom hover tooltip: one fact carries which tool card is
+  // currently hovered or keyboard-focused (null = none). The panel renders
+  // straight from this field — no submodel, no show-delay machinery.
+  HoveredToolChanged: {
+    type: S.NullOr(S.Literals(LAYER_TYPES)),
+  },
+
+  /**
+   * The GPU readback landed. The pixels stay in the shared export-dialog
+   * frame slot — megabytes of ImageData never ride through the model; only
+   * the readiness flag does (docs/adr/0031).
+   */
+  ExportSnapshotted: {},
+  ExportSnapshotFailed: {
+    error: GpuError,
+  },
+
+  // ---- save ----
+
+  // The user pressed Save: persist the committed chain through the Edit store
+  // — in place when the editor has an attached Edit, as a new Edit (fresh id,
+  // duplicated source) when the image was picked fresh in-editor.
+  SaveRequested: {},
+  // The user pressed Save as: always fork a new Edit, even when attached.
+  SaveAsRequested: {},
+  // A save completed. `id` is the persisted Edit's id — update attaches the
+  // model to it (a fresh-pick Save creates the attachment; Save as re-points
+  // it) and emits `EditCreated` when that id is new. `savedAt` is the
+  // timestamp written to the record, which the top bar shows.
+  EditSaved: { id: EditIdSchema, savedAt: S.Number },
+  SaveFailed: { error: SaveError },
 })
-export const RenderFailed = Message.m('RenderFailed', {
-  error: S.Union([CanvasUnavailableError, GpuError, LutLoadError, LutParseError]),
-})
-
-// ---- histogram overlay ----
-
-// The luminance histogram bins (256 u32 Rec.709 luma counts) of the frame
-// just rendered, read back from the GPU asynchronously — the display path
-// never waits on the readback. The stamp guards staleness exactly like
-// RenderedFrame: bins that land after a newer mutation are dropped.
-export const HistogramComputed = Message.m('HistogramComputed', {
-  bins: S.instanceOf(Uint32Array),
-  stamp: S.Number,
-})
-// Bins readback failure — observability only (the frame itself is already
-// on the canvas; a 1KB map cannot be retried or shown).
-export const HistogramFailed = Message.m('HistogramFailed', { error: GpuError })
-
-// ---- canvas registration ----
-
-// One-shot acknowledgment from the canvas mount: the side effect (registering
-// the element in the CanvasRef service) already happened in the mount; this
-// message exists so the mount stays observable (DevTools, Scene, replay).
-export const CanvasRegistered = Message.m('CanvasRegistered')
-
-// ---- export dialog ----
-
-// Opens the export dialog instead of downloading immediately.
-export const ExportRequested = Message.m('ExportRequested')
-
-// The shared export-dialog machine's messages arrive wrapped (docs/adr/0031);
-// update delegates to its update. Snapshot outcomes are fed in through
-// ExportSnapshotted / ExportSnapshotFailed below.
-export const GotExportDialogMessage = Message.m('GotExportDialogMessage', {
-  message: ExportDialog.Message,
-})
-
-// The tool rail's custom hover tooltip: one fact carries which tool card is
-// currently hovered or keyboard-focused (null = none). The panel renders
-// straight from this field — no submodel, no show-delay machinery.
-export const HoveredToolChanged = Message.m('HoveredToolChanged', {
-  type: S.NullOr(S.Literals(LAYER_TYPES)),
-})
-
-/**
- * The GPU readback landed. The pixels stay in the shared export-dialog
- * frame slot — megabytes of ImageData never ride through the model; only
- * the readiness flag does (docs/adr/0031).
- */
-export const ExportSnapshotted = Message.m('ExportSnapshotted', {})
-export const ExportSnapshotFailed = Message.m('ExportSnapshotFailed', {
-  error: GpuError,
-})
-
-// ---- save ----
-
-// The user pressed Save: persist the committed chain through the Edit store
-// — in place when the editor has an attached Edit, as a new Edit (fresh id,
-// duplicated source) when the image was picked fresh in-editor.
-export const SaveRequested = Message.m('SaveRequested')
-// The user pressed Save as: always fork a new Edit, even when attached.
-export const SaveAsRequested = Message.m('SaveAsRequested')
-// A save completed. `id` is the persisted Edit's id — update attaches the
-// model to it (a fresh-pick Save creates the attachment; Save as re-points
-// it) and emits `EditCreated` when that id is new. `savedAt` is the
-// timestamp written to the record, which the top bar shows.
-export const EditSaved = Message.m('EditSaved', { id: EditIdSchema, savedAt: S.Number })
-export const SaveFailed = Message.m('SaveFailed', { error: SaveError })
-
-export const EditorMessage = S.Union([
-  FilePickRequested,
-  FilePickCancelled,
-  ToggledMobileSheet,
-  SelectedImageFile,
-  ImageDecoded,
-  ImageFailedToDecode,
-  ClearedImage,
-  EditLoaded,
-  EditLoadFailed,
-  CatalogLoaded,
-  CatalogFailed,
-  OfflineFileFetching,
-  OfflineFileDownloaded,
-  OfflineConnectivityChanged,
-  OfflineLutUnavailable,
-  ScaledCanvas,
-  SelectedTool,
-  LayerCreated,
-  LayerCreationFailed,
-  ConfirmedDraft,
-  CancelledDraft,
-  UpdatedDraftParam,
-  ChangedDraftLut,
-  SelectedLayer,
-  RemovedLayer,
-  ReorderedLayer,
-  ToggledLayerVisibility,
-  UpdatedLayerParam,
-  ChangedLayerLut,
-  ToggledLutPicker,
-  PreviewedLut,
-  SelectedLutTab,
-  LutRecentsLoaded,
-  LutRecentsSaved,
-  LutThumbGenerated,
-  LutThumbFailed,
-  LutThumbsRevoked,
-  CycledToggledField,
-  SelectedMixerColor,
-  CurvePointDragged,
-  CurveReset,
-  StartedLayerReorder,
-  MovedLayerReorder,
-  ChangedCompareMode,
-  ChangedSplitPosition,
-  FramePresented,
-  RenderedFrame,
-  RenderFailed,
-  HistogramComputed,
-  HistogramFailed,
-  CanvasRegistered,
-  ExportRequested,
-  GotExportDialogMessage,
-  HoveredToolChanged,
-  ExportSnapshotted,
-  ExportSnapshotFailed,
-  SaveRequested,
-  SaveAsRequested,
-  EditSaved,
-  SaveFailed,
-])
 export type EditorMessage = typeof EditorMessage.Type
 
 /**
@@ -473,7 +408,9 @@ export type EditorMessage = typeof EditorMessage.Type
  * reload re-attaches the editor to the saved Edit. In-place saves (Save on
  * an attached Edit) emit nothing — the URL already addresses the Edit.
  */
-export const EditCreated = Message.m('EditCreated', { id: EditIdSchema })
-export type EditorOutMessage = typeof EditCreated.Type
+export const EditorOutMessage = defineMessageUnion({
+  EditCreated: { id: EditIdSchema },
+})
+export type EditorOutMessage = typeof EditorOutMessage.Type
 
 export { Layer, type LayerType } from '@lutra/engine'

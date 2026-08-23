@@ -1,14 +1,7 @@
 import { Option, pipe } from 'effect'
 import type { ChildAttribute, HtmlBuilder } from 'foldkit/html'
 import { Dialog } from '@foldkit/ui'
-import type { ExportDialogMessage as Message } from './message'
-import {
-  ChangedFormat,
-  ChangedQuality,
-  ChangedScale,
-  EncodeRequested,
-  GotDialogMessage,
-} from './message'
+import { ExportDialogMessage as Message } from './message'
 import { filenameFor } from './update'
 import type { Model } from './model'
 import { fmtBytes, formatSection, qualitySection, resolutionSection } from './sections'
@@ -30,7 +23,7 @@ export const exportDialogView = <P>(
   h.submodel({
     model: model.dialog,
     slotId: model.dialog.id,
-    toParentMessage: (message) => toParent(GotDialogMessage({ message })),
+    toParentMessage: (message) => toParent(Message.GotDialogMessage({ message })),
     view: Dialog.view,
     viewInputs: {
       toView: ({ dialog, backdrop, panel, title, closeButton, isVisible }) =>
@@ -58,13 +51,13 @@ export const exportDialogView = <P>(
                       [h.Class('flex flex-col gap-4 px-4 py-4')],
                       [
                         formatSection(h, model.settings, (format) =>
-                          toParent(ChangedFormat({ format })),
+                          toParent(Message.ChangedFormat({ format })),
                         ),
                         qualitySection(h, model.settings, (quality) =>
-                          toParent(ChangedQuality({ quality })),
+                          toParent(Message.ChangedQuality({ quality })),
                         ),
                         resolutionSection(h, model.settings, peekFrame(), (scale) =>
-                          toParent(ChangedScale({ scale })),
+                          toParent(Message.ChangedScale({ scale })),
                         ),
                         statusSection(h, model),
                       ],
@@ -111,7 +104,7 @@ const footer = <P>(
       ),
       h.button(
         [
-          h.OnClick(toParent(EncodeRequested())),
+          h.OnClick(toParent(Message.EncodeRequested())),
           h.Disabled(!model.ready || model.encoding),
           h.Class('bg-accent px-4 py-1.5 text-xs text-ink hover:opacity-90 disabled:opacity-30'),
         ],

@@ -6,11 +6,10 @@ import type { LutThumbnailer } from '../thumbs/worker-layer'
 import type { ImageEncoder } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import type { EditStore } from '@lutra/store'
-import type { EditorMessage } from './message'
+import { EditorMessage } from './message'
 import type { Model } from './model'
 import type { AppRoute } from '../route'
 import * as ExportDialog from '../export-dialog'
-import { GotExportDialogMessage } from './message'
 import { LoadCatalog, LoadEdit, LoadLutRecents } from './command'
 
 type Resource =
@@ -42,7 +41,7 @@ export type RouteChangedReturn = readonly [
 export const informRouteChanged = (model: Model, route: AppRoute): RouteChangedReturn => {
   const settings = [
     Command.mapMessage(ExportDialog.LoadExportSettings(), (message) =>
-      GotExportDialogMessage({ message }),
+      EditorMessage.GotExportDialogMessage({ message }),
     ),
   ]
   const boot = [LoadCatalog(), ...settings, LoadLutRecents()]

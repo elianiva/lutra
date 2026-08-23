@@ -1,5 +1,5 @@
 import { Schema as S } from 'effect'
-import { Message } from 'foldkit'
+import { defineMessageUnion } from 'foldkit/message'
 import { LutIdSchema } from '@lutra/engine'
 import type { LutId } from '@lutra/engine'
 
@@ -40,73 +40,59 @@ export type FillEvent =
 
 // ---- root messages (bridged from the PubSub, plus the UI's requests) ----
 
-export const OfflineFillStarted = Message.m('OfflineFillStarted', {
-  done: S.Number,
-  total: S.Number,
+export const OfflineMessage = defineMessageUnion({
+  OfflineFillStarted: {
+    done: S.Number,
+    total: S.Number,
+  },
+  OfflineFileStarted: {
+    lutId: S.NullOr(LutIdSchema),
+  },
+  OfflineFileCompleted: {
+    lutId: S.NullOr(LutIdSchema),
+  },
+  OfflineFileFailed: {
+    lutId: S.NullOr(LutIdSchema),
+  },
+  OfflineFillPaused: {},
+  OfflineFillResumed: {},
+  OfflineFillComplete: {},
+  OfflineQuotaError: {
+    message: S.String,
+  },
+  // The browser's online/offline state (drives the machine's Paused state and
+  // the LUT bar's offline dimming).
+  ConnectivityChanged: {
+    online: S.Boolean,
+  },
+  // The user asked to start the fill manually (the saveData gate's "Start
+  // offline download" button — the auto-start is skipped on metered
+  // connections).
+  OfflineFillRequested: {},
+  // The result of the persist() request the fill makes on start (and again on
+  // a quota retry).
+  StoragePersisted: {
+    persisted: S.Boolean,
+  },
+  // The "Offline ready" toast was dismissed (click or the auto-dismiss timer).
+  OfflineReadyDismissed: {},
 })
-export const OfflineFileStarted = Message.m('OfflineFileStarted', {
-  lutId: S.NullOr(LutIdSchema),
-})
-export const OfflineFileCompleted = Message.m('OfflineFileCompleted', {
-  lutId: S.NullOr(LutIdSchema),
-})
-export const OfflineFileFailed = Message.m('OfflineFileFailed', {
-  lutId: S.NullOr(LutIdSchema),
-})
-export const OfflineFillPaused = Message.m('OfflineFillPaused')
-export const OfflineFillResumed = Message.m('OfflineFillResumed')
-export const OfflineFillComplete = Message.m('OfflineFillComplete')
-export const OfflineQuotaError = Message.m('OfflineQuotaError', {
-  message: S.String,
-})
-// The browser's online/offline state (drives the machine's Paused state and
-// the LUT bar's offline dimming).
-export const ConnectivityChanged = Message.m('ConnectivityChanged', {
-  online: S.Boolean,
-})
-// The user asked to start the fill manually (the saveData gate's "Start
-// offline download" button — the auto-start is skipped on metered
-// connections).
-export const OfflineFillRequested = Message.m('OfflineFillRequested')
-// The result of the persist() request the fill makes on start (and again on
-// a quota retry).
-export const StoragePersisted = Message.m('StoragePersisted', {
-  persisted: S.Boolean,
-})
-// The "Offline ready" toast was dismissed (click or the auto-dismiss timer).
-export const OfflineReadyDismissed = Message.m('OfflineReadyDismissed')
-
-/** The offline messages the root's update handles (a subset of RootMessage). */
-export const OfflineMessage = S.Union([
-  OfflineFillStarted,
-  OfflineFileStarted,
-  OfflineFileCompleted,
-  OfflineFileFailed,
-  OfflineFillPaused,
-  OfflineFillResumed,
-  OfflineFillComplete,
-  OfflineQuotaError,
-  ConnectivityChanged,
-  OfflineFillRequested,
-  StoragePersisted,
-  OfflineReadyDismissed,
-])
 export type OfflineMessage = typeof OfflineMessage.Type
 
-/** FillEvent → RootMessage, the bridge the root subscription applies. */
+/** FillEvent → root message, the bridge the root subscription applies. */
 export const fillEventToMessage = (event: FillEvent): OfflineMessage =>
   event._tag === 'FillStarted'
-    ? OfflineFillStarted({ done: event.done, total: event.total })
+    ? OfflineMessage.OfflineFillStarted({ done: event.done, total: event.total })
     : event._tag === 'FillFileStarted'
-      ? OfflineFileStarted({ lutId: event.file.lutId })
+      ? OfflineMessage.OfflineFileStarted({ lutId: event.file.lutId })
       : event._tag === 'FillFileCompleted'
-        ? OfflineFileCompleted({ lutId: event.file.lutId })
+        ? OfflineMessage.OfflineFileCompleted({ lutId: event.file.lutId })
         : event._tag === 'FillFileFailed'
-          ? OfflineFileFailed({ lutId: event.file.lutId })
+          ? OfflineMessage.OfflineFileFailed({ lutId: event.file.lutId })
           : event._tag === 'FillPaused'
-            ? OfflineFillPaused()
+            ? OfflineMessage.OfflineFillPaused()
             : event._tag === 'FillResumed'
-              ? OfflineFillResumed()
+              ? OfflineMessage.OfflineFillResumed()
               : event._tag === 'FillComplete'
-                ? OfflineFillComplete()
-                : OfflineQuotaError({ message: event.message })
+                ? OfflineMessage.OfflineFillComplete()
+                : OfflineMessage.OfflineQuotaError({ message: event.message })

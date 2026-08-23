@@ -2,8 +2,7 @@ import { DateTime, Match } from 'effect'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 import { CopyPlus, Download, Plus } from 'lucide'
 import { icon } from '../components/icon'
-import { ExportRequested, ClearedImage, SaveRequested, SaveAsRequested } from './message'
-import type { EditorMessage } from './message'
+import { EditorMessage } from './message'
 import type { Model } from './model'
 
 /**
@@ -33,7 +32,7 @@ export const topBar = (h: HtmlBuilder<EditorMessage>, model: Model, hasImage: bo
           saveStatusText(h, model),
           h.button(
             [
-              h.OnClick(SaveRequested()),
+              h.OnClick(EditorMessage.SaveRequested()),
               h.Disabled(!hasImage || saving),
               h.AriaLabel('Save edit'),
               h.Class(
@@ -44,7 +43,7 @@ export const topBar = (h: HtmlBuilder<EditorMessage>, model: Model, hasImage: bo
           ),
           h.button(
             [
-              h.OnClick(SaveAsRequested()),
+              h.OnClick(EditorMessage.SaveAsRequested()),
               h.Disabled(!hasImage || saving || attachedId === null),
               h.AriaLabel('Save as a new edit'),
               h.Class('px-2 py-1 text-xs text-muted hover:text-ink disabled:opacity-30'),
@@ -59,7 +58,7 @@ export const topBar = (h: HtmlBuilder<EditorMessage>, model: Model, hasImage: bo
           ),
           h.button(
             [
-              h.OnClick(ExportRequested()),
+              h.OnClick(EditorMessage.ExportRequested()),
               h.Disabled(!hasImage),
               h.AriaLabel('Export image'),
               h.Class(
@@ -70,7 +69,7 @@ export const topBar = (h: HtmlBuilder<EditorMessage>, model: Model, hasImage: bo
           ),
           h.button(
             [
-              h.OnClick(ClearedImage()),
+              h.OnClick(EditorMessage.ClearedImage()),
               h.Disabled(!hasImage),
               h.AriaLabel('Start over'),
               h.Class('px-2 py-1 text-xs text-muted hover:text-ink disabled:opacity-30'),

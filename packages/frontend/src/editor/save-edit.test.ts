@@ -20,16 +20,7 @@ import { update } from './update'
 import { view } from './view'
 import { PanZoom, RegisterCanvas } from './canvas-stage'
 import { SaveEdit } from './command'
-import {
-  ClearedImage,
-  EditCreated,
-  EditLoaded,
-  EditSaved,
-  ImageDecoded,
-  SaveAsRequested,
-  SaveFailed,
-  SaveRequested,
-} from './message'
+import { EditorMessage, EditorOutMessage } from './message'
 import { Idle, Loading } from './phase'
 
 // ---- helpers ----
@@ -61,21 +52,27 @@ const saveEditOf = (commands: readonly Command.Command<unknown, unknown, unknown
 
 describe('editor: save flow (Save / Save as)', () => {
   it('SaveRequested without an image dispatches nothing', () => {
-    const [model, commands, out] = update(initialModel(), SaveRequested())
+    const [model, commands, out] = update(initialModel(), EditorMessage.SaveRequested())
     expect(model).toEqual(initialModel())
     expect(commands).toEqual([])
     expect(Option.isNone(out)).toBe(true)
   })
 
   it('SaveRequested saves in place when the editor is attached', () => {
-    const [model, commands, out] = update(loaded({ id: id(), source: source() }), SaveRequested())
+    const [model, commands, out] = update(
+      loaded({ id: id(), source: source() }),
+      EditorMessage.SaveRequested(),
+    )
     expect(model.saveStatus).toEqual({ _tag: 'saving' })
     expect(saveEditOf(commands)?.args?.id).toBe(id())
     expect(Option.isNone(out)).toBe(true)
   })
 
   it('SaveRequested creates a new Edit when the image was picked fresh in-editor', () => {
-    const [, commands] = update(loaded({ id: null, source: source() }), SaveRequested())
+    const [, commands] = update(
+      loaded({ id: null, source: source() }),
+      EditorMessage.SaveRequested(),
+    )
     const save = saveEditOf(commands)
     // The picked file's bytes are the new Edit's source — unchanged.
     expect(save?.args?.id).toBeNull()
@@ -84,12 +81,18 @@ describe('editor: save flow (Save / Save as)', () => {
   })
 
   it('SaveAsRequested always forks a new Edit, even when attached', () => {
-    const [, commands] = update(loaded({ id: id(), source: source() }), SaveAsRequested())
+    const [, commands] = update(
+      loaded({ id: id(), source: source() }),
+      EditorMessage.SaveAsRequested(),
+    )
     expect(saveEditOf(commands)?.args?.id).toBeNull()
   })
 
   it('Save as on a fresh pick forks like Save', () => {
-    const [, commands] = update(loaded({ id: null, source: source() }), SaveAsRequested())
+    const [, commands] = update(
+      loaded({ id: null, source: source() }),
+      EditorMessage.SaveAsRequested(),
+    )
     expect(saveEditOf(commands)?.args?.id).toBeNull()
   })
 
@@ -98,7 +101,7 @@ describe('editor: save flow (Save / Save as)', () => {
       ...loaded({ id: id(), source: source() }),
       saveStatus: { _tag: 'saving' } as const,
     }
-    const [model, commands] = update(busy, SaveRequested())
+    const [model, commands] = update(busy, EditorMessage.SaveRequested())
     expect(model).toEqual(busy)
     expect(commands).toEqual([])
   })
@@ -106,18 +109,18 @@ describe('editor: save flow (Save / Save as)', () => {
   it('EditSaved attaches the model to a fresh-pick save and surfaces EditCreated', () => {
     const [model, commands, out] = update(
       loaded({ id: null, source: source() }),
-      EditSaved({ id: id(), savedAt: 1234 }),
+      EditorMessage.EditSaved({ id: id(), savedAt: 1234 }),
     )
     expect(model.attachedEdit).toEqual({ id: id(), source: source() })
     expect(model.saveStatus).toEqual({ _tag: 'saved', at: 1234 })
     expect(commands).toEqual([])
-    expect(out).toEqual(Option.some(EditCreated({ id: id() })))
+    expect(out).toEqual(Option.some(EditorOutMessage.EditCreated({ id: id() })))
   })
 
   it('an in-place save keeps the attachment and emits no EditCreated', () => {
     const [model, , out] = update(
       loaded({ id: id(), source: source() }),
-      EditSaved({ id: id(), savedAt: 1234 }),
+      EditorMessage.EditSaved({ id: id(), savedAt: 1234 }),
     )
     expect(model.attachedEdit).toEqual({ id: id(), source: source() })
     expect(out).toEqual(Option.none())
@@ -126,16 +129,16 @@ describe('editor: save flow (Save / Save as)', () => {
   it('a Save as result re-points the attachment and surfaces EditCreated', () => {
     const [model, , out] = update(
       loaded({ id: id(), source: source() }),
-      EditSaved({ id: otherId(), savedAt: 5 }),
+      EditorMessage.EditSaved({ id: otherId(), savedAt: 5 }),
     )
     expect(model.attachedEdit).toEqual({ id: otherId(), source: source() })
-    expect(out).toEqual(Option.some(EditCreated({ id: otherId() })))
+    expect(out).toEqual(Option.some(EditorOutMessage.EditCreated({ id: otherId() })))
   })
 
   it('SaveFailed records the reason for the top bar', () => {
     const [model, commands, out] = update(
       loaded({ id: id(), source: source() }),
-      SaveFailed({ error: new StoreError({ message: 'quota exceeded' }) }),
+      EditorMessage.SaveFailed({ error: new StoreError({ message: 'quota exceeded' }) }),
     )
     expect(model.saveStatus).toEqual({
       _tag: 'failed',
@@ -148,7 +151,7 @@ describe('editor: save flow (Save / Save as)', () => {
   it('ImageDecoded records the picked bytes as an unattached source record', () => {
     const [model] = update(
       { ...initialModel(), phase: Loading() },
-      ImageDecoded({ bitmap: bitmap(), height: 480, source: source(), width: 640 }),
+      EditorMessage.ImageDecoded({ bitmap: bitmap(), height: 480, source: source(), width: 640 }),
     )
     expect(model.attachedEdit).toEqual({ id: null, source: source() })
     expect(model.saveStatus).toEqual({ _tag: 'idle' })
@@ -157,7 +160,7 @@ describe('editor: save flow (Save / Save as)', () => {
   it('EditLoaded records the stored id + source bytes as the attachment', () => {
     const [model] = update(
       initialModel(),
-      EditLoaded({
+      EditorMessage.EditLoaded({
         bitmap: bitmap(),
         chain: [],
         height: 480,
@@ -171,7 +174,7 @@ describe('editor: save flow (Save / Save as)', () => {
   })
 
   it('ClearedImage drops the attachment and resets the save status', () => {
-    const [model] = update(loaded({ id: id(), source: source() }), ClearedImage())
+    const [model] = update(loaded({ id: id(), source: source() }), EditorMessage.ClearedImage())
     expect(model.attachedEdit).toBeNull()
     expect(model.saveStatus).toEqual({ _tag: 'idle' })
   })
@@ -205,7 +208,7 @@ describe('editor: top bar save controls', () => {
       // The button flips to Saving… while the command is in flight.
       sceneExpect(text('Saving…')).toExist(),
       SceneCommand.expectHas(SaveEdit),
-      SceneCommand.resolve(SaveEdit, EditSaved({ id: id(), savedAt: 1234 })),
+      SceneCommand.resolve(SaveEdit, EditorMessage.EditSaved({ id: id(), savedAt: 1234 })),
       // The top bar shows the last save's time; an in-place save emits no
       // OutMessage (the URL already addresses the Edit).
       sceneExpect(text('Saved', { exact: false })).toExist(),
@@ -243,9 +246,9 @@ describe('editor: top bar save controls', () => {
       ...settleCanvasMounts,
       click(role('button', { name: 'Save as a new edit' })),
       SceneCommand.expectHas(SaveEdit),
-      SceneCommand.resolve(SaveEdit, EditSaved({ id: otherId(), savedAt: 1234 })),
+      SceneCommand.resolve(SaveEdit, EditorMessage.EditSaved({ id: otherId(), savedAt: 1234 })),
       sceneExpect(text('Saved', { exact: false })).toExist(),
-      expectOutMessage(EditCreated({ id: otherId() })),
+      expectOutMessage(EditorOutMessage.EditCreated({ id: otherId() })),
       SceneCommand.expectNone(),
     )
   })

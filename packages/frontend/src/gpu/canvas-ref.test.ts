@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Scope } from 'effect'
 import { Effect, Fiber, Option, Ref, Stream } from 'effect'
-import { CanvasRegistered } from '../editor/message'
+import { EditorMessage } from '../editor/message'
 import { RegisterCanvas } from '../editor/canvas-stage'
 import { canvasRef } from './canvas-ref'
 
@@ -60,7 +60,7 @@ describe('RegisterCanvas mount', () => {
       ),
     )
 
-    expect(messages).toEqual([CanvasRegistered()])
+    expect(messages).toEqual([EditorMessage.CanvasRegistered()])
   })
 
   it('clears the ref when the canvas unmounts', async () => {

@@ -10,8 +10,7 @@ import * as ExportDialog from '../export-dialog'
 import type { AppRoute } from '../route'
 import { initialModel } from './model'
 import type { Model } from './model'
-import type { EditorMessage } from './message'
-import { GotExportDialogMessage } from './message'
+import { EditorMessage } from './message'
 import { LoadCatalog, LoadEdit, LoadLutRecents } from './command'
 
 type Resource =
@@ -35,7 +34,7 @@ export type InitReturn = [Model, readonly Command.Command<EditorMessage, never, 
 export const init = (route: AppRoute): InitReturn => {
   const settings = [
     Command.mapMessage(ExportDialog.LoadExportSettings(), (message) =>
-      GotExportDialogMessage({ message }),
+      EditorMessage.GotExportDialogMessage({ message }),
     ),
   ]
   const boot = [LoadCatalog(), ...settings, LoadLutRecents()]

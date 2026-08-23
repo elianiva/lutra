@@ -1,7 +1,7 @@
 import { Duration, Effect, Option, Schema as S } from 'effect'
 import { Command } from 'foldkit'
 import { OfflineFill } from '../offline/fill'
-import { OfflineReadyDismissed, StoragePersisted } from '../offline/messages'
+import { OfflineMessage } from '../offline/messages'
 
 // The root's offline commands (docs/adr/0015): the fill's start (with the
 // persist() request the offline library depends on — a granted origin is
@@ -32,14 +32,16 @@ export const StartOfflineFill = Command.define('StartOfflineFill', {
       if (!requirePersist || persisted) {
         yield* fill.start()
       }
-      return StoragePersisted({ persisted })
+      return OfflineMessage.StoragePersisted({ persisted })
     }),
-  messages: [StoragePersisted],
+  messages: [OfflineMessage.StoragePersisted],
 })
 
 /** Auto-dismiss the "Offline ready" toast: dispatch OfflineReadyDismissed
  *  after the toast's lifetime (a click dismisses it earlier). */
 export const DismissOfflineToast = Command.define('DismissOfflineToast', {
-  execute: Effect.sleep(Duration.seconds(8)).pipe(Effect.as(OfflineReadyDismissed())),
-  messages: [OfflineReadyDismissed],
+  execute: Effect.sleep(Duration.seconds(8)).pipe(
+    Effect.as(OfflineMessage.OfflineReadyDismissed()),
+  ),
+  messages: [OfflineMessage.OfflineReadyDismissed],
 })

@@ -25,33 +25,7 @@ import {
   LayerCreationError,
   ThumbnailEncodeError,
 } from '../errors'
-import {
-  FilePickCancelled,
-  ImageDecoded,
-  ImageFailedToDecode,
-  EditLoaded,
-  EditLoadFailed,
-  RenderedFrame,
-  RenderFailed,
-  HistogramComputed,
-  HistogramFailed,
-  ExportSnapshotted,
-  ExportSnapshotFailed,
-  LutRecentsLoaded,
-  LutRecentsSaved,
-  LutThumbGenerated,
-  LutThumbFailed,
-  LutThumbsRevoked,
-  SaveFailed,
-  EditSaved,
-  CatalogLoaded,
-  CatalogFailed,
-  FramePresented,
-  PresentState,
-  SelectedImageFile,
-  LayerCreated,
-  LayerCreationFailed,
-} from './message'
+import { EditorMessage, PresentState } from './message'
 import { ENGINE_REGISTRY } from '../editor/layer-meta'
 
 // The frontend consumes the engine's registry directly — no duplicate layer
@@ -69,12 +43,12 @@ export const CreateLayer = Command.define('CreateLayer', {
   execute: ({ type }) =>
     Effect.gen(function* () {
       const layer = yield* createLayerFor(type)
-      return LayerCreated({ layer })
+      return EditorMessage.LayerCreated({ layer })
     }).pipe(
       Effect.catchTags({
         SchemaError: (cause) =>
           Effect.succeed(
-            LayerCreationFailed({
+            EditorMessage.LayerCreationFailed({
               error: new LayerCreationError({
                 cause,
                 message: `Failed to create ${type} layer: ${String(cause)}`,
@@ -83,7 +57,7 @@ export const CreateLayer = Command.define('CreateLayer', {
           ),
         UnknownLayerTypeError: (cause) =>
           Effect.succeed(
-            LayerCreationFailed({
+            EditorMessage.LayerCreationFailed({
               error: new LayerCreationError({
                 cause,
                 message: `Failed to create ${type} layer: ${String(cause)}`,
@@ -92,7 +66,7 @@ export const CreateLayer = Command.define('CreateLayer', {
           ),
       }),
     ),
-  messages: [LayerCreated, LayerCreationFailed],
+  messages: [EditorMessage.LayerCreated, EditorMessage.LayerCreationFailed],
 })
 
 /**
@@ -104,12 +78,12 @@ export const PickImageFile = Command.define('PickImageFile', {
   execute: FoldkitFile.select(['image/*', '.jpg', '.jpeg', '.png', '.webp', '.avif']).pipe(
     Effect.map(
       Option.match({
-        onNone: () => FilePickCancelled(),
-        onSome: (file) => SelectedImageFile({ file }),
+        onNone: () => EditorMessage.FilePickCancelled(),
+        onSome: (file) => EditorMessage.SelectedImageFile({ file }),
       }),
     ),
   ),
-  messages: [SelectedImageFile, FilePickCancelled],
+  messages: [EditorMessage.SelectedImageFile, EditorMessage.FilePickCancelled],
 })
 
 /**
@@ -140,7 +114,7 @@ export const DecodeImage = Command.define('DecodeImage', {
           }),
         try: async () => await createImageBitmap(file),
       })
-      return ImageDecoded({
+      return EditorMessage.ImageDecoded({
         bitmap,
         height: bitmap.height,
         source: new Uint8Array(source),
@@ -148,10 +122,10 @@ export const DecodeImage = Command.define('DecodeImage', {
       })
     }).pipe(
       Effect.catchTag('ImageDecodeError', (err: ImageDecodeError) =>
-        Effect.succeed(ImageFailedToDecode({ error: err })),
+        Effect.succeed(EditorMessage.ImageFailedToDecode({ error: err })),
       ),
     ),
-  messages: [ImageDecoded, ImageFailedToDecode],
+  messages: [EditorMessage.ImageDecoded, EditorMessage.ImageFailedToDecode],
 })
 
 /**
@@ -168,7 +142,9 @@ export const LoadEdit = Command.define('LoadEdit', {
       const store = yield* EditStore
       const maybeEdit = yield* store.load(id)
       if (Option.isNone(maybeEdit)) {
-        return EditLoadFailed({ error: new EditNotFoundError({ message: 'edit not found' }) })
+        return EditorMessage.EditLoadFailed({
+          error: new EditNotFoundError({ message: 'edit not found' }),
+        })
       }
       const edit = maybeEdit.value
       const bitmap = yield* Effect.tryPromise({
@@ -181,7 +157,7 @@ export const LoadEdit = Command.define('LoadEdit', {
             message: `Failed to decode saved image: ${String(cause)}`,
           }),
       })
-      return EditLoaded({
+      return EditorMessage.EditLoaded({
         id: edit.id,
         chain: edit.chain,
         bitmap,
@@ -192,13 +168,13 @@ export const LoadEdit = Command.define('LoadEdit', {
       })
     }).pipe(
       Effect.catchTag('StoreError', (err: StoreError) =>
-        Effect.succeed(EditLoadFailed({ error: err })),
+        Effect.succeed(EditorMessage.EditLoadFailed({ error: err })),
       ),
       Effect.catchTag('ImageDecodeError', (err: ImageDecodeError) =>
-        Effect.succeed(EditLoadFailed({ error: err })),
+        Effect.succeed(EditorMessage.EditLoadFailed({ error: err })),
       ),
     ),
-  messages: [EditLoaded, EditLoadFailed],
+  messages: [EditorMessage.EditLoaded, EditorMessage.EditLoadFailed],
 })
 
 // ---- save ----
@@ -271,17 +247,19 @@ export const SaveEdit = Command.define('SaveEdit', {
       const editId = id ?? newEditId()
       const savedAt = DateTime.nowUnsafe().epochMilliseconds
       yield* store.save(Edit.make({ chain, id: editId, savedAt, source, thumbnail }))
-      return EditSaved({ id: editId, savedAt })
+      return EditorMessage.EditSaved({ id: editId, savedAt })
     }).pipe(
-      Effect.catchTag('GpuError', (err: GpuError) => Effect.succeed(SaveFailed({ error: err }))),
+      Effect.catchTag('GpuError', (err: GpuError) =>
+        Effect.succeed(EditorMessage.SaveFailed({ error: err })),
+      ),
       Effect.catchTag('StoreError', (err: StoreError) =>
-        Effect.succeed(SaveFailed({ error: err })),
+        Effect.succeed(EditorMessage.SaveFailed({ error: err })),
       ),
       Effect.catchTag('ThumbnailEncodeError', (err: ThumbnailEncodeError) =>
-        Effect.succeed(SaveFailed({ error: err })),
+        Effect.succeed(EditorMessage.SaveFailed({ error: err })),
       ),
     ),
-  messages: [EditSaved, SaveFailed],
+  messages: [EditorMessage.EditSaved, EditorMessage.SaveFailed],
 })
 
 /**
@@ -293,13 +271,13 @@ export const LoadCatalog = Command.define('LoadCatalog', {
   execute: Effect.gen(function* () {
     const store = yield* LutStore
     const catalog = yield* store.getCatalog()
-    return CatalogLoaded({ catalog })
+    return EditorMessage.CatalogLoaded({ catalog })
   }).pipe(
     Effect.catchTag('LutLoadError', (err: LutLoadError) =>
-      Effect.succeed(CatalogFailed({ error: err })),
+      Effect.succeed(EditorMessage.CatalogFailed({ error: err })),
     ),
   ),
-  messages: [CatalogLoaded, CatalogFailed],
+  messages: [EditorMessage.CatalogLoaded, EditorMessage.CatalogFailed],
 })
 
 /**
@@ -339,7 +317,9 @@ export const RenderChain = Command.define('RenderChain', {
       const canvasRef = yield* CanvasRef
       const canvas = yield* Ref.get(canvasRef)
       if (Option.isNone(canvas)) {
-        return RenderFailed({ error: new CanvasUnavailableError({ message: 'Canvas not ready' }) })
+        return EditorMessage.RenderFailed({
+          error: new CanvasUnavailableError({ message: 'Canvas not ready' }),
+        })
       }
 
       const chain: Layer[] = [...layers]
@@ -351,17 +331,17 @@ export const RenderChain = Command.define('RenderChain', {
       const request = yield* createRenderRequest(chain, ENGINE_REGISTRY, bitmap, stamp, luts)
       const backend = yield* GpuBackend
       const handle = yield* backend.execute(request, canvas.value, present)
-      return RenderedFrame({ handle, stamp })
+      return EditorMessage.RenderedFrame({ handle, stamp })
     }).pipe(
       // Every failure of this command surfaces as RenderFailed; the message
       // schema names the failure set.
       Effect.catchTags({
-        GpuError: (err) => Effect.succeed(RenderFailed({ error: err })),
-        LutLoadError: (err) => Effect.succeed(RenderFailed({ error: err })),
-        LutParseError: (err) => Effect.succeed(RenderFailed({ error: err })),
+        GpuError: (err) => Effect.succeed(EditorMessage.RenderFailed({ error: err })),
+        LutLoadError: (err) => Effect.succeed(EditorMessage.RenderFailed({ error: err })),
+        LutParseError: (err) => Effect.succeed(EditorMessage.RenderFailed({ error: err })),
       }),
     ),
-  messages: [RenderedFrame, RenderFailed],
+  messages: [EditorMessage.RenderedFrame, EditorMessage.RenderFailed],
 })
 
 /**
@@ -381,19 +361,19 @@ export const PresentFrame = Command.define('PresentFrame', {
       const canvasRef = yield* CanvasRef
       const canvas = yield* Ref.get(canvasRef)
       if (Option.isNone(canvas)) {
-        return FramePresented()
+        return EditorMessage.FramePresented()
       }
       const backend = yield* GpuBackend
       yield* backend.present(canvas.value, present)
-      return FramePresented()
+      return EditorMessage.FramePresented()
     }).pipe(
       // A present failure (a defect surfaced as GpuError) is best-effort by
       // nature: the next render or present re-blits anyway, so there is
       // nothing to surface and nothing that wedges — unlike a failed
       // RenderChain, which must clear renderPending.
-      Effect.catchTag('GpuError', () => Effect.succeed(FramePresented())),
+      Effect.catchTag('GpuError', () => Effect.succeed(EditorMessage.FramePresented())),
     ),
-  messages: [FramePresented],
+  messages: [EditorMessage.FramePresented],
 })
 
 /**
@@ -410,13 +390,13 @@ export const ReadHistogram = Command.define('ReadHistogram', {
     Effect.gen(function* () {
       const backend = yield* GpuBackend
       const bins = yield* backend.readHistogram(handle)
-      return HistogramComputed({ bins, stamp })
+      return EditorMessage.HistogramComputed({ bins, stamp })
     }).pipe(
       Effect.catchTag('GpuError', (err: GpuError) =>
-        Effect.succeed(HistogramFailed({ error: err })),
+        Effect.succeed(EditorMessage.HistogramFailed({ error: err })),
       ),
     ),
-  messages: [HistogramComputed, HistogramFailed],
+  messages: [EditorMessage.HistogramComputed, EditorMessage.HistogramFailed],
 })
 
 // ---- export dialog ----
@@ -437,13 +417,13 @@ export const SnapshotForExport = Command.define('SnapshotForExport', {
       const backend = yield* GpuBackend
       const image = yield* backend.snapshot(handle)
       setFrame(image)
-      return ExportSnapshotted()
+      return EditorMessage.ExportSnapshotted()
     }).pipe(
       Effect.catchTag('GpuError', (err: GpuError) =>
-        Effect.succeed(ExportSnapshotFailed({ error: err })),
+        Effect.succeed(EditorMessage.ExportSnapshotFailed({ error: err })),
       ),
     ),
-  messages: [ExportSnapshotted, ExportSnapshotFailed],
+  messages: [EditorMessage.ExportSnapshotted, EditorMessage.ExportSnapshotFailed],
 })
 
 // ---- LUT recents (the bar's Recents tab, docs/adr/0012) ----
@@ -458,9 +438,9 @@ export const LoadLutRecents = Command.define('LoadLutRecents', {
     const schemaStore = Persistence.toSchemaStore(store, Schema.Array(LutIdSchema))
     // `Effect.option` wraps the success (itself an Option) — flatten.
     const saved = Option.flatten(yield* schemaStore.get(LUT_RECENTS_KEY).pipe(Effect.option))
-    return LutRecentsLoaded({ recents: Option.getOrElse(() => [])(saved) })
+    return EditorMessage.LutRecentsLoaded({ recents: Option.getOrElse(() => [])(saved) })
   }),
-  messages: [LutRecentsLoaded],
+  messages: [EditorMessage.LutRecentsLoaded],
 })
 
 /** Persist LUT recents (fired on every bump; localStorage is cheap). */
@@ -472,9 +452,9 @@ export const SaveLutRecents = Command.define('SaveLutRecents', {
       yield* Persistence.toSchemaStore(store, Schema.Array(LutIdSchema))
         .set(LUT_RECENTS_KEY, recents)
         .pipe(Effect.ignore)
-      return LutRecentsSaved()
+      return EditorMessage.LutRecentsSaved()
     }),
-  messages: [LutRecentsSaved],
+  messages: [EditorMessage.LutRecentsSaved],
 })
 
 // ---- per-photo LUT thumbnails (filmstrip previews, docs/adr/0013) ----
@@ -501,18 +481,18 @@ export const GenerateLutThumb = Command.define('GenerateLutThumb', {
       const thumbs = yield* LutThumbnailer
       const cube = yield* store.getCube(lutId).pipe(Effect.option)
       if (Option.isNone(cube)) {
-        return LutThumbFailed({ lutId })
+        return EditorMessage.LutThumbFailed({ lutId })
       }
       const bytes = yield* thumbs.render(lutId, bitmap, cube.value)
       if (Option.isNone(bytes)) {
-        return LutThumbFailed({ lutId })
+        return EditorMessage.LutThumbFailed({ lutId })
       }
       // SAFETY: the thumb encoder returned its JPEG over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
       // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
       const blob = new Blob([bytes.value as BlobPart], { type: 'image/jpeg' })
-      return LutThumbGenerated({ bitmap, lutId, url: URL.createObjectURL(blob) })
+      return EditorMessage.LutThumbGenerated({ bitmap, lutId, url: URL.createObjectURL(blob) })
     }),
-  messages: [LutThumbGenerated, LutThumbFailed],
+  messages: [EditorMessage.LutThumbGenerated, EditorMessage.LutThumbFailed],
 })
 
 /** Revoke per-photo preview blob URLs (fired when a new image loads — the
@@ -524,7 +504,7 @@ export const RevokeLutThumbs = Command.define('RevokeLutThumbs', {
       for (const url of urls) {
         URL.revokeObjectURL(url)
       }
-      return LutThumbsRevoked()
+      return EditorMessage.LutThumbsRevoked()
     }),
-  messages: [LutThumbsRevoked],
+  messages: [EditorMessage.LutThumbsRevoked],
 })

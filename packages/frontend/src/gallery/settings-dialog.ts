@@ -1,8 +1,7 @@
 import type { HtmlBuilder } from 'foldkit/html'
 import { Dialog, Switch } from '@foldkit/ui'
 import type { Model } from './model'
-import type { GalleryMessage } from './message'
-import { GotSettingsDialogMessage, ToggledInfiniteCanvas } from './message'
+import { GalleryMessage } from './message'
 
 /**
  * The gallery's settings dialog. One section for now — "Experimental" —
@@ -18,7 +17,7 @@ export const settingsDialogView = (h: HtmlBuilder<GalleryMessage>, model: Model)
   h.submodel({
     model: model.settingsDialog,
     slotId: model.settingsDialog.id,
-    toParentMessage: (message) => GotSettingsDialogMessage({ message }),
+    toParentMessage: (message) => GalleryMessage.GotSettingsDialogMessage({ message }),
     view: Dialog.view,
     viewInputs: {
       toView: ({ dialog, backdrop, panel, title, closeButton, isVisible }) =>
@@ -95,7 +94,7 @@ const infiniteCanvasRow = (h: HtmlBuilder<GalleryMessage>, model: Model) => {
     {
       id: 'setting-infinite-canvas',
       isChecked: enabled,
-      onToggle: (isEnabled) => ToggledInfiniteCanvas({ isEnabled }),
+      onToggle: (isEnabled) => GalleryMessage.ToggledInfiniteCanvas({ isEnabled }),
       toView: ({ button, label, description }) =>
         h.div(
           [h.Class('flex items-center justify-between gap-6')],

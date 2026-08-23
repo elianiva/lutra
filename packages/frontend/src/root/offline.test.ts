@@ -6,20 +6,7 @@ import { webGpuSupported } from '../gpu/capability'
 import { update } from './update'
 import type { Model } from './model'
 import { Filling, Paused, Ready, QuotaError, Idle } from '../offline/machine'
-import {
-  OfflineFillStarted,
-  OfflineFileStarted,
-  OfflineFileCompleted,
-  OfflineFileFailed,
-  OfflineFillPaused,
-  OfflineFillResumed,
-  OfflineFillComplete,
-  OfflineQuotaError,
-  ConnectivityChanged,
-  OfflineFillRequested,
-  StoragePersisted,
-  OfflineReadyDismissed,
-} from '../offline/messages'
+import { OfflineMessage } from '../offline/messages'
 import { LutId } from '@lutra/engine'
 
 // The root's offline slice (docs/adr/0015): the machine steps here, the
@@ -32,7 +19,8 @@ const galleryUrl = () => Option.getOrThrow(Url.fromString('https://lutra.test/')
 
 const galleryModel = (): Model => init(webGpuSupported, galleryUrl())[0]
 
-const fillStarted = () => update(galleryModel(), OfflineFillStarted({ done: 7, total: 593 }))
+const fillStarted = () =>
+  update(galleryModel(), OfflineMessage.OfflineFillStarted({ done: 7, total: 593 }))
 
 describe('root: offline library', () => {
   afterEach(() => {
@@ -69,34 +57,34 @@ describe('root: offline library', () => {
 
   it('a started cube file marks its LUT row fetching in the editor', () => {
     const [model] = fillStarted()
-    const [next] = update(model, OfflineFileStarted({ lutId: lutA }))
+    const [next] = update(model, OfflineMessage.OfflineFileStarted({ lutId: lutA }))
     expect(next.editor.lutDownloads[lutA]).toBe('fetching')
   })
 
   it('a completed file bumps the counter and marks the row downloaded', () => {
     const [model] = fillStarted()
-    const [next] = update(model, OfflineFileCompleted({ lutId: lutA }))
+    const [next] = update(model, OfflineMessage.OfflineFileCompleted({ lutId: lutA }))
     expect(next.offline.downloaded).toBe(8)
     expect(next.editor.lutDownloads[lutA]).toBe('downloaded')
   })
 
   it('catalog/thumbnail files (null lutId) count but never touch the editor', () => {
     const [model] = fillStarted()
-    const [next] = update(model, OfflineFileCompleted({ lutId: null }))
+    const [next] = update(model, OfflineMessage.OfflineFileCompleted({ lutId: null }))
     expect(next.offline.downloaded).toBe(8)
     expect(next.editor.lutDownloads).toEqual({})
   })
 
   it('a failed file changes nothing — absence means not downloaded', () => {
     const [model] = fillStarted()
-    const [next] = update(model, OfflineFileFailed({ lutId: lutA }))
+    const [next] = update(model, OfflineMessage.OfflineFileFailed({ lutId: lutA }))
     expect(next.offline.downloaded).toBe(7)
     expect(next.editor.lutDownloads).toEqual({})
   })
 
   it('completing the run reaches Ready, shows the toast, and starts its timer', () => {
     const [model] = fillStarted()
-    const [next, commands] = update(model, OfflineFillComplete())
+    const [next, commands] = update(model, OfflineMessage.OfflineFillComplete())
     expect(next.offline.phase).toEqual(Ready())
     expect(next.offline.readyToast).toBe(true)
     expect(commands.map((c) => c.name)).toContain('DismissOfflineToast')
@@ -104,14 +92,14 @@ describe('root: offline library', () => {
 
   it('the toast dismisses on demand', () => {
     const [model] = fillStarted()
-    const [ready] = update(model, OfflineFillComplete())
-    const [next] = update(ready, OfflineReadyDismissed())
+    const [ready] = update(model, OfflineMessage.OfflineFillComplete())
+    const [next] = update(ready, OfflineMessage.OfflineReadyDismissed())
     expect(next.offline.readyToast).toBe(false)
   })
 
   it('an offline flip pauses a Filling run and dims the editor', () => {
     const [model] = fillStarted()
-    const [next] = update(model, ConnectivityChanged({ online: false }))
+    const [next] = update(model, OfflineMessage.ConnectivityChanged({ online: false }))
     expect(next.offline.phase).toEqual(Paused())
     expect(next.offline.online).toBe(false)
     expect(next.editor.online).toBe(false)
@@ -119,21 +107,21 @@ describe('root: offline library', () => {
 
   it('the loop pausing/resuming drives the machine itself', () => {
     const [model] = fillStarted()
-    const [paused] = update(model, OfflineFillPaused())
+    const [paused] = update(model, OfflineMessage.OfflineFillPaused())
     expect(paused.offline.phase).toEqual(Paused())
-    const [resumed] = update(paused, OfflineFillResumed())
+    const [resumed] = update(paused, OfflineMessage.OfflineFillResumed())
     expect(resumed.offline.phase).toEqual(Filling())
   })
 
   it('quota stops the run and fires the persist-retry command', () => {
     const [model] = fillStarted()
-    const [next, commands] = update(model, OfflineQuotaError({ message: 'full' }))
+    const [next, commands] = update(model, OfflineMessage.OfflineQuotaError({ message: 'full' }))
     expect(next.offline.phase).toEqual(QuotaError())
     expect(commands.map((c) => c.name)).toContain('StartOfflineFill')
   })
 
   it('the manual start button dispatches the same start command', () => {
-    const [model, commands] = update(galleryModel(), OfflineFillRequested())
+    const [model, commands] = update(galleryModel(), OfflineMessage.OfflineFillRequested())
     // The machine never races the loop: the request itself does not
     // transition — the run's own Started event does.
     expect(model.offline.phase).toEqual(Idle())
@@ -141,7 +129,7 @@ describe('root: offline library', () => {
   })
 
   it('the persist result is recorded', () => {
-    const [model] = update(galleryModel(), StoragePersisted({ persisted: true }))
+    const [model] = update(galleryModel(), OfflineMessage.StoragePersisted({ persisted: true }))
     expect(model.offline.persisted).toBe(true)
   })
 
@@ -149,7 +137,7 @@ describe('root: offline library', () => {
     const [model] = fillStarted()
     // A random root message (ConnectivityChanged with online) has no edge
     // from Filling other than the offline direction — this one is ignored.
-    const [next] = update(model, ConnectivityChanged({ online: true }))
+    const [next] = update(model, OfflineMessage.ConnectivityChanged({ online: true }))
     expect(next.offline.phase).toEqual(Filling())
   })
 })

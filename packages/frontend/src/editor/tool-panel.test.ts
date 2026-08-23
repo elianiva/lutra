@@ -22,14 +22,7 @@ import { update } from './update'
 import { view } from './view'
 import { Idle } from './phase'
 import { selectTool, createTestLayer } from './test-layer'
-import {
-  LayerCreated,
-  ConfirmedDraft,
-  RenderedFrame,
-  HistogramComputed,
-  ScaledCanvas,
-  CanvasRegistered,
-} from './message'
+import { EditorMessage } from './message'
 import { PanZoom, RegisterCanvas } from './canvas-stage'
 import { CreateLayer, RenderChain, ReadHistogram } from './command'
 import { LutLoadError } from '../luts/store'
@@ -63,14 +56,14 @@ const loaded = () => ({
 /** Settle the in-flight render the way RenderedFrame does, so the next
  *  renderNow dispatches a fresh RenderChain (assertable in tests). */
 const settled = (model: Model): Model =>
-  update(model, RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
+  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
 
 /** An edit with two committed Exposure layers (the ×2 badge fixture). */
 const twoExposureLayers = () => {
   const [a] = selectTool(loaded(), 'exposure')
-  const [b] = update(a, ConfirmedDraft())
+  const [b] = update(a, EditorMessage.ConfirmedDraft())
   const [c] = selectTool(b, 'exposure')
-  const [d] = update(c, ConfirmedDraft())
+  const [d] = update(c, EditorMessage.ConfirmedDraft())
   return d
 }
 
@@ -82,13 +75,16 @@ const lutDraft = () => settled(selectTool(loaded(), 'lut')[0])
 const sceneConfig = { update, view } as const
 
 const stageMounts = [
-  Mount.resolve(PanZoom, ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
-  Mount.resolve(RegisterCanvas, CanvasRegistered()),
+  Mount.resolve(PanZoom, EditorMessage.ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
+  Mount.resolve(RegisterCanvas, EditorMessage.CanvasRegistered()),
 ]
 
 const resolveRender = () => [
-  Command.resolve(RenderChain, RenderedFrame({ handle: stubHandle(), stamp: 999 })),
-  Command.resolve(ReadHistogram, HistogramComputed({ bins: new Uint32Array(256), stamp: 999 })),
+  Command.resolve(RenderChain, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: 999 })),
+  Command.resolve(
+    ReadHistogram,
+    EditorMessage.HistogramComputed({ bins: new Uint32Array(256), stamp: 999 }),
+  ),
 ]
 
 describe('tool panel cards', () => {
@@ -184,7 +180,7 @@ describe('tool panel cards', () => {
 
   it('a single committed layer shows ×1', () => {
     const [withDraft] = selectTool(loaded(), 'vignette')
-    const [committed] = update(withDraft, ConfirmedDraft())
+    const [committed] = update(withDraft, EditorMessage.ConfirmedDraft())
     scene(
       sceneConfig,
       given(committed),
@@ -235,7 +231,10 @@ describe('tool panel cards', () => {
       given(loaded()),
       ...stageMounts,
       click(role('button', { name: 'Add Exposure adjustment' })),
-      Command.resolve(CreateLayer, LayerCreated({ layer: createTestLayer('exposure') })),
+      Command.resolve(
+        CreateLayer,
+        EditorMessage.LayerCreated({ layer: createTestLayer('exposure') }),
+      ),
       ...resolveRender(),
       sceneExpect(label('Exposure draft')).toExist(),
       Command.expectNone(),

@@ -1,12 +1,11 @@
 import { Effect, Queue, Stream } from 'effect'
 import { Subscription } from 'foldkit'
 import { OfflineFill } from '../offline/fill'
-import { ConnectivityChanged, fillEventToMessage } from '../offline/messages'
-import { GotCollageMessage } from './message'
+import { OfflineMessage, fillEventToMessage } from '../offline/messages'
+import { AppMessage, RootMessage } from './message'
 import { subscriptions as collageSubscriptions } from '../collage/subscriptions'
 import type { CollageMessage } from '../collage/message'
-import type { Model } from './model'
-import type { RootMessage } from './message' /**
+import type { Model } from './model' /**
  * The root's subscriptions (docs/adr/0015): the two bridges that feed the
  * offline slice from the outside world.
  *
@@ -20,13 +19,13 @@ import type { RootMessage } from './message' /**
  *   while it is offline, so this stream is UI-state-only — the machine's
  *   Paused transition and the LUT bar's dimming.
  */
-export const subscriptions = Subscription.aggregate<Model, RootMessage, OfflineFill>()(
-  Subscription.make<Model, RootMessage, OfflineFill>()((_entry) => ({
+export const subscriptions = Subscription.aggregate<Model, AppMessage, OfflineFill>()(
+  Subscription.make<Model, AppMessage, OfflineFill>()((_entry) => ({
     connectivity: Subscription.persistent(
-      Stream.callback<RootMessage>((queue) =>
+      Stream.callback<AppMessage>((queue) =>
         Effect.gen(function* () {
           const emit = (online: boolean) =>
-            Queue.offerUnsafe(queue, ConnectivityChanged({ online }))
+            Queue.offerUnsafe(queue, OfflineMessage.ConnectivityChanged({ online }))
           // The initial state, then the browser's events.
           emit(globalThis.navigator === undefined ? true : navigator.onLine)
           yield* Effect.acquireRelease(
@@ -50,7 +49,7 @@ export const subscriptions = Subscription.aggregate<Model, RootMessage, OfflineF
     offlineFill: Subscription.persistent(
       Stream.flatMap(Stream.service(OfflineFill), (service) =>
         Stream.fromPubSub(service.events),
-      ).pipe(Stream.map((event): RootMessage => fillEventToMessage(event))),
+      ).pipe(Stream.map((event): AppMessage => fillEventToMessage(event))),
     ),
   })),
   // The collage screen's gesture listeners (docs/adr/0033): the drag-and-drop
@@ -58,6 +57,7 @@ export const subscriptions = Subscription.aggregate<Model, RootMessage, OfflineF
   // cell-size observers, lifted across the GotCollageMessage boundary.
   Subscription.lift(collageSubscriptions)({
     toChildModel: (model: Model) => model.collage,
-    toParentMessage: (message: CollageMessage): RootMessage => GotCollageMessage({ message }),
+    toParentMessage: (message: CollageMessage): AppMessage =>
+      RootMessage.GotCollageMessage({ message }),
   }),
 )

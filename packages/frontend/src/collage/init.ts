@@ -6,8 +6,7 @@ import * as ExportDialog from '../export-dialog'
 import type { AppRoute } from '../route'
 import { initialModel } from './model'
 import type { Model } from './model'
-import type { CollageMessage } from './message'
-import { GotCollageExportDialogMessage } from './message'
+import { CollageMessage } from './message'
 import { LoadCollage } from './command'
 
 /**
@@ -24,7 +23,7 @@ import { LoadCollage } from './command'
 type Resource = KeyValueStore | CollageStore | EditStore
 
 const toSelf = (message: ExportDialog.Message): CollageMessage =>
-  GotCollageExportDialogMessage({ message })
+  CollageMessage.GotCollageExportDialogMessage({ message })
 
 const settings = [CommandModule.mapMessage(ExportDialog.LoadExportSettings(), toSelf)]
 

@@ -7,8 +7,7 @@ import type { LutStore } from '../luts/store'
 import type { ImageEncoder } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import type { EditStore, CollageStore } from '@lutra/store'
-import type { RootMessage } from './message'
-import { GotGalleryMessage, GotEditorMessage, GotCollageMessage } from './message'
+import { AppMessage, RootMessage } from './message'
 import type { Model } from './model'
 import { GalleryRoute, EditorRoute, CollageRoute, parseRoute } from '../route'
 import * as Gallery from '../gallery'
@@ -31,7 +30,7 @@ type Resource =
   | LutThumbnailer
   | OfflineFill
 
-export type InitReturn = readonly [Model, readonly Command.Command<RootMessage, never, Resource>[]]
+export type InitReturn = readonly [Model, readonly Command.Command<AppMessage, never, Resource>[]]
 
 /**
  * The root's cold-load `init` (docs/adr/0009, routing-and-navigation). Parses
@@ -53,15 +52,15 @@ export const init = (capability: WebGpuCapability, url: Url.Url): InitReturn => 
   const offline = initialOffline()
 
   const commands = Match.value(route).pipe(
-    Match.withReturnType<readonly Command.Command<RootMessage, never, Resource>[]>(),
+    Match.withReturnType<readonly Command.Command<AppMessage, never, Resource>[]>(),
     Match.when(S.is(GalleryRoute), () =>
-      Command.mapMessages(galleryCommands, (message) => GotGalleryMessage({ message })),
+      Command.mapMessages(galleryCommands, (message) => RootMessage.GotGalleryMessage({ message })),
     ),
     Match.when(S.is(EditorRoute), () =>
-      Command.mapMessages(editorCommands, (message) => GotEditorMessage({ message })),
+      Command.mapMessages(editorCommands, (message) => RootMessage.GotEditorMessage({ message })),
     ),
     Match.when(S.is(CollageRoute), () =>
-      Command.mapMessages(collageCommands, (message) => GotCollageMessage({ message })),
+      Command.mapMessages(collageCommands, (message) => RootMessage.GotCollageMessage({ message })),
     ),
     Match.orElse(() => []),
   )

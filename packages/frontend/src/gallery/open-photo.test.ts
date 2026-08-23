@@ -16,15 +16,7 @@ import { initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
 import { OpenPhoto } from './command'
-import {
-  OpenPhotoRequested,
-  PhotoCreated,
-  PhotoPickCancelled,
-  PhotoCreateFailed,
-  PhotosAdded,
-  PhotoCreateError,
-  OpenedEdit,
-} from './message'
+import { GalleryMessage, GalleryOutMessage, PhotoCreateError } from './message'
 import { ImageDecodeError } from '../errors'
 
 const config = {
@@ -47,13 +39,13 @@ describe('gallery: open a photo (new edit)', () => {
       Command.expectHas(OpenPhoto),
       // The native file picker can't run in the harness — resolve the
       // command as a dismissed picker so the scene ends cleanly.
-      Command.resolve(OpenPhoto, PhotoPickCancelled()),
+      Command.resolve(OpenPhoto, GalleryMessage.PhotoPickCancelled()),
       expectNoOutMessage(),
     )
   })
 
   it('a cancelled picker is a no-op: no commands, no OutMessage', () => {
-    const [model, commands, out] = update(initialModel(), PhotoPickCancelled())
+    const [model, commands, out] = update(initialModel(), GalleryMessage.PhotoPickCancelled())
     expect(model).toEqual(initialModel())
     expect(commands).toEqual([])
     expect(Option.isNone(out)).toBe(true)
@@ -64,15 +56,15 @@ describe('gallery: open a photo (new edit)', () => {
       config,
       given(initialModel()),
       click(text('Open photo')),
-      Command.resolve(OpenPhoto, PhotoCreated({ id })),
-      expectOutMessage(OpenedEdit({ id })),
+      Command.resolve(OpenPhoto, GalleryMessage.PhotoCreated({ id })),
+      expectOutMessage(GalleryOutMessage.OpenedEdit({ id })),
     )
   })
 
   it('a failed create sets the notice banner instead of losing the photo silently', () => {
     const [model, commands, out] = update(
       initialModel(),
-      PhotoCreateFailed({ error: new StoreError({ message: 'quota' }) }),
+      GalleryMessage.PhotoCreateFailed({ error: new StoreError({ message: 'quota' }) }),
     )
     expect(model.notice).toBe('Could not open photo: quota')
     expect(commands).toEqual([])
@@ -80,7 +72,7 @@ describe('gallery: open a photo (new edit)', () => {
   })
 
   it('OpenPhotoRequested dispatches the OpenPhoto command', () => {
-    const [, commands] = update(initialModel(), OpenPhotoRequested())
+    const [, commands] = update(initialModel(), GalleryMessage.OpenPhotoRequested())
     expect(commands.map((c) => c.name)).toEqual(['OpenPhoto'])
   })
 })
@@ -104,7 +96,7 @@ const added = (
     summaries?: Option.Option<readonly EditSummaryRecord[]>
   } = {},
 ) =>
-  PhotosAdded({
+  GalleryMessage.PhotosAdded({
     added: 0,
     failed: 0,
     error: Option.none(),

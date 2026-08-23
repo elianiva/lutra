@@ -17,7 +17,7 @@ import { initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
 import { createLayerFor } from './command'
-import { ReorderedLayer } from './message'
+import { EditorMessage } from './message'
 import type { Model } from './model'
 
 import { Effect, Option } from 'effect'
@@ -129,7 +129,7 @@ describe('layer reorder buttons', () => {
 
 // ---- reorder semantics (property-based) ----
 
-// The buttons dispatch ReorderedLayer({ from: chainIndex, to: chainIndex ± 1 })
+// The buttons dispatch EditorMessage.ReorderedLayer({ from: chainIndex, to: chainIndex ± 1 })
 // — "Move up" targets a higher chain index (the drawer renders bottom-up, so
 // that is visually up), "Move down" a lower one. In rendered (top→bottom)
 // order each click is an adjacent swap. This pins the splice semantics
@@ -183,7 +183,7 @@ describe('layer reorder semantics (property-based)', () => {
 
             // The real update path.
             const to = click.dir === 'up' ? chainIndex + 1 : chainIndex - 1
-            ;[model] = update(model, ReorderedLayer({ from: chainIndex, to }))
+            ;[model] = update(model, EditorMessage.ReorderedLayer({ from: chainIndex, to }))
 
             vitestExpect(model.chain.map((l) => l.id).reverse()).toEqual(rendered)
             // The chain is always a permutation of the original layers.

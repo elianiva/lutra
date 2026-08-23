@@ -1,6 +1,6 @@
-import { Effect, Schema as S } from "effect";
-import { EditIdSchema } from "../edit/edit-id";
-import { CollageIdSchema } from "./collage-id";
+import { Effect, Schema as S } from 'effect'
+import { EditIdSchema } from '../edit/edit-id'
+import { CollageIdSchema } from './collage-id'
 
 /**
  * **Tile framing** — the part of a referenced Edit's image one Collage tile
@@ -24,15 +24,15 @@ export const TileFraming = S.Struct({
   focusX: S.Number,
   /** Vertical center of the visible region, as a fraction of image height (0–1). */
   focusY: S.Number,
-});
-export type TileFraming = typeof TileFraming.Type;
+})
+export type TileFraming = typeof TileFraming.Type
 
 /** Cover-fit, centered — the look every pre-framing collage renders with. */
 export const defaultTileFraming = (): TileFraming => ({
   zoom: 1,
   focusX: 0.5,
   focusY: 0.5,
-});
+})
 
 /**
  * One placed **Edit** within a **Collage**: the referenced Edit id plus that
@@ -47,18 +47,13 @@ export const defaultTileFraming = (): TileFraming => ({
 export const CollageTile = S.Struct({
   /** The referenced Edit — by id, never pixels (docs/adr/0030). */
   editId: EditIdSchema,
-  framing: TileFraming.pipe(
-    S.withDecodingDefaultTypeKey(Effect.sync(defaultTileFraming)),
-  ),
-});
-export type CollageTile = typeof CollageTile.Type;
+  framing: TileFraming.pipe(S.withDecodingDefaultTypeKey(Effect.sync(defaultTileFraming))),
+})
+export type CollageTile = typeof CollageTile.Type
 
 /** The cell background behind the grid: dark or light. */
-export const CollageBackground = S.Union([
-  S.Literal("dark"),
-  S.Literal("light"),
-]);
-export type CollageBackground = typeof CollageBackground.Type;
+export const CollageBackground = S.Union([S.Literal('dark'), S.Literal('light')])
+export type CollageBackground = typeof CollageBackground.Type
 
 /**
  * The fixed-grid layout parameters. Numbers are unconstrained here (the
@@ -89,17 +84,17 @@ export const CollageLayout = S.Struct({
   /** The composed frame's width:height; 1 = square. */
   frameRatio: S.Number.pipe(S.withDecodingDefaultTypeKey(Effect.sync(() => 1))),
   background: CollageBackground,
-});
-export type CollageLayout = typeof CollageLayout.Type;
+})
+export type CollageLayout = typeof CollageLayout.Type
 
 /** The v1 defaults: 3 columns, derived rows, 8px gutter, square frame, dark background. */
 export const defaultCollageLayout = (): CollageLayout => ({
-  background: "dark",
+  background: 'dark',
   columns: 3,
   rows: 1,
   gutter: 8,
   frameRatio: 1,
-});
+})
 
 /**
  * A gallery-side composition of several **Edits** into one shareable image:
@@ -117,5 +112,5 @@ export const Collage = S.Struct({
   savedAt: S.Number,
   layout: CollageLayout,
   tiles: S.Array(CollageTile),
-});
-export type Collage = typeof Collage.Type;
+})
+export type Collage = typeof Collage.Type

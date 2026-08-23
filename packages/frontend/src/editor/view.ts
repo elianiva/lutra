@@ -4,8 +4,6 @@ import { type Html, type HtmlBuilder, createLazy } from 'foldkit/html'
 import { Boxes, Layers as LayersIcon, SlidersHorizontal } from 'lucide'
 import type { IconNode } from 'lucide'
 import { hasImage } from './phase'
-import type { EditorMessage } from './message'
-import { ToggledLutPicker, ToggledMobileSheet } from './message'
 import type { Model } from './model'
 import { topBar } from './top-bar'
 import { toolPanel } from './tool-panel'
@@ -14,7 +12,7 @@ import { canvasStage } from './canvas-stage'
 import { lutBar } from './lut-bar'
 import { lutTarget } from './lut-bar/target'
 import * as ExportDialog from '../export-dialog'
-import { GotExportDialogMessage } from './message'
+import { EditorMessage } from './message'
 import { icon } from '../components/icon'
 
 // ---- lazy islands (ADR 0034) ----
@@ -154,7 +152,9 @@ const mobileTabBarView = (
   return mobileTabBarImpl(m, hasLutTarget, h)
 }
 const exportDialogView = (dialog: Model['exportDialog'], h: HtmlBuilder<EditorMessage>): Html =>
-  ExportDialog.exportDialogView(h, dialog, (message) => GotExportDialogMessage({ message }))
+  ExportDialog.exportDialogView(h, dialog, (message) =>
+    EditorMessage.GotExportDialogMessage({ message }),
+  )
 
 /**
  * The Editor submodel's view (docs/adr/0009). Branded via `defineView` so it
@@ -258,15 +258,15 @@ const mobileTabBarImpl = (model: Model, hasLutTarget: boolean, h: HtmlBuilder<Ed
     ],
     [
       panelTab('Adjustments', SlidersHorizontal, model.mobileSheet === 'tools', () =>
-        ToggledMobileSheet({ sheet: 'tools' }),
+        EditorMessage.ToggledMobileSheet({ sheet: 'tools' }),
       ),
       panelTab('Layers', LayersIcon, model.mobileSheet === 'layers', () =>
-        ToggledMobileSheet({ sheet: 'layers' }),
+        EditorMessage.ToggledMobileSheet({ sheet: 'layers' }),
       ),
       // The LUT tab only exists while a LUT target exists (a drafting LUT
       // layer or a selected chain LUT layer) — same gate as the LUT bar.
       ...(Option.isSome(lutTarget(model))
-        ? [panelTab('LUT', Boxes, model.lutBarOpen, () => ToggledLutPicker())]
+        ? [panelTab('LUT', Boxes, model.lutBarOpen, () => EditorMessage.ToggledLutPicker())]
         : []),
     ],
   )

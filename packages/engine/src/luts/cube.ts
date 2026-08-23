@@ -26,7 +26,7 @@ export interface LutCube {
   readonly data: Float32Array
 }
 
-export class LutParseError extends Schema.TaggedErrorClass<LutParseError>()('LutParseError', {
+export class LutParseError extends Schema.TaggedError<LutParseError>()('LutParseError', {
   message: Schema.String,
 }) {}
 

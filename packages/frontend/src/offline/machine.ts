@@ -2,7 +2,7 @@ import { Option, Schema as S } from 'effect'
 import { Machine } from 'foldkit/experimental'
 import { to, when } from 'foldkit/experimental/machine'
 import { ts } from 'foldkit/schema'
-import { RootMessage } from '../root/message'
+import { AppMessage } from '../root/message'
 
 // The offline library's fill state machine (CONTEXT.md "Offline fill"). One
 // state union owning the fill's lifecycle — the main menu's progress card
@@ -12,7 +12,7 @@ import { RootMessage } from '../root/message'
 // are ignored — that absence of an edge IS the behavior (a completed fill
 // ignores every event; a paused fill ignores a second pause).
 //
-// The machine steps on the full RootMessage union (like the editor's
+// The machine steps on the full AppMessage union (like the editor's
 // machine steps on EditorMessage): root update steps it with whatever
 // message lands; only the offline messages below have edges.
 
@@ -32,7 +32,7 @@ export const OfflinePhase = S.Union([Idle, Filling, Paused, Ready, QuotaError])
 export type OfflinePhase = typeof OfflinePhase.Type
 
 export const offlineMachine = Machine.define({
-  message: RootMessage,
+  message: AppMessage,
   state: OfflinePhase,
 })({
   initial: Idle(),

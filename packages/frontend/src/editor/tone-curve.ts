@@ -5,8 +5,7 @@ import { RotateCcw } from 'lucide'
 import { icon } from '../components/icon'
 import { curvePointsOf, isCurveNeutral } from '@lutra/engine'
 import type { Layer } from '@lutra/engine'
-import { CurvePointDragged, CurveReset } from './message'
-import type { EditorMessage } from './message'
+import { EditorMessage } from './message'
 
 // The Tone Curve widget (docs/adr/0028): the drawer's curve editor for a
 // toneCurve draft or focused chain layer. A square-ish SVG plot in unit
@@ -46,9 +45,9 @@ const fmt = (v: number) => String(Math.round(v * 100) / 100)
  */
 export const CurveWidget = Mount.defineStream(
   'CurveWidget',
-  CurvePointDragged,
+  EditorMessage.CurvePointDragged,
 )((element) =>
-  Stream.callback<typeof CurvePointDragged.Type>((queue) =>
+  Stream.callback<typeof EditorMessage.CurvePointDragged.Type>((queue) =>
     Effect.gen(function* () {
       // Narrow to the SVG element (the mount target is always the widget's
       // svg) so the listeners get typed PointerEvents, like the canvas
@@ -61,7 +60,7 @@ export const CurveWidget = Mount.defineStream(
       let dragging = -1
 
       const emit = (index: number, x: number, y: number) =>
-        Queue.offerUnsafe(queue, CurvePointDragged({ index, x, y }))
+        Queue.offerUnsafe(queue, EditorMessage.CurvePointDragged({ index, x, y }))
 
       /** Pointer position in unit space (0..1, y up). */
       const unitCoords = (e: PointerEvent) => {
@@ -191,7 +190,7 @@ export const toneCurveWidget = (h: HtmlBuilder<EditorMessage>, layer: Layer) => 
             : [
                 h.button(
                   [
-                    h.OnClick(CurveReset()),
+                    h.OnClick(EditorMessage.CurveReset()),
                     h.AriaLabel('Reset curve'),
                     h.Class('grid size-6 place-items-center text-muted hover:text-ink'),
                   ],

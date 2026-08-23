@@ -17,13 +17,7 @@ import { update } from '../update'
 import { view } from '../view'
 import { Idle } from '../phase'
 import { selectTool } from '../test-layer'
-import {
-  RenderedFrame,
-  OfflineConnectivityChanged,
-  OfflineFileDownloaded,
-  LutRecentsSaved,
-  HistogramComputed,
-} from '../message'
+import { EditorMessage } from '../message'
 import { PanZoom, RegisterCanvas } from '../canvas-stage'
 import { SaveLutRecents, RenderChain, ReadHistogram } from '../command'
 import type { Catalog } from '../message'
@@ -67,17 +61,18 @@ const loaded = () => ({
 })
 
 const settled = (model: Model): Model =>
-  update(model, RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
+  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
 
 /** A LUT draft with the bar open (the draft selects the first catalog entry). */
 const lutDraft = () => settled(selectTool(loaded(), 'lut')[0])
 
 /** The same draft, but the device is offline. */
-const offlineLutDraft = () => update(lutDraft(), OfflineConnectivityChanged({ online: false }))[0]
+const offlineLutDraft = () =>
+  update(lutDraft(), EditorMessage.OfflineConnectivityChanged({ online: false }))[0]
 
 /** The same draft, offline, with the cube already in the offline library. */
 const offlineLutDraftDownloaded = () =>
-  update(offlineLutDraft(), OfflineFileDownloaded({ lutId: lutPrint }))[0]
+  update(offlineLutDraft(), EditorMessage.OfflineFileDownloaded({ lutId: lutPrint }))[0]
 
 describe('LUT bar offline library', () => {
   it('an undownloaded cube while offline is dimmed with a badge', () => {
@@ -120,9 +115,15 @@ describe('LUT bar offline library', () => {
       // The commit went through (the notice path fires nothing): the render
       // + recents-save commands are dispatched — assert before resolving.
       Command.expectHas(SaveLutRecents({ recents: [lutPrint] })),
-      Command.resolve(RenderChain, RenderedFrame({ handle: stubHandle(), stamp: 999 })),
-      Command.resolve(ReadHistogram, HistogramComputed({ bins: new Uint32Array(256), stamp: 999 })),
-      Command.resolve(SaveLutRecents, LutRecentsSaved()),
+      Command.resolve(
+        RenderChain,
+        EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: 999 }),
+      ),
+      Command.resolve(
+        ReadHistogram,
+        EditorMessage.HistogramComputed({ bins: new Uint32Array(256), stamp: 999 }),
+      ),
+      Command.resolve(SaveLutRecents, EditorMessage.LutRecentsSaved()),
       sceneExpect(text("isn't downloaded yet", { exact: false })).toBeAbsent(),
     )
   })

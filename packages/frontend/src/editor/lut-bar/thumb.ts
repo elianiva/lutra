@@ -1,7 +1,6 @@
 import type { HtmlBuilder } from 'foldkit/html'
 import { Check } from 'lucide'
-import type { EditorMessage } from '../message'
-import { PreviewedLut } from '../message'
+import { EditorMessage } from '../message'
 import type { LutCatalogEntry } from '../../luts/store'
 import type { LutDownloadState } from '../../offline/model'
 import { icon } from '../../components/icon'
@@ -35,8 +34,8 @@ export const thumb = (
   return h.button(
     [
       h.OnClick(onPick()),
-      h.OnMouseEnter(PreviewedLut({ lutId: entry.lut_file })),
-      h.OnMouseLeave(PreviewedLut({ lutId: null })),
+      h.OnMouseEnter(EditorMessage.PreviewedLut({ lutId: entry.lut_file })),
+      h.OnMouseLeave(EditorMessage.PreviewedLut({ lutId: null })),
       h.AriaLabel(
         unavailable
           ? `Apply ${entry.name} — not downloaded, needs a connection`

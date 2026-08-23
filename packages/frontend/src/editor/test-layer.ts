@@ -1,7 +1,7 @@
 import { Effect } from 'effect'
 import type { LayerType } from '@lutra/engine'
 import { createLayerFor } from './command'
-import { LayerCreated, SelectedTool } from './message'
+import { EditorMessage } from './message'
 import type { Model } from './model'
 import { update } from './update'
 import type { UpdateReturn } from './update'
@@ -16,9 +16,9 @@ export const createTestLayer = <K extends LayerType>(type: K) =>
  * production.
  */
 export const selectTool = (model: Model, type: LayerType): UpdateReturn => {
-  const [creating, commands, out] = update(model, SelectedTool({ type }))
+  const [creating, commands, out] = update(model, EditorMessage.SelectedTool({ type }))
   if (!commands.some((command) => command.name === 'CreateLayer')) {
     return [creating, commands, out]
   }
-  return update(creating, LayerCreated({ layer: createTestLayer(type) }))
+  return update(creating, EditorMessage.LayerCreated({ layer: createTestLayer(type) }))
 }

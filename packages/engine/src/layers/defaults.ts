@@ -9,7 +9,7 @@ import type { LayerType } from './schemas'
  * should be unreachable for normal callers. It remains a typed failure so
  * callers can compose layer creation without a synchronous exception.
  */
-export class UnknownLayerTypeError extends Schema.TaggedErrorClass<UnknownLayerTypeError>()(
+export class UnknownLayerTypeError extends Schema.TaggedError<UnknownLayerTypeError>()(
   'UnknownLayerTypeError',
   {
     cause: Schema.optional(Schema.Unknown),

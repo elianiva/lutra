@@ -1,22 +1,7 @@
 import { Match as M, Option } from 'effect'
 import { Command } from 'foldkit'
 import { Dialog } from '@foldkit/ui'
-import type { ExportDialogMessage as Message } from './message'
-import {
-  ChangedFormat,
-  ChangedQuality,
-  ChangedScale,
-  Downloaded,
-  EncodeFailed,
-  EncodePrepared,
-  EncodeRequested,
-  FrameFailed,
-  FrameReady,
-  GotDialogMessage,
-  SettingsLoaded,
-  SettingsSaved,
-  UrlRevoked,
-} from './message'
+import { ExportDialogMessage as Message } from './message'
 import { ExportDownload, PrepareExport, RevokeExportUrl, SaveExportSettings } from './command'
 import type { Resource } from './command'
 import type { Model } from './model'
@@ -146,4 +131,4 @@ const delegateToDialog = (model: Model, message: Dialog.Message): UpdateReturn =
 const wrapDialogCommand = (
   command: Command.Command<Dialog.Message>,
 ): Command.Command<Message, never, Resource> =>
-  Command.mapMessage(command, (message) => GotDialogMessage({ message }))
+  Command.mapMessage(command, (message) => Message.GotDialogMessage({ message }))

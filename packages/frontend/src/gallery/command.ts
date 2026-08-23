@@ -15,23 +15,7 @@ import {
   defaultTileFraming,
 } from '@lutra/store'
 import { ImageDecodeError, ThumbnailEncodeError } from '../errors'
-import {
-  EditsListed,
-  ListFailed,
-  EditDeleted,
-  DeleteFailed,
-  PhotoCreated,
-  PhotoCreateFailed,
-  PhotoPickCancelled,
-  PhotosAdded,
-  CollageCreated,
-  CollageCreateFailed,
-  CollagesListed,
-  CollageListFailed,
-  CollageThumbsMeasured,
-  CollageDeleted,
-  CollageDeleteFailed,
-} from './message'
+import { GalleryMessage } from './message'
 
 /**
  * Fetch the gallery grid (`EditStore.list`): the Edit summaries, source bytes
@@ -42,11 +26,13 @@ export const ListEdits = Command.define('ListEdits', {
   execute: Effect.gen(function* () {
     const store = yield* EditStore
     const summaries = yield* store.list()
-    return EditsListed({ summaries })
+    return GalleryMessage.EditsListed({ summaries })
   }).pipe(
-    Effect.catchTag('StoreError', (err: StoreError) => Effect.succeed(ListFailed({ error: err }))),
+    Effect.catchTag('StoreError', (err: StoreError) =>
+      Effect.succeed(GalleryMessage.ListFailed({ error: err })),
+    ),
   ),
-  messages: [EditsListed, ListFailed],
+  messages: [GalleryMessage.EditsListed, GalleryMessage.ListFailed],
 })
 
 /**
@@ -63,13 +49,13 @@ export const ListCollages = Command.define('ListCollages', {
   execute: Effect.gen(function* () {
     const store = yield* CollageStore
     const collages = yield* store.list()
-    return CollagesListed({ collages })
+    return GalleryMessage.CollagesListed({ collages })
   }).pipe(
     Effect.catchTag('StoreError', (err: StoreError) =>
-      Effect.succeed(CollageListFailed({ error: err })),
+      Effect.succeed(GalleryMessage.CollageListFailed({ error: err })),
     ),
   ),
-  messages: [CollagesListed, CollageListFailed],
+  messages: [GalleryMessage.CollagesListed, GalleryMessage.CollageListFailed],
 })
 
 /**
@@ -99,9 +85,9 @@ export const MeasureCollageThumbs = Command.define('MeasureCollageThumbs', {
         sizes.push({ editId: id, width: decoded.value.width, height: decoded.value.height })
         yield* Effect.sync(() => decoded.value.close())
       }
-      return CollageThumbsMeasured({ sizes })
+      return GalleryMessage.CollageThumbsMeasured({ sizes })
     }),
-  messages: [CollageThumbsMeasured],
+  messages: [GalleryMessage.CollageThumbsMeasured],
 })
 
 /**
@@ -116,13 +102,13 @@ export const DeleteCollage = Command.define('DeleteCollage', {
     Effect.gen(function* () {
       const store = yield* CollageStore
       yield* store.delete(id)
-      return CollageDeleted()
+      return GalleryMessage.CollageDeleted()
     }).pipe(
       Effect.catchTag('StoreError', (err: StoreError) =>
-        Effect.succeed(CollageDeleteFailed({ error: err })),
+        Effect.succeed(GalleryMessage.CollageDeleteFailed({ error: err })),
       ),
     ),
-  messages: [CollageDeleted, CollageDeleteFailed],
+  messages: [GalleryMessage.CollageDeleted, GalleryMessage.CollageDeleteFailed],
 })
 
 export const DeleteEdit = Command.define('DeleteEdit', {
@@ -131,13 +117,13 @@ export const DeleteEdit = Command.define('DeleteEdit', {
     Effect.gen(function* () {
       const store = yield* EditStore
       yield* store.delete(id)
-      return EditDeleted()
+      return GalleryMessage.EditDeleted()
     }).pipe(
       Effect.catchTag('StoreError', (err: StoreError) =>
-        Effect.succeed(DeleteFailed({ error: err })),
+        Effect.succeed(GalleryMessage.DeleteFailed({ error: err })),
       ),
     ),
-  messages: [EditDeleted, DeleteFailed],
+  messages: [GalleryMessage.EditDeleted, GalleryMessage.DeleteFailed],
 })
 
 /** The accepted image types for the native picker (mirrors the editor's `PickImageFile`). */
@@ -250,7 +236,7 @@ export const OpenPhoto = Command.define('OpenPhoto', {
   execute: Effect.gen(function* () {
     const files = yield* FoldkitFile.selectMultiple(IMAGE_TYPES)
     if (files.length === 0) {
-      return PhotoPickCancelled()
+      return GalleryMessage.PhotoPickCancelled()
     }
 
     // A single pick keeps the classic flow: straight into the editor on the
@@ -258,10 +244,10 @@ export const OpenPhoto = Command.define('OpenPhoto', {
     if (files.length === 1) {
       const [file] = files
       if (file === undefined) {
-        return PhotoPickCancelled()
+        return GalleryMessage.PhotoPickCancelled()
       }
       const id = yield* createEdit(file)
-      return PhotoCreated({ id })
+      return GalleryMessage.PhotoCreated({ id })
     }
 
     // Several picks at once: every photo becomes its own Edit — one bad file
@@ -271,7 +257,7 @@ export const OpenPhoto = Command.define('OpenPhoto', {
     const [failures, createdIds] = yield* Effect.partition(files, createEdit)
     const store = yield* EditStore
     const summaries = yield* Effect.option(store.list())
-    return PhotosAdded({
+    return GalleryMessage.PhotosAdded({
       added: createdIds.length,
       failed: failures.length,
       error: Array.head(failures),
@@ -279,16 +265,21 @@ export const OpenPhoto = Command.define('OpenPhoto', {
     })
   }).pipe(
     Effect.catchTag('StoreError', (err: StoreError) =>
-      Effect.succeed(PhotoCreateFailed({ error: err })),
+      Effect.succeed(GalleryMessage.PhotoCreateFailed({ error: err })),
     ),
     Effect.catchTag('ImageDecodeError', (err: ImageDecodeError) =>
-      Effect.succeed(PhotoCreateFailed({ error: err })),
+      Effect.succeed(GalleryMessage.PhotoCreateFailed({ error: err })),
     ),
     Effect.catchTag('ThumbnailEncodeError', (err: ThumbnailEncodeError) =>
-      Effect.succeed(PhotoCreateFailed({ error: err })),
+      Effect.succeed(GalleryMessage.PhotoCreateFailed({ error: err })),
     ),
   ),
-  messages: [PhotoCreated, PhotoPickCancelled, PhotoCreateFailed, PhotosAdded],
+  messages: [
+    GalleryMessage.PhotoCreated,
+    GalleryMessage.PhotoPickCancelled,
+    GalleryMessage.PhotoCreateFailed,
+    GalleryMessage.PhotosAdded,
+  ],
 })
 
 /**
@@ -313,11 +304,11 @@ export const CreateCollage = Command.define('CreateCollage', {
           tiles: editIds.map((editId) => ({ editId, framing: defaultTileFraming() })),
         }),
       )
-      return CollageCreated({ id })
+      return GalleryMessage.CollageCreated({ id })
     }).pipe(
       Effect.catchTag('StoreError', (err: StoreError) =>
-        Effect.succeed(CollageCreateFailed({ error: err })),
+        Effect.succeed(GalleryMessage.CollageCreateFailed({ error: err })),
       ),
     ),
-  messages: [CollageCreated, CollageCreateFailed],
+  messages: [GalleryMessage.CollageCreated, GalleryMessage.CollageCreateFailed],
 })

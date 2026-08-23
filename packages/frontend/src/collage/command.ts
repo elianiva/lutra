@@ -12,20 +12,7 @@ import {
   EditStore,
 } from '@lutra/store'
 import type { EditId, StoreError } from '@lutra/store'
-import {
-  CellMeasured,
-  CollageExportSnapshotFailed,
-  CollageExportSnapshotted,
-  CollageLoaded,
-  CollageSaved,
-  CollageMissing,
-  LoadFailed,
-  NavigatedBack,
-  SaveFailed,
-  ThumbsMeasured,
-  UndoExpired,
-  ZoomSettled,
-} from './message'
+import { CollageMessage } from './message'
 import { renderEditTile } from './render-tile'
 import { cellSize, composeGrid } from './compose'
 import { setFrame } from '../export-dialog'
@@ -44,7 +31,7 @@ export const LoadCollage = Command.define('LoadCollage', {
       const collages = yield* CollageStoreTag
       const loaded = yield* collages.load(id)
       if (Option.isNone(loaded)) {
-        return CollageMissing()
+        return CollageMessage.CollageMissing()
       }
       const edits = yield* EditStore
       const record = loaded.value
@@ -60,17 +47,21 @@ export const LoadCollage = Command.define('LoadCollage', {
           dropped += 1
         }
       }
-      return CollageLoaded({
+      return CollageMessage.CollageLoaded({
         collage: { ...record, tiles: kept },
         photos,
         dropped,
       })
     }).pipe(
       Effect.catchTag('StoreError', (err: StoreError) =>
-        Effect.succeed(LoadFailed({ error: err })),
+        Effect.succeed(CollageMessage.LoadFailed({ error: err })),
       ),
     ),
-  messages: [CollageLoaded, CollageMissing, LoadFailed],
+  messages: [
+    CollageMessage.CollageLoaded,
+    CollageMessage.CollageMissing,
+    CollageMessage.LoadFailed,
+  ],
 })
 
 /**
@@ -104,9 +95,9 @@ export const MeasureThumbs = Command.define('MeasureThumbs', {
         sizes.push({ editId: id, width: bitmap.width, height: bitmap.height })
         yield* Effect.sync(() => bitmap.close())
       }
-      return ThumbsMeasured({ sizes })
+      return CollageMessage.ThumbsMeasured({ sizes })
     }),
-  messages: [ThumbsMeasured],
+  messages: [CollageMessage.ThumbsMeasured],
 })
 
 /**
@@ -120,13 +111,13 @@ export const SaveCollage = Command.define('SaveCollage', {
     Effect.gen(function* SaveCollage() {
       const store = yield* CollageStoreTag
       yield* store.save(collage)
-      return CollageSaved()
+      return CollageMessage.CollageSaved()
     }).pipe(
       Effect.catchTag('StoreError', (err: StoreError) =>
-        Effect.succeed(SaveFailed({ error: err })),
+        Effect.succeed(CollageMessage.SaveFailed({ error: err })),
       ),
     ),
-  messages: [CollageSaved, SaveFailed],
+  messages: [CollageMessage.CollageSaved, CollageMessage.SaveFailed],
 })
 
 /**
@@ -136,8 +127,9 @@ export const SaveCollage = Command.define('SaveCollage', {
  */
 export const ScheduleUndoExpiry = Command.define('ScheduleUndoExpiry', {
   args: { seq: S.Number },
-  execute: ({ seq }) => Effect.sleep(Duration.seconds(5)).pipe(Effect.as(UndoExpired({ seq }))),
-  messages: [UndoExpired],
+  execute: ({ seq }) =>
+    Effect.sleep(Duration.seconds(5)).pipe(Effect.as(CollageMessage.UndoExpired({ seq }))),
+  messages: [CollageMessage.UndoExpired],
 })
 
 /**
@@ -147,8 +139,9 @@ export const ScheduleUndoExpiry = Command.define('ScheduleUndoExpiry', {
  */
 export const ScheduleZoomCommit = Command.define('ScheduleZoomCommit', {
   args: { seq: S.Number },
-  execute: ({ seq }) => Effect.sleep(Duration.millis(600)).pipe(Effect.as(ZoomSettled({ seq }))),
-  messages: [ZoomSettled],
+  execute: ({ seq }) =>
+    Effect.sleep(Duration.millis(600)).pipe(Effect.as(CollageMessage.ZoomSettled({ seq }))),
+  messages: [CollageMessage.ZoomSettled],
 })
 
 /**
@@ -157,8 +150,8 @@ export const ScheduleZoomCommit = Command.define('ScheduleZoomCommit', {
  */
 export const ReportCellSize = Command.define('ReportCellSize', {
   args: { width: S.Number, height: S.Number },
-  execute: ({ width, height }) => Effect.succeed(CellMeasured({ width, height })),
-  messages: [CellMeasured],
+  execute: ({ width, height }) => Effect.succeed(CollageMessage.CellMeasured({ width, height })),
+  messages: [CollageMessage.CellMeasured],
 })
 
 /**
@@ -167,8 +160,8 @@ export const ReportCellSize = Command.define('ReportCellSize', {
  * starts it.
  */
 export const NavigateMenu = Command.define('NavigateMenu', {
-  execute: pushUrl('/').pipe(Effect.as(NavigatedBack())),
-  messages: [NavigatedBack],
+  execute: pushUrl('/').pipe(Effect.as(CollageMessage.NavigatedBack())),
+  messages: [CollageMessage.NavigatedBack],
 })
 
 /**
@@ -209,17 +202,17 @@ export const SnapshotCollageExport = Command.define('SnapshotCollageExport', {
       const image = composeGrid(images, layout)
       // The pixels bypass the model entirely (see export-dialog/frame.ts).
       setFrame(image)
-      return CollageExportSnapshotted({ failedTiles })
+      return CollageMessage.CollageExportSnapshotted({ failedTiles })
     }).pipe(
       Effect.matchEager({
         // Any failure of load/render/compose degrades to a dialog error —
         // the collage itself is untouched (auto-save owns its persistence).
         onFailure: (error) =>
-          CollageExportSnapshotFailed({
+          CollageMessage.CollageExportSnapshotFailed({
             message: `could not compose the collage: ${String(error)}`,
           }),
         onSuccess: (message) => message,
       }),
     ),
-  messages: [CollageExportSnapshotted, CollageExportSnapshotFailed],
+  messages: [CollageMessage.CollageExportSnapshotted, CollageMessage.CollageExportSnapshotFailed],
 })

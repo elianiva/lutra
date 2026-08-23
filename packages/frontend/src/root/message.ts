@@ -1,13 +1,10 @@
 import { Schema as S } from 'effect'
-import { Message } from 'foldkit'
+import { defineMessageUnion } from 'foldkit/message'
 import { AppRoute } from '../route'
 import * as Gallery from '../gallery/message'
 import * as Editor from '../editor/message'
 import * as Collage from '../collage/message'
-import * as Offline from '../offline/messages'
-// The offline UI's own requests/acks, re-exported so root-owned views
-// (the strip's start button, the toast) can dispatch them directly.
-export { OfflineFillRequested, OfflineReadyDismissed } from '../offline/messages'
+import { OfflineMessage } from '../offline/messages'
 
 // The root orchestrated Submodel Messages (docs/adr/0009): routing facts the
 // root owns (`ChangedRoute`, `Navigated`) plus the `Got*Message` wrappers that
@@ -15,43 +12,28 @@ export { OfflineFillRequested, OfflineReadyDismissed } from '../offline/messages
 // wrappers carry routing, not payload — any domain payload lives inside the
 // child Message (submodel.md).
 
-/** The resolved URL changed (browser back/forward, a pushed URL). */
-export const ChangedRoute = Message.m('ChangedRoute', { route: AppRoute })
-/** A link/click requested navigation. */
-export const Navigated = Message.m('Navigated', { request: S.Unknown })
-
-/** Wraps a Gallery Submodel Message so the root can delegate to `Gallery.update`. */
-export const GotGalleryMessage = Message.m('GotGalleryMessage', { message: Gallery.GalleryMessage })
-/** Wraps an Editor Submodel Message so the root can delegate to `Editor.update`. */
-export const GotEditorMessage = Message.m('GotEditorMessage', { message: Editor.EditorMessage })
-/** Wraps a Collage Submodel Message so the root can delegate to `Collage.update`. */
-export const GotCollageMessage = Message.m('GotCollageMessage', { message: Collage.CollageMessage })
-
-/** The root pushed `/edit/:id` in response to a Gallery `OpenedEdit` fact.
- *  Observability only — the URL change itself drives the route transition. */
-export const NavigatedTo = Message.m('NavigatedTo')
-
-export const RootMessage = S.Union([
-  ChangedRoute,
-  Navigated,
-  GotGalleryMessage,
-  GotEditorMessage,
-  GotCollageMessage,
-  NavigatedTo,
-  // The offline slice's universe (../offline/messages): the fill's bridged
-  // events, the connectivity facts, and the UI's requests/acks. The root
-  // owns the fill machine and forwards per-file facts into the editor.
-  Offline.OfflineFillStarted,
-  Offline.OfflineFileStarted,
-  Offline.OfflineFileCompleted,
-  Offline.OfflineFileFailed,
-  Offline.OfflineFillPaused,
-  Offline.OfflineFillResumed,
-  Offline.OfflineFillComplete,
-  Offline.OfflineQuotaError,
-  Offline.ConnectivityChanged,
-  Offline.OfflineFillRequested,
-  Offline.StoragePersisted,
-  Offline.OfflineReadyDismissed,
-])
+export const RootMessage = defineMessageUnion({
+  /** The resolved URL changed (browser back/forward, a pushed URL). */
+  ChangedRoute: { route: AppRoute },
+  // A link/click requested navigation.
+  Navigated: { request: S.Unknown },
+  // Wraps a Gallery Submodel Message so the root can delegate to `Gallery.update`.
+  GotGalleryMessage: { message: Gallery.GalleryMessage },
+  // Wraps an Editor Submodel Message so the root can delegate to `Editor.update`.
+  GotEditorMessage: { message: Editor.EditorMessage },
+  // Wraps a Collage Submodel Message so the root can delegate to `Collage.update`.
+  GotCollageMessage: { message: Collage.CollageMessage },
+  /** The root pushed `/edit/:id` in response to a Gallery `OpenedEdit` fact.
+   *  Observability only — the URL change itself drives the route transition. */
+  NavigatedTo: {},
+})
 export type RootMessage = typeof RootMessage.Type
+
+/**
+ * The application's full message universe: everything the root's update
+ * handles — the root-owned routing/wrappers plus the offline slice
+ * (docs/adr/0015). The root owns the fill machine, so its Messages sit in
+ * the root loop unwrapped rather than behind a `Got*Message`.
+ */
+export const AppMessage = S.Union([RootMessage, OfflineMessage])
+export type AppMessage = typeof AppMessage.Type

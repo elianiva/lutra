@@ -5,7 +5,7 @@ import { Dialog } from '@foldkit/ui'
 import { initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
-import { GotSettingsDialogMessage, SettingsRequested, ToggledInfiniteCanvas } from './message'
+import { GalleryMessage } from './message'
 
 const config = {
   update,
@@ -15,7 +15,7 @@ const config = {
 // Resolve the dialog's internal ShowDialog command.
 const openDialog = [
   Command.expectHas(Dialog.ShowDialog),
-  Command.resolve(Dialog.ShowDialog, Dialog.CompletedShowDialog()),
+  Command.resolve(Dialog.ShowDialog, Dialog.Message.CompletedShowDialog()),
 ]
 
 describe('gallery: settings dialog', () => {
@@ -65,31 +65,40 @@ describe('gallery: settings dialog', () => {
 
       click(text('Close')),
       Command.expectHas(Dialog.CloseDialog),
-      Command.resolve(Dialog.CloseDialog, Dialog.CompletedCloseDialog()),
+      Command.resolve(Dialog.CloseDialog, Dialog.Message.CompletedCloseDialog()),
       expect(text('SETTINGS')).not.toExist(),
       Command.expectNone(),
     )
   })
 
   it('the toggle updates only the experimental flag in the model', () => {
-    const [model] = update(initialModel(), ToggledInfiniteCanvas({ isEnabled: true }))
+    const [model] = update(
+      initialModel(),
+      GalleryMessage.ToggledInfiniteCanvas({ isEnabled: true }),
+    )
     vitestExpect(model.experimental.infiniteCanvas).toBe(true)
 
-    const [back, commands, out] = update(model, ToggledInfiniteCanvas({ isEnabled: false }))
+    const [back, commands, out] = update(
+      model,
+      GalleryMessage.ToggledInfiniteCanvas({ isEnabled: false }),
+    )
     vitestExpect(back.experimental.infiniteCanvas).toBe(false)
     vitestExpect(commands).toEqual([])
     vitestExpect(Option.isNone(out)).toBe(true)
   })
 
   it('SettingsRequested opens the dialog submodel', () => {
-    const [model, commands] = update(initialModel(), SettingsRequested())
+    const [model, commands] = update(initialModel(), GalleryMessage.SettingsRequested())
     vitestExpect(model.settingsDialog.isOpen).toBe(true)
     vitestExpect(commands.map((c) => c.name)).toEqual(['ShowDialog'])
   })
 
   it('delegates dialog messages to Dialog.update', () => {
-    const [opened] = update(initialModel(), SettingsRequested())
-    const [closed] = update(opened, GotSettingsDialogMessage({ message: Dialog.RequestedClose() }))
+    const [opened] = update(initialModel(), GalleryMessage.SettingsRequested())
+    const [closed] = update(
+      opened,
+      GalleryMessage.GotSettingsDialogMessage({ message: Dialog.Message.RequestedClose() }),
+    )
     vitestExpect(closed.settingsDialog.isOpen).toBe(false)
   })
 })
