@@ -6,7 +6,6 @@ import { Layer, LayerIdSchema, moveCurvePoint, resetCurve } from '@lutra/engine'
 import { CreateLayer, DecodeImage } from './command'
 import { EditorMessage } from './message'
 
-// ---- editor phase ----
 // The editor's interaction mode is one state union owning BOTH the image
 // lifecycle and the interaction mode, because they gate each other: a draft
 // is only reachable from a loaded image, and loading/clearing an image
@@ -42,8 +41,6 @@ export const Selected = ts('Selected', { layerId: LayerIdSchema })
 
 export const EditorPhase = S.Union([Empty, Loading, ErrorState, Idle, Creating, Drafting, Selected])
 export type EditorPhase = typeof EditorPhase.Type
-
-// ---- machine ----
 
 export const editorMachine = Machine.define({
   message: EditorMessage,
@@ -212,8 +209,6 @@ export const editorMachine = Machine.define({
     },
   },
 })
-
-// ---- helpers ----
 
 /** True while an image is loaded and the canvas is showing — the phases the
  *  editor can work in. Empty/Loading/Error render the upload zone (or the

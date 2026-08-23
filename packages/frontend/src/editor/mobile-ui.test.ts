@@ -24,8 +24,6 @@ import { CreateLayer, RenderChain, ReadHistogram } from './command'
 import type { Catalog } from './message'
 import type { Model } from './model'
 
-// ---- helpers ----
-
 const lutPrint = LutId('luts/print/kodak_2393_cuspclip.cube')
 
 const catalog: Catalog = [
@@ -57,7 +55,7 @@ const loaded = () => ({
 const settled = (model: Model): Model =>
   update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
 
-// ---- update flow (docs/adr/0024-mobile-ui) ----
+// update flow (docs/adr/0024-mobile-ui)
 
 describe('mobile bottom sheets', () => {
   it('starts closed', () => {
@@ -134,8 +132,6 @@ describe('mobile bottom sheets', () => {
     expect(model.mobileSheet).toBeNull()
   })
 })
-
-// ---- view (scene) ----
 
 const sceneConfig = { update, view } as const
 

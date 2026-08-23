@@ -177,8 +177,6 @@ export const LoadEdit = Command.define('LoadEdit', {
   messages: [EditorMessage.EditLoaded, EditorMessage.EditLoadFailed],
 })
 
-// ---- save ----
-
 /**
  * A small JPEG of the graded frame, downscaled to fit `maxDim`, to refresh
  * the Edit's thumbnail on every save — the gallery tile shows the graded
@@ -399,8 +397,6 @@ export const ReadHistogram = Command.define('ReadHistogram', {
   messages: [EditorMessage.HistogramComputed, EditorMessage.HistogramFailed],
 })
 
-// ---- export dialog ----
-
 /** Settings persistence is shared with the collage's export dialog (docs/adr/0031). */
 import { setFrame } from '../export-dialog'
 
@@ -426,7 +422,7 @@ export const SnapshotForExport = Command.define('SnapshotForExport', {
   messages: [EditorMessage.ExportSnapshotted, EditorMessage.ExportSnapshotFailed],
 })
 
-// ---- LUT recents (the bar's Recents tab, docs/adr/0012) ----
+// LUT recents (the bar's Recents tab, docs/adr/0012)
 
 const LUT_RECENTS_KEY = 'lutRecents'
 
@@ -457,7 +453,7 @@ export const SaveLutRecents = Command.define('SaveLutRecents', {
   messages: [EditorMessage.LutRecentsSaved],
 })
 
-// ---- per-photo LUT thumbnails (filmstrip previews, docs/adr/0013) ----
+// per-photo LUT thumbnails (filmstrip previews, docs/adr/0013)
 
 /**
  * Render one per-photo LUT thumbnail: resolve the cube (memoized by the

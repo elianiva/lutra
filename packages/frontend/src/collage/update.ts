@@ -192,7 +192,6 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         ]
       },
 
-      // ---- thumb sizes ----
       ThumbsMeasured: ({ sizes }): UpdateReturn => [
         {
           ...model,
@@ -226,7 +225,7 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         Option.none(),
       ],
 
-      // ---- layout (bounds live in model.ts; layout changes take no undo) ----
+      // layout (bounds live in model.ts; layout changes take no undo)
       ChangedColumns: ({ columns }) =>
         mutate(model, (c) => ({
           ...c,
@@ -268,7 +267,6 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
           },
         })),
 
-      // ---- mode ----
       ModeChanged: ({ mode }) =>
         mode === model.mode
           ? [model, [], Option.none()]
@@ -276,7 +274,6 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
             ? [{ ...model, mode }, [], Option.none()]
             : commitDraft({ ...model, mode }),
 
-      // ---- arrangement ----
       RemovedTile: ({ index }) => {
         const collage = collageOf(model)
         if (!collage) {
@@ -290,7 +287,7 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         return [emptied ? { ...nextModel, userEmptied: true } : nextModel, commands, Option.none()]
       },
 
-      // ---- drag-and-drop reorder (docs/adr/0033) ----
+      // drag-and-drop reorder (docs/adr/0033)
       GotDragMessage: ({ message }) => {
         const [drag, dragCommands, out] = DragAndDrop.update(model.drag, message)
         const base: UpdateReturn = [
@@ -319,7 +316,7 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
           : base
       },
 
-      // ---- tile framing (docs/adr/0033) ----
+      // tile framing (docs/adr/0033)
       PanStarted: ({ index, screenX, screenY }) => {
         const collage = collageOf(model)
         if (!collage || model.mode !== 'frame') {
@@ -430,7 +427,7 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         return [same ? model : { ...model, cellPx: { width, height } }, [], Option.none()]
       },
 
-      // ---- undo (docs/adr/0033) ----
+      // undo (docs/adr/0033)
       UndoPressed: () => {
         const collage = collageOf(model)
         if (!collage || !model.undo) {
@@ -454,7 +451,6 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
           ? [{ ...model, undo: null, undoLabel: null }, [], Option.none()]
           : [model, [], Option.none()],
 
-      // ---- auto-save ----
       CollageSaved: () => [model, [], Option.none()],
       SaveFailed: ({ error }) => [
         { ...model, notice: `Could not save the collage: ${error.message}` },
@@ -462,7 +458,7 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         Option.none(),
       ],
 
-      // ---- export (docs/adr/0031: compose on open, encode on press) ----
+      // export (docs/adr/0031: compose on open, encode on press)
       ExportRequested: () => {
         const collage = collageOf(model)
         if (!collage) {

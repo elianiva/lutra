@@ -48,8 +48,6 @@ export type CollageRoute = typeof CollageRoute.Type
 export type CollageHomeRoute = typeof CollageHomeRoute.Type
 export type NotFoundRoute = typeof NotFoundRoute.Type
 
-// ---- routers (biparsers) matching each route's URL ----
-
 const galleryRouter = pipe(Route.root, Route.mapTo(GalleryRoute))
 const editorRouter = pipe(
   Route.literal('edit'),

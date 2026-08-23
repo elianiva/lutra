@@ -9,8 +9,6 @@ import { EditorMessage } from './message'
 import { PanZoom, RegisterCanvas } from './canvas-stage'
 import { RenderHandle } from '../gpu/backend'
 
-// ---- helpers ----
-
 // SAFETY: fabricated GPU handle stub — the scene never executes GPU work, so only its type and the bins buffer identity flow through the model; the buffer has no backing storage.
 const stubHandle = () =>
   // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
@@ -18,8 +16,6 @@ const stubHandle = () =>
 
 // A model in the Idle phase (image loaded) so RenderedFrame lands.
 const loadedModel = () => ({ ...initialModel(), phase: Idle() })
-
-// ---- tests ----
 
 describe('histogram flow', () => {
   it('dispatches ReadHistogram for a rendered frame and stores the handle', () => {
@@ -95,8 +91,6 @@ describe('histogram flow', () => {
     expect(cleared.bins).toBeNull()
   })
 })
-
-// ---- overlay rendering (scene) ----
 
 const sceneConfig = { update, view } as const
 

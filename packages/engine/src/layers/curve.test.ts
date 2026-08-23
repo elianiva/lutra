@@ -21,8 +21,6 @@ import {
 } from '../shaders'
 import { curvePointsOf, isCurveNeutral, moveCurvePoint, resetCurve } from './curve'
 
-// ---- helpers ----
-
 const registry = makeRegistry({
   chromaticAberration: renderChromaticAberration,
   clarity: renderClarity,
@@ -44,8 +42,6 @@ const curveLayer = () => Effect.runSync(createLayer('toneCurve', registry))
 /** A point moved by the UI: the layer's fields after one moveCurvePoint call. */
 const move = (layer: Layer, index: number, x: number, y: number) =>
   moveCurvePoint(layer, index, x, y)
-
-// ---- tests ----
 
 describe('tone curve layer defaults', () => {
   it('a fresh layer is the identity curve (and reads back as neutral)', () => {

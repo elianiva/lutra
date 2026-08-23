@@ -144,11 +144,9 @@ export const Model = Schema.Struct({
   bins: Schema.NullOr(Schema.instanceOf(Uint32Array)),
   // Monotonic counter hashed into the render trigger stamp.
   revision: Schema.Number,
-  // ---- export dialog ----
   // The shared export-dialog machine (docs/adr/0031): settings, encode
   // flow, and the frame slot's readiness flag.
   exportDialog: ExportDialog.Model,
-  // ---- tool panel tooltip ----
   // The tool card currently under the pointer (or keyboard focus) — the
   // desktop icon rail prints that card's copy as a custom tooltip panel.
   // Presentation-only; null = no card hovered.

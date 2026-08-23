@@ -10,8 +10,6 @@ import type { LutId } from '@lutra/engine'
 // (./machine.ts) and forwards per-file facts into the editor Submodel (its
 // LUT bar rows render per-LUT download state).
 
-// ---- the fill's internal events (PubSub payloads) ----
-
 // One library file to mirror: the catalog itself, a `.cube`, or a generic
 // thumbnail. `lutId` is set for cube files — the LUT bar rows key on it —
 // and null for catalog/thumbnail files.
@@ -38,8 +36,6 @@ export type FillEvent =
   // app retries once with a fresh persist() grant.
   | { readonly _tag: 'FillQuotaError'; readonly message: string }
 
-// ---- root messages (bridged from the PubSub, plus the UI's requests) ----
-
 export const OfflineMessage = defineMessageUnion({
   OfflineFillStarted: {
     done: S.Number,
@@ -60,21 +56,18 @@ export const OfflineMessage = defineMessageUnion({
   OfflineQuotaError: {
     message: S.String,
   },
-  // The browser's online/offline state (drives the machine's Paused state and
-  // the LUT bar's offline dimming).
+  // The browser's online/offline state.
   ConnectivityChanged: {
     online: S.Boolean,
   },
-  // The user asked to start the fill manually (the saveData gate's "Start
-  // offline download" button — the auto-start is skipped on metered
-  // connections).
+  // The saveData gate's manual start button (the auto-start is skipped on
+  // metered connections).
   OfflineFillRequested: {},
   // The result of the persist() request the fill makes on start (and again on
   // a quota retry).
   StoragePersisted: {
     persisted: S.Boolean,
   },
-  // The "Offline ready" toast was dismissed (click or the auto-dismiss timer).
   OfflineReadyDismissed: {},
 })
 export type OfflineMessage = typeof OfflineMessage.Type

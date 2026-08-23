@@ -68,8 +68,6 @@ export const fieldBounds = (type: LayerType, field: FieldKey) => {
   return { max: meta.max, min: meta.min }
 }
 
-// ---- value formatters ----
-
 export type Formatter = (v: number) => string
 
 const formatSigned = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`
@@ -88,14 +86,10 @@ const formatTemp = (v: number) => {
   return `${k} K`
 }
 
-// ---- per-field UI metadata ----
-
 export interface FieldUi {
   readonly label: string
   readonly format: Formatter
 }
-
-// ---- per-layer UI metadata ----
 
 export interface LayerUi {
   readonly label: string

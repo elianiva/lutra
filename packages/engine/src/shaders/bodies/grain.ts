@@ -33,7 +33,7 @@ import type { BodyRenderer } from '../types'
 
 export const renderGrain: BodyRenderer = (i) => ({
   helpers: `
-// --- Hash + value noise (integer-only, no transcendentals) ---
+// Hash + value noise (integer-only, no transcendentals)
 
 fn grainHash(p: vec2<u32>, frame: u32) -> f32 {
   var h: u32 = p.x * 374761393u + p.y * 668265263u + frame * 974634337u;
@@ -61,7 +61,6 @@ fn grainNoise(p: vec2<f32>, frame: u32) -> f32 {
   return mix(mix(n00, n10, u), mix(n01, n11, u), v);
 }
 
-// --- Profile lookup ---
 // Returns [grainSize, peak, rolloff, blur] for the selected profile.
 
 struct GrainProfile {
@@ -92,7 +91,6 @@ fn grainProfile(profile: i32) -> GrainProfile {
   return GrainProfile(1.00, 0.36, 0.45, 0.40);
 }
 
-// --- Luminance weight ---
 // Asymmetric curve: tight Gaussian for highlights, power-law for shadows.
 // Validated against real film reference scans and AV1 grain synthesis spec.
 
@@ -107,7 +105,6 @@ fn grainLumaWeight(luma: f32, peak: f32, rolloff: f32) -> f32 {
   return bell * shadow;
 }
 
-// --- Multi-scale grain sample ---
 // Fine layer at grainSize, coarse layer at grainSize × 1.5.
 // Mixed by blur parameter (more blur → more coarse → softer grain).
 
@@ -118,7 +115,6 @@ fn grainSample(pos: vec2<f32>, frame: u32, grainSize: f32, blurAmt: f32) -> f32 
 }
 `,
   stmts: `
-// grain
 {
   let prof = grainProfile(i32(l${i}_profile + 0.5));
 
@@ -129,23 +125,21 @@ fn grainSample(pos: vec2<f32>, frame: u32, grainSize: f32, blurAmt: f32) -> f32 
   // Noise frequency: log-scale from fine (0.3 px) to coarse (1.5 px)
   let f = 0.6667 * pow(0.15, baseSize);
 
-  // Fine grain layer
+  // Fine layer at grainSize, coarse at 0.67× frequency; mixed by blur.
   let fine = grainSample(vec2<f32>(coord) * f, u_frame, baseSize, prof.blur);
 
-  // Coarse grain layer at 0.67× frequency (1.5× size)
+  // 0.67× frequency (1.5× size)
   let coarse = grainSample(vec2<f32>(coord) * f * 0.667, u_frame + 7u, baseSize, prof.blur);
 
-  // Blend fine + coarse (coarse layer adds organic clustering)
+  // coarse layer adds organic clustering
   let n = mix(fine, coarse, 0.35);
 
   // Center to [-1, 1] so amplitude is the actual max swing
   let noise = (n - 0.5) * 2.0;
 
-  // Luminance weight: asymmetric bell × shadow power law × smoothstep
   let L = clamp(dot(color, vec3<f32>(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
   let weight = grainLumaWeight(L, prof.peak, prof.rolloff);
 
-  // Apply luma grain (same to all channels)
   let grainAmt = l${i}_amount * 0.15 * weight;
   color += vec3<f32>(noise * grainAmt);
 

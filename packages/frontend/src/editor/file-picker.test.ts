@@ -90,14 +90,10 @@ const mockPngFile = new File(
   { type: 'image/png' },
 )
 
-// ---- Scene test config ----
-
 const config = {
   update,
   view,
 } as const
-
-// ---- Tests ----
 
 describe('Upload zone (empty state)', () => {
   it('shows the upload prompt with a browse button when no image is loaded', () => {

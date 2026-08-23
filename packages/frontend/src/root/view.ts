@@ -19,7 +19,7 @@ import * as Collage from '../collage'
  * root-owned in the model: the progress card floats bottom-right on the main
  * menu, the toast is global, and both read the offline slice directly.
  */
-// ---- lazy slots (ADR 0034) ----
+// lazy slots (ADR 0034)
 // Each slot preserves a cached VNode when its slice's reference is unchanged
 // (root uses `evo`, so unchanged keys keep ===). Builder `h` is singleton.
 const lazyUnsupported = createLazy()

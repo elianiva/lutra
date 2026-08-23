@@ -11,8 +11,6 @@ import { ImageDecodeError, LayerCreationError } from '../errors'
 import { EditorMessage } from './message'
 import type { Model } from './model'
 
-// ---- helpers ----
-
 const bitmap = (width: number, height: number) => new MockImageBitmap(width, height)
 
 /** Picked-file bytes for ImageDecoded (the fresh-pick source record). */
@@ -28,8 +26,6 @@ const loadedModel = (): Model => ({
 const file = () => new File(['x'], 'a.png')
 
 const draftOf = (model: Model) => (model.phase._tag === 'Drafting' ? model.phase.layer : null)
-
-// ---- tests ----
 
 describe('editor phase machine', () => {
   it('compiles to a sound table — no dead transitions, all states reachable', () => {

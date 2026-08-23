@@ -36,7 +36,6 @@ export const update = (model: Model, message: Message): UpdateReturn =>
     M.tags({
       GotDialogMessage: ({ message }) => delegateToDialog(model, message),
 
-      // ---- frame ----
       // A frame slotted after close has no consumer — drop it with its pixels.
       FrameReady: () => {
         if (!model.dialog.isOpen) {
@@ -47,7 +46,7 @@ export const update = (model: Model, message: Message): UpdateReturn =>
       },
       FrameFailed: ({ message }) => [{ ...model, error: model.dialog.isOpen ? message : null }, []],
 
-      // ---- settings: persist; the encode waits for the Export press ----
+      // settings: persist; the encode waits for the Export press
       ChangedFormat: ({ format }) =>
         settingsChanged(model, {
           ...model.settings,
@@ -58,7 +57,6 @@ export const update = (model: Model, message: Message): UpdateReturn =>
       ChangedScale: ({ scale }) => settingsChanged(model, { ...model.settings, scale }),
       SettingsLoaded: ({ settings }) => [{ ...model, settings }, []],
 
-      // ---- encode + download ----
       EncodeRequested: () => {
         // The encode runs here, on Export press — not on settings change.
         if (!model.ready || model.encoding) {
@@ -97,7 +95,7 @@ export const update = (model: Model, message: Message): UpdateReturn =>
         return [{ ...model, downloaded: true }, []]
       },
 
-      // ---- acks (observability only) ----
+      // acks (observability only)
       SettingsSaved: () => [model, []],
       UrlRevoked: () => [model, []],
     }),

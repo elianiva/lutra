@@ -8,8 +8,6 @@ import type { LutId } from '@lutra/engine'
 // Submodels — the card floats bottom-right on the main menu, the per-LUT
 // download states reach the editor's LUT bar through the root's delegation.
 
-// ---- per-LUT download states (the LUT bar's rows) ----
-
 /** A cube file's mirroring state: being fetched, or in the cache. Absence
  *  means "not downloaded" — the offline LUT bar dims those entries. */
 export const DownloadState = S.Union([S.Literal('fetching'), S.Literal('downloaded')])
@@ -23,12 +21,6 @@ export type LutDownloadState = DownloadState | 'not-downloaded'
 /** The bar's lookup: a missing entry reads as "not downloaded". */
 export const stateFor = (downloads: LutDownloads, lutId: LutId): LutDownloadState =>
   downloads[lutId] ?? 'not-downloaded'
-
-// The root's offline slice (CONTEXT.md "Offline library"): the fill
-// machine's state plus the counters the main menu's progress card and the
-// "Offline ready" toast read. Owned by the root because it spans both
-// Submodels — the card floats bottom-right on the main menu, the per-LUT
-// download states reach the editor's LUT bar through the root's delegation.
 
 export const Offline = S.Struct({
   // The fill's lifecycle (./machine.ts): Idle | Filling | Paused | Ready |

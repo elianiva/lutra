@@ -313,8 +313,6 @@ export const PanZoom = Mount.defineStream(
       ),
 )
 
-// ---- canvas registration ----
-
 /**
  * One-shot mount on the render canvas: registers the element in the shared
  * `canvasRef` so render commands resolve the canvas from the app context
@@ -340,7 +338,7 @@ export const RegisterCanvas = Mount.define(
   }),
 )
 
-// ---- compare (before/after viewing) ----
+// compare (before/after viewing)
 
 /**
  * Pointer mount for the Split-mode divider: dragging moves the split
@@ -509,8 +507,6 @@ const compareView = (mode: CompareMode, hasImage: boolean, h: HtmlBuilder<Editor
 const compareControl = (h: HtmlBuilder<EditorMessage>, model: Model, hasImage: boolean): Html =>
   lazyCompare(compareView, [model.compareMode, hasImage, h])!
 
-// ---- sub-views ----
-
 const emptyStage = (h: HtmlBuilder<EditorMessage>) =>
   h.div(
     [
@@ -557,8 +553,6 @@ const errorStage = (h: HtmlBuilder<EditorMessage>, error: string) =>
       ),
     ],
   )
-
-// ---- histogram overlay ----
 
 const HISTOGRAM_WIDTH = 220
 const HISTOGRAM_HEIGHT = 110

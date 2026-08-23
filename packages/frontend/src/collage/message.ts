@@ -12,7 +12,6 @@ import { CollagePhoto } from './model'
  * bare-route redirect push URLs through commands directly.
  */
 export const CollageMessage = defineMessageUnion({
-  // ---- load ----
   /**
    * The requested collage landed, pruned of dangling references. `dropped` is
    * how many tiles referenced edits that no longer exist; `photos` carries the
@@ -23,16 +22,14 @@ export const CollageMessage = defineMessageUnion({
     photos: S.Array(CollagePhoto),
     dropped: S.Number,
   },
-  /** The store failed the load (backend unavailable, quota, corruption). */
   LoadFailed: { error: StoreError },
   /** The id is well-formed but no such collage exists (deleted elsewhere). */
   CollageMissing: {},
-  /** The referenced thumbnails' pixel sizes landed — framing math needs aspects. */
   ThumbsMeasured: {
     sizes: S.Array(S.Struct({ editId: EditIdSchema, width: S.Number, height: S.Number })),
   },
 
-  // ---- layout (each change auto-saves, docs/adr/0030) ----
+  // layout (each change auto-saves, docs/adr/0030)
   ChangedColumns: {
     columns: S.Number,
   },
@@ -45,67 +42,53 @@ export const CollageMessage = defineMessageUnion({
   },
   ToggledBackground: {},
 
-  // ---- mode ----
   /** The Arrange/Frame toggle moved (docs/adr/0033). Leaving Frame commits any in-flight framing gesture. */
   ModeChanged: {
     mode: S.Literals(['arrange', 'frame']),
   },
 
-  // ---- arrangement (auto-saves on every mutation, docs/adr/0030) ----
+  // arrangement (auto-saves on every mutation, docs/adr/0030)
   RemovedTile: { index: S.Number },
-  /** A drag-and-drop gesture finished with a reorder — the DnD machine's fact. */
   GotDragMessage: {
     message: DragAndDrop.Message,
   },
 
-  // ---- tile framing (docs/adr/0033) ----
-  /** A pan gesture started on a tile (Frame mode only). */
+  // tile framing (docs/adr/0033)
   PanStarted: {
     index: S.Number,
     screenX: S.Number,
     screenY: S.Number,
   },
-  /** The pan gesture moved; deltas are applied to that tile's framing draft. */
   PanMoved: {
     screenX: S.Number,
     screenY: S.Number,
   },
   /** The pan gesture ended — the draft framing commits and auto-saves. */
   PanEnded: {},
-  /** One wheel tick over a tile in Frame mode; zooms that tile's draft. */
   WheelZoomed: {
     index: S.Number,
     deltaY: S.Number,
   },
   /** The wheel went quiet — the drafted zoom commits and auto-saves. */
   ZoomSettled: { seq: S.Number },
-  /** Reset one tile's framing to cover-centered (the tile's reset button). */
   ResetFraming: { index: S.Number },
-  /** One preview cell's CSS-pixel size was measured (ResizeObserver). */
   CellMeasured: {
     width: S.Number,
     height: S.Number,
   },
 
-  // ---- undo (docs/adr/0033) ----
-  /** The user pressed Undo on the toast: restore the snapshotted tiles array. */
+  // undo (docs/adr/0033)
   UndoPressed: {},
   /** The toast expired without an undo; the slot clears (sequence-guarded). */
   UndoExpired: { seq: S.Number },
 
-  // ---- auto-save ----
-  /** The mutated record persisted. Observability only. */
   CollageSaved: {},
   SaveFailed: { error: StoreError },
 
-  // ---- navigation ----
-  /** The user pressed the back control; a command pushes the menu URL. */
   BackRequested: {},
-  /** The menu URL was pushed. Observability only — the URL change itself
-   *  drives the route transition (mirrors the root's `NavigatedTo`). */
   NavigatedBack: {},
 
-  // ---- export (docs/adr/0031) ----
+  // export (docs/adr/0031)
   ExportRequested: {},
   /**
    * The composed grid landed in the export-dialog's frame slot — all tiles
@@ -118,7 +101,6 @@ export const CollageMessage = defineMessageUnion({
   CollageExportSnapshotFailed: {
     message: S.String,
   },
-  /** Wraps the shared export-dialog machine's messages (docs/adr/0031). */
   GotCollageExportDialogMessage: {
     message: ExportDialog.Message,
   },

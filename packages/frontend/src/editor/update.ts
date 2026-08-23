@@ -216,7 +216,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
   return Match.value(message).pipe(
     Match.withReturnType<UpdateReturn>(),
     Match.tagsExhaustive({
-      // ---- mobile bottom sheets (docs/adr/0024-mobile-ui) ----
+      // mobile bottom sheets (docs/adr/0024-mobile-ui)
       // Toggle the tapped sheet: tapping the active tab closes it, tapping
       // the other switches. Desktop never reads this — the panels render
       // side-by-side there regardless (the sheet classes are `lg:`-scoped).
@@ -226,16 +226,13 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         Option.none(),
       ],
 
-      // ---- canvas registration ----
       // The mount already wrote the element into the CanvasRef service; the
       // acknowledgment exists for observability (DevTools, Scene, replay).
       CanvasRegistered: () => [model, [], Option.none()],
 
-      // ---- image ----
       FilePickRequested: () => [model, [PickImageFile()], Option.none()],
       FilePickCancelled: () => [model, [], Option.none()],
 
-      // ---- LUT library ----
       // The load result drives the LUT card's status slot (plan 06): a
       // failure records the error (the card shows "LUTs unavailable" with
       // the message as its title); a success clears it.
@@ -246,7 +243,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       ],
       CatalogFailed: ({ error }) => [{ ...model, catalogError: error, phase }, [], Option.none()],
 
-      // ---- offline library (the LUT bar's per-row states, docs/adr/0015) ----
+      // offline library (the LUT bar's per-row states, docs/adr/0015)
       // Root-delegated facts; the editor machine has no edges for them, so
       // the phase passes through untouched. A cube file's fetch began: the
       // bar row shows its spinner.
@@ -375,7 +372,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         ]
       },
 
-      // ---- attached edit (gallery → /edit/:id) ----
+      // attached edit (gallery → /edit/:id)
       // The machine moved to Idle (or ignored the message); the branch seeds
       // the loaded chain + source bitmap and renders it — the same shape a
       // fresh `ImageDecoded` produces, so the editor cannot tell whether it
@@ -433,7 +430,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         ]
       },
 
-      // ---- save ----
       // Save/export while a bar preview is active dismisses the preview
       // instead of acting (docs/adr/0012 D7) — the thumbnail and the export
       // frame snapshot `model.lastRender`, which would otherwise capture the
@@ -469,14 +465,12 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         Option.none(),
       ],
 
-      // ---- canvas ----
       ScaledCanvas: ({ scale, offsetX, offsetY }) => [
         { ...model, offsetX, offsetY, phase, scale },
         [],
         Option.none(),
       ],
 
-      // ---- tool panel / draft ----
       SelectedTool: () => {
         // The machine moved into Creating and attached CreateLayer as its
         // command. Keep the old visual context until that Effect reports;
@@ -609,7 +603,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         return [next, open ? generateThumbCommands(next) : [], Option.none()]
       },
 
-      // ---- LUT bar (bottom filmstrip picker, docs/adr/0012) ----
+      // LUT bar (bottom filmstrip picker, docs/adr/0012)
       // Hover enter/leave on a bar thumb. Presentation-only: sets the
       // previewed lutId and re-renders; the committed chain/draft is
       // untouched. null restores the committed look. The same-value guard
@@ -641,7 +635,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       ],
       LutRecentsSaved: () => [model, [], Option.none()],
 
-      // ---- per-photo LUT thumbnails (filmstrip previews, docs/adr/0013) ----
+      // per-photo LUT thumbnails (filmstrip previews, docs/adr/0013)
       // A thumb landed. One that belongs to a previous photo (the bitmap
       // changed while the worker was rendering) is revoked and dropped —
       // the map only ever holds the current photo's previews.
@@ -661,7 +655,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       LutThumbFailed: () => [model, [], Option.none()],
       LutThumbsRevoked: () => [model, [], Option.none()],
 
-      // ---- committed chain ----
       SelectedLayer: () => {
         // The machine moved to Selected; the branch closes the bar (a
         // selection is a new context — D9, and the bar's target may be
@@ -791,7 +784,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         Option.none(),
       ],
 
-      // ---- tone curve widget (docs/adr/0028) ----
+      // tone curve widget (docs/adr/0028)
       // A chain-layer drag is a plain data op (the machine has no edge from
       // Selected — the chain lives in the model, not the phase); a draft
       // drag goes through the machine's Drafting edge and only re-renders
@@ -839,11 +832,10 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         return renderNow({ ...model, phase })
       },
 
-      // ---- reorder drag (drag operations reshuffle via ReorderedLayer) ----
       StartedLayerReorder: () => [model, [], Option.none()],
       MovedLayerReorder: () => [model, [], Option.none()],
 
-      // ---- compare (before/after viewing) ----
+      // compare (before/after viewing)
       // Presentation-only state (docs/adr/0011): mode and split changes
       // dispatch the blit-only PresentFrame, never a chain render — the
       // graded side keeps showing the last rendered frame.
@@ -874,7 +866,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       },
       FramePresented: () => [model, [], Option.none()],
 
-      // ---- rendering ----
       RenderedFrame: ({ stamp, handle }) => {
         // A newer mutation arrived while this render was in flight — render
         // again with the newest chain+draft instead of dropping the work.
@@ -902,7 +893,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         [],
         Option.none(),
       ],
-      // ---- histogram overlay ----
       // Bins for the frame that's on screen — or a stale readback that
       // landed after a newer mutation, which is dropped (the buffer was
       // already consumed by the ReadHistogram command).
@@ -916,7 +906,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       // the canvas; a 1KB map cannot be retried or shown.
       HistogramFailed: () => [model, [], Option.none()],
 
-      // ---- export dialog (the shared machine owns encode/download/settings) ----
+      // export dialog (the shared machine owns encode/download/settings)
       ExportRequested: () => {
         // D7: the export frame snapshots `model.lastRender` — a hover
         // preview must never be exported, so the click dismisses it first.

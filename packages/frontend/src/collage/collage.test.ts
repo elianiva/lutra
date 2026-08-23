@@ -521,8 +521,6 @@ describe('collage submodel: frame mode', () => {
   })
 })
 
-// ---- export flow ----
-
 // Resolve the dialog's internal ShowDialog command.
 const openDialog = [
   Command.expectHas(Dialog.ShowDialog),

@@ -11,8 +11,6 @@ import { EditorMessage } from './message'
 import { PanZoom, RegisterCanvas, CompareDivider } from './canvas-stage'
 import { createLayerFor, PresentFrame } from './command'
 
-// ---- helpers ----
-
 /** A model with an image loaded (Idle phase) so compare messages land. */
 const loadedModel = () => ({
   ...initialModel(),
@@ -30,8 +28,6 @@ interface PresentArgs {
 }
 const presented = (commands: readonly { readonly name: string; readonly args?: PresentArgs }[]) =>
   commands.find((c) => c.name === 'PresentFrame')?.args?.present
-
-// ---- update flow ----
 
 describe('compare flow', () => {
   it('entering Toggle reveals the source and presents without rendering', () => {
@@ -113,8 +109,6 @@ describe('compare flow', () => {
     })
   })
 })
-
-// ---- view (scene) ----
 
 const sceneConfig = { update, view } as const
 

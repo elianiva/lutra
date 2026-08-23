@@ -25,8 +25,6 @@ import { PanZoom, RegisterCanvas } from './canvas-stage'
 import { MIXER_COLORS } from './layer-meta'
 import type { Model } from './model'
 
-// ---- helpers ----
-
 // SAFETY: fabricated GPU handle stub — tests never execute GPU work, so only its type flows through the model; the buffer has no backing storage and is never read.
 const stubHandle = () =>
   // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
@@ -56,8 +54,6 @@ const draftId = (model: Model) => draftLayer(model)?.id
 
 /** Read a numeric field off a heterogeneous layer. */
 const field = (layer: Layer, key: string): number => numField(layer, FieldKey(key))
-
-// ---- update flow ----
 
 describe('Color Mixer layer flow', () => {
   it('creates a Color Mixer draft with all 24 fields zeroed', () => {
@@ -163,8 +159,6 @@ describe('Color Mixer layer flow', () => {
     expect(editLoaded.activeMixerColor).toEqual({})
   })
 })
-
-// ---- view (scene) ----
 
 const sceneConfig = { update, view } as const
 

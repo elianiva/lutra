@@ -15,7 +15,7 @@ import * as ExportDialog from '../export-dialog'
 import { EditorMessage } from './message'
 import { icon } from '../components/icon'
 
-// ---- lazy islands (ADR 0034) ----
+// lazy islands (ADR 0034)
 // Editor has ~28 Model fields but only a handful change per message.
 // Each island is memoized by its slice's reference (editor uses `evo`,
 // so unchanged keys keep ===). This keeps a slider drag at ~16ms instead

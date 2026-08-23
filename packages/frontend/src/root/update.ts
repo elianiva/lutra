@@ -175,7 +175,7 @@ export const update = (model: Model, message: AppMessage): UpdateReturn =>
       },
       NavigatedTo: () => [model, []],
 
-      // ---- offline library (docs/adr/0015) ----
+      // offline library (docs/adr/0015)
       // The fill's bridged events: the root owns the machine and the
       // counters; cube-file facts delegate into the editor (the LUT bar's
       // per-row states). Every arm steps the machine first — messages with

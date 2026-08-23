@@ -104,8 +104,6 @@ export class GpuBackend extends Context.Service<GpuBackend, GpuBackendContract>(
 // editor on `WebGpuCapability`, so acquisition only runs once the device is
 // known good; failures surface as `GpuError` for the command to catch.
 
-// ---- presentation pass ----
-
 /**
  * Fullscreen-triangle blit: samples the processed storage texture with
  * bilinear filtering and writes it into the canvas swapchain texture. The
@@ -179,8 +177,6 @@ fn fs(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
 
 const roundUp = (n: number, to: number) => Math.ceil(n / to) * to
 
-// ---- histogram pass ----
-
 /** Bins per channel. Matches the 8-bit sRGB-encoded display texture 1:1. */
 const HISTOGRAM_BINS = 256
 
@@ -219,8 +215,6 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   atomicAdd(&bins[bin], 1u);
 }
 `
-
-// ---- the live backend ----
 
 interface ComputeEntry {
   readonly paramsBuffer: GPUBuffer | null

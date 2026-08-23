@@ -5,7 +5,6 @@ import type { BodyRenderer } from '../types'
 // scaled by the aspect ratio (width/height) before the distance is
 // computed, so the falloff stays circular on any frame shape.
 export const renderVignette: BodyRenderer = (i) => `
-// vignette
 {
   var uv = vec2<f32>(f32(coord.x), f32(coord.y)) / u_resolution * 2.0 - 1.0;
   uv.x *= u_resolution.x / u_resolution.y;

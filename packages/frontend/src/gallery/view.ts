@@ -18,7 +18,7 @@ import { deleteDialogView } from './delete-dialog'
  * on unmount / delete) is refined in the editor save-flow slice per the
  * thumbnail contract (docs/adr/0007).
  */
-// ---- memoization (ADR 0034) ----
+// memoization (ADR 0034)
 const lazyHeader = createLazy()
 const lazyNotice = createLazy()
 const lazyTile = createKeyedLazy()
@@ -301,7 +301,7 @@ const tileThumb = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) => {
     : h.div([h.Class('flex h-full w-full items-center justify-center text-muted')], ['No thumb'])
 }
 
-// ---- Collages section (docs/adr/0030) ----
+// Collages section (docs/adr/0030)
 
 /**
  * The saved-collages strip beneath the edits grid. Each card composes a live

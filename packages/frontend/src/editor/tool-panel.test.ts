@@ -29,8 +29,6 @@ import { LutLoadError } from '../luts/store'
 import type { Catalog } from './message'
 import type { Model } from './model'
 
-// ---- helpers ----
-
 const catalog: Catalog = [
   {
     category: 'Print',
@@ -69,8 +67,6 @@ const twoExposureLayers = () => {
 
 /** A LUT draft (Drafting phase — no new picks allowed). */
 const lutDraft = () => settled(selectTool(loaded(), 'lut')[0])
-
-// ---- view (scene) ----
 
 const sceneConfig = { update, view } as const
 

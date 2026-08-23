@@ -30,8 +30,6 @@ import { LutLoadError } from '../luts/store'
 import type { Catalog } from './message'
 import type { Model } from './model'
 
-// ---- helpers ----
-
 const lutPrint = LutId('luts/print/kodak_2393_cuspclip.cube')
 const lutBw = LutId('luts/bw/agfa_apx_100.cube')
 
@@ -95,8 +93,6 @@ const draftLutId = (model: Model): LutId | undefined =>
   model.phase._tag === 'Drafting' && model.phase.layer.type === 'lut'
     ? model.phase.layer.lutId
     : undefined
-
-// ---- update flow ----
 
 describe('LUT layer flow', () => {
   it('keeps the LUT tool inert until the catalog loads', () => {
@@ -530,8 +526,6 @@ describe('catalog load state (LUT card status slot)', () => {
     expect(model.catalog).toEqual(catalog)
   })
 })
-
-// ---- view (scene) ----
 
 const sceneConfig = { update, view } as const
 

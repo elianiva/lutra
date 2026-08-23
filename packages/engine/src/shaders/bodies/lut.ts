@@ -15,7 +15,6 @@ import type { BodyRenderer } from '../types'
 export const renderLut: BodyRenderer = (i) => ({
   needsLut: true,
   stmts: `
-// lut
 {
   let p = clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)) * (LUT_SIZE - 1.0);
   let x0 = vec3<i32>(floor(p));

@@ -90,7 +90,7 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
         Option.none(),
       ],
 
-      // ---- collage selection (docs/adr/0030) ----
+      // collage selection (docs/adr/0030)
       ToggledSelection: ({ id }) => {
         const selected = model.selection.some((selected) => selected === id)
         const selection = selected
@@ -116,7 +116,7 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
         Option.none(),
       ],
 
-      // ---- collage section (docs/adr/0030): list + open + delete ----
+      // collage section (docs/adr/0030): list + open + delete
       CollagesListed: ({ collages }) => {
         // Custom-framed tiles need their thumbnails' aspects before the
         // mini-previews can mirror the framing (docs/adr/0033); the grid's
@@ -193,7 +193,6 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
         Option.none(),
       ],
 
-      // ---- open photo(s) (new edits) ----
       OpenPhotoRequested: () => [model, [OpenPhoto()], Option.none()],
       PhotoPickCancelled: () => [model, [], Option.none()],
       // A single new Edit persisted: surface it upward — the root pushes the
@@ -223,7 +222,6 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
         Option.none(),
       ],
 
-      // ---- settings dialog ----
       SettingsRequested: () => {
         const [dialog, dialogCommands] = Dialog.open(model.settingsDialog)
         return [

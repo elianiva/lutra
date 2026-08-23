@@ -39,7 +39,7 @@ const FRAME_PRESETS: readonly { label: string; value: number }[] = [
 
 const matchesPreset = (ratio: number, value: number) => Math.abs(ratio - value) < 1e-9
 
-// ---- lazy islands (ADR 0034) ----
+// lazy islands (ADR 0034)
 const lazyControls = createLazy()
 const lazyGrid = createLazy()
 const lazyCell = createKeyedLazy()
@@ -166,8 +166,6 @@ const ghostView = (
   })
 }
 
-// ---- undo toast ----
-
 const undoToast = (h: HtmlBuilder<CollageMessage>, model: Model) => {
   const { undo, undoLabel } = model
   if (undo === null || undoLabel === null) {
@@ -196,8 +194,6 @@ const undoToast = (h: HtmlBuilder<CollageMessage>, model: Model) => {
 }
 
 // (ghost superseded by ghostView)
-
-// ---- body ----
 
 const controlsWrapper = (
   mode: Model['mode'],
@@ -249,8 +245,6 @@ const emptyState = (h: HtmlBuilder<CollageMessage>, emptiedByUser: boolean) =>
       ),
     ],
   )
-
-// ---- layout controls ----
 
 const stepperButton = (
   h: HtmlBuilder<CollageMessage>,

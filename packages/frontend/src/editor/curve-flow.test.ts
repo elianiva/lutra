@@ -27,8 +27,6 @@ import { CurveWidget } from './tone-curve'
 import { RenderChain, ReadHistogram } from './command'
 import type { Model } from './model'
 
-// ---- helpers ----
-
 // SAFETY: fabricated GPU handle stub — tests never execute GPU work, so only its type flows through the model; the buffer has no backing storage and is never read.
 const stubHandle = () =>
   // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
@@ -58,8 +56,6 @@ const pointsOf = (model: Model, index = 0) => curvePointsOf(model.chain[index]!)
 
 const drag = (model: Model, index: number, x: number, y: number) =>
   update(model, EditorMessage.CurvePointDragged({ index, x, y }))
-
-// ---- update flow ----
 
 describe('Tone Curve layer flow', () => {
   it('creates a Tone Curve draft as the identity curve', () => {
@@ -164,8 +160,6 @@ describe('Tone Curve layer flow', () => {
     expect(afterReset.chain[0]).toBe(exposure.chain[0])
   })
 })
-
-// ---- view (scene) ----
 
 const sceneConfig = { update, view } as const
 

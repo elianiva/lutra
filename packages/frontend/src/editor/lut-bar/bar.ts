@@ -12,7 +12,7 @@ import { tab } from './tab'
 import { thumb } from './thumb'
 import { stateFor } from '../../offline/model'
 
-// ---- memoization (ADR 0034) ----
+// memoization (ADR 0034)
 // The bar's catalog grouping (`groupByCategory`) over ~300 entries and the
 // thumb strip's `visibleEntries` + per-thumb `thumb()` calls are the heaviest
 // pure work in the editor. A hover `PreviewedLut` should not recompute the

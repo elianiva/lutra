@@ -13,15 +13,10 @@ import { OfflineMessage } from '../offline/messages'
 // child Message (submodel.md).
 
 export const RootMessage = defineMessageUnion({
-  /** The resolved URL changed (browser back/forward, a pushed URL). */
   ChangedRoute: { route: AppRoute },
-  // A link/click requested navigation.
   Navigated: { request: S.Unknown },
-  // Wraps a Gallery Submodel Message so the root can delegate to `Gallery.update`.
   GotGalleryMessage: { message: Gallery.GalleryMessage },
-  // Wraps an Editor Submodel Message so the root can delegate to `Editor.update`.
   GotEditorMessage: { message: Editor.EditorMessage },
-  // Wraps a Collage Submodel Message so the root can delegate to `Collage.update`.
   GotCollageMessage: { message: Collage.CollageMessage },
   /** The root pushed `/edit/:id` in response to a Gallery `OpenedEdit` fact.
    *  Observability only — the URL change itself drives the route transition. */

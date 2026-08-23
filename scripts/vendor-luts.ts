@@ -108,7 +108,6 @@ See the upstream LICENSE file for the mirror's terms.
 `,
     )
 
-    // ---- verify: every catalog entry resolves ----
     const catalog: {
       filmLUTs: { name: string; lut_file: string; thumbnail: string }[]
     } = await Bun.file(join(OUT, 'film_luts.json')).json()

@@ -4,7 +4,6 @@ import type { BodyRenderer } from '../types'
 // smaller R/B pull. Multiplicative in linear light. temp: -1 cool /
 // +1 warm, tint: -1 magenta / +1 green, both 0 = neutral.
 export const renderWhiteBalance: BodyRenderer = (i) => `
-// white balance
 {
   let temp = l${i}_temp;
   let tint = l${i}_tint;

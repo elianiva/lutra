@@ -12,13 +12,9 @@ import { EditorMessage } from './message'
 import { EditNotFoundError } from '../errors'
 import { Idle } from './phase'
 
-// ---- helpers ----
-
 const id = () => EditId('11111111-1111-4111-8111-111111111111')
 const bitmap = (width = 640, height = 480) => new MockImageBitmap(width, height)
 const editorRoute = { _tag: 'Editor', editId: id() } as const
-
-// ---- tests ----
 
 describe('attached edit load (gallery → /edit/:id)', () => {
   it('init fires LoadEdit when the boot route attaches an Edit', () => {

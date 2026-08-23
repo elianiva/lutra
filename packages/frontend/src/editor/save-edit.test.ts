@@ -23,8 +23,6 @@ import { SaveEdit } from './command'
 import { EditorMessage, EditorOutMessage } from './message'
 import { Idle, Loading } from './phase'
 
-// ---- helpers ----
-
 const id = () => EditId('11111111-1111-4111-8111-111111111111')
 const otherId = () => EditId('22222222-2222-4222-8222-222222222222')
 const bitmap = (width = 640, height = 480) => new MockImageBitmap(width, height)
@@ -47,8 +45,6 @@ const loaded = (attached: { id: EditId | null; source: Uint8Array }) => ({
 /** The SaveEdit command among a command list, if one was dispatched. */
 const saveEditOf = (commands: readonly Command.Command<unknown, unknown, unknown>[]) =>
   commands.find((c) => c.name === 'SaveEdit')
-
-// ---- tests ----
 
 describe('editor: save flow (Save / Save as)', () => {
   it('SaveRequested without an image dispatches nothing', () => {
@@ -179,8 +175,6 @@ describe('editor: save flow (Save / Save as)', () => {
     expect(model.saveStatus).toEqual({ _tag: 'idle' })
   })
 })
-
-// ---- top bar (scene) ----
 
 const config = {
   update,

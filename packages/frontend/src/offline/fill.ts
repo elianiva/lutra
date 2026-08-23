@@ -14,8 +14,6 @@ import type { FillEvent, FillFile } from './messages'
 // same channel). The service worker never drives this — it only serves the
 // cache the fill writes.
 
-// ---- the file list the library is made of ----
-
 /** Every file of the offline library: the catalog itself, then per entry
  *  the `.cube` and the generic thumbnail. The path is the URL the app
  *  already fetches (the LUT bar reads `/luts/${entry.thumbnail}`, the cube
@@ -30,8 +28,6 @@ export const libraryFiles = (catalog: readonly LutCatalogEntry[]): readonly Fill
     { lutId: null, path: `/luts/${entry.thumbnail}` },
   ]),
 ]
-
-// ---- the loop ----
 
 export interface FillOptions {
   readonly cache: LutCacheContract
@@ -193,8 +189,6 @@ export const fillFiles = (
     // catalog shrinks (a deploy removed a LUT).
     yield* pruneOrphans(files, opts)
   })
-
-// ---- service ----
 
 export interface OfflineFillContract {
   /** Per-file fill events; the root subscription bridges this into the

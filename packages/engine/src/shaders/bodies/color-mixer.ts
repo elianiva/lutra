@@ -157,7 +157,6 @@ fn mixerWeight(h: f32, left: f32, right: f32) -> f32 {
 }
 `,
     stmts: `
-// color mixer
 {
   let c = clamp(color, vec3<f32>(0.0), vec3<f32>(1.0));
   let srgb = mixerLinearToSrgb(c);

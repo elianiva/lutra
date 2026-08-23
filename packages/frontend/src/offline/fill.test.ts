@@ -269,8 +269,6 @@ describe('fillFiles', () => {
   })
 })
 
-// ---- property-based convergence ----
-
 /** A random fill scenario: a catalog, an arbitrary cache snapshot (library
  *  files already mirrored, plus orphans a shrink left behind), and a
  *  per-file fetch verdict. The catalog pairs unique LUT references with

@@ -12,8 +12,6 @@ import { RenderHandle } from '../gpu/backend'
 import { SnapshotForExport } from './command'
 import { EditorMessage } from './message'
 
-// ---- Scene test config ----
-
 const config = {
   update,
   view,
@@ -51,8 +49,6 @@ const openDialog = [
   Command.expectHas(Dialog.ShowDialog),
   Command.resolve(Dialog.ShowDialog, Dialog.Message.CompletedShowDialog()),
 ]
-
-// ---- Tests ----
 
 describe('Export dialog', () => {
   it('opens on ExportRequested and snapshots the frame — encoding waits for Export', () => {

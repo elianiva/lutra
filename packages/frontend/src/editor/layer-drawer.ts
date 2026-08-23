@@ -139,7 +139,7 @@ const layerSliders = (
   )
 }
 
-// ---- memoization (ADR 0034) ----
+// memoization (ADR 0034)
 const lazyDraft = createLazy()
 const lazyRow = createKeyedLazy()
 

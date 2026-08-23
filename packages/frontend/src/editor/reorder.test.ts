@@ -127,8 +127,6 @@ describe('layer reorder buttons', () => {
   })
 })
 
-// ---- reorder semantics (property-based) ----
-
 // The buttons dispatch EditorMessage.ReorderedLayer({ from: chainIndex, to: chainIndex ± 1 })
 // — "Move up" targets a higher chain index (the drawer renders bottom-up, so
 // that is visually up), "Move down" a lower one. In rendered (top→bottom)

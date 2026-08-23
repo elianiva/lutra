@@ -58,8 +58,6 @@ afterEach(async () => {
   )
 })
 
-// ---- model-based property ----
-
 /** The reference model: exactly the rows the store should hold. */
 class Model {
   readonly rows = new Map<EditId, EditRecord>()
