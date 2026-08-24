@@ -17,7 +17,7 @@ export interface TileRender {
 }
 
 /**
- * Render one Edit's full chain into a framed tile of `cell` px (docs/adr/0009-collage,
+ * Render one Edit's full chain into a framed tile of `cell` px (docs/adr/0031,
  * 0033): the source bytes are decoded, drawn through the tile's framing
  * (zoom + focus) onto a detached cell-sized canvas, then run through the
  * engine's normal render path — `GpuBackend.execute` runs the chain at the
@@ -94,6 +94,16 @@ const renderTileInner = (
         (bitmap) => Effect.sync(() => bitmap.close()),
       )
 
+      // A separate canvas for the GPU render: a canvas that already holds a
+      // 2d context can never acquire a webgpu one (one context type per
+      // canvas — `getContext('webgpu')` returns null), so reusing the framing
+      // canvas fails every tile into a blank cell. The GPU canvas stays
+      // context-free until `execute` configures it; `snapshot` reads the
+      // GPU-side texture, never this canvas's pixels.
+      const gpuCanvas = document.createElement('canvas')
+      gpuCanvas.width = cell.width
+      gpuCanvas.height = cell.height
+
       const luts = yield* resolveLuts(chain)
       const request: RenderRequest = yield* createRenderRequest(
         [...chain],
@@ -105,7 +115,7 @@ const renderTileInner = (
       )
 
       const backend = yield* GpuBackend
-      const handle = yield* backend.execute(request, canvas, OFF_PRESENT)
+      const handle = yield* backend.execute(request, gpuCanvas, OFF_PRESENT)
       const image = yield* backend.snapshot(handle)
       return { image, ok: true } satisfies TileRender
     }),
