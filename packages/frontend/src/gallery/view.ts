@@ -1,7 +1,7 @@
 import { DateTime } from 'effect'
 import { Submodel, AsyncData } from 'foldkit'
 import { type Html, type HtmlBuilder, createLazy, createKeyedLazy } from 'foldkit/html'
-import { Check, Undo2, X } from 'lucide'
+import { Check, Undo2, Upload, X } from 'lucide'
 import { GalleryMessage } from './message'
 import type { Model } from './model'
 import type { Collage as CollageRecord, EditSummary, EditId, StoreError } from '@lutra/store'
@@ -33,7 +33,15 @@ const noticeView = (message: string | null, h: HtmlBuilder<GalleryMessage>): Htm
 export const view = Submodel.defineView<Model, GalleryMessage>((model, h) => {
   const { grid } = model
   return h.div(
-    [h.Class('flex h-full flex-col bg-bg text-ink')],
+    [
+      h.Class('relative flex h-full flex-col bg-bg text-ink'),
+      h.DataAttribute('gallery-drop-zone', 'true'),
+      h.OnDragEnter(GalleryMessage.DragEntered()),
+      h.OnDragLeave(GalleryMessage.DragLeft()),
+      h.OnDragOver(GalleryMessage.DragEntered()),
+      h.AllowDrop(),
+      h.OnDropFiles((files) => GalleryMessage.FilesDropped({ files: [...files] })),
+    ],
     [
       lazyHeader(headerView, [model.selection.length, h])!,
       lazyNotice(noticeView, [model.notice, h]) ?? notice(model.notice, h),
@@ -52,6 +60,7 @@ export const view = Submodel.defineView<Model, GalleryMessage>((model, h) => {
       ),
       settingsDialogView(h, model),
       deleteDialogView(h, model),
+      dropOverlay(h, model.dragOver),
     ],
   )
 })
@@ -153,20 +162,56 @@ const gridBody = (
 const spinner = (h: HtmlBuilder<GalleryMessage>) =>
   h.div([h.Class('flex flex-1 items-center justify-center text-sm text-muted')], ['Loading…'])
 
+const dropOverlay = (h: HtmlBuilder<GalleryMessage>, active: boolean): Html =>
+  active
+    ? h.div(
+        [
+          h.Class(
+            'pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 border-2 border-dashed border-accent bg-bg/80 backdrop-blur-sm',
+          ),
+          h.DataAttribute('drop-overlay', 'true'),
+        ],
+        [
+          h.div(
+            [
+              h.Class(
+                'flex h-16 w-16 items-center justify-center rounded-full border-2 border-accent bg-panel text-accent',
+              ),
+            ],
+            [icon(h, Upload, 'Drop photos', 28)],
+          ),
+          h.p(
+            [h.Class('text-sm font-semibold tracking-wide text-accent')],
+            ['Drop photos to add'],
+          ),
+          h.p([h.Class('text-xs text-muted')], ['Release to add them to your gallery']),
+        ],
+      )
+    : null
+
 const emptyState = (h: HtmlBuilder<GalleryMessage>) =>
   h.div(
-    [h.Class('flex flex-1 flex-col items-center justify-center gap-3 text-sm text-muted')],
+    [
+      h.Class('flex flex-1 flex-col items-center justify-center gap-3 text-sm text-muted'),
+      h.DataAttribute('empty-state', 'true'),
+    ],
     [
       h.p([], ['No saved edits yet.']),
-      h.button(
+      h.div(
+        [h.Class('flex flex-wrap items-center justify-center gap-2')],
         [
-          h.OnClick(GalleryMessage.OpenPhotoRequested()),
-          h.AriaLabel('Open a photo to start a new edit'),
-          h.Class('rounded bg-accent px-4 py-2 text-xs text-ink hover:opacity-80'),
+          h.button(
+            [
+              h.OnClick(GalleryMessage.OpenPhotoRequested()),
+              h.AriaLabel('Open a photo to start a new edit'),
+              h.Class('rounded bg-accent px-4 py-2 text-xs text-ink hover:opacity-80'),
+            ],
+            ['Open a photo to start editing'],
+          ),
+          h.span([h.Class('text-xs text-muted')], ['or drop images here']),
         ],
-        ['Open a photo to start editing'],
       ),
-      h.p([h.Class('text-xs text-muted')], ['Your edits will appear here.']),
+      h.p([h.Class('text-xs text-muted')], ['Paste (⌘V / Ctrl+V) also works. Your edits will appear here.']),
     ],
   )
 

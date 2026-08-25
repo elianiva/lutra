@@ -129,6 +129,14 @@ export const DeleteEdit = Command.define('DeleteEdit', {
 /** The accepted image types for the native picker (mirrors the editor's `PickImageFile`). */
 const IMAGE_TYPES = ['image/*', '.jpg', '.jpeg', '.png', '.webp', '.avif']
 
+/** Accept only image files: mime must start with image/ or extension looks like an image. */
+export const isImageFile = (file: File): boolean => {
+  if (file.type.startsWith('image/')) {
+    return true
+  }
+  return /\.(jpe?g|png|webp|avif|gif|bmp|tiff|heic|heif)$/i.test(file.name)
+}
+
 /** The picked file's bytes — the Edit's source image, stored verbatim. */
 const readBytes = (file: File): Effect.Effect<Uint8Array, ImageDecodeError> =>
   Effect.tryPromise({
@@ -274,6 +282,58 @@ export const OpenPhoto = Command.define('OpenPhoto', {
       Effect.succeed(GalleryMessage.PhotoCreateFailed({ error: err })),
     ),
   ),
+  messages: [
+    GalleryMessage.PhotoCreated,
+    GalleryMessage.PhotoPickCancelled,
+    GalleryMessage.PhotoCreateFailed,
+    GalleryMessage.PhotosAdded,
+  ],
+})
+
+/**
+ * Create Edits from files already in hand — the drop/paste counterpart to
+ * `OpenPhoto`'s picker flow. The files arrive from OnDropFiles or the
+ * paste mount, already filtered to image types. A single image keeps the
+ * classic "open in editor" flow; several stay on the gallery via
+ * `PhotosAdded`, mirroring the multi-pick path so one bad file never loses
+ * the batch. Non-image files are ignored; an empty image set is a no-op.
+ */
+export const AddFiles = Command.define('AddFiles', {
+  args: { files: S.Array(S.instanceOf(File)) },
+  execute: ({ files }) =>
+    Effect.gen(function* () {
+      const images = files.filter(isImageFile)
+      if (images.length === 0) {
+        return GalleryMessage.PhotoPickCancelled()
+      }
+      if (images.length === 1) {
+        const [file] = images
+        if (file === undefined) {
+          return GalleryMessage.PhotoPickCancelled()
+        }
+        const id = yield* createEdit(file)
+        return GalleryMessage.PhotoCreated({ id })
+      }
+      const [failures, createdIds] = yield* Effect.partition(images, createEdit)
+      const store = yield* EditStore
+      const summaries = yield* Effect.option(store.list())
+      return GalleryMessage.PhotosAdded({
+        added: createdIds.length,
+        failed: failures.length,
+        error: Array.head(failures),
+        summaries,
+      })
+    }).pipe(
+      Effect.catchTag('StoreError', (err: StoreError) =>
+        Effect.succeed(GalleryMessage.PhotoCreateFailed({ error: err })),
+      ),
+      Effect.catchTag('ImageDecodeError', (err: ImageDecodeError) =>
+        Effect.succeed(GalleryMessage.PhotoCreateFailed({ error: err })),
+      ),
+      Effect.catchTag('ThumbnailEncodeError', (err: ThumbnailEncodeError) =>
+        Effect.succeed(GalleryMessage.PhotoCreateFailed({ error: err })),
+      ),
+    ),
   messages: [
     GalleryMessage.PhotoCreated,
     GalleryMessage.PhotoPickCancelled,

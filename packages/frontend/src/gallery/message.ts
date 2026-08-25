@@ -67,6 +67,12 @@ export const GalleryMessage = defineMessageUnion({
   CollageCreated: { id: CollageIdSchema },
   CollageCreateFailed: { error: StoreError },
 
+  // drag & drop / paste (gallery drop zone + clipboard)
+  DragEntered: {},
+  DragLeft: {},
+  FilesDropped: { files: S.Array(S.instanceOf(File)) },
+  FilesPasted: { files: S.Array(S.instanceOf(File)) },
+
   SettingsRequested: {},
 
   GotSettingsDialogMessage: {

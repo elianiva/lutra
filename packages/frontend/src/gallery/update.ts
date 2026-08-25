@@ -4,6 +4,7 @@ import { Dialog } from '@foldkit/ui'
 import type { EditStore, CollageStore, EditSummary } from '@lutra/store'
 import { GalleryMessage, GalleryOutMessage, PhotoCreateError } from './message'
 import {
+  AddFiles,
   CreateCollage,
   DeleteCollage,
   DeleteEdit,
@@ -194,6 +195,14 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
       ],
 
       OpenPhotoRequested: () => [model, [OpenPhoto()], Option.none()],
+      DragEntered: () => [{ ...model, dragOver: true }, [], Option.none()],
+      DragLeft: () => [{ ...model, dragOver: false }, [], Option.none()],
+      FilesDropped: ({ files }) => [
+        { ...model, dragOver: false },
+        [AddFiles({ files: [...files] })],
+        Option.none(),
+      ],
+      FilesPasted: ({ files }) => [model, [AddFiles({ files: [...files] })], Option.none()],
       PhotoPickCancelled: () => [model, [], Option.none()],
       // A single new Edit persisted: surface it upward — the root pushes the
       // editor URL, exactly as if the user had clicked the tile.

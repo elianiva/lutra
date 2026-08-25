@@ -47,6 +47,10 @@ export const Model = S.Struct({
   deleteDialog: Dialog.Model,
   // The Experimental section's flags. UI-only for now — nothing reads them
   // yet; wiring them up changes app behavior and comes later.
+  // Visual drag-over state: true while a file drag hovers the gallery
+  // root so the view can render a drop overlay. Purely presentation —
+  // the drop itself is handled by OnDropFiles.
+  dragOver: S.Boolean,
   experimental: S.Struct({
     // "Infinite canvas": pan/zoom a Figma-style workspace instead of the
     // fixed photo canvas. Not wired up — a visual toggle only.
@@ -65,6 +69,7 @@ export const initialModel = (): Model => ({
   pendingDelete: null,
   settingsDialog: Dialog.init({ id: 'gallery-settings-dialog' }),
   deleteDialog: Dialog.init({ id: 'gallery-delete-dialog' }),
+  dragOver: false,
   experimental: {
     infiniteCanvas: false,
   },
