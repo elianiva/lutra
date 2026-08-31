@@ -140,10 +140,12 @@ const thumbView = (
     if (!online && downloadState !== 'downloaded') {
       return EditorMessage.OfflineLutUnavailable({ lutId: entry.lut_file })
     }
+    if (commitKind === 'draft') {
+      return EditorMessage.ChangedDraftLut({ lutId: entry.lut_file })
+    }
     // SAFETY: commitId is LayerId when commitKind is 'layer' (barView guarantees targetId non-null)
-    return commitKind === 'draft'
-      ? EditorMessage.ChangedDraftLut({ lutId: entry.lut_file })
-      : EditorMessage.ChangedLayerLut({ id: commitId as LayerId, lutId: entry.lut_file })
+    // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
+    return EditorMessage.ChangedLayerLut({ id: commitId as LayerId, lutId: entry.lut_file })
   })
 
 const barView = (
@@ -162,23 +164,26 @@ const barView = (
   chain: Model['chain'],
   h: HtmlBuilder<EditorMessage>,
 ): Html => {
+  // SAFETY: narrow slice for lazy memoization — only fields the view island reads
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
+  const m = {
+    previewLut,
+    lutTab,
+    lutRecents,
+    lutThumbs,
+    lutDownloads,
+    online,
+    offlineLutNotice: offlineNotice,
+    phase,
+    chain,
+    catalog,
+  } as unknown as Model
   const current = (() => {
-    const m = {
-      previewLut,
-      lutTab,
-      lutRecents,
-      lutThumbs,
-      lutDownloads,
-      online,
-      offlineLutNotice: offlineNotice,
-      phase,
-      chain,
-      catalog,
-      // SAFETY: narrow slice for lazy memoization — only fields the view island reads
-    } as unknown as Model
     if (targetKind === 'draft') {
       return currentLutId(m, { kind: 'draft' })
     } else if (targetId !== null) {
+      // SAFETY: targetId is LayerId when targetKind is 'layer' (guarded by targetId !== null)
+      // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
       return currentLutId(m, { kind: 'layer', id: targetId as LayerId })
     }
     return Option.none<LutId>()

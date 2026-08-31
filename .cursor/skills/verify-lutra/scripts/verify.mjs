@@ -15,7 +15,15 @@
 
 import { spawn, spawnSync } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync } from 'node:fs'
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  readdirSync,
+  rmSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, resolve, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -40,7 +48,13 @@ if (!SCENARIOS.includes(SCENARIO)) {
 const APP = opt('url', process.env.LUTRA_URL || 'http://localhost:5173/')
 const IMAGE = resolve(opt('image', join(SKILL_DIR, 'fixtures', 'sample.png')))
 const OUT = resolve(
-  opt('out', process.env.VERIFY_OUT || (existsSync('/opt/cursor/artifacts') ? '/opt/cursor/artifacts/verify-lutra' : join(process.cwd(), '.verify-artifacts'))),
+  opt(
+    'out',
+    process.env.VERIFY_OUT ||
+      (existsSync('/opt/cursor/artifacts')
+        ? '/opt/cursor/artifacts/verify-lutra'
+        : join(process.cwd(), '.verify-artifacts')),
+  ),
 )
 const KEEP_OPEN = has('keep-open')
 const DISPLAY = process.env.DISPLAY || ':1'
@@ -50,7 +64,9 @@ mkdirSync(OUT, { recursive: true })
 function loadWs() {
   const bases = [process.cwd(), SKILL_DIR, '/workspace']
   for (const b of bases) {
-    try { return createRequire(join(b, 'noop.js'))('ws') } catch {}
+    try {
+      return createRequire(join(b, 'noop.js'))('ws')
+    } catch {}
   }
   // Fallback: scan the pnpm virtual store for any ws@* copy.
   for (const b of bases) {
@@ -58,7 +74,9 @@ function loadWs() {
     if (!existsSync(store)) continue
     const hit = readdirSync(store).find((d) => d.startsWith('ws@'))
     if (hit) {
-      try { return createRequire(join(store, hit, 'node_modules', 'ws', 'index.js'))('.') } catch {}
+      try {
+        return createRequire(join(store, hit, 'node_modules', 'ws', 'index.js'))('.')
+      } catch {}
     }
   }
   throw new Error('could not resolve the "ws" module; run pnpm install first')
@@ -67,7 +85,12 @@ const WebSocket = loadWs()
 
 // ---- locate chrome -------------------------------------------------------
 function findChrome() {
-  const cands = ['google-chrome', 'google-chrome-stable', '/usr/bin/google-chrome-stable', '/opt/google/chrome/chrome']
+  const cands = [
+    'google-chrome',
+    'google-chrome-stable',
+    '/usr/bin/google-chrome-stable',
+    '/opt/google/chrome/chrome',
+  ]
   for (const c of cands) {
     const r = spawnSync(c, ['--version'], { stdio: 'ignore' })
     if (!r.error) return c
@@ -110,42 +133,83 @@ async function getPageWs() {
   throw new Error('Chrome DevTools endpoint never came up')
 }
 
-const result = { scenario: SCENARIO, url: APP, image: IMAGE, out: OUT, steps: [], consoleErrors: [], ok: false }
-const record = (name, ok, detail) => { result.steps.push({ name, ok, detail }); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`) }
+const result = {
+  scenario: SCENARIO,
+  url: APP,
+  image: IMAGE,
+  out: OUT,
+  steps: [],
+  consoleErrors: [],
+  ok: false,
+}
+const record = (name, ok, detail) => {
+  result.steps.push({ name, ok, detail })
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`)
+}
 
 let ws
 try {
   const wsUrl = await getPageWs()
   ws = new WebSocket(wsUrl)
-  await new Promise((r, j) => { ws.on('open', r); ws.on('error', j) })
+  await new Promise((r, j) => {
+    ws.on('open', r)
+    ws.on('error', j)
+  })
   let id = 0
   const pending = new Map()
   // If the socket drops mid-command, reject every awaiter so the run fails
   // fast and reaches `finally` cleanup instead of hanging forever.
   const rejectAll = (reason) => {
-    for (const [, p] of pending) { clearTimeout(p.timer); p.reject(new Error(reason)) }
+    for (const [, p] of pending) {
+      clearTimeout(p.timer)
+      p.reject(new Error(reason))
+    }
     pending.clear()
   }
   ws.on('close', () => rejectAll('CDP socket closed'))
   ws.on('error', (e) => rejectAll('CDP socket error: ' + (e?.message || e)))
   ws.on('message', (d) => {
     const m = JSON.parse(d.toString())
-    if (m.id && pending.has(m.id)) { const p = pending.get(m.id); clearTimeout(p.timer); p.resolve(m); pending.delete(m.id) }
-    else if (m.method === 'Log.entryAdded' && ['error', 'warning'].includes(m.params.entry.level)) {
+    if (m.id && pending.has(m.id)) {
+      const p = pending.get(m.id)
+      clearTimeout(p.timer)
+      p.resolve(m)
+      pending.delete(m.id)
+    } else if (
+      m.method === 'Log.entryAdded' &&
+      ['error', 'warning'].includes(m.params.entry.level)
+    ) {
       const t = (m.params.entry.text || '').slice(0, 200)
-      if (!/apple-mobile-web-app-capable|willReadFrequently/.test(t)) result.consoleErrors.push(`[${m.params.entry.level}] ${t}`)
-    }
-    else if (m.method === 'Runtime.exceptionThrown') result.consoleErrors.push('[exception] ' + (m.params.exceptionDetails?.exception?.description || m.params.exceptionDetails?.text || '').slice(0, 200))
+      if (!/apple-mobile-web-app-capable|willReadFrequently/.test(t))
+        result.consoleErrors.push(`[${m.params.entry.level}] ${t}`)
+    } else if (m.method === 'Runtime.exceptionThrown')
+      result.consoleErrors.push(
+        '[exception] ' +
+          (
+            m.params.exceptionDetails?.exception?.description ||
+            m.params.exceptionDetails?.text ||
+            ''
+          ).slice(0, 200),
+      )
   })
-  const send = (method, params = {}) => new Promise((resolve, reject) => {
-    const mid = ++id
-    const timer = setTimeout(() => { pending.delete(mid); reject(new Error(`CDP command timed out: ${method}`)) }, 30000)
-    pending.set(mid, { resolve, reject, timer })
-    ws.send(JSON.stringify({ id: mid, method, params }))
-  })
+  const send = (method, params = {}) =>
+    new Promise((resolve, reject) => {
+      const mid = ++id
+      const timer = setTimeout(() => {
+        pending.delete(mid)
+        reject(new Error(`CDP command timed out: ${method}`))
+      }, 30000)
+      pending.set(mid, { resolve, reject, timer })
+      ws.send(JSON.stringify({ id: mid, method, params }))
+    })
   const evalp = async (expr, awaitPromise = true) => {
-    const r = await send('Runtime.evaluate', { expression: expr, awaitPromise, returnByValue: true })
-    if (r.result?.exceptionDetails) return { error: JSON.stringify(r.result.exceptionDetails).slice(0, 300) }
+    const r = await send('Runtime.evaluate', {
+      expression: expr,
+      awaitPromise,
+      returnByValue: true,
+    })
+    if (r.result?.exceptionDetails)
+      return { error: JSON.stringify(r.result.exceptionDetails).slice(0, 300) }
     return { value: r.result?.result?.value }
   }
   const shot = async (name) => {
@@ -156,13 +220,16 @@ try {
     return file
   }
   // click the first element whose accessible name / text matches a regex
-  const clickByName = async (re) => (await evalp(`(() => {
+  const clickByName = async (re) =>
+    (
+      await evalp(`(() => {
     const rx = ${re};
     const els = [...document.querySelectorAll('button,[role=button],a,[aria-label],[title]')];
     const hit = els.find(e => rx.test((e.getAttribute&&(e.getAttribute('aria-label')||e.getAttribute('title'))||'') + ' ' + (e.innerText||'')));
     if (hit) { hit.click(); return (hit.getAttribute&&hit.getAttribute('aria-label'))||hit.innerText||'(clicked)'; }
     return null;
-  })()`)).value
+  })()`)
+    ).value
 
   await send('Page.enable')
   await send('Runtime.enable')
@@ -170,19 +237,30 @@ try {
   await sleep(4000)
 
   // --- WebGPU adapter present? (proves the environment is set up) ---
-  const adapter = await evalp(`(async () => { if(!navigator.gpu) return 'no-navigator.gpu'; const a = await navigator.gpu.requestAdapter(); return a ? ('ok:'+((a.info&&a.info.architecture)||'?')) : 'null-adapter'; })()`)
-  record('webgpu-adapter', String(adapter.value).startsWith('ok:'), String(adapter.value ?? adapter.error))
+  const adapter = await evalp(
+    `(async () => { if(!navigator.gpu) return 'no-navigator.gpu'; const a = await navigator.gpu.requestAdapter(); return a ? ('ok:'+((a.info&&a.info.architecture)||'?')) : 'null-adapter'; })()`,
+  )
+  record(
+    'webgpu-adapter',
+    String(adapter.value).startsWith('ok:'),
+    String(adapter.value ?? adapter.error),
+  )
 
   // --- gallery loaded past the WebGPU gate ---
-  const body = (await evalp(`(document.body.innerText||'').replace(/\\n/g,' | ').slice(0,160)`)).value || ''
-  record('gallery-loaded', !/WebGPU required/i.test(body) && /Open a photo|No saved edits|drop images/i.test(body), body.slice(0, 80))
+  const body =
+    (await evalp(`(document.body.innerText||'').replace(/\\n/g,' | ').slice(0,160)`)).value || ''
+  record(
+    'gallery-loaded',
+    !/WebGPU required/i.test(body) && /Open a photo|No saved edits|drop images/i.test(body),
+    body.slice(0, 80),
+  )
   await shot('gallery')
 
   const NEEDS_EDITOR = ['smoke', 'open', 'lut', 'adjust'].includes(SCENARIO)
   if (NEEDS_EDITOR) {
     // --- open a photo via the reliable drop path ---
     const b64 = readFileSync(IMAGE).toString('base64')
-    const drop = await evalp(`(() => {
+    await evalp(`(() => {
       const bin = atob(${JSON.stringify(b64)});
       const arr = new Uint8Array(bin.length);
       for (let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
@@ -195,7 +273,11 @@ try {
     await sleep(9000)
     const url = (await evalp('location.href')).value || ''
     record('open-photo', /\/edit\//.test(url), url)
-    const canvases = (await evalp(`JSON.stringify([...document.querySelectorAll('canvas')].map(c=>({w:c.width,h:c.height})))`)).value
+    const canvases = (
+      await evalp(
+        `JSON.stringify([...document.querySelectorAll('canvas')].map(c=>({w:c.width,h:c.height})))`,
+      )
+    ).value
     record('editor-canvas', /"w":\s*\d+/.test(String(canvases)), String(canvases))
     await shot('editor')
   }
@@ -210,7 +292,11 @@ try {
     await sleep(4000)
     // the applied layer shows up in the right-hand LAYERS panel
     const layerText = (await evalp(`(document.body.innerText||'')`)).value || ''
-    record('lut-layer-present', /STRENGTH/i.test(layerText) && /LUT/i.test(layerText), 'LAYERS shows a LUT layer with STRENGTH')
+    record(
+      'lut-layer-present',
+      /STRENGTH/i.test(layerText) && /LUT/i.test(layerText),
+      'LAYERS shows a LUT layer with STRENGTH',
+    )
     await shot('lut-applied')
   }
 
@@ -242,13 +328,25 @@ try {
       const disp = r && r.parentElement && r.parentElement.querySelector('.tnum');
       return JSON.stringify({ value: r && r.value, display: (disp&&disp.textContent)||null });
     })()`)
-    let b = {}, a = {}
-    try { b = JSON.parse(before.value || '{}'); a = JSON.parse(after.value || '{}') } catch {}
-    record('exposure-changed', b.ok === true && a.display != null && a.display !== b.display, `readout ${b.display} -> ${a.display} (value ${a.value})`)
+    let b = {},
+      a = {}
+    try {
+      b = JSON.parse(before.value || '{}')
+      a = JSON.parse(after.value || '{}')
+    } catch {}
+    record(
+      'exposure-changed',
+      b.ok === true && a.display != null && a.display !== b.display,
+      `readout ${b.display} -> ${a.display} (value ${a.value})`,
+    )
     await shot('exposure')
   }
 
-  record('no-console-errors', result.consoleErrors.length === 0, result.consoleErrors.slice(0, 3).join(' ; ') || 'clean')
+  record(
+    'no-console-errors',
+    result.consoleErrors.length === 0,
+    result.consoleErrors.slice(0, 3).join(' ; ') || 'clean',
+  )
 
   result.ok = result.steps.every((s) => s.ok)
 } catch (e) {
@@ -257,15 +355,30 @@ try {
   const summary = join(OUT, `${SCENARIO}-result.json`)
   writeFileSync(summary, JSON.stringify(result, null, 2))
   console.log('RESULT', summary, '=>', result.ok ? 'OK' : 'FAILED')
-  if (ws) try { ws.close() } catch {}
+  if (ws)
+    try {
+      ws.close()
+    } catch {}
   if (!KEEP_OPEN) {
-    try { chrome.kill('SIGKILL') } catch {}
+    try {
+      chrome.kill('SIGKILL')
+    } catch {}
     await sleep(300)
     // Remove the throwaway Chrome profile so repeated runs don't accumulate
     // cache under the temp dir. Evidence in --out is never touched.
-    try { rmSync(profileDir, { recursive: true, force: true }) } catch {}
+    try {
+      rmSync(profileDir, { recursive: true, force: true })
+    } catch {}
   } else {
-    console.log('Chrome left open (pid', chrome.pid + ') on', DISPLAY, 'debug port', port, '— profile', profileDir)
+    console.log(
+      'Chrome left open (pid',
+      chrome.pid + ') on',
+      DISPLAY,
+      'debug port',
+      port,
+      '— profile',
+      profileDir,
+    )
   }
   await sleep(200)
   process.exit(result.ok ? 0 : 1)

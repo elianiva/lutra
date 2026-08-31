@@ -1,4 +1,4 @@
-import { Effect, Match, Option, Schema as S } from 'effect'
+import { Effect, Match, Schema as S } from 'effect'
 import { Command, Update } from 'foldkit'
 import { pushUrl } from 'foldkit/navigation'
 import { evo } from 'foldkit/struct'
@@ -17,6 +17,7 @@ import type { AppRoute } from '../route'
 import * as Gallery from '../gallery'
 import * as Editor from '../editor'
 import * as Collage from '../collage'
+import { OfflineMessage } from '../offline/messages'
 import { offlineMachine } from '../offline/machine'
 import type { Offline } from '../offline/model'
 import { EditorMessage } from '../editor/message'
@@ -71,33 +72,51 @@ const applyRoute = (model: Model, route: AppRoute) =>
   Match.value(route).pipe(
     Match.withReturnType<UpdateReturn>(),
     Match.when(S.is(GalleryRoute), (route) => {
-      const { model: nextGallery, commands: cmds = [] } = Gallery.informRouteChanged(model.gallery, route)
+      const { model: nextGallery, commands: cmds = [] } = Gallery.informRouteChanged(
+        model.gallery,
+        route,
+      )
       const mapped = Command.mapMessages(cmds, (m) => RootMessage.GotGalleryMessage({ message: m }))
-      return { model: withRoute(evo(model, { gallery: (_) => nextGallery }), route), commands: mapped }
+      return {
+        model: withRoute(evo(model, { gallery: (_) => nextGallery }), route),
+        commands: mapped,
+      }
     }),
     Match.when(S.is(EditorRoute), (route) => {
-      const { model: nextEditor, commands: cmds = [] } = Editor.informRouteChanged(model.editor, route)
+      const { model: nextEditor, commands: cmds = [] } = Editor.informRouteChanged(
+        model.editor,
+        route,
+      )
       const mapped = Command.mapMessages(cmds, (m) => RootMessage.GotEditorMessage({ message: m }))
-      return { model: withRoute(evo(model, { editor: (_) => nextEditor }), route), commands: mapped }
+      return {
+        model: withRoute(evo(model, { editor: (_) => nextEditor }), route),
+        commands: mapped,
+      }
     }),
     Match.when(S.is(CollageHomeRoute), (route) => {
       // Bare `/collage` is a redirect home, not a screen.
       return { model: withRoute(model, route), commands: [NavigateHome()] }
     }),
     Match.when(S.is(CollageRoute), (route) => {
-      const { model: nextCollage, commands: cmds = [] } = Collage.informRouteChanged(model.collage, route)
+      const { model: nextCollage, commands: cmds = [] } = Collage.informRouteChanged(
+        model.collage,
+        route,
+      )
       const mapped = Command.mapMessages(cmds, (m) => RootMessage.GotCollageMessage({ message: m }))
-      return { model: withRoute(evo(model, { collage: (_) => nextCollage }), route), commands: mapped }
+      return {
+        model: withRoute(evo(model, { collage: (_) => nextCollage }), route),
+        commands: mapped,
+      }
     }),
     Match.orElse((route) => ({ model: withRoute(model, route) })),
   )
 
 /** Step the offline machine with a landed message; carries the new phase. */
 const stepOffline = (offline: Offline, message: AppMessage): Offline => {
-  const result = offlineMachine.step(
-    offline.phase,
-    message as Extract<AppMessage, { readonly _tag: string }>,
-  )
+  if (!S.is(OfflineMessage)(message)) {
+    return offline
+  }
+  const result = offlineMachine.step(offline.phase, message)
   return { ...offline, phase: result.state }
 }
 
@@ -107,10 +126,11 @@ const stepOffline = (offline: Offline, message: AppMessage): Offline => {
  *  editor can surface nothing for these facts (no EditCreated), but the out
  *  channel is handled the same way as GotEditorMessage's for safety. */
 const delegateToEditor = (model: Model, editorMessage: EditorMessage): UpdateReturn => {
-  const { model: nextEditor, commands: cmds = [], outMessage: out } = Editor.update(
-    model.editor,
-    editorMessage,
-  )
+  const {
+    model: nextEditor,
+    commands: cmds = [],
+    outMessage: out,
+  } = Editor.update(model.editor, editorMessage)
   const mapped = Command.mapMessages(cmds, (m) => RootMessage.GotEditorMessage({ message: m }))
   return out === undefined
     ? { model: evo(model, { editor: (_) => nextEditor }), commands: mapped }
@@ -131,17 +151,18 @@ const delegateToEditor = (model: Model, editorMessage: EditorMessage): UpdateRet
  */
 export const update = (model: Model, message: AppMessage): UpdateReturn => {
   if (message._tag === 'ChangedRoute') {
-    return applyRoute(model, (message as { readonly route: AppRoute }).route)
+    return applyRoute(model, message.route)
   }
   return Match.value(message).pipe(
     Match.withReturnType<UpdateReturn>(),
     Match.tagsExhaustive({
       Navigated: () => ({ model }),
       GotGalleryMessage: ({ message: galleryMessage }) => {
-        const { model: nextGallery, commands: cmds = [], outMessage: out } = Gallery.update(
-          model.gallery,
-          galleryMessage,
-        )
+        const {
+          model: nextGallery,
+          commands: cmds = [],
+          outMessage: out,
+        } = Gallery.update(model.gallery, galleryMessage)
         const mapped = Command.mapMessages(cmds, (m) =>
           RootMessage.GotGalleryMessage({ message: m }),
         )
@@ -159,10 +180,11 @@ export const update = (model: Model, message: AppMessage): UpdateReturn => {
         }
       },
       GotEditorMessage: ({ message: editorMessage }) => {
-        const { model: nextEditor, commands: cmds = [], outMessage: out } = Editor.update(
-          model.editor,
-          editorMessage,
-        )
+        const {
+          model: nextEditor,
+          commands: cmds = [],
+          outMessage: out,
+        } = Editor.update(model.editor, editorMessage)
         const mapped = Command.mapMessages(cmds, (m) =>
           RootMessage.GotEditorMessage({ message: m }),
         )
@@ -179,7 +201,10 @@ export const update = (model: Model, message: AppMessage): UpdateReturn => {
         }
       },
       GotCollageMessage: ({ message: collageMessage }) => {
-        const { model: nextCollage, commands: cmds = [] } = Collage.update(model.collage, collageMessage)
+        const { model: nextCollage, commands: cmds = [] } = Collage.update(
+          model.collage,
+          collageMessage,
+        )
         const mapped = Command.mapMessages(cmds, (m) =>
           RootMessage.GotCollageMessage({ message: m }),
         )
@@ -202,7 +227,9 @@ export const update = (model: Model, message: AppMessage): UpdateReturn => {
       }),
       // A file fetch began; cube files mark their LUT row fetching.
       OfflineFileStarted: ({ lutId }) =>
-        lutId === null ? { model } : delegateToEditor(model, EditorMessage.OfflineFileFetching({ lutId })),
+        lutId === null
+          ? { model }
+          : delegateToEditor(model, EditorMessage.OfflineFileFetching({ lutId })),
       // A file landed in the cache: bump the count; cube files mark their
       // LUT row downloaded.
       OfflineFileCompleted: ({ lutId }) => {
@@ -223,7 +250,9 @@ export const update = (model: Model, message: AppMessage): UpdateReturn => {
       // The device went offline mid-run / the loop resumed: the machine
       // follows the loop's own announcements.
       OfflineFillPaused: () => ({ model: evo(model, { offline: (o) => stepOffline(o, message) }) }),
-      OfflineFillResumed: () => ({ model: evo(model, { offline: (o) => stepOffline(o, message) }) }),
+      OfflineFillResumed: () => ({
+        model: evo(model, { offline: (o) => stepOffline(o, message) }),
+      }),
       // The run finished: Ready, the toast shows, and the auto-dismiss
       // timer starts (a click dismisses it earlier).
       OfflineFillComplete: () => ({
@@ -248,7 +277,10 @@ export const update = (model: Model, message: AppMessage): UpdateReturn => {
         return delegateToEditor(withOffline, EditorMessage.OfflineConnectivityChanged({ online }))
       },
       // The saveData gate's manual start button.
-      OfflineFillRequested: () => ({ model, commands: [StartOfflineFill({ requirePersist: false })] }),
+      OfflineFillRequested: () => ({
+        model,
+        commands: [StartOfflineFill({ requirePersist: false })],
+      }),
       StoragePersisted: ({ persisted }) => ({
         model: evo(model, { offline: (o) => ({ ...o, persisted }) }),
       }),

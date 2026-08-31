@@ -93,7 +93,11 @@ describe('collage submodel: load', () => {
   })
 
   it('CollageLoaded fills the AsyncData, shows no notice, and measures the photos', () => {
-    const { model, commands = [], outMessage: out } = update(
+    const {
+      model,
+      commands = [],
+      outMessage: out,
+    } = update(
       initialModel(),
       CollageMessage.CollageLoaded({ collage: collageWith([1]), photos: [], dropped: 0 }),
     )
@@ -163,7 +167,10 @@ describe('collage submodel: back navigation', () => {
   })
 
   it('BackRequested emits only the NavigateMenu command', () => {
-    const { commands = [], outMessage: out } = update(initialModel(), CollageMessage.BackRequested())
+    const { commands = [], outMessage: out } = update(
+      initialModel(),
+      CollageMessage.BackRequested(),
+    )
     expect(commands.map((c) => c.name)).toEqual(['NavigateMenu'])
     expect(out).toBeUndefined()
   })
@@ -172,7 +179,10 @@ describe('collage submodel: back navigation', () => {
 describe('collage submodel: layout auto-saves', () => {
   it('ChangedColumns clamps to 1–6 and queues a save', () => {
     const loaded = loadedWith([1, 2, 3], { columns: 3 })
-    const { model: high, commands: highCommands = [] } = update(loaded, CollageMessage.ChangedColumns({ columns: 99 }))
+    const { model: high, commands: highCommands = [] } = update(
+      loaded,
+      CollageMessage.ChangedColumns({ columns: 99 }),
+    )
     expect(collageOf(high).layout.columns).toBe(6)
     expect(highCommands.map((c) => c.name)).toEqual(['SaveCollage'])
     const { model: low } = update(loaded, CollageMessage.ChangedColumns({ columns: 0 }))
@@ -181,7 +191,10 @@ describe('collage submodel: layout auto-saves', () => {
 
   it('ChangedRows clamps to 1–6 and queues a save (docs/adr/0009-collage)', () => {
     const loaded = loadedWith([1, 2, 3], { columns: 3, rows: 2 })
-    const { model: high, commands: highCommands = [] } = update(loaded, CollageMessage.ChangedRows({ rows: 99 }))
+    const { model: high, commands: highCommands = [] } = update(
+      loaded,
+      CollageMessage.ChangedRows({ rows: 99 }),
+    )
     expect(collageOf(high).layout.rows).toBe(6)
     expect(highCommands.map((c) => c.name)).toEqual(['SaveCollage'])
     const { model: low } = update(loaded, CollageMessage.ChangedRows({ rows: 0 }))
@@ -219,7 +232,10 @@ describe('collage submodel: layout auto-saves', () => {
 
   it('ChangedFrameRatio clamps to 0.5–3 and queues a save', () => {
     const loaded = loadedWith([1, 2, 3])
-    const { model: preset } = update(loaded, CollageMessage.ChangedFrameRatio({ frameRatio: 4 / 5 }))
+    const { model: preset } = update(
+      loaded,
+      CollageMessage.ChangedFrameRatio({ frameRatio: 4 / 5 }),
+    )
     expect(collageOf(preset).layout.frameRatio).toBeCloseTo(0.8)
     const { model: high } = update(loaded, CollageMessage.ChangedFrameRatio({ frameRatio: 99 }))
     expect(collageOf(high).layout.frameRatio).toBe(3)
@@ -422,7 +438,10 @@ describe('collage submodel: frame mode', () => {
     )
     const { model: moved } = update(panning, CollageMessage.PanMoved({ screenX: 100, screenY: 0 }))
     expect(moved.framingDraft).not.toBe(null)
-    const { model: committed, commands = [] } = update(moved, CollageMessage.ModeChanged({ mode: 'arrange' }))
+    const { model: committed, commands = [] } = update(
+      moved,
+      CollageMessage.ModeChanged({ mode: 'arrange' }),
+    )
     expect(committed.mode).toBe('arrange')
     expect(committed.framingDraft).toBe(null)
     expect(collageOf(committed).tiles[0]!.framing).not.toEqual(defaultTileFraming())
@@ -440,7 +459,10 @@ describe('collage submodel: frame mode', () => {
       ...base,
       sizes: [{ editId: tileEditId(1), width: 400, height: 100 }],
     }
-    const { model: started } = update(sized, CollageMessage.PanStarted({ index: 0, screenX: 0, screenY: 0 }))
+    const { model: started } = update(
+      sized,
+      CollageMessage.PanStarted({ index: 0, screenX: 0, screenY: 0 }),
+    )
     expect(started.framingDraft?.index).toBe(0)
     expect(started.framingDraft?.framing).toEqual(defaultTileFraming())
     const { model: moved } = update(started, CollageMessage.PanMoved({ screenX: 50, screenY: 0 }))
@@ -455,7 +477,10 @@ describe('collage submodel: frame mode', () => {
 
   it('pan with an unmeasured cell size is a no-op', () => {
     const base = { ...loadedWith([1, 2]), mode: 'frame' as const }
-    const { model: started } = update(base, CollageMessage.PanStarted({ index: 0, screenX: 0, screenY: 0 }))
+    const { model: started } = update(
+      base,
+      CollageMessage.PanStarted({ index: 0, screenX: 0, screenY: 0 }),
+    )
     const { model: moved } = update(started, CollageMessage.PanMoved({ screenX: 50, screenY: 0 }))
     expect(moved.framingDraft?.framing).toEqual(defaultTileFraming())
   })
@@ -494,7 +519,10 @@ describe('collage submodel: frame mode', () => {
       ...base,
       collage: AsyncData.Success({ data: framedCollage }),
     }
-    const { model: reset, commands = [] } = update(framed, CollageMessage.ResetFraming({ index: 0 }))
+    const { model: reset, commands = [] } = update(
+      framed,
+      CollageMessage.ResetFraming({ index: 0 }),
+    )
     expect(collageOf(reset).tiles[0]!.framing).toEqual(defaultTileFraming())
     expect(reset.undoLabel).toBe('Framing reset')
     expect(commands.map((c) => c.name)).toEqual(['SaveCollage', 'ScheduleUndoExpiry'])

@@ -151,13 +151,13 @@ const draftView = (
   activeMixer: number | undefined,
   h: HtmlBuilder<EditorMessage>,
 ): Html => {
-  // Narrow model for the draft row
+  // SAFETY: narrow slice for lazy memoization — only fields the view island reads
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
   const m = {
     catalog,
     lutBarOpen,
     activeFieldIndex: activeField !== undefined ? { [layer.id]: activeField } : {},
     activeMixerColor: activeMixer !== undefined ? { [layer.id]: activeMixer } : {},
-    // SAFETY: narrow slice for lazy memoization — only fields the view island reads
   } as unknown as Model
   return draftRow(h, m, layer)
 }
@@ -299,20 +299,6 @@ const draftSlider = (
   )
 }
 
-// Legacy entry used by tests / non-memoized path — delegates to impl
-const chainRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer, index: number) =>
-  chainRowImpl(
-    h,
-    layer,
-    index,
-    model.chain.length,
-    model.phase._tag === 'Selected' && model.phase.layerId === layer.id,
-    model.lutBarOpen,
-    model.catalog,
-    model.activeFieldIndex[layer.id],
-    model.activeMixerColor[layer.id],
-  )
-
 const chainRowImpl = (
   h: HtmlBuilder<EditorMessage>,
   layer: Layer,
@@ -325,12 +311,13 @@ const chainRowImpl = (
   activeMixer: number | undefined,
 ) => {
   const ui = LAYER_UI[layer.type]
+  // SAFETY: narrow slice for lazy memoization — only fields the view island reads
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
   const fakeModel = {
     catalog,
     activeFieldIndex: activeField !== undefined ? { [layer.id]: activeField } : {},
     activeMixerColor: activeMixer !== undefined ? { [layer.id]: activeMixer } : {},
     lutBarOpen,
-    // SAFETY: narrow slice for lazy memoization — only fields the view island reads
   } as unknown as Model
   return h.div(
     [
@@ -386,12 +373,12 @@ const chainRowImpl = (
             [h.Class('flex flex-col gap-3 px-4 pb-4')],
             [
               ...(() => {
-                // Chain sliders need a Model with activeFieldIndex/activeMixerColor
+                // SAFETY: narrow slice for lazy memoization — only fields the view island reads
+                // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
                 const m = {
                   catalog,
                   activeFieldIndex: activeField !== undefined ? { [layer.id]: activeField } : {},
                   activeMixerColor: activeMixer !== undefined ? { [layer.id]: activeMixer } : {},
-                  // SAFETY: narrow slice for lazy memoization — only fields the view island reads
                 } as unknown as Model
                 return layerSliders(h, m, layer, ui, 'chain')
               })(),

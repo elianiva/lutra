@@ -115,7 +115,10 @@ describe('root: offline library', () => {
 
   it('quota stops the run and fires the persist-retry command', () => {
     const { model } = fillStarted()
-    const { model: next, commands = [] } = update(model, OfflineMessage.OfflineQuotaError({ message: 'full' }))
+    const { model: next, commands = [] } = update(
+      model,
+      OfflineMessage.OfflineQuotaError({ message: 'full' }),
+    )
     expect(next.offline.phase).toEqual(QuotaError())
     expect(commands.map((c) => c.name)).toContain('StartOfflineFill')
   })

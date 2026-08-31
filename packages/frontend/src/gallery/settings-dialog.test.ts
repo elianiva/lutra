@@ -1,5 +1,4 @@
 import { describe, it, expect as vitestExpect } from 'vitest'
-import { Option } from 'effect'
 import { Command, click, expect, given, scene, selector, text } from 'foldkit/scene'
 import { Dialog } from '@foldkit/ui'
 import { initialModel } from './model'
@@ -78,10 +77,11 @@ describe('gallery: settings dialog', () => {
     )
     vitestExpect(model.experimental.infiniteCanvas).toBe(true)
 
-    const { model: back, commands = [], outMessage: out } = update(
-      model,
-      GalleryMessage.ToggledInfiniteCanvas({ isEnabled: false }),
-    )
+    const {
+      model: back,
+      commands = [],
+      outMessage: out,
+    } = update(model, GalleryMessage.ToggledInfiniteCanvas({ isEnabled: false }))
     vitestExpect(back.experimental.infiniteCanvas).toBe(false)
     vitestExpect(commands).toEqual([])
     vitestExpect(out).toBeUndefined()

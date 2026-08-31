@@ -54,7 +54,7 @@ const loaded = () => ({
 /** Settle the in-flight render the way RenderedFrame does, so the next
  *  renderNow dispatches a fresh RenderChain (assertable in tests). */
 const settled = (model: Model): Model =>
-  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
+  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision })).model
 
 /** An edit with two committed Exposure layers (the ×2 badge fixture). */
 const twoExposureLayers = () => {
@@ -66,7 +66,7 @@ const twoExposureLayers = () => {
 }
 
 /** A LUT draft (Drafting phase — no new picks allowed). */
-const lutDraft = () => settled(selectTool(loaded(), 'lut')[0])
+const lutDraft = () => settled(selectTool(loaded(), 'lut').model)
 
 const sceneConfig = { update, view } as const
 

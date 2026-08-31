@@ -262,12 +262,13 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       // click never reaches the chain).
       OfflineLutUnavailable: ({ lutId }) => {
         const name = model.catalog?.find((entry) => entry.lut_file === lutId)?.name ?? lutId
-        return { model: 
-          {
+        return {
+          model: {
             ...model,
             offlineLutNotice: `${name} isn't downloaded yet — connect once and the offline library finishes preparing.`,
             phase,
-          } }
+          },
+        }
       },
 
       // The machine's edge already dispatched DecodeImage (its args come from
@@ -277,7 +278,10 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         if (!transitioned) {
           return { model }
         }
-        return { model: { ...model, phase, source: { ...model.source, error: null } }, commands: machineCommands }
+        return {
+          model: { ...model, phase, source: { ...model.source, error: null } },
+          commands: machineCommands,
+        }
       },
       // A decode can only land while Loading (or re-land in Idle/Error for
       // the double-pick race). A completion that lands in Empty — after a
@@ -303,7 +307,10 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           // canvas is the first thing on screen (docs/adr/0010-editor-ui.md).
           mobileSheet: null,
         })
-        return { model: next, commands: urls.length > 0 ? [...commands, RevokeLutThumbs({ urls })] : commands }
+        return {
+          model: next,
+          commands: urls.length > 0 ? [...commands, RevokeLutThumbs({ urls })] : commands,
+        }
       },
       ImageFailedToDecode: ({ error }) => {
         if (!transitioned) {
@@ -381,7 +388,10 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           saveStatus: { _tag: 'idle' },
           lutThumbs: {},
         })
-        return { model: next, commands: urls.length > 0 ? [...commands, RevokeLutThumbs({ urls })] : commands }
+        return {
+          model: next,
+          commands: urls.length > 0 ? [...commands, RevokeLutThumbs({ urls })] : commands,
+        }
       },
       EditLoadFailed: ({ error }) => {
         if (!transitioned) {
@@ -413,19 +423,21 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         // Edit. An in-place save keeps the URL it already addresses.
         const attached = model.attachedEdit
         if (!attached) {
-          return { model }
+          return { model: { ...model, phase } }
         }
         const out =
           attached.id === id ? Option.none() : Option.some(EditorOutMessage.EditCreated({ id }))
-        return {
-          model: {
-            ...model,
-            attachedEdit: { ...attached, id },
-            phase,
-            saveStatus: { _tag: 'saved', at: savedAt },
+        return Update.withOutMessage(
+          {
+            model: {
+              ...model,
+              attachedEdit: { ...attached, id },
+              phase,
+              saveStatus: { _tag: 'saved', at: savedAt },
+            },
           },
-          ...(Option.isSome(out) ? { outMessage: out.value } : {}),
-        }
+          Option.isSome(out) ? out.value : undefined,
+        )
       },
       SaveFailed: ({ error }) => ({
         model: { ...model, phase, saveStatus: { _tag: 'failed', error } },
@@ -543,7 +555,10 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         }
         const next = bumpRecents({ ...model, phase, previewLut: null }, lutId)
         const { model: rendered, commands = [] } = renderNow(next)
-        return { model: rendered, commands: [...commands, SaveLutRecents({ recents: next.lutRecents })] }
+        return {
+          model: rendered,
+          commands: [...commands, SaveLutRecents({ recents: next.lutRecents })],
+        }
       },
       ToggledLutPicker: () => {
         if (Option.isNone(lutTarget(model))) {
@@ -616,7 +631,9 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         }
         // Selecting a layer opens its sliders: on mobile the sheet follows
         // to the layer drawer (docs/adr/0010-editor-ui.md).
-        return { model: { ...model, lutBarOpen: false, mobileSheet: 'layers', phase, previewLut: null } }
+        return {
+          model: { ...model, lutBarOpen: false, mobileSheet: 'layers', phase, previewLut: null },
+        }
       },
       RemovedLayer: ({ id }) => {
         const { [id]: _r, ...restIndex } = model.activeFieldIndex
@@ -685,7 +702,10 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           lutId,
         )
         const { model: rendered, commands = [] } = renderNow(next)
-        return { model: rendered, commands: [...commands, SaveLutRecents({ recents: next.lutRecents })] }
+        return {
+          model: rendered,
+          commands: [...commands, SaveLutRecents({ recents: next.lutRecents })],
+        }
       },
       CycledToggledField: ({ id }) => {
         const layer = model.chain.find((l) => l.id === id)
@@ -813,10 +833,23 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         // runs for the stale frame so its per-render bins buffer is consumed
         // (destroyed) rather than leaked; the stale bins are dropped below.
         if (stamp < model.revision) {
-          const { model: next, commands = [] } = renderNow({ ...model, phase, renderPending: false })
+          const { model: next, commands = [] } = renderNow({
+            ...model,
+            phase,
+            renderPending: false,
+          })
           return { model: next, commands: [...commands, ReadHistogram({ handle, stamp })] }
         }
-        return { model: { ...model, lastRender: handle, phase, renderPending: false, renderedStamp: stamp }, commands: [ReadHistogram({ handle, stamp })] }
+        return {
+          model: {
+            ...model,
+            lastRender: handle,
+            phase,
+            renderPending: false,
+            renderedStamp: stamp,
+          },
+          commands: [ReadHistogram({ handle, stamp })],
+        }
       },
       RenderFailed: ({ error }) => ({
         model: {
@@ -852,7 +885,9 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         if (model.renderedStamp === 0 || !model.lastRender) {
           return { model }
         }
-        const { model: dialogModel, commands: dialogCommands = [] } = ExportDialog.open(model.exportDialog)
+        const { model: dialogModel, commands: dialogCommands = [] } = ExportDialog.open(
+          model.exportDialog,
+        )
         return {
           model: { ...model, exportDialog: dialogModel, phase },
           commands: [

@@ -45,7 +45,11 @@ describe('gallery: open a photo (new edit)', () => {
   })
 
   it('a cancelled picker is a no-op: no commands, no OutMessage', () => {
-    const { model, commands = [], outMessage: out } = update(initialModel(), GalleryMessage.PhotoPickCancelled())
+    const {
+      model,
+      commands = [],
+      outMessage: out,
+    } = update(initialModel(), GalleryMessage.PhotoPickCancelled())
     expect(model).toEqual(initialModel())
     expect(commands).toEqual([])
     expect(out).toBeUndefined()
@@ -62,7 +66,11 @@ describe('gallery: open a photo (new edit)', () => {
   })
 
   it('a failed create sets the notice banner instead of losing the photo silently', () => {
-    const { model, commands = [], outMessage: out } = update(
+    const {
+      model,
+      commands = [],
+      outMessage: out,
+    } = update(
       initialModel(),
       GalleryMessage.PhotoCreateFailed({ error: new StoreError({ message: 'quota' }) }),
     )
@@ -124,7 +132,11 @@ describe('gallery: opening several photos at once', () => {
   })
 
   it('a batch refreshes the grid in place and reports nothing when all landed', () => {
-    const { model, commands = [], outMessage: out } = update(
+    const {
+      model,
+      commands = [],
+      outMessage: out,
+    } = update(
       initialModel(),
       added({ added: 2, summaries: Option.some([summary(id), summary(otherId)]) }),
     )

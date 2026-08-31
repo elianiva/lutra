@@ -66,13 +66,13 @@ const loaded = () => ({
 /** Settle the in-flight render the way RenderedFrame does, so the next
  *  renderNow dispatches a fresh RenderChain (assertable in tests). */
 const settled = (model: Model): Model =>
-  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
+  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision })).model
 
 /** A LUT draft (Drafting phase, bar open, no render in flight). */
-const lutDraft = () => settled(selectTool(loaded(), 'lut')[0])
+const lutDraft = () => settled(selectTool(loaded(), 'lut').model)
 
 /** A committed LUT layer (Selected phase, bar closed, no render in flight). */
-const selectedLut = () => settled(update(lutDraft(), EditorMessage.ConfirmedDraft())[0])
+const selectedLut = () => settled(update(lutDraft(), EditorMessage.ConfirmedDraft()).model)
 
 /** A committed lut + exposure chain with the LUT layer selected. */
 const selectedLutWithExposure = () => {
@@ -83,7 +83,7 @@ const selectedLutWithExposure = () => {
   if (!lutLayer) {
     throw new Error('fixture: expected a lut layer')
   }
-  return update(done, EditorMessage.SelectedLayer({ id: lutLayer.id }))[0]
+  return update(done, EditorMessage.SelectedLayer({ id: lutLayer.id })).model
 }
 
 const draftLayerType = (model: Model): LayerType | undefined =>
@@ -154,7 +154,10 @@ describe('LUT layer flow', () => {
 
 describe('LUT bar preview (hover)', () => {
   it('previews the LUT on the draft without touching the machine', () => {
-    const { model, commands = [] } = update(lutDraft(), EditorMessage.PreviewedLut({ lutId: lutBw }))
+    const { model, commands = [] } = update(
+      lutDraft(),
+      EditorMessage.PreviewedLut({ lutId: lutBw }),
+    )
     expect(model.previewLut).toBe(lutBw)
     // The machine-owned draft keeps its committed lutId — the preview is
     // applied at render time only.
@@ -165,7 +168,10 @@ describe('LUT bar preview (hover)', () => {
 
   it('PreviewedLut(null) restores the committed lutId', () => {
     const { model: hovered } = update(lutDraft(), EditorMessage.PreviewedLut({ lutId: lutBw }))
-    const { model, commands = [] } = update(settled(hovered), EditorMessage.PreviewedLut({ lutId: null }))
+    const { model, commands = [] } = update(
+      settled(hovered),
+      EditorMessage.PreviewedLut({ lutId: null }),
+    )
     expect(model.previewLut).toBeNull()
     const render = commands.find((c) => c.name === 'RenderChain')
     expect(render?.args?.draft).toMatchObject({ lutId: lutPrint })
@@ -212,7 +218,10 @@ describe('LUT bar preview (hover)', () => {
 describe('LUT bar commit + recents', () => {
   it('bar commit clears the preview, bumps recents, and persists', () => {
     const { model: hovered } = update(lutDraft(), EditorMessage.PreviewedLut({ lutId: lutBw }))
-    const { model, commands = [] } = update(hovered, EditorMessage.ChangedDraftLut({ lutId: lutBw }))
+    const { model, commands = [] } = update(
+      hovered,
+      EditorMessage.ChangedDraftLut({ lutId: lutBw }),
+    )
     expect(model.previewLut).toBeNull()
     expect(model.lutRecents).toEqual([lutBw])
     const save = commands.find((c) => c.name === 'SaveLutRecents')
@@ -239,14 +248,17 @@ describe('LUT bar commit + recents', () => {
       model = update(
         model,
         EditorMessage.ChangedDraftLut({ lutId: LutId(`luts/print/seed_${i}.cube`) }),
-      )[0]
+      ).model
     }
     expect(model.lutRecents).toHaveLength(12)
     expect(model.lutRecents[0]).toBe('luts/print/seed_11.cube')
     expect(model.lutRecents[11]).toBe('luts/print/seed_0.cube')
 
     // A 13th pick pushes the oldest out.
-    model = update(model, EditorMessage.ChangedDraftLut({ lutId: LutId('luts/print/new.cube') }))[0]
+    model = update(
+      model,
+      EditorMessage.ChangedDraftLut({ lutId: LutId('luts/print/new.cube') }),
+    ).model
     expect(model.lutRecents).toHaveLength(12)
     expect(model.lutRecents[0]).toBe('luts/print/new.cube')
     expect(model.lutRecents).not.toContain('luts/print/seed_0.cube')
@@ -255,7 +267,7 @@ describe('LUT bar commit + recents', () => {
     model = update(
       model,
       EditorMessage.ChangedDraftLut({ lutId: LutId('luts/print/seed_5.cube') }),
-    )[0]
+    ).model
     expect(model.lutRecents).toHaveLength(12)
     expect(model.lutRecents[0]).toBe('luts/print/seed_5.cube')
     expect(model.lutRecents.filter((id) => id === 'luts/print/seed_5.cube')).toHaveLength(1)
@@ -364,7 +376,10 @@ describe('per-photo LUT thumbnails (lazy generation)', () => {
   })
 
   it('LutThumbFailed keeps the generic fallback (no state change)', () => {
-    const { model, commands = [] } = update(lutDraft(), EditorMessage.LutThumbFailed({ lutId: lutBw }))
+    const { model, commands = [] } = update(
+      lutDraft(),
+      EditorMessage.LutThumbFailed({ lutId: lutBw }),
+    )
     expect(model.lutThumbs[lutBw]).toBeUndefined()
     expect(commands).toEqual([])
   })
@@ -377,17 +392,17 @@ describe('preview cleanup on bar-closing transitions', () => {
     readonly fire: (model: Model) => Model
   }[] = [
     {
-      fire: (m) => selectTool(m, 'exposure')[0],
+      fire: (m) => selectTool(m, 'exposure').model,
       make: selectedLut,
       name: 'SelectedTool (new draft context)',
     },
     {
-      fire: (m) => update(m, EditorMessage.ConfirmedDraft())[0],
+      fire: (m) => update(m, EditorMessage.ConfirmedDraft()).model,
       make: lutDraft,
       name: 'ConfirmedDraft',
     },
     {
-      fire: (m) => update(m, EditorMessage.CancelledDraft())[0],
+      fire: (m) => update(m, EditorMessage.CancelledDraft()).model,
       make: lutDraft,
       name: 'CancelledDraft',
     },
@@ -397,7 +412,7 @@ describe('preview cleanup on bar-closing transitions', () => {
         if (!other) {
           throw new Error('fixture: expected a non-lut layer')
         }
-        return update(m, EditorMessage.SelectedLayer({ id: other.id }))[0]
+        return update(m, EditorMessage.SelectedLayer({ id: other.id })).model
       },
       make: selectedLutWithExposure,
       name: 'SelectedLayer (another layer)',
@@ -408,13 +423,13 @@ describe('preview cleanup on bar-closing transitions', () => {
         if (!lut) {
           throw new Error('fixture: expected a lut layer')
         }
-        return update(m, EditorMessage.RemovedLayer({ id: lut.id }))[0]
+        return update(m, EditorMessage.RemovedLayer({ id: lut.id })).model
       },
       make: selectedLut,
       name: 'RemovedLayer',
     },
     {
-      fire: (m) => update(m, EditorMessage.ClearedImage())[0],
+      fire: (m) => update(m, EditorMessage.ClearedImage()).model,
       make: lutDraft,
       name: 'ClearedImage',
     },
@@ -430,12 +445,12 @@ describe('preview cleanup on bar-closing transitions', () => {
             source: new Uint8Array([9]),
             width: 200,
           }),
-        )[0],
+        ).model,
       make: lutDraft,
       name: 'EditLoaded',
     },
     {
-      fire: (m) => update(m, EditorMessage.ToggledLutPicker())[0],
+      fire: (m) => update(m, EditorMessage.ToggledLutPicker()).model,
       make: lutDraft,
       name: 'ToggledLutPicker (closing)',
     },
@@ -463,7 +478,7 @@ describe('persistence-during-preview dismissal', () => {
 
   const hoveredDraft = () => {
     const { model: withDraft } = selectTool(saveReady(), 'lut')
-    return update(withDraft, EditorMessage.PreviewedLut({ lutId: lutBw }))[0]
+    return update(withDraft, EditorMessage.PreviewedLut({ lutId: lutBw })).model
   }
 
   it('SaveRequested while previewing dismisses the preview instead of saving', () => {
@@ -472,7 +487,10 @@ describe('persistence-during-preview dismissal', () => {
     expect(model.saveStatus).toEqual({ _tag: 'idle' })
     expect(commands.some((c) => c.name === 'SaveEdit')).toBe(false)
     // The next Save proceeds normally.
-    const { model: next, commands: nextCommands = [] } = update(model, EditorMessage.SaveRequested())
+    const { model: next, commands: nextCommands = [] } = update(
+      model,
+      EditorMessage.SaveRequested(),
+    )
     expect(next.saveStatus).toEqual({ _tag: 'saving' })
     expect(nextCommands.some((c) => c.name === 'SaveEdit')).toBe(true)
   })
@@ -491,7 +509,10 @@ describe('persistence-during-preview dismissal', () => {
     expect(model.exportDialog.dialog.isOpen).toBe(false)
     expect(commands.some((c) => c.name === 'SnapshotForExport')).toBe(false)
     // The next Export opens the dialog.
-    const { model: next, commands: nextCommands = [] } = update(model, EditorMessage.ExportRequested())
+    const { model: next, commands: nextCommands = [] } = update(
+      model,
+      EditorMessage.ExportRequested(),
+    )
     expect(next.exportDialog.dialog.isOpen).toBe(true)
     expect(nextCommands.some((c) => c.name === 'SnapshotForExport')).toBe(true)
   })

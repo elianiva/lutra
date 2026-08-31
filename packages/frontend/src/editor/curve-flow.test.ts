@@ -42,13 +42,13 @@ const loaded = () => ({
 /** Settle the in-flight render the way RenderedFrame does, so the next
  *  renderNow dispatches a fresh RenderChain (assertable in tests). */
 const settled = (model: Model): Model =>
-  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
+  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision })).model
 
 /** A Tone Curve draft (Drafting phase, no render in flight). */
-const curveDraft = () => settled(selectTool(loaded(), 'toneCurve')[0])
+const curveDraft = () => settled(selectTool(loaded(), 'toneCurve').model)
 
 /** A committed Tone Curve layer (Selected phase, no render in flight). */
-const selectedCurve = () => settled(update(curveDraft(), EditorMessage.ConfirmedDraft())[0])
+const selectedCurve = () => settled(update(curveDraft(), EditorMessage.ConfirmedDraft()).model)
 
 const draftLayer = (model: Model) => (model.phase._tag === 'Drafting' ? model.phase.layer : null)
 
@@ -88,7 +88,7 @@ describe('Tone Curve layer flow', () => {
   it('a drag clamps the draft point between its neighbors', () => {
     const { model: withDraft } = selectTool(loaded(), 'toneCurve')
     // Dragging p1 far right must stop before p2's x.
-    const { model: model } = drag(withDraft, 1, 0.9, 0.5)
+    const { model } = drag(withDraft, 1, 0.9, 0.5)
     const layer = draftLayer(model)
     if (layer?.type === 'toneCurve') {
       const points = curvePointsOf(layer)
@@ -108,7 +108,7 @@ describe('Tone Curve layer flow', () => {
   })
 
   it('a drag on the focused chain layer updates it directly', () => {
-    const { model: model } = drag(selectedCurve(), 2, 0.5, 0.7)
+    const { model } = drag(selectedCurve(), 2, 0.5, 0.7)
     expect(model.phase._tag).toBe('Selected')
     expect(pointsOf(model)[2]).toEqual({ x: 0.5, y: 0.7 })
   })
@@ -233,7 +233,7 @@ describe('Tone Curve view', () => {
 
   it('the reset button returns the curve to the diagonal', () => {
     const dragged = settled(
-      update(curveDraft(), EditorMessage.CurvePointDragged({ index: 2, x: 0.5, y: 0.7 }))[0],
+      update(curveDraft(), EditorMessage.CurvePointDragged({ index: 2, x: 0.5, y: 0.7 })).model,
     )
     scene(
       sceneConfig,
@@ -256,7 +256,7 @@ describe('Tone Curve view', () => {
 
   it('a committed curve shows the widget when selected, with the Custom summary', () => {
     const withDrag = settled(
-      update(selectedCurve(), EditorMessage.CurvePointDragged({ index: 1, x: 0.3, y: 0.2 }))[0],
+      update(selectedCurve(), EditorMessage.CurvePointDragged({ index: 1, x: 0.3, y: 0.2 })).model,
     )
     scene(
       sceneConfig,

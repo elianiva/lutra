@@ -106,11 +106,17 @@ describe('gallery: collages section', () => {
     expect(armed.confirmingCollageDelete).toBe(first.id)
 
     // Re-tap disarms.
-    const { model: disarmed } = update(armed, GalleryMessage.ToggledCollageDeleteConfirm({ id: first.id }))
+    const { model: disarmed } = update(
+      armed,
+      GalleryMessage.ToggledCollageDeleteConfirm({ id: first.id }),
+    )
     expect(disarmed.confirmingCollageDelete).toBe(null)
 
     // Arming the second moves the state off the first.
-    const { model: moved } = update(armed, GalleryMessage.ToggledCollageDeleteConfirm({ id: second.id }))
+    const { model: moved } = update(
+      armed,
+      GalleryMessage.ToggledCollageDeleteConfirm({ id: second.id }),
+    )
     expect(moved.confirmingCollageDelete).toBe(second.id)
 
     // Cancel clears.
@@ -142,7 +148,10 @@ describe('gallery: collages section', () => {
     const { commands = [] } = update(armed, GalleryMessage.CollageDeleteRequested({ id: first.id }))
     expect(commands.map((c) => c.name)).toEqual([DeleteCollage.name])
 
-    const { model: afterDelete, commands: followUps = [] } = update(armed, GalleryMessage.CollageDeleted())
+    const { model: afterDelete, commands: followUps = [] } = update(
+      armed,
+      GalleryMessage.CollageDeleted(),
+    )
     expect(afterDelete.confirmingCollageDelete).toBe(null)
     expect(followUps.map((c) => c.name)).toEqual([ListCollages.name])
   })
@@ -172,7 +181,10 @@ describe('gallery: collages section', () => {
     expect(args['thumbs']).toEqual([{ id: editId(1), thumbnail: summary(editId(1)).thumbnail }])
 
     // All-default collages cost nothing.
-    const { commands: none = [] } = update(loadedWith(plain), GalleryMessage.CollagesListed({ collages: [plain] }))
+    const { commands: none = [] } = update(
+      loadedWith(plain),
+      GalleryMessage.CollagesListed({ collages: [plain] }),
+    )
     expect(none).toEqual([])
   })
 

@@ -19,7 +19,6 @@ type Resource = EditStore | CollageStore
 
 export type InitReturn = Update.Return<Model, GalleryMessage, Resource>
 export const init = (route: AppRoute): InitReturn => {
-  const commands =
-    route._tag === 'Gallery' ? [ListEdits(), ListCollages()] : []
+  const commands = route._tag === 'Gallery' ? [ListEdits(), ListCollages()] : []
   return { model: initialModel(), commands }
 }

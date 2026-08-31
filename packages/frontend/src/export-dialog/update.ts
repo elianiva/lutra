@@ -115,10 +115,11 @@ const settingsChanged = (model: Model, settings: Model['settings']): UpdateRetur
  * persist across sessions.
  */
 const delegateToDialog = (model: Model, message: Dialog.Message): UpdateReturn => {
-  const { model: dialog, commands: dialogCommands = [], outMessage: out } = Dialog.update(
-    model.dialog,
-    message,
-  )
+  const {
+    model: dialog,
+    commands: dialogCommands = [],
+    outMessage: out,
+  } = Dialog.update(model.dialog, message)
   let next: Model = { ...model, dialog }
   let commands = dialogCommands.map(wrapDialogCommand)
   if (out?._tag === 'Closed') {

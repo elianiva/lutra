@@ -3,3 +3,8 @@ packages:
 allowBuilds:
   msgpackr-extract: true
   workerd: true
+minimumReleaseAgeExclude:
+  - '@alchemy.run/cloudflare-runtime@2.0.0-beta.75'
+  - '@alchemy.run/floci@2.0.0-beta.75'
+  - '@alchemy.run/node-utils@2.0.0-beta.75'
+  - alchemy@2.0.0-beta.75

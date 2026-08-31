@@ -66,7 +66,9 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
       // A tile's ✕: arm the pending delete and open the confirmation
       // dialog (ADR-0010, superseded to a dialog).
       DeleteConfirmRequested: ({ id }) => {
-        const { model: deleteDialog, commands: dialogCommands = [] } = Dialog.open(model.deleteDialog)
+        const { model: deleteDialog, commands: dialogCommands = [] } = Dialog.open(
+          model.deleteDialog,
+        )
         return {
           model: { ...model, pendingDelete: id, deleteDialog },
           commands: Command.mapMessages(dialogCommands, toDeleteDialogMessage),
@@ -75,10 +77,15 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
       // Confirmed in the dialog: fire the store delete and dismiss the
       // dialog right away — a failure re-surfaces through the notice.
       DeleteRequested: ({ id }) => {
-        const { model: deleteDialog, commands: dialogCommands = [] } = Dialog.close(model.deleteDialog)
+        const { model: deleteDialog, commands: dialogCommands = [] } = Dialog.close(
+          model.deleteDialog,
+        )
         return {
           model: { ...model, pendingDelete: null, deleteDialog },
-          commands: [DeleteEdit({ id }), ...Command.mapMessages(dialogCommands, toDeleteDialogMessage)],
+          commands: [
+            DeleteEdit({ id }),
+            ...Command.mapMessages(dialogCommands, toDeleteDialogMessage),
+          ],
         }
       },
       EditDeleted: () => ({ model, commands: [ListEdits()] }),
@@ -212,7 +219,10 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
         }
       },
       GotSettingsDialogMessage: ({ message }) => {
-        const { model: dialog, commands: dialogCommands = [] } = Dialog.update(model.settingsDialog, message)
+        const { model: dialog, commands: dialogCommands = [] } = Dialog.update(
+          model.settingsDialog,
+          message,
+        )
         return {
           model: { ...model, settingsDialog: dialog },
           commands: Command.mapMessages(dialogCommands, toSettingsDialogMessage),
@@ -222,7 +232,10 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
       // the Cancel button) arrives as `RequestedClose`, which also disarms
       // the pending delete so a reopened dialog never confirms a stale id.
       GotDeleteDialogMessage: ({ message }) => {
-        const { model: dialog, commands: dialogCommands = [] } = Dialog.update(model.deleteDialog, message)
+        const { model: dialog, commands: dialogCommands = [] } = Dialog.update(
+          model.deleteDialog,
+          message,
+        )
         // Clear the armed delete only when the dialog actually closed; a
         // conditional spread would hide the omission behind an empty object.
         const next = message._tag === 'RequestedClose' ? { ...model, pendingDelete: null } : model

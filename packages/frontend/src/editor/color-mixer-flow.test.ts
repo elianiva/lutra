@@ -40,13 +40,13 @@ const loaded = () => ({
 /** Settle the in-flight render the way RenderedFrame does, so the next
  *  renderNow dispatches a fresh RenderChain (assertable in tests). */
 const settled = (model: Model): Model =>
-  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
+  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision })).model
 
 /** A Color Mixer draft (Drafting phase, no render in flight). */
-const mixerDraft = () => settled(selectTool(loaded(), 'colorMixer')[0])
+const mixerDraft = () => settled(selectTool(loaded(), 'colorMixer').model)
 
 /** A committed Color Mixer layer (Selected phase, no render in flight). */
-const selectedMixer = () => settled(update(mixerDraft(), EditorMessage.ConfirmedDraft())[0])
+const selectedMixer = () => settled(update(mixerDraft(), EditorMessage.ConfirmedDraft()).model)
 
 const draftLayer = (model: Model) => (model.phase._tag === 'Drafting' ? model.phase.layer : null)
 
@@ -88,16 +88,25 @@ describe('Color Mixer layer flow', () => {
     const id = draftId(withDraft)
     expect(id).toBeDefined()
     // Presentation-only: no render is dispatched for a swatch tap.
-    const { model: selected } = update(withDraft, EditorMessage.SelectedMixerColor({ color: 5, id: id! }))
+    const { model: selected } = update(
+      withDraft,
+      EditorMessage.SelectedMixerColor({ color: 5, id: id! }),
+    )
     expect(selected.activeMixerColor[id!]).toBe(5)
-    const { model: clamped } = update(selected, EditorMessage.SelectedMixerColor({ color: 99, id: id! }))
+    const { model: clamped } = update(
+      selected,
+      EditorMessage.SelectedMixerColor({ color: 99, id: id! }),
+    )
     expect(clamped.activeMixerColor[id!]).toBe(7)
   })
 
   it('keeps the active range selection across confirm (same layer id)', () => {
     const { model: withDraft } = selectTool(loaded(), 'colorMixer')
     const id = draftId(withDraft)
-    const { model: withColor } = update(withDraft, EditorMessage.SelectedMixerColor({ color: 3, id: id! }))
+    const { model: withColor } = update(
+      withDraft,
+      EditorMessage.SelectedMixerColor({ color: 3, id: id! }),
+    )
     const { model } = update(withColor, EditorMessage.ConfirmedDraft())
     expect(model.chain).toHaveLength(1)
     expect(model.chain[0]?.id).toBe(id)
@@ -123,7 +132,10 @@ describe('Color Mixer layer flow', () => {
   it('clears the selection entry on cancel and on remove', () => {
     const { model: withDraft } = selectTool(loaded(), 'colorMixer')
     const id = draftId(withDraft)!
-    const { model: withColor } = update(withDraft, EditorMessage.SelectedMixerColor({ color: 2, id }))
+    const { model: withColor } = update(
+      withDraft,
+      EditorMessage.SelectedMixerColor({ color: 2, id }),
+    )
     const { model: cancelled } = update(withColor, EditorMessage.CancelledDraft())
     expect(cancelled.activeMixerColor[id]).toBeUndefined()
 
@@ -135,7 +147,10 @@ describe('Color Mixer layer flow', () => {
   it('resets the selection map when the image clears or an edit loads', () => {
     const { model: withDraft } = selectTool(loaded(), 'colorMixer')
     const id = draftId(withDraft)!
-    const { model: withColor } = update(withDraft, EditorMessage.SelectedMixerColor({ color: 4, id }))
+    const { model: withColor } = update(
+      withDraft,
+      EditorMessage.SelectedMixerColor({ color: 4, id }),
+    )
 
     const { model: cleared } = update(withColor, EditorMessage.ClearedImage())
     expect(cleared.activeMixerColor).toEqual({})
@@ -211,7 +226,7 @@ describe('Color Mixer view', () => {
       update(
         mixerDraft(),
         EditorMessage.UpdatedDraftParam({ field: FieldKey('redHue'), value: 0.5 }),
-      )[0],
+      ).model,
     )
     scene(
       sceneConfig,
@@ -235,7 +250,7 @@ describe('Color Mixer view', () => {
       update(
         withMixer,
         EditorMessage.UpdatedLayerParam({ field: FieldKey('redHue'), id, value: 0.5 }),
-      )[0],
+      ).model,
     )
     scene(
       sceneConfig,

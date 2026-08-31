@@ -79,49 +79,6 @@ const unsupportedScreenView = (webgpu: Model['webgpu'], h: HtmlBuilder<AppMessag
     ],
   )
 
-const unsupportedScreen = (model: Model, h: HtmlBuilder<AppMessage>): Document => ({
-  body: h.div(
-    [h.Class('flex h-full flex-col items-center justify-center bg-bg px-6 py-12 text-ink')],
-    [
-      h.div(
-        [h.Class('max-w-md text-center')],
-        [
-          h.h1([h.Class('text-xl font-semibold')], ['WebGPU required']),
-          h.p(
-            [h.Class('mt-3 text-sm text-muted')],
-            [
-              'Lutra grades photos on your GPU through WebGPU, and this browser doesn’t expose it — so the editor can’t run here.',
-            ],
-          ),
-          h.ul(
-            [h.Class('mt-6 space-y-2 text-left text-sm text-muted')],
-            [
-              h.li([], ['Use a recent Chrome, Edge, or Safari 17+ (desktop).']),
-              h.li(
-                [],
-                ['On Firefox, enable WebGPU (about:config → dom.webgpu.enabled) or update.'],
-              ),
-              h.li([], ['Make sure hardware acceleration is enabled in your browser settings.']),
-              h.li(
-                [],
-                ['On a managed or locked-down device, ask your administrator to allow WebGPU.'],
-              ),
-            ],
-          ),
-          model.webgpu.reason === ''
-            ? null
-            : h.p([h.Class('mt-6 text-xs text-muted')], [`Details: ${model.webgpu.reason}`]),
-          h.p(
-            [h.Class('mt-6 text-xs text-muted')],
-            ['Once you’re on a supported browser, just reload.'],
-          ),
-        ],
-      ),
-    ],
-  ),
-  title: 'Lutra',
-})
-
 const readyToastView = (ready: boolean, h: HtmlBuilder<AppMessage>): Html =>
   ready
     ? h.div(
@@ -215,7 +172,7 @@ export const view = (model: Model, h: HtmlBuilder<AppMessage>): Document => {
 // strip appears or disappears. Nothing renders once the library is ready
 // (the toast announced it) — and nothing renders in the editor; the fill is
 // housekeeping, the editor is for grading.
-const offlineCardImpl = (offline: Model['offline'], h: HtmlBuilder<AppMessage>) => {
+const offlineCardImpl = (offline: Model['offline'], h: HtmlBuilder<AppMessage>): Html => {
   // offline passed as slice for lazy === check
   const pct = offline.total > 0 ? Math.round((offline.downloaded / offline.total) * 100) : 0
   const frame = (content: readonly Html[]) =>
@@ -298,6 +255,9 @@ const offlineCardImpl = (offline: Model['offline'], h: HtmlBuilder<AppMessage>) 
         : null
     }
     case 'Ready': {
+      return null
+    }
+    default: {
       return null
     }
   }

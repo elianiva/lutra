@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest'
-import { Option } from 'effect'
 import {
   Command,
   click,
@@ -49,7 +48,10 @@ describe('gallery: collage selection', () => {
   it('a selected tile shows a check and the accent border; the CTA appears at two', () => {
     const one = editId(1)
     const two = editId(2)
-    const { model: afterFirst } = update(gridWith(one, two), GalleryMessage.ToggledSelection({ id: one }))
+    const { model: afterFirst } = update(
+      gridWith(one, two),
+      GalleryMessage.ToggledSelection({ id: one }),
+    )
     expect(afterFirst.selection).toEqual([one])
 
     const { model: both } = update(afterFirst, GalleryMessage.ToggledSelection({ id: two }))
@@ -66,7 +68,10 @@ describe('gallery: collage selection', () => {
   it('no CTA below two selections; it appears with the count at two or more', () => {
     const one = editId(1)
     const two = editId(2)
-    const { model: oneSelected } = update(gridWith(one, two), GalleryMessage.ToggledSelection({ id: one }))
+    const { model: oneSelected } = update(
+      gridWith(one, two),
+      GalleryMessage.ToggledSelection({ id: one }),
+    )
     scene(
       config,
       given(oneSelected),
@@ -92,7 +97,10 @@ describe('gallery: collage selection', () => {
   it('CreateCollageRequested dispatches CreateCollage with the pick-order selection', () => {
     const one = editId(1)
     const two = editId(2)
-    const { model: oneSelected } = update(gridWith(one, two), GalleryMessage.ToggledSelection({ id: one }))
+    const { model: oneSelected } = update(
+      gridWith(one, two),
+      GalleryMessage.ToggledSelection({ id: one }),
+    )
     const { model: twoSelected } = update(oneSelected, GalleryMessage.ToggledSelection({ id: two }))
     const { commands = [] } = update(twoSelected, GalleryMessage.CreateCollageRequested())
     expect(commands.map((c) => c.name)).toEqual(['CreateCollage'])
@@ -101,7 +109,10 @@ describe('gallery: collage selection', () => {
   it('a created collage surfaces as the CreatedCollage OutMessage and clears the selection', () => {
     const one = editId(1)
     const two = editId(2)
-    const { model: oneSelected } = update(gridWith(one, two), GalleryMessage.ToggledSelection({ id: one }))
+    const { model: oneSelected } = update(
+      gridWith(one, two),
+      GalleryMessage.ToggledSelection({ id: one }),
+    )
     const { model: twoSelected } = update(oneSelected, GalleryMessage.ToggledSelection({ id: two }))
     scene(
       config,
@@ -110,7 +121,10 @@ describe('gallery: collage selection', () => {
       Command.resolve(CreateCollage, GalleryMessage.CollageCreated({ id: collageId })),
       expectOutMessage(GalleryOutMessage.CreatedCollage({ id: collageId })),
     )
-    const { model: cleared, outMessage: out } = update(twoSelected, GalleryMessage.CollageCreated({ id: collageId }))
+    const { model: cleared, outMessage: out } = update(
+      twoSelected,
+      GalleryMessage.CollageCreated({ id: collageId }),
+    )
     expect(cleared.selection).toEqual([])
     expect(out).toEqual(GalleryOutMessage.CreatedCollage({ id: collageId }))
   })
@@ -118,10 +132,16 @@ describe('gallery: collage selection', () => {
   it('EditsListed prunes the selection to edits that still exist', () => {
     const one = editId(1)
     const two = editId(2)
-    const { model: oneSelected } = update(gridWith(one, two), GalleryMessage.ToggledSelection({ id: one }))
+    const { model: oneSelected } = update(
+      gridWith(one, two),
+      GalleryMessage.ToggledSelection({ id: one }),
+    )
     const { model: twoSelected } = update(oneSelected, GalleryMessage.ToggledSelection({ id: two }))
     // Edit 2 was deleted elsewhere; only summaries for 1 come back.
-    const { model: pruned } = update(twoSelected, GalleryMessage.EditsListed({ summaries: [summary(one)] }))
+    const { model: pruned } = update(
+      twoSelected,
+      GalleryMessage.EditsListed({ summaries: [summary(one)] }),
+    )
     expect(pruned.selection).toEqual([one])
   })
 })

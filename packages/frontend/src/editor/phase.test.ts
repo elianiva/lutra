@@ -43,15 +43,24 @@ describe('editor phase machine', () => {
   })
 
   it('ignores tool selection while a decode is in flight', () => {
-    const { model: loading } = update(initialModel(), EditorMessage.SelectedImageFile({ file: file() }))
+    const { model: loading } = update(
+      initialModel(),
+      EditorMessage.SelectedImageFile({ file: file() }),
+    )
     expect(loading.phase._tag).toBe('Loading')
-    const { model, commands = [] } = update(loading, EditorMessage.SelectedTool({ type: 'exposure' }))
+    const { model, commands = [] } = update(
+      loading,
+      EditorMessage.SelectedTool({ type: 'exposure' }),
+    )
     expect(model.phase._tag).toBe('Loading')
     expect(commands).toEqual([])
   })
 
   it('ignores tool selection after a decode failure', () => {
-    const { model: loading } = update(initialModel(), EditorMessage.SelectedImageFile({ file: file() }))
+    const { model: loading } = update(
+      initialModel(),
+      EditorMessage.SelectedImageFile({ file: file() }),
+    )
     const { model: errored } = update(
       loading,
       EditorMessage.ImageFailedToDecode({ error: new ImageDecodeError({ message: 'Corrupt' }) }),
@@ -78,7 +87,10 @@ describe('editor phase machine', () => {
   })
 
   it('restores the idle phase and records a layer creation failure', () => {
-    const { model: pending } = update(loadedModel(), EditorMessage.SelectedTool({ type: 'exposure' }))
+    const { model: pending } = update(
+      loadedModel(),
+      EditorMessage.SelectedTool({ type: 'exposure' }),
+    )
     const error = new LayerCreationError({ message: 'registry failure' })
     const { model, commands = [] } = update(pending, EditorMessage.LayerCreationFailed({ error }))
     expect(model.phase._tag).toBe('Idle')
@@ -142,7 +154,10 @@ describe('editor phase machine', () => {
   })
 
   it('drops a stale decode that lands after the image was cleared', () => {
-    const { model: loading } = update(initialModel(), EditorMessage.SelectedImageFile({ file: file() }))
+    const { model: loading } = update(
+      initialModel(),
+      EditorMessage.SelectedImageFile({ file: file() }),
+    )
     const { model: cleared } = update(loading, EditorMessage.ClearedImage())
     expect(cleared.phase._tag).toBe('Empty')
     const { model } = update(
@@ -154,7 +169,10 @@ describe('editor phase machine', () => {
   })
 
   it('drops a stale decode failure that lands after the image was cleared', () => {
-    const { model: loading } = update(initialModel(), EditorMessage.SelectedImageFile({ file: file() }))
+    const { model: loading } = update(
+      initialModel(),
+      EditorMessage.SelectedImageFile({ file: file() }),
+    )
     const { model: cleared } = update(loading, EditorMessage.ClearedImage())
     const { model } = update(
       cleared,
@@ -167,8 +185,14 @@ describe('editor phase machine', () => {
   })
 
   it('last completion wins when two files are selected while loading', () => {
-    const { model: loading } = update(initialModel(), EditorMessage.SelectedImageFile({ file: file() }))
-    const { model: stillLoading } = update(loading, EditorMessage.SelectedImageFile({ file: file() }))
+    const { model: loading } = update(
+      initialModel(),
+      EditorMessage.SelectedImageFile({ file: file() }),
+    )
+    const { model: stillLoading } = update(
+      loading,
+      EditorMessage.SelectedImageFile({ file: file() }),
+    )
     expect(stillLoading.phase._tag).toBe('Loading')
 
     // First pick succeeds, second fails: the current pick's failure shows.

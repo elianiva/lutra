@@ -16,10 +16,11 @@ export const createTestLayer = <K extends LayerType>(type: K) =>
  * production.
  */
 export const selectTool = (model: Model, type: LayerType): UpdateReturn => {
-  const { model: creating, commands = [], outMessage: out } = update(
-    model,
-    EditorMessage.SelectedTool({ type }),
-  )
+  const {
+    model: creating,
+    commands = [],
+    outMessage: out,
+  } = update(model, EditorMessage.SelectedTool({ type }))
   if (!commands.some((command) => command.name === 'CreateLayer')) {
     return out === undefined
       ? { model: creating, commands }

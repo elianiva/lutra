@@ -39,8 +39,8 @@ const topBarView = (
   hasImage: boolean,
   h: HtmlBuilder<EditorMessage>,
 ): Html => {
-  // oxlint-disable-next-line no-unsafe-type-assertion
   // SAFETY: narrow slice for lazy memoization — only fields the view island reads
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
   const m = { saveStatus, attachedEdit } as unknown as Model
   return topBar(h, m, hasImage)
 }
@@ -53,8 +53,8 @@ const toolPanelView = (
   toolsOpen: boolean,
   h: HtmlBuilder<EditorMessage>,
 ): Html => {
-  // oxlint-disable-next-line no-unsafe-type-assertion
   // SAFETY: narrow slice for lazy memoization — only fields the view island reads
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
   const m = { chain, catalog, catalogError, phase, hoveredTool } as unknown as Model
   return toolPanel(h, m, toolsOpen)
 }
@@ -70,7 +70,8 @@ const canvasStageView = (
   phase: Model['phase'],
   h: HtmlBuilder<EditorMessage>,
 ): Html => {
-  // oxlint-disable-next-line no-unsafe-type-assertion
+  // SAFETY: narrow slice for lazy memoization — only fields the view island reads
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
   const m = {
     source,
     scale,
@@ -81,7 +82,6 @@ const canvasStageView = (
     compareToggleBefore,
     bins,
     phase,
-    // SAFETY: narrow slice for lazy memoization — only fields the view island reads
   } as unknown as Model
   return canvasStage(h, m)
 }
@@ -95,7 +95,8 @@ const layerDrawerView = (
   layersOpen: boolean,
   h: HtmlBuilder<EditorMessage>,
 ): Html => {
-  // oxlint-disable-next-line no-unsafe-type-assertion
+  // SAFETY: narrow slice for lazy memoization — only fields the view island reads
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
   const m = {
     chain,
     phase,
@@ -103,7 +104,6 @@ const layerDrawerView = (
     activeMixerColor,
     lutBarOpen,
     catalog,
-    // SAFETY: narrow slice for lazy memoization — only fields the view island reads
   } as unknown as Model
   return layerDrawer(h, m, layersOpen)
 }
@@ -121,7 +121,8 @@ const lutBarView = (
   chain: Model['chain'],
   h: HtmlBuilder<EditorMessage>,
 ): Html => {
-  // oxlint-disable-next-line no-unsafe-type-assertion
+  // SAFETY: narrow slice for lazy memoization — only fields the view island reads
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
   const m = {
     catalog,
     lutBarOpen,
@@ -134,7 +135,6 @@ const lutBarView = (
     offlineLutNotice,
     phase,
     chain,
-    // SAFETY: narrow slice for lazy memoization — only fields the view island reads
   } as unknown as Model
   return lutBar(h, m)
 }
@@ -146,8 +146,8 @@ const mobileTabBarView = (
   chain: Model['chain'],
   h: HtmlBuilder<EditorMessage>,
 ): Html => {
-  // oxlint-disable-next-line no-unsafe-type-assertion
   // SAFETY: narrow slice for lazy memoization — only fields the view island reads
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
   const m = { mobileSheet, lutBarOpen, phase, chain } as unknown as Model
   return mobileTabBarImpl(m, hasLutTarget, h)
 }

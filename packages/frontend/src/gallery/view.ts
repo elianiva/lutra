@@ -72,12 +72,13 @@ const collagesSectionView = (
   confirming: Model['confirmingCollageDelete'],
   h: HtmlBuilder<GalleryMessage>,
 ): Html => {
+  // SAFETY: narrow slice for lazy memoization — only fields the view island reads
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
   const m = {
     collages,
     grid,
     collageThumbSizes: thumbSizes,
     confirmingCollageDelete: confirming,
-    // SAFETY: narrow slice for lazy memoization — only fields the view island reads
   } as unknown as Model
   return collagesSection(h, m)
 }
@@ -180,10 +181,7 @@ const dropOverlay = (h: HtmlBuilder<GalleryMessage>, active: boolean): Html =>
             ],
             [icon(h, Upload, 'Drop photos', 28)],
           ),
-          h.p(
-            [h.Class('text-sm font-semibold tracking-wide text-accent')],
-            ['Drop photos to add'],
-          ),
+          h.p([h.Class('text-sm font-semibold tracking-wide text-accent')], ['Drop photos to add']),
           h.p([h.Class('text-xs text-muted')], ['Release to add them to your gallery']),
         ],
       )
@@ -211,7 +209,10 @@ const emptyState = (h: HtmlBuilder<GalleryMessage>) =>
           h.span([h.Class('text-xs text-muted')], ['or drop images here']),
         ],
       ),
-      h.p([h.Class('text-xs text-muted')], ['Paste (⌘V / Ctrl+V) also works. Your edits will appear here.']),
+      h.p(
+        [h.Class('text-xs text-muted')],
+        ['Paste (⌘V / Ctrl+V) also works. Your edits will appear here.'],
+      ),
     ],
   )
 
@@ -399,11 +400,12 @@ const collageCardView = (
   confirmingId: Model['confirmingCollageDelete'],
   h: HtmlBuilder<GalleryMessage>,
 ): Html => {
+  // SAFETY: narrow slice for lazy memoization — only fields the view island reads
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
   const m = {
     grid,
     collageThumbSizes: thumbSizes,
     confirmingCollageDelete: confirmingId,
-    // SAFETY: narrow slice for lazy memoization — only fields the view island reads
   } as unknown as Model
   return collageCard(h, collage, m)
 }

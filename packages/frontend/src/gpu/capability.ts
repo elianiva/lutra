@@ -27,10 +27,18 @@ export const webGpuSupported: WebGpuCapability = { supported: true, reason: '' }
  */
 export const detectWebGpu = Effect.gen(function* () {
   const capability = yield* Effect.tryPromise({
-    catch: () =>
-      ({ supported: false, reason: 'WebGPU probe threw an unexpected error.' }) as WebGpuCapability,
+    catch: () => {
+      // SAFETY: catch handler must return the same WebGpuCapability union as the try branch
+      // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
+      return {
+        supported: false,
+        reason: 'WebGPU probe threw an unexpected error.',
+      } as WebGpuCapability
+    },
     try: async () => {
       if (navigator.gpu === undefined) {
+        // SAFETY: literal matches the unsupported arm of WebGpuCapability
+        // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
         return {
           supported: false,
           reason: 'navigator.gpu is undefined — this browser does not expose WebGPU.',
@@ -38,6 +46,8 @@ export const detectWebGpu = Effect.gen(function* () {
       }
       const adapter = await navigator.gpu.requestAdapter()
       if (adapter === null) {
+        // SAFETY: literal matches the unsupported arm of WebGpuCapability
+        // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
         return {
           supported: false,
           reason: 'WebGPU is present but requestAdapter() returned no GPU adapter.',

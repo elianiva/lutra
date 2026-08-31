@@ -48,17 +48,22 @@ const saveEditOf = (commands: readonly Command.Command<unknown, unknown, unknown
 
 describe('editor: save flow (Save / Save as)', () => {
   it('SaveRequested without an image dispatches nothing', () => {
-    const { model, commands = [], outMessage: out } = update(initialModel(), EditorMessage.SaveRequested())
+    const {
+      model,
+      commands = [],
+      outMessage: out,
+    } = update(initialModel(), EditorMessage.SaveRequested())
     expect(model).toEqual(initialModel())
     expect(commands).toEqual([])
     expect(out).toBeUndefined()
   })
 
   it('SaveRequested saves in place when the editor is attached', () => {
-    const { model, commands = [], outMessage: out } = update(
-      loaded({ id: id(), source: source() }),
-      EditorMessage.SaveRequested(),
-    )
+    const {
+      model,
+      commands = [],
+      outMessage: out,
+    } = update(loaded({ id: id(), source: source() }), EditorMessage.SaveRequested())
     expect(model.saveStatus).toEqual({ _tag: 'saving' })
     expect(saveEditOf(commands)?.args?.id).toBe(id())
     expect(out).toBeUndefined()
@@ -103,7 +108,11 @@ describe('editor: save flow (Save / Save as)', () => {
   })
 
   it('EditSaved attaches the model to a fresh-pick save and surfaces EditCreated', () => {
-    const { model, commands = [], outMessage: out } = update(
+    const {
+      model,
+      commands = [],
+      outMessage: out,
+    } = update(
       loaded({ id: null, source: source() }),
       EditorMessage.EditSaved({ id: id(), savedAt: 1234 }),
     )
@@ -132,7 +141,11 @@ describe('editor: save flow (Save / Save as)', () => {
   })
 
   it('SaveFailed records the reason for the top bar', () => {
-    const { model, commands = [], outMessage: out } = update(
+    const {
+      model,
+      commands = [],
+      outMessage: out,
+    } = update(
       loaded({ id: id(), source: source() }),
       EditorMessage.SaveFailed({ error: new StoreError({ message: 'quota exceeded' }) }),
     )

@@ -245,9 +245,9 @@ describe('Export dialog', () => {
     // commands, but the readback can genuinely outlive a Cancel click.
     // Open, close (bypassing the dialog's own commands), then deliver the
     // snapshot — nothing may encode or retain a blob URL.
-    let [model] = update(loadedModel(), EditorMessage.ExportRequested())
-    ;[model] = update(model, dialogMessage(Dialog.Message.RequestedClose()))
-    ;[model] = update(model, dialogMessage(Dialog.Message.CompletedCloseDialog()))
+    let { model } = update(loadedModel(), EditorMessage.ExportRequested())
+    model = update(model, dialogMessage(Dialog.Message.RequestedClose())).model
+    model = update(model, dialogMessage(Dialog.Message.CompletedCloseDialog())).model
     vitestExpect(model.exportDialog.dialog.isOpen).toBe(false)
 
     const { model: after, commands = [] } = update(model, EditorMessage.ExportSnapshotted())
@@ -258,17 +258,17 @@ describe('Export dialog', () => {
   it('revokes an encode that completes after the dialog closed — no download', () => {
     // The Export button blocks double-presses while encoding, but the dialog
     // can close mid-encode. A late result must not trigger a download.
-    let [model] = update(loadedModel(), EditorMessage.ExportRequested())
-    ;[model] = update(model, EditorMessage.ExportSnapshotted())
-    ;[model] = update(
+    let { model } = update(loadedModel(), EditorMessage.ExportRequested())
+    model = update(model, EditorMessage.ExportSnapshotted()).model
+    model = update(
       model,
       EditorMessage.GotExportDialogMessage({ message: ExportDialog.Message.EncodeRequested() }),
-    )
+    ).model
     vitestExpect(model.exportDialog.encoding).toBe(true)
 
     // Close while the encode is in flight.
-    ;[model] = update(model, dialogMessage(Dialog.Message.RequestedClose()))
-    ;[model] = update(model, dialogMessage(Dialog.Message.CompletedCloseDialog()))
+    model = update(model, dialogMessage(Dialog.Message.RequestedClose())).model
+    model = update(model, dialogMessage(Dialog.Message.CompletedCloseDialog())).model
 
     const { model: after, commands = [] } = update(
       model,

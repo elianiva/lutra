@@ -78,6 +78,8 @@ export const init = (capability: WebGpuCapability, url: Url.Url): InitReturn => 
     // asked for reduced data usage — then the card's manual start button
     // is the only path in, and `start` stays idempotent for both. The
     // persist() request rides along ungated (a bonus, not a precondition).
-    commands: offline.saveData ? commands : [...commands, StartOfflineFill({ requirePersist: false })],
+    commands: offline.saveData
+      ? commands
+      : [...commands, StartOfflineFill({ requirePersist: false })],
   }
 }

@@ -15,19 +15,19 @@
     "vendor:luts": "bun scripts/vendor-luts.ts"
   },
   "dependencies": {
-    "@effect/platform-node": "4.0.0-beta.102",
-    "alchemy": "2.0.0-beta.74",
-    "effect": "4.0.0-rc.111"
+    "@effect/platform-node": "4.0.0-rc.112",
+    "alchemy": "2.0.0-beta.75",
+    "effect": "4.0.0-rc.112"
   },
   "devDependencies": {
-    "@foldkit/oxlint-plugin": "^0.7.0",
-    "@oxlint/plugins": "1.79.0",
+    "@foldkit/oxlint-plugin": "^0.11.0",
+    "@oxlint/plugins": "1.80.0",
     "@resvg/resvg-js": "^2.6.2",
     "@types/bun": "^1.4.0",
-    "oxlint": "1.79.0",
-    "turbo": "^2.10.11",
+    "oxlint": "1.80.0",
+    "turbo": "^2.10.12",
     "typescript": "^7.0.2",
-    "vite-plus": "^0.2.9"
+    "vite-plus": "^0.3.0"
   },
   "packageManager": "pnpm@11.18.0"
 }

@@ -64,6 +64,7 @@ const own = Subscription.make<Model, CollageMessage>()((entry) => ({
               }
               const onMove = (event: PointerEvent) => {
                 // SAFETY: getCoalescedEvents is a standard PointerEvent API missing from older lib.dom; intersect to access it optionally.
+                // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
                 const anyEvent = event as PointerEvent & {
                   getCoalescedEvents?: () => PointerEvent[]
                 }

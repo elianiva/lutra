@@ -275,7 +275,11 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
 
       // drag-and-drop reorder (docs/adr/0009-collage)
       GotDragMessage: ({ message }) => {
-        const { model: drag, commands: dragCommands = [], outMessage: out } = DragAndDrop.update(model.drag, message)
+        const {
+          model: drag,
+          commands: dragCommands = [],
+          outMessage: out,
+        } = DragAndDrop.update(model.drag, message)
         const base: UpdateReturn = {
           model: { ...model, drag },
           commands: Command.mapMessages(dragCommands, toDragMessage),
@@ -381,8 +385,7 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
           commands: [ScheduleZoomCommit({ seq })],
         }
       },
-      ZoomSettled: (settled) =>
-        settled.seq === model.zoomSeq ? commitDraft(model) : { model },
+      ZoomSettled: (settled) => (settled.seq === model.zoomSeq ? commitDraft(model) : { model }),
       ResetFraming: ({ index }) => {
         const collage = collageOf(model)
         if (!collage || model.mode !== 'frame') {
@@ -424,9 +427,7 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         }
       },
       UndoExpired: ({ seq }) =>
-        model.undo?.seq === seq
-          ? { model: { ...model, undo: null, undoLabel: null } }
-          : { model },
+        model.undo?.seq === seq ? { model: { ...model, undo: null, undoLabel: null } } : { model },
 
       CollageSaved: () => ({ model }),
       SaveFailed: ({ error }) => ({
@@ -439,7 +440,9 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         if (!collage) {
           return { model }
         }
-        const { model: dialogModel, commands: dialogCommands = [] } = ExportDialog.open(model.exportDialog)
+        const { model: dialogModel, commands: dialogCommands = [] } = ExportDialog.open(
+          model.exportDialog,
+        )
         return {
           model: { ...model, exportDialog: dialogModel },
           commands: [

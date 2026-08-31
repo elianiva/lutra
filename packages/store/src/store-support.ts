@@ -118,10 +118,10 @@ export const rejectingStore = <Contract>(
  * owning screen shows its error state instead of the app failing to boot.
  * Wire this into the app resource stack alongside the other backends.
  */
-export const indexedDbStoreLayer = <Id, Shape>(
-  tag: Context.Key<Id, Shape>,
+export const indexedDbStoreLayer = <Id, Contract>(
+  tag: Context.Key<Id, Contract>,
   live: Layer.Layer<Id, StoreError, IndexedDbDatabase.IndexedDbDatabase>,
-  ofContract: (ops: RejectingOps) => Shape,
+  ofContract: (ops: RejectingOps) => Contract,
   databaseLabel: string,
 ): Layer.Layer<Id> =>
   live.pipe(

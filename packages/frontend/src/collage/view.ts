@@ -101,11 +101,6 @@ const header = (h: HtmlBuilder<CollageMessage>) =>
     ],
   )
 
-const notice = (message: string | null, h: HtmlBuilder<CollageMessage>) =>
-  message === null
-    ? null
-    : h.div([h.Class('border-b border-border bg-panel px-4 py-1 text-xs text-accent')], [message])
-
 const undoToastView = (
   undo: Model['undo'],
   undoLabel: Model['undoLabel'],
@@ -146,6 +141,7 @@ const ghostView = (
       const dragged = Option.match(DragAndDrop.maybeDraggedItemId(drag), {
         onNone: () => null,
         // SAFETY: EditId brand is string at runtime; DragAndDrop stores it as string
+        // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
         onSome: (id) => photoById.get(id as unknown as EditId) ?? null,
       })
       const draggedUrl = dragged && photoUrl(dragged.id, dragged.source)
@@ -166,33 +162,6 @@ const ghostView = (
   })
 }
 
-const undoToast = (h: HtmlBuilder<CollageMessage>, model: Model) => {
-  const { undo, undoLabel } = model
-  if (undo === null || undoLabel === null) {
-    return null
-  }
-  return h.div(
-    [
-      h.DataAttribute('undo-toast', 'true'),
-      h.Class(
-        'absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded border border-border bg-panel px-3 py-1.5 text-xs shadow-lg',
-      ),
-    ],
-    [
-      h.span([h.Class('text-muted')], [undoLabel]),
-      h.button(
-        [
-          h.OnClick(CollageMessage.UndoPressed()),
-          h.AriaLabel(`Undo: ${undoLabel.toLowerCase()}`),
-          h.DataAttribute('undo-button', 'true'),
-          h.Class('rounded bg-accent px-2 py-0.5 text-ink hover:opacity-80'),
-        ],
-        ['Undo'],
-      ),
-    ],
-  )
-}
-
 // (ghost superseded by ghostView)
 
 const controlsWrapper = (
@@ -201,6 +170,7 @@ const controlsWrapper = (
   h: HtmlBuilder<CollageMessage>,
 ): Html => {
   // SAFETY: narrow slice for lazy memoization — only fields the view island reads
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
   const m = { mode } as unknown as Model
   return controls(h, m, collage)
 }
@@ -455,6 +425,8 @@ const gridView = (
   // Maps for O(1) lookups during per-tile render — avoids linear find per tile
   // on every rAF-throttled PanMoved. Created once per grid render, not per cell.
   const photoById = new Map(photos.map((p) => [p.id, p]))
+  // SAFETY: EditId brand is string at runtime; Map keys are plain strings
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
   const sizeById = new Map(sizes.map((s) => [s.editId as string, s]))
   // An explicit M×N grid renders its spare capacity as background cells
   // (docs/adr/0009-collage) — non-interactive placeholders past the last tile.
@@ -510,8 +482,9 @@ const tileCellView = (
   sizeById: Map<string, Model['sizes'][number]>,
   h: HtmlBuilder<CollageMessage>,
 ): Html => {
-  // SAFETY: EditId brand is string at runtime
-  const photo = (photoById as Map<string, Model['photos'][number]>).get(editId as string)
+  // SAFETY: EditId brand is string at runtime; Map keys are plain strings
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
+  const photo = photoById.get(editId as string)
   const url = photo === undefined ? null : photoUrl(photo.id, photo.source)
   const arrange = mode === 'arrange'
   const dropTarget = Option.match(DragAndDrop.maybeDropTarget(drag), {
@@ -630,6 +603,8 @@ const framedPhotoCached = (
   cellAspect: number,
   sizeById: Map<string, Model['sizes'][number]>,
 ): Html => {
+  // SAFETY: EditId brand is string at runtime; Map keys are plain strings
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
   const size = sizeById.get(editId as string)
   const imageAspect = !size || size.width <= 0 || size.height <= 0 ? null : size.width / size.height
   if (imageAspect === null)
