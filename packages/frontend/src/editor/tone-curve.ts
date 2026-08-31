@@ -43,107 +43,106 @@ const fmt = (v: number) => String(Math.round(v * 100) / 100)
  * drag alive beyond the widget's bounds; `touch-none` (the class on the
  * svg) keeps a touch drag from scrolling the drawer.
  */
-export const CurveWidget = Mount.defineStream(
-  'CurveWidget',
-  EditorMessage.CurvePointDragged,
-)((element) =>
-  Stream.callback<typeof EditorMessage.CurvePointDragged.Type>((queue) =>
-    Effect.gen(function* () {
-      // Narrow to the SVG element (the mount target is always the widget's
-      // svg) so the listeners get typed PointerEvents, like the canvas
-      // stage's HTMLElement narrowing.
-      if (!(element instanceof SVGSVGElement)) {
-        return yield* Effect.never
-      }
-      const svg: SVGSVGElement = element
-      // The handle index being dragged; -1 while no drag is active.
-      let dragging = -1
-
-      const emit = (index: number, x: number, y: number) =>
-        Queue.offerUnsafe(queue, EditorMessage.CurvePointDragged({ index, x, y }))
-
-      /** Pointer position in unit space (0..1, y up). */
-      const unitCoords = (e: PointerEvent) => {
-        const rect = svg.getBoundingClientRect()
-        return {
-          x: (e.clientX - rect.left) / rect.width,
-          y: (rect.bottom - e.clientY) / rect.height,
+export const CurveWidget = Mount.defineStream('CurveWidget', {
+  messages: [EditorMessage.CurvePointDragged],
+  execute: ({ element }) =>
+    Stream.callback<typeof EditorMessage.CurvePointDragged.Type>((queue) =>
+      Effect.gen(function* () {
+        // Narrow to the SVG element (the mount target is always the widget's
+        // svg) so the listeners get typed PointerEvents, like the canvas
+        // stage's HTMLElement narrowing.
+        if (!(element instanceof SVGSVGElement)) {
+          return yield* Effect.never
         }
-      }
+        const svg: SVGSVGElement = element
+        // The handle index being dragged; -1 while no drag is active.
+        let dragging = -1
 
-      /** The handle index under the pointer, or -1 when none is within
-       *  GRAB_THRESHOLD client px of it. */
-      const hitTest = (e: PointerEvent): number => {
-        const rect = svg.getBoundingClientRect()
-        if (rect.width === 0 || rect.height === 0) {
-          return -1
-        }
-        let best = -1
-        let bestDist = GRAB_THRESHOLD
-        svg.querySelectorAll('[data-curve-handle]').forEach((el, index) => {
-          const cx = (Number(el.getAttribute('cx')) / CURVE_VIEW) * rect.width
-          const cy = (Number(el.getAttribute('cy')) / CURVE_VIEW) * rect.height
-          const dx = e.clientX - (rect.left + cx)
-          const dy = e.clientY - (rect.top + cy)
-          const d = Math.hypot(dx, dy)
-          if (d < bestDist) {
-            bestDist = d
-            best = index
+        const emit = (index: number, x: number, y: number) =>
+          Queue.offerUnsafe(queue, EditorMessage.CurvePointDragged({ index, x, y }))
+
+        /** Pointer position in unit space (0..1, y up). */
+        const unitCoords = (e: PointerEvent) => {
+          const rect = svg.getBoundingClientRect()
+          return {
+            x: (e.clientX - rect.left) / rect.width,
+            y: (rect.bottom - e.clientY) / rect.height,
           }
-        })
-        return best
-      }
+        }
 
-      const onDown = (e: PointerEvent) => {
-        if (e.button !== 0) {
-          return
+        /** The handle index under the pointer, or -1 when none is within
+         *  GRAB_THRESHOLD client px of it. */
+        const hitTest = (e: PointerEvent): number => {
+          const rect = svg.getBoundingClientRect()
+          if (rect.width === 0 || rect.height === 0) {
+            return -1
+          }
+          let best = -1
+          let bestDist = GRAB_THRESHOLD
+          svg.querySelectorAll('[data-curve-handle]').forEach((el, index) => {
+            const cx = (Number(el.getAttribute('cx')) / CURVE_VIEW) * rect.width
+            const cy = (Number(el.getAttribute('cy')) / CURVE_VIEW) * rect.height
+            const dx = e.clientX - (rect.left + cx)
+            const dy = e.clientY - (rect.top + cy)
+            const d = Math.hypot(dx, dy)
+            if (d < bestDist) {
+              bestDist = d
+              best = index
+            }
+          })
+          return best
         }
-        const index = hitTest(e)
-        if (index < 0) {
-          return
-        }
-        dragging = index
-        svg.setPointerCapture(e.pointerId)
-        // Grab-and-jump: the point follows the pointer from the moment the
-        // grab lands (the same feel as dragging an already-selected handle).
-        const { x, y } = unitCoords(e)
-        emit(index, x, y)
-      }
-      const onMove = (e: PointerEvent) => {
-        if (dragging < 0) {
-          return
-        }
-        const { x, y } = unitCoords(e)
-        emit(dragging, x, y)
-      }
-      const onUp = (e: PointerEvent) => {
-        if (dragging < 0) {
-          return
-        }
-        dragging = -1
-        svg.releasePointerCapture(e.pointerId)
-      }
 
-      yield* Effect.acquireRelease(
-        Effect.sync(() => {
-          svg.addEventListener('pointerdown', onDown)
-          svg.addEventListener('pointermove', onMove)
-          svg.addEventListener('pointerup', onUp)
-          svg.addEventListener('pointercancel', onUp)
-          return { onDown, onMove, onUp }
-        }),
-        ({ onDown, onMove, onUp }) =>
+        const onDown = (e: PointerEvent) => {
+          if (e.button !== 0) {
+            return
+          }
+          const index = hitTest(e)
+          if (index < 0) {
+            return
+          }
+          dragging = index
+          svg.setPointerCapture(e.pointerId)
+          // Grab-and-jump: the point follows the pointer from the moment the
+          // grab lands (the same feel as dragging an already-selected handle).
+          const { x, y } = unitCoords(e)
+          emit(index, x, y)
+        }
+        const onMove = (e: PointerEvent) => {
+          if (dragging < 0) {
+            return
+          }
+          const { x, y } = unitCoords(e)
+          emit(dragging, x, y)
+        }
+        const onUp = (e: PointerEvent) => {
+          if (dragging < 0) {
+            return
+          }
+          dragging = -1
+          svg.releasePointerCapture(e.pointerId)
+        }
+
+        yield* Effect.acquireRelease(
           Effect.sync(() => {
-            svg.removeEventListener('pointerdown', onDown)
-            svg.removeEventListener('pointermove', onMove)
-            svg.removeEventListener('pointerup', onUp)
-            svg.removeEventListener('pointercancel', onUp)
+            svg.addEventListener('pointerdown', onDown)
+            svg.addEventListener('pointermove', onMove)
+            svg.addEventListener('pointerup', onUp)
+            svg.addEventListener('pointercancel', onUp)
+            return { onDown, onMove, onUp }
           }),
-      )
-      return yield* Effect.never
-    }),
-  ),
-)
+          ({ onDown, onMove, onUp }) =>
+            Effect.sync(() => {
+              svg.removeEventListener('pointerdown', onDown)
+              svg.removeEventListener('pointermove', onMove)
+              svg.removeEventListener('pointerup', onUp)
+              svg.removeEventListener('pointercancel', onUp)
+            }),
+        )
+        return yield* Effect.never
+      }),
+    ),
+})
 
 /** The 25/50/75% grid lines, both axes. */
 const gridLines = (h: HtmlBuilder<EditorMessage>) =>

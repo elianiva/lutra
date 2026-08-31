@@ -45,10 +45,14 @@ describe('gallery: open a photo (new edit)', () => {
   })
 
   it('a cancelled picker is a no-op: no commands, no OutMessage', () => {
-    const [model, commands, out] = update(initialModel(), GalleryMessage.PhotoPickCancelled())
+    const {
+      model,
+      commands = [],
+      outMessage: out,
+    } = update(initialModel(), GalleryMessage.PhotoPickCancelled())
     expect(model).toEqual(initialModel())
     expect(commands).toEqual([])
-    expect(Option.isNone(out)).toBe(true)
+    expect(out).toBeUndefined()
   })
 
   it('a created Edit surfaces as the OpenedEdit OutMessage for the root', () => {
@@ -62,17 +66,21 @@ describe('gallery: open a photo (new edit)', () => {
   })
 
   it('a failed create sets the notice banner instead of losing the photo silently', () => {
-    const [model, commands, out] = update(
+    const {
+      model,
+      commands = [],
+      outMessage: out,
+    } = update(
       initialModel(),
       GalleryMessage.PhotoCreateFailed({ error: new StoreError({ message: 'quota' }) }),
     )
     expect(model.notice).toBe('Could not open photo: quota')
     expect(commands).toEqual([])
-    expect(Option.isNone(out)).toBe(true)
+    expect(out).toBeUndefined()
   })
 
   it('OpenPhotoRequested dispatches the OpenPhoto command', () => {
-    const [, commands] = update(initialModel(), GalleryMessage.OpenPhotoRequested())
+    const { commands = [] } = update(initialModel(), GalleryMessage.OpenPhotoRequested())
     expect(commands.map((c) => c.name)).toEqual(['OpenPhoto'])
   })
 })
@@ -124,7 +132,11 @@ describe('gallery: opening several photos at once', () => {
   })
 
   it('a batch refreshes the grid in place and reports nothing when all landed', () => {
-    const [model, commands, out] = update(
+    const {
+      model,
+      commands = [],
+      outMessage: out,
+    } = update(
       initialModel(),
       added({ added: 2, summaries: Option.some([summary(id), summary(otherId)]) }),
     )
@@ -134,11 +146,11 @@ describe('gallery: opening several photos at once', () => {
     }
     expect(model.notice).toBe(null)
     expect(commands).toEqual([])
-    expect(Option.isNone(out)).toBe(true)
+    expect(out).toBeUndefined()
   })
 
   it('a partial failure reports what landed and what did not', () => {
-    const [model] = update(
+    const { model } = update(
       initialModel(),
       added({
         added: 2,
@@ -155,7 +167,7 @@ describe('gallery: opening several photos at once', () => {
   })
 
   it('a fully failed batch reads like the single-pick failure', () => {
-    const [model] = update(
+    const { model } = update(
       initialModel(),
       added({
         failed: 3,
@@ -167,7 +179,7 @@ describe('gallery: opening several photos at once', () => {
   })
 
   it('a failed post-save listing keeps the current grid but still reports', () => {
-    const [model] = update(
+    const { model } = update(
       initialModel(),
       added({ added: 1, failed: 1, error: Option.none(), summaries: Option.none() }),
     )

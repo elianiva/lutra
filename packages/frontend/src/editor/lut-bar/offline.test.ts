@@ -61,18 +61,18 @@ const loaded = () => ({
 })
 
 const settled = (model: Model): Model =>
-  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
+  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision })).model
 
 /** A LUT draft with the bar open (the draft selects the first catalog entry). */
-const lutDraft = () => settled(selectTool(loaded(), 'lut')[0])
+const lutDraft = () => settled(selectTool(loaded(), 'lut').model)
 
 /** The same draft, but the device is offline. */
 const offlineLutDraft = () =>
-  update(lutDraft(), EditorMessage.OfflineConnectivityChanged({ online: false }))[0]
+  update(lutDraft(), EditorMessage.OfflineConnectivityChanged({ online: false })).model
 
 /** The same draft, offline, with the cube already in the offline library. */
 const offlineLutDraftDownloaded = () =>
-  update(offlineLutDraft(), EditorMessage.OfflineFileDownloaded({ lutId: lutPrint }))[0]
+  update(offlineLutDraft(), EditorMessage.OfflineFileDownloaded({ lutId: lutPrint })).model
 
 describe('LUT bar offline library', () => {
   it('an undownloaded cube while offline is dimmed with a badge', () => {

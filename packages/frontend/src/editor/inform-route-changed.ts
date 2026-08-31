@@ -1,4 +1,4 @@
-import { Command } from 'foldkit'
+import { Command, Update } from 'foldkit'
 import type { GpuBackend } from '../gpu/backend'
 import type { CanvasRef } from '../gpu/canvas-ref'
 import type { LutStore } from '../luts/store'
@@ -34,10 +34,7 @@ type Resource =
  * without an id (gallery route) leaves the editor as-is; it is persistent
  * cross-route state per ADR 0006.
  */
-export type RouteChangedReturn = readonly [
-  Model,
-  readonly Command.Command<EditorMessage, never, Resource>[],
-]
+export type RouteChangedReturn = Update.Return<Model, EditorMessage, Resource>
 export const informRouteChanged = (model: Model, route: AppRoute): RouteChangedReturn => {
   const settings = [
     Command.mapMessage(ExportDialog.LoadExportSettings(), (message) =>
@@ -46,5 +43,5 @@ export const informRouteChanged = (model: Model, route: AppRoute): RouteChangedR
   ]
   const boot = [LoadCatalog(), ...settings, LoadLutRecents()]
   const commands = route._tag === 'Editor' ? [LoadEdit({ id: route.editId }), ...boot] : boot
-  return [model, commands]
+  return { model, commands }
 }

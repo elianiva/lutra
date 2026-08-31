@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { Idle, Filling, Paused, Ready, QuotaError, offlineMachine } from './machine'
 import type { OfflinePhase } from './machine'
-import type { AppMessage } from '../root/message'
 import { OfflineMessage } from './messages'
 
 // The offline fill machine's transition table (docs/adr/0007-offline), asserted the
@@ -10,7 +9,7 @@ import { OfflineMessage } from './messages'
 // ignored — that absence IS the blocking (a Ready fill ignores everything; a
 // paused fill ignores a second pause).
 
-const step = (state: OfflinePhase, message: AppMessage) => offlineMachine.step(state, message)
+const step = (state: OfflinePhase, message: OfflineMessage) => offlineMachine.step(state, message)
 
 describe('offline machine', () => {
   it('starts Idle', () => {

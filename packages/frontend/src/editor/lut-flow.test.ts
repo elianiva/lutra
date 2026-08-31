@@ -66,24 +66,24 @@ const loaded = () => ({
 /** Settle the in-flight render the way RenderedFrame does, so the next
  *  renderNow dispatches a fresh RenderChain (assertable in tests). */
 const settled = (model: Model): Model =>
-  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
+  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision })).model
 
 /** A LUT draft (Drafting phase, bar open, no render in flight). */
-const lutDraft = () => settled(selectTool(loaded(), 'lut')[0])
+const lutDraft = () => settled(selectTool(loaded(), 'lut').model)
 
 /** A committed LUT layer (Selected phase, bar closed, no render in flight). */
-const selectedLut = () => settled(update(lutDraft(), EditorMessage.ConfirmedDraft())[0])
+const selectedLut = () => settled(update(lutDraft(), EditorMessage.ConfirmedDraft()).model)
 
 /** A committed lut + exposure chain with the LUT layer selected. */
 const selectedLutWithExposure = () => {
   const committed = selectedLut()
-  const [withExposure] = selectTool(committed, 'exposure')
-  const [done] = update(withExposure, EditorMessage.ConfirmedDraft())
+  const { model: withExposure } = selectTool(committed, 'exposure')
+  const { model: done } = update(withExposure, EditorMessage.ConfirmedDraft())
   const lutLayer = done.chain.find((l) => l.type === 'lut')
   if (!lutLayer) {
     throw new Error('fixture: expected a lut layer')
   }
-  return update(done, EditorMessage.SelectedLayer({ id: lutLayer.id }))[0]
+  return update(done, EditorMessage.SelectedLayer({ id: lutLayer.id })).model
 }
 
 const draftLayerType = (model: Model): LayerType | undefined =>
@@ -96,12 +96,12 @@ const draftLutId = (model: Model): LutId | undefined =>
 
 describe('LUT layer flow', () => {
   it('keeps the LUT tool inert until the catalog loads', () => {
-    const [model] = update(initialModel(), EditorMessage.SelectedTool({ type: 'lut' }))
+    const { model } = update(initialModel(), EditorMessage.SelectedTool({ type: 'lut' }))
     expect(model.phase._tag).toBe('Empty')
   })
 
   it('creates a LUT draft with the first catalog entry and the bar open', () => {
-    const [model] = selectTool(loaded(), 'lut')
+    const { model } = selectTool(loaded(), 'lut')
     expect(model.phase._tag).toBe('Drafting')
     if (model.phase._tag === 'Drafting' && model.phase.layer.type === 'lut') {
       expect(model.phase.layer.lutId).toBe(lutPrint)
@@ -111,22 +111,22 @@ describe('LUT layer flow', () => {
   })
 
   it('swaps the draft LUT through the machine and keeps the draft', () => {
-    const [withDraft] = selectTool(loaded(), 'lut')
-    const [model] = update(withDraft, EditorMessage.ChangedDraftLut({ lutId: lutBw }))
+    const { model: withDraft } = selectTool(loaded(), 'lut')
+    const { model } = update(withDraft, EditorMessage.ChangedDraftLut({ lutId: lutBw }))
     expect(model.phase._tag).toBe('Drafting')
     expect(draftLutId(model)).toBe(lutBw)
   })
 
   it('ignores a LUT swap on a non-LUT draft', () => {
-    const [withDraft] = selectTool(loaded(), 'exposure')
-    const [model] = update(withDraft, EditorMessage.ChangedDraftLut({ lutId: lutBw }))
+    const { model: withDraft } = selectTool(loaded(), 'exposure')
+    const { model } = update(withDraft, EditorMessage.ChangedDraftLut({ lutId: lutBw }))
     expect(model.phase._tag).toBe('Drafting')
     expect(draftLayerType(model)).toBe('exposure')
   })
 
   it('confirms the draft into the chain and closes the bar', () => {
-    const [withDraft] = selectTool(loaded(), 'lut')
-    const [model] = update(withDraft, EditorMessage.ConfirmedDraft())
+    const { model: withDraft } = selectTool(loaded(), 'lut')
+    const { model } = update(withDraft, EditorMessage.ConfirmedDraft())
     expect(model.chain).toHaveLength(1)
     expect(model.phase._tag).toBe('Selected')
     expect(model.lutBarOpen).toBe(false)
@@ -137,24 +137,27 @@ describe('LUT layer flow', () => {
 
   it('only toggles the bar for a LUT draft or selected LUT layer', () => {
     // No draft, nothing selected: toggle is a no-op
-    const [m1] = update(loaded(), EditorMessage.ToggledLutPicker())
+    const { model: m1 } = update(loaded(), EditorMessage.ToggledLutPicker())
     expect(m1.lutBarOpen).toBe(false)
 
     // With a LUT draft: toggles
-    const [withDraft] = selectTool(loaded(), 'lut')
-    const [m2] = update(withDraft, EditorMessage.ToggledLutPicker())
+    const { model: withDraft } = selectTool(loaded(), 'lut')
+    const { model: m2 } = update(withDraft, EditorMessage.ToggledLutPicker())
     expect(m2.lutBarOpen).toBe(false)
 
     // A non-LUT draft: no-op
-    const [withExposure] = selectTool(loaded(), 'exposure')
-    const [m3] = update(withExposure, EditorMessage.ToggledLutPicker())
+    const { model: withExposure } = selectTool(loaded(), 'exposure')
+    const { model: m3 } = update(withExposure, EditorMessage.ToggledLutPicker())
     expect(m3.lutBarOpen).toBe(false)
   })
 })
 
 describe('LUT bar preview (hover)', () => {
   it('previews the LUT on the draft without touching the machine', () => {
-    const [model, commands] = update(lutDraft(), EditorMessage.PreviewedLut({ lutId: lutBw }))
+    const { model, commands = [] } = update(
+      lutDraft(),
+      EditorMessage.PreviewedLut({ lutId: lutBw }),
+    )
     expect(model.previewLut).toBe(lutBw)
     // The machine-owned draft keeps its committed lutId — the preview is
     // applied at render time only.
@@ -164,23 +167,26 @@ describe('LUT bar preview (hover)', () => {
   })
 
   it('PreviewedLut(null) restores the committed lutId', () => {
-    const [hovered] = update(lutDraft(), EditorMessage.PreviewedLut({ lutId: lutBw }))
-    const [model, commands] = update(settled(hovered), EditorMessage.PreviewedLut({ lutId: null }))
+    const { model: hovered } = update(lutDraft(), EditorMessage.PreviewedLut({ lutId: lutBw }))
+    const { model, commands = [] } = update(
+      settled(hovered),
+      EditorMessage.PreviewedLut({ lutId: null }),
+    )
     expect(model.previewLut).toBeNull()
     const render = commands.find((c) => c.name === 'RenderChain')
     expect(render?.args?.draft).toMatchObject({ lutId: lutPrint })
   })
 
   it('same-value hover does not bump the revision (no redundant render)', () => {
-    const [hovered] = update(lutDraft(), EditorMessage.PreviewedLut({ lutId: lutBw }))
-    const [model, commands] = update(hovered, EditorMessage.PreviewedLut({ lutId: lutBw }))
+    const { model: hovered } = update(lutDraft(), EditorMessage.PreviewedLut({ lutId: lutBw }))
+    const { model, commands = [] } = update(hovered, EditorMessage.PreviewedLut({ lutId: lutBw }))
     expect(model.previewLut).toBe(lutBw)
     expect(model.revision).toBe(hovered.revision)
     expect(commands).toEqual([])
   })
 
   it('hover without an image is ignored', () => {
-    const [model, commands] = update(
+    const { model, commands = [] } = update(
       { ...initialModel(), catalog, phase: Idle() },
       EditorMessage.PreviewedLut({ lutId: lutBw }),
     )
@@ -189,14 +195,14 @@ describe('LUT bar preview (hover)', () => {
   })
 
   it('hover without a LUT target is ignored', () => {
-    const [model, commands] = update(loaded(), EditorMessage.PreviewedLut({ lutId: lutBw }))
+    const { model, commands = [] } = update(loaded(), EditorMessage.PreviewedLut({ lutId: lutBw }))
     expect(model.previewLut).toBeNull()
     expect(commands).toEqual([])
   })
 
   it('previews on a selected chain LUT layer without touching the chain', () => {
     const committed = selectedLut()
-    const [model, commands] = update(committed, EditorMessage.PreviewedLut({ lutId: lutBw }))
+    const { model, commands = [] } = update(committed, EditorMessage.PreviewedLut({ lutId: lutBw }))
     expect(model.previewLut).toBe(lutBw)
     expect(model.chain).toEqual(committed.chain)
     const render = commands.find((c) => c.name === 'RenderChain')
@@ -204,15 +210,18 @@ describe('LUT bar preview (hover)', () => {
   })
 
   it('SelectedLutTab sets the tab', () => {
-    const [model] = update(loaded(), EditorMessage.SelectedLutTab({ tab: 'Print' }))
+    const { model } = update(loaded(), EditorMessage.SelectedLutTab({ tab: 'Print' }))
     expect(model.lutTab).toBe('Print')
   })
 })
 
 describe('LUT bar commit + recents', () => {
   it('bar commit clears the preview, bumps recents, and persists', () => {
-    const [hovered] = update(lutDraft(), EditorMessage.PreviewedLut({ lutId: lutBw }))
-    const [model, commands] = update(hovered, EditorMessage.ChangedDraftLut({ lutId: lutBw }))
+    const { model: hovered } = update(lutDraft(), EditorMessage.PreviewedLut({ lutId: lutBw }))
+    const { model, commands = [] } = update(
+      hovered,
+      EditorMessage.ChangedDraftLut({ lutId: lutBw }),
+    )
     expect(model.previewLut).toBeNull()
     expect(model.lutRecents).toEqual([lutBw])
     const save = commands.find((c) => c.name === 'SaveLutRecents')
@@ -221,8 +230,8 @@ describe('LUT bar commit + recents', () => {
 
   it('ChangedLayerLut clears the preview and bumps recents', () => {
     const committed = selectedLut()
-    const [hovered] = update(committed, EditorMessage.PreviewedLut({ lutId: lutBw }))
-    const [model, commands] = update(
+    const { model: hovered } = update(committed, EditorMessage.PreviewedLut({ lutId: lutBw }))
+    const { model, commands = [] } = update(
       hovered,
       EditorMessage.ChangedLayerLut({ id: hovered.chain[0]!.id, lutId: lutBw }),
     )
@@ -239,14 +248,17 @@ describe('LUT bar commit + recents', () => {
       model = update(
         model,
         EditorMessage.ChangedDraftLut({ lutId: LutId(`luts/print/seed_${i}.cube`) }),
-      )[0]
+      ).model
     }
     expect(model.lutRecents).toHaveLength(12)
     expect(model.lutRecents[0]).toBe('luts/print/seed_11.cube')
     expect(model.lutRecents[11]).toBe('luts/print/seed_0.cube')
 
     // A 13th pick pushes the oldest out.
-    model = update(model, EditorMessage.ChangedDraftLut({ lutId: LutId('luts/print/new.cube') }))[0]
+    model = update(
+      model,
+      EditorMessage.ChangedDraftLut({ lutId: LutId('luts/print/new.cube') }),
+    ).model
     expect(model.lutRecents).toHaveLength(12)
     expect(model.lutRecents[0]).toBe('luts/print/new.cube')
     expect(model.lutRecents).not.toContain('luts/print/seed_0.cube')
@@ -255,20 +267,20 @@ describe('LUT bar commit + recents', () => {
     model = update(
       model,
       EditorMessage.ChangedDraftLut({ lutId: LutId('luts/print/seed_5.cube') }),
-    )[0]
+    ).model
     expect(model.lutRecents).toHaveLength(12)
     expect(model.lutRecents[0]).toBe('luts/print/seed_5.cube')
     expect(model.lutRecents.filter((id) => id === 'luts/print/seed_5.cube')).toHaveLength(1)
   })
 
   it('the SelectedTool auto-default does not bump recents', () => {
-    const [model] = selectTool(loaded(), 'lut')
+    const { model } = selectTool(loaded(), 'lut')
     expect(model.lutBarOpen).toBe(true)
     expect(model.lutRecents).toEqual([])
   })
 
   it('LutRecentsLoaded seeds the recents list', () => {
-    const [model] = update(loaded(), EditorMessage.LutRecentsLoaded({ recents: [lutBw] }))
+    const { model } = update(loaded(), EditorMessage.LutRecentsLoaded({ recents: [lutBw] }))
     expect(model.lutRecents).toEqual([lutBw])
   })
 })
@@ -279,47 +291,47 @@ describe('per-photo LUT thumbnails (lazy generation)', () => {
 
   it('a LUT draft auto-open generates the visible group', () => {
     // Effective tab: recents-empty falls back to the first category (Print).
-    const [, commands] = selectTool(loaded(), 'lut')
+    const { commands = [] } = selectTool(loaded(), 'lut')
     expect(genIds(commands)).toEqual([lutPrint])
   })
 
   it('a non-LUT draft does not generate (the bar stays closed)', () => {
-    const [, commands] = selectTool(loaded(), 'exposure')
+    const { commands = [] } = selectTool(loaded(), 'exposure')
     expect(genIds(commands)).toEqual([])
   })
 
   it('SelectedLutTab generates only the newly visible group', () => {
-    const [, commands] = update(lutDraft(), EditorMessage.SelectedLutTab({ tab: 'Bw' }))
+    const { commands = [] } = update(lutDraft(), EditorMessage.SelectedLutTab({ tab: 'Bw' }))
     expect(genIds(commands)).toEqual([lutBw])
   })
 
   it('does not regenerate thumbs that already exist', () => {
     const model = { ...lutDraft(), lutThumbs: { [lutBw]: 'blob:done' } }
-    const [, commands] = update(model, EditorMessage.SelectedLutTab({ tab: 'Bw' }))
+    const { commands = [] } = update(model, EditorMessage.SelectedLutTab({ tab: 'Bw' }))
     expect(genIds(commands)).toEqual([])
     // The other group is still missing and generates on its visit.
-    const [, back] = update(model, EditorMessage.SelectedLutTab({ tab: 'Print' }))
+    const { commands: back = [] } = update(model, EditorMessage.SelectedLutTab({ tab: 'Print' }))
     expect(genIds(back)).toEqual([lutPrint])
   })
 
   it('opening the bar via the chevron generates the visible group; closing does not', () => {
     const committed = selectedLut()
-    const [opened, commands] = update(committed, EditorMessage.ToggledLutPicker())
+    const { model: opened, commands = [] } = update(committed, EditorMessage.ToggledLutPicker())
     expect(opened.lutBarOpen).toBe(true)
     expect(genIds(commands)).toEqual([lutPrint])
-    const [, closed] = update(opened, EditorMessage.ToggledLutPicker())
+    const { commands: closed = [] } = update(opened, EditorMessage.ToggledLutPicker())
     expect(genIds(closed)).toEqual([])
   })
 
   it('the recents tab generates its missing entries', () => {
     const model = { ...lutDraft(), lutRecents: [lutBw] }
-    const [, commands] = update(model, EditorMessage.SelectedLutTab({ tab: 'recents' }))
+    const { commands = [] } = update(model, EditorMessage.SelectedLutTab({ tab: 'recents' }))
     expect(genIds(commands)).toEqual([lutBw])
   })
 
   it('LutThumbGenerated stores the URL for the current photo', () => {
     const model = lutDraft()
-    const [next] = update(
+    const { model: next } = update(
       model,
       EditorMessage.LutThumbGenerated({
         bitmap: model.source.bitmap!,
@@ -332,7 +344,7 @@ describe('per-photo LUT thumbnails (lazy generation)', () => {
 
   it('a thumb from a previous photo is revoked and dropped', () => {
     const model = lutDraft()
-    const [next, commands] = update(
+    const { model: next, commands = [] } = update(
       model,
       EditorMessage.LutThumbGenerated({
         bitmap: new MockImageBitmap(1, 1),
@@ -347,7 +359,7 @@ describe('per-photo LUT thumbnails (lazy generation)', () => {
 
   it('a new image clears the thumbnails and revokes their URLs', () => {
     const model = { ...lutDraft(), lutThumbs: { [lutBw]: 'blob:old' } }
-    const [next, commands] = update(
+    const { model: next, commands = [] } = update(
       model,
       EditorMessage.EditLoaded({
         bitmap: new MockImageBitmap(200, 150),
@@ -364,7 +376,10 @@ describe('per-photo LUT thumbnails (lazy generation)', () => {
   })
 
   it('LutThumbFailed keeps the generic fallback (no state change)', () => {
-    const [model, commands] = update(lutDraft(), EditorMessage.LutThumbFailed({ lutId: lutBw }))
+    const { model, commands = [] } = update(
+      lutDraft(),
+      EditorMessage.LutThumbFailed({ lutId: lutBw }),
+    )
     expect(model.lutThumbs[lutBw]).toBeUndefined()
     expect(commands).toEqual([])
   })
@@ -377,17 +392,17 @@ describe('preview cleanup on bar-closing transitions', () => {
     readonly fire: (model: Model) => Model
   }[] = [
     {
-      fire: (m) => selectTool(m, 'exposure')[0],
+      fire: (m) => selectTool(m, 'exposure').model,
       make: selectedLut,
       name: 'SelectedTool (new draft context)',
     },
     {
-      fire: (m) => update(m, EditorMessage.ConfirmedDraft())[0],
+      fire: (m) => update(m, EditorMessage.ConfirmedDraft()).model,
       make: lutDraft,
       name: 'ConfirmedDraft',
     },
     {
-      fire: (m) => update(m, EditorMessage.CancelledDraft())[0],
+      fire: (m) => update(m, EditorMessage.CancelledDraft()).model,
       make: lutDraft,
       name: 'CancelledDraft',
     },
@@ -397,7 +412,7 @@ describe('preview cleanup on bar-closing transitions', () => {
         if (!other) {
           throw new Error('fixture: expected a non-lut layer')
         }
-        return update(m, EditorMessage.SelectedLayer({ id: other.id }))[0]
+        return update(m, EditorMessage.SelectedLayer({ id: other.id })).model
       },
       make: selectedLutWithExposure,
       name: 'SelectedLayer (another layer)',
@@ -408,13 +423,13 @@ describe('preview cleanup on bar-closing transitions', () => {
         if (!lut) {
           throw new Error('fixture: expected a lut layer')
         }
-        return update(m, EditorMessage.RemovedLayer({ id: lut.id }))[0]
+        return update(m, EditorMessage.RemovedLayer({ id: lut.id })).model
       },
       make: selectedLut,
       name: 'RemovedLayer',
     },
     {
-      fire: (m) => update(m, EditorMessage.ClearedImage())[0],
+      fire: (m) => update(m, EditorMessage.ClearedImage()).model,
       make: lutDraft,
       name: 'ClearedImage',
     },
@@ -430,19 +445,19 @@ describe('preview cleanup on bar-closing transitions', () => {
             source: new Uint8Array([9]),
             width: 200,
           }),
-        )[0],
+        ).model,
       make: lutDraft,
       name: 'EditLoaded',
     },
     {
-      fire: (m) => update(m, EditorMessage.ToggledLutPicker())[0],
+      fire: (m) => update(m, EditorMessage.ToggledLutPicker()).model,
       make: lutDraft,
       name: 'ToggledLutPicker (closing)',
     },
   ]
 
   it.each(closingTransitions)('$name clears the hover preview', ({ make, fire }) => {
-    const [hovered] = update(make(), EditorMessage.PreviewedLut({ lutId: lutBw }))
+    const { model: hovered } = update(make(), EditorMessage.PreviewedLut({ lutId: lutBw }))
     expect(hovered.previewLut).not.toBeNull()
     const model = fire(hovered)
     expect(model.previewLut).toBeNull()
@@ -462,36 +477,42 @@ describe('persistence-during-preview dismissal', () => {
   })
 
   const hoveredDraft = () => {
-    const [withDraft] = selectTool(saveReady(), 'lut')
-    return update(withDraft, EditorMessage.PreviewedLut({ lutId: lutBw }))[0]
+    const { model: withDraft } = selectTool(saveReady(), 'lut')
+    return update(withDraft, EditorMessage.PreviewedLut({ lutId: lutBw })).model
   }
 
   it('SaveRequested while previewing dismisses the preview instead of saving', () => {
-    const [model, commands] = update(hoveredDraft(), EditorMessage.SaveRequested())
+    const { model, commands = [] } = update(hoveredDraft(), EditorMessage.SaveRequested())
     expect(model.previewLut).toBeNull()
     expect(model.saveStatus).toEqual({ _tag: 'idle' })
     expect(commands.some((c) => c.name === 'SaveEdit')).toBe(false)
     // The next Save proceeds normally.
-    const [next, nextCommands] = update(model, EditorMessage.SaveRequested())
+    const { model: next, commands: nextCommands = [] } = update(
+      model,
+      EditorMessage.SaveRequested(),
+    )
     expect(next.saveStatus).toEqual({ _tag: 'saving' })
     expect(nextCommands.some((c) => c.name === 'SaveEdit')).toBe(true)
   })
 
   it('SaveAsRequested while previewing dismisses the preview instead of saving', () => {
-    const [model, commands] = update(hoveredDraft(), EditorMessage.SaveAsRequested())
+    const { model, commands = [] } = update(hoveredDraft(), EditorMessage.SaveAsRequested())
     expect(model.previewLut).toBeNull()
     expect(commands.some((c) => c.name === 'SaveEdit')).toBe(false)
-    const [, nextCommands] = update(model, EditorMessage.SaveAsRequested())
+    const { commands: nextCommands = [] } = update(model, EditorMessage.SaveAsRequested())
     expect(nextCommands.some((c) => c.name === 'SaveEdit')).toBe(true)
   })
 
   it('ExportRequested while previewing dismisses the preview instead of opening', () => {
-    const [model, commands] = update(hoveredDraft(), EditorMessage.ExportRequested())
+    const { model, commands = [] } = update(hoveredDraft(), EditorMessage.ExportRequested())
     expect(model.previewLut).toBeNull()
     expect(model.exportDialog.dialog.isOpen).toBe(false)
     expect(commands.some((c) => c.name === 'SnapshotForExport')).toBe(false)
     // The next Export opens the dialog.
-    const [next, nextCommands] = update(model, EditorMessage.ExportRequested())
+    const { model: next, commands: nextCommands = [] } = update(
+      model,
+      EditorMessage.ExportRequested(),
+    )
     expect(next.exportDialog.dialog.isOpen).toBe(true)
     expect(nextCommands.some((c) => c.name === 'SnapshotForExport')).toBe(true)
   })
@@ -501,7 +522,7 @@ describe('catalog load state (LUT card status slot)', () => {
   it('CatalogFailed records the error for the LUT card caption', () => {
     // A catalog-less model: the startup fetch is still in flight (or the
     // LUT library is broken) — the tool panel shows the status caption.
-    const [model] = update(
+    const { model } = update(
       { ...initialModel(), phase: Idle() },
       EditorMessage.CatalogFailed({
         error: new LutLoadError({ message: 'Failed to load luts/film_luts.json: HTTP 500' }),
@@ -513,13 +534,13 @@ describe('catalog load state (LUT card status slot)', () => {
   })
 
   it('CatalogLoaded clears a previous failure', () => {
-    const [failed] = update(
+    const { model: failed } = update(
       { ...initialModel(), phase: Idle() },
       EditorMessage.CatalogFailed({
         error: new LutLoadError({ message: 'Failed to load luts/film_luts.json: HTTP 500' }),
       }),
     )
-    const [model] = update(failed, EditorMessage.CatalogLoaded({ catalog }))
+    const { model } = update(failed, EditorMessage.CatalogLoaded({ catalog }))
     expect(model.catalogError).toBeNull()
     // The message boundary re-validates the payload — structural equality,
     // not identity.

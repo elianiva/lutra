@@ -54,19 +54,19 @@ const loaded = () => ({
 /** Settle the in-flight render the way RenderedFrame does, so the next
  *  renderNow dispatches a fresh RenderChain (assertable in tests). */
 const settled = (model: Model): Model =>
-  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
+  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision })).model
 
 /** An edit with two committed Exposure layers (the ×2 badge fixture). */
 const twoExposureLayers = () => {
-  const [a] = selectTool(loaded(), 'exposure')
-  const [b] = update(a, EditorMessage.ConfirmedDraft())
-  const [c] = selectTool(b, 'exposure')
-  const [d] = update(c, EditorMessage.ConfirmedDraft())
+  const { model: a } = selectTool(loaded(), 'exposure')
+  const { model: b } = update(a, EditorMessage.ConfirmedDraft())
+  const { model: c } = selectTool(b, 'exposure')
+  const { model: d } = update(c, EditorMessage.ConfirmedDraft())
   return d
 }
 
 /** A LUT draft (Drafting phase — no new picks allowed). */
-const lutDraft = () => settled(selectTool(loaded(), 'lut')[0])
+const lutDraft = () => settled(selectTool(loaded(), 'lut').model)
 
 const sceneConfig = { update, view } as const
 
@@ -175,8 +175,8 @@ describe('tool panel cards', () => {
   })
 
   it('a single committed layer shows ×1', () => {
-    const [withDraft] = selectTool(loaded(), 'vignette')
-    const [committed] = update(withDraft, EditorMessage.ConfirmedDraft())
+    const { model: withDraft } = selectTool(loaded(), 'vignette')
+    const { model: committed } = update(withDraft, EditorMessage.ConfirmedDraft())
     scene(
       sceneConfig,
       given(committed),

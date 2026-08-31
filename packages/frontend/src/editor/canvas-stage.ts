@@ -46,285 +46,282 @@ export const asHtmlElement = (element: Element): HTMLElement => {
  *  without the browser hijacking the gesture; two fingers pinch-zoom about
  *  the midpoint, and a double-tap toggles between the fit and 2×.
  */
-export const PanZoom = Mount.defineStream(
-  'PanZoom',
-  { imageHeight: S.Number, imageWidth: S.Number },
-  EditorMessage.ScaledCanvas,
-)(
-  ({ imageWidth, imageHeight }) =>
-    (element) =>
-      Stream.callback<typeof EditorMessage.ScaledCanvas.Type>((queue) =>
-        Effect.gen(function* () {
-          const stage = asHtmlElement(element)
-          const state = {
-            scale: 1,
-            offsetX: 0,
-            offsetY: 0,
-            dragging: false,
-            lastX: 0,
-            lastY: 0,
-            // Set on the first wheel/drag; while false the view is still the
-            // auto-fit, so a stage resize can safely re-fit.
-            touched: false,
-          }
-          // Active pointers, for touch pan/pinch tracking.
-          const pointers = new Map<number, { x: number; y: number }>()
-          // The pinch anchor: offsets and stage-relative midpoint at pinch
-          // start, so the content under the start midpoint stays under the
-          // live midpoint as the scale changes.
-          let pinch: {
-            startDist: number
-            startScale: number
-            startOffsetX: number
-            startOffsetY: number
-            startMidX: number
-            startMidY: number
-          } | null = null
-          // Last single tap (time + position), for double-tap detection.
-          let lastTap = { at: 0, x: 0, y: 0 }
-          const emit = (scale: number, offsetX: number, offsetY: number) =>
-            Queue.offerUnsafe(queue, EditorMessage.ScaledCanvas({ offsetX, offsetY, scale }))
+export const PanZoom = Mount.defineStream('PanZoom', {
+  args: { imageHeight: S.Number, imageWidth: S.Number },
+  messages: [EditorMessage.ScaledCanvas],
+  execute: ({ element, imageWidth, imageHeight }) =>
+    Stream.callback<typeof EditorMessage.ScaledCanvas.Type>((queue) =>
+      Effect.gen(function* () {
+        const stage = asHtmlElement(element)
+        const state = {
+          scale: 1,
+          offsetX: 0,
+          offsetY: 0,
+          dragging: false,
+          lastX: 0,
+          lastY: 0,
+          // Set on the first wheel/drag; while false the view is still the
+          // auto-fit, so a stage resize can safely re-fit.
+          touched: false,
+        }
+        // Active pointers, for touch pan/pinch tracking.
+        const pointers = new Map<number, { x: number; y: number }>()
+        // The pinch anchor: offsets and stage-relative midpoint at pinch
+        // start, so the content under the start midpoint stays under the
+        // live midpoint as the scale changes.
+        let pinch: {
+          startDist: number
+          startScale: number
+          startOffsetX: number
+          startOffsetY: number
+          startMidX: number
+          startMidY: number
+        } | null = null
+        // Last single tap (time + position), for double-tap detection.
+        let lastTap = { at: 0, x: 0, y: 0 }
+        const emit = (scale: number, offsetX: number, offsetY: number) =>
+          Queue.offerUnsafe(queue, EditorMessage.ScaledCanvas({ offsetX, offsetY, scale }))
 
-          /** Scale + offsets that center the content in the stage. */
-          const fitToStage = () => {
-            const rect = stage.getBoundingClientRect()
-            if (rect.width === 0 || rect.height === 0) {
-              return null
-            }
-            const content = contentSize() ?? { height: imageHeight, width: imageWidth }
-            if (content.width === 0 || content.height === 0) {
-              return null
-            }
-            const scale = Math.min(rect.width / content.width, rect.height / content.height, 1)
-            return {
-              offsetX: (rect.width - content.width * scale) / 2,
-              offsetY: (rect.height - content.height * scale) / 2,
-              scale,
-            }
+        /** Scale + offsets that center the content in the stage. */
+        const fitToStage = () => {
+          const rect = stage.getBoundingClientRect()
+          if (rect.width === 0 || rect.height === 0) {
+            return null
           }
-
-          /**
-           * The panned/zoomed content's layout size. The stage's first child
-           * is the w-fit transform container around the canvas, so its layout
-           * size IS the content size — and it changes with the canvas: Side by
-           * side doubles the canvas width. (Transforms never affect layout, so
-           * measuring the container is immune to the pan/zoom itself.) Falls
-           * back to the mount-time props when the container is missing or not
-           * laid out yet.
-           */
-          const contentSize = () => {
-            const container = stage.firstElementChild
-            if (!container) {
-              return null
-            }
-            const width = container.clientWidth
-            const height = container.clientHeight
-            if (width === 0 || height === 0) {
-              return null
-            }
-            return { height, width }
+          const content = contentSize() ?? { height: imageHeight, width: imageWidth }
+          if (content.width === 0 || content.height === 0) {
+            return null
           }
+          const scale = Math.min(rect.width / content.width, rect.height / content.height, 1)
+          return {
+            offsetX: (rect.width - content.width * scale) / 2,
+            offsetY: (rect.height - content.height * scale) / 2,
+            scale,
+          }
+        }
 
-          /** Re-fit the view, unless the user has taken over (zoomed/panned). */
-          const refit = () => {
-            if (state.touched) {
-              return
-            }
+        /**
+         * The panned/zoomed content's layout size. The stage's first child
+         * is the w-fit transform container around the canvas, so its layout
+         * size IS the content size — and it changes with the canvas: Side by
+         * side doubles the canvas width. (Transforms never affect layout, so
+         * measuring the container is immune to the pan/zoom itself.) Falls
+         * back to the mount-time props when the container is missing or not
+         * laid out yet.
+         */
+        const contentSize = () => {
+          const container = stage.firstElementChild
+          if (!container) {
+            return null
+          }
+          const width = container.clientWidth
+          const height = container.clientHeight
+          if (width === 0 || height === 0) {
+            return null
+          }
+          return { height, width }
+        }
+
+        /** Re-fit the view, unless the user has taken over (zoomed/panned). */
+        const refit = () => {
+          if (state.touched) {
+            return
+          }
+          const fit = fitToStage()
+          if (!fit) {
+            return
+          }
+          state.scale = fit.scale
+          state.offsetX = fit.offsetX
+          state.offsetY = fit.offsetY
+          emit(fit.scale, fit.offsetX, fit.offsetY)
+        }
+
+        refit()
+
+        const onWheel = (e: WheelEvent) => {
+          e.preventDefault()
+          state.touched = true
+          const rect = stage.getBoundingClientRect()
+          const cx = e.clientX - rect.left
+          const cy = e.clientY - rect.top
+          // Normalize the delta to pixels: trackpads report pixels, mice report
+          // lines (and some devices pages). Then scale the zoom factor by the
+          // delta so trackpads (many small deltas) and mice (few large deltas)
+          // zoom at a comparable, controlled rate. A fixed per-event factor made
+          // trackpads zoom far too aggressively.
+          const delta =
+            e.deltaMode === WheelEvent.DOM_DELTA_LINE
+              ? e.deltaY * 16
+              : e.deltaMode === WheelEvent.DOM_DELTA_PAGE
+                ? e.deltaY * 100
+                : e.deltaY
+          const factor = Math.exp(-delta * ZOOM_SPEED)
+          const nextScale = Math.max(0.1, Math.min(8, state.scale * factor))
+          const k = nextScale / state.scale
+          state.offsetX = cx - (cx - state.offsetX) * k
+          state.offsetY = cy - (cy - state.offsetY) * k
+          state.scale = nextScale
+          emit(state.scale, state.offsetX, state.offsetY)
+        }
+        /** Zoom to `nextScale` about the stage-relative point (cx, cy). */
+        const zoomAbout = (nextScale: number, cx: number, cy: number) => {
+          const k = nextScale / state.scale
+          state.offsetX = cx - (cx - state.offsetX) * k
+          state.offsetY = cy - (cy - state.offsetY) * k
+          state.scale = nextScale
+          emit(state.scale, state.offsetX, state.offsetY)
+        }
+        /** Double-tap/click: zoomed in → back to the fit; at the fit → 2×. */
+        const toggleZoom = () => {
+          if (state.scale > 1.02) {
             const fit = fitToStage()
             if (!fit) {
               return
             }
+            state.touched = false
             state.scale = fit.scale
             state.offsetX = fit.offsetX
             state.offsetY = fit.offsetY
             emit(fit.scale, fit.offsetX, fit.offsetY)
-          }
-
-          refit()
-
-          const onWheel = (e: WheelEvent) => {
-            e.preventDefault()
+          } else {
             state.touched = true
             const rect = stage.getBoundingClientRect()
-            const cx = e.clientX - rect.left
-            const cy = e.clientY - rect.top
-            // Normalize the delta to pixels: trackpads report pixels, mice report
-            // lines (and some devices pages). Then scale the zoom factor by the
-            // delta so trackpads (many small deltas) and mice (few large deltas)
-            // zoom at a comparable, controlled rate. A fixed per-event factor made
-            // trackpads zoom far too aggressively.
-            const delta =
-              e.deltaMode === WheelEvent.DOM_DELTA_LINE
-                ? e.deltaY * 16
-                : e.deltaMode === WheelEvent.DOM_DELTA_PAGE
-                  ? e.deltaY * 100
-                  : e.deltaY
-            const factor = Math.exp(-delta * ZOOM_SPEED)
-            const nextScale = Math.max(0.1, Math.min(8, state.scale * factor))
-            const k = nextScale / state.scale
-            state.offsetX = cx - (cx - state.offsetX) * k
-            state.offsetY = cy - (cy - state.offsetY) * k
-            state.scale = nextScale
-            emit(state.scale, state.offsetX, state.offsetY)
+            zoomAbout(2, rect.width / 2, rect.height / 2)
           }
-          /** Zoom to `nextScale` about the stage-relative point (cx, cy). */
-          const zoomAbout = (nextScale: number, cx: number, cy: number) => {
-            const k = nextScale / state.scale
-            state.offsetX = cx - (cx - state.offsetX) * k
-            state.offsetY = cy - (cy - state.offsetY) * k
-            state.scale = nextScale
-            emit(state.scale, state.offsetX, state.offsetY)
+        }
+        const onDown = (e: PointerEvent) => {
+          if (e.button !== 0) {
+            return
           }
-          /** Double-tap/click: zoomed in → back to the fit; at the fit → 2×. */
-          const toggleZoom = () => {
-            if (state.scale > 1.02) {
-              const fit = fitToStage()
-              if (!fit) {
-                return
-              }
-              state.touched = false
-              state.scale = fit.scale
-              state.offsetX = fit.offsetX
-              state.offsetY = fit.offsetY
-              emit(fit.scale, fit.offsetX, fit.offsetY)
-            } else {
-              state.touched = true
-              const rect = stage.getBoundingClientRect()
-              zoomAbout(2, rect.width / 2, rect.height / 2)
-            }
-          }
-          const onDown = (e: PointerEvent) => {
-            if (e.button !== 0) {
+          state.touched = true
+          pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+          if (pointers.size === 1) {
+            // A double-tap toggles the zoom instead of starting a drag
+            // (two taps, 300ms, within a finger-width — the browser does
+            // not fire dblclick for touch).
+            const now = performance.now()
+            if (
+              e.pointerType === 'touch' &&
+              now - lastTap.at < 300 &&
+              Math.abs(e.clientX - lastTap.x) < 30 &&
+              Math.abs(e.clientY - lastTap.y) < 30
+            ) {
+              lastTap = { at: 0, x: 0, y: 0 }
+              toggleZoom()
               return
             }
-            state.touched = true
-            pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
-            if (pointers.size === 1) {
-              // A double-tap toggles the zoom instead of starting a drag
-              // (two taps, 300ms, within a finger-width — the browser does
-              // not fire dblclick for touch).
-              const now = performance.now()
-              if (
-                e.pointerType === 'touch' &&
-                now - lastTap.at < 300 &&
-                Math.abs(e.clientX - lastTap.x) < 30 &&
-                Math.abs(e.clientY - lastTap.y) < 30
-              ) {
-                lastTap = { at: 0, x: 0, y: 0 }
-                toggleZoom()
-                return
-              }
-              lastTap = { at: now, x: e.clientX, y: e.clientY }
-              state.dragging = true
-              state.lastX = e.clientX
-              state.lastY = e.clientY
-              stage.setPointerCapture(e.pointerId)
-            } else if (pointers.size === 2) {
-              // The second finger lands: switch from pan to pinch, anchored
-              // at the current midpoint.
-              state.dragging = false
-              const [a, b] = [...pointers.values()]
-              const rect = stage.getBoundingClientRect()
-              pinch = {
-                startDist: Math.max(1, Math.hypot(a!.x - b!.x, a!.y - b!.y)),
-                startMidX: (a!.x + b!.x) / 2 - rect.left,
-                startMidY: (a!.y + b!.y) / 2 - rect.top,
-                startOffsetX: state.offsetX,
-                startOffsetY: state.offsetY,
-                startScale: state.scale,
-              }
-            }
-          }
-          const onMove = (e: PointerEvent) => {
-            if (!pointers.has(e.pointerId)) {
-              return
-            }
-            pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
-            if (pinch && pointers.size === 2) {
-              // Pinch: the content under the start midpoint stays under the
-              // live midpoint while the scale follows the finger distance.
-              const [a, b] = [...pointers.values()]
-              const rect = stage.getBoundingClientRect()
-              const d = Math.hypot(a!.x - b!.x, a!.y - b!.y)
-              const nextScale = Math.max(0.1, Math.min(8, pinch.startScale * (d / pinch.startDist)))
-              const k = nextScale / pinch.startScale
-              const midX = (a!.x + b!.x) / 2 - rect.left
-              const midY = (a!.y + b!.y) / 2 - rect.top
-              state.scale = nextScale
-              state.offsetX = midX - (pinch.startMidX - pinch.startOffsetX) * k
-              state.offsetY = midY - (pinch.startMidY - pinch.startOffsetY) * k
-              emit(state.scale, state.offsetX, state.offsetY)
-              return
-            }
-            if (!state.dragging) {
-              return
-            }
-            state.offsetX += e.clientX - state.lastX
-            state.offsetY += e.clientY - state.lastY
+            lastTap = { at: now, x: e.clientX, y: e.clientY }
+            state.dragging = true
             state.lastX = e.clientX
             state.lastY = e.clientY
-            emit(state.scale, state.offsetX, state.offsetY)
-          }
-          const onUp = (e: PointerEvent) => {
-            pointers.delete(e.pointerId)
-            if (pointers.size === 0) {
-              state.dragging = false
-              pinch = null
-              stage.releasePointerCapture(e.pointerId)
-            } else if (pointers.size === 1) {
-              // One finger lifted: the remaining one takes over the pan,
-              // anchored where it is so the image doesn't jump.
-              pinch = null
-              state.dragging = true
-              const [rest] = [...pointers.values()]
-              state.lastX = rest!.x
-              state.lastY = rest!.y
+            stage.setPointerCapture(e.pointerId)
+          } else if (pointers.size === 2) {
+            // The second finger lands: switch from pan to pinch, anchored
+            // at the current midpoint.
+            state.dragging = false
+            const [a, b] = [...pointers.values()]
+            const rect = stage.getBoundingClientRect()
+            pinch = {
+              startDist: Math.max(1, Math.hypot(a!.x - b!.x, a!.y - b!.y)),
+              startMidX: (a!.x + b!.x) / 2 - rect.left,
+              startMidY: (a!.y + b!.y) / 2 - rect.top,
+              startOffsetX: state.offsetX,
+              startOffsetY: state.offsetY,
+              startScale: state.scale,
             }
           }
-
-          // Re-fit when the stage resizes, as long as the user hasn't panned or
-          // zoomed since the last fit.
-          const resizeObserver = new ResizeObserver(refit)
-          resizeObserver.observe(stage)
-          // The canvas itself resizes when the compare mode changes (Side by
-          // side doubles the canvas width) — the stage does not. Observe the
-          // content container so the wider strip is re-fitted into view. The
-          // observer's initial callback re-emits the mount-time fit, which is
-          // a no-op (same values).
-          const container = stage.firstElementChild
-          const contentObserver = container ? new ResizeObserver(refit) : null
-          if (contentObserver && container) {
-            contentObserver.observe(container)
+        }
+        const onMove = (e: PointerEvent) => {
+          if (!pointers.has(e.pointerId)) {
+            return
           }
+          pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+          if (pinch && pointers.size === 2) {
+            // Pinch: the content under the start midpoint stays under the
+            // live midpoint while the scale follows the finger distance.
+            const [a, b] = [...pointers.values()]
+            const rect = stage.getBoundingClientRect()
+            const d = Math.hypot(a!.x - b!.x, a!.y - b!.y)
+            const nextScale = Math.max(0.1, Math.min(8, pinch.startScale * (d / pinch.startDist)))
+            const k = nextScale / pinch.startScale
+            const midX = (a!.x + b!.x) / 2 - rect.left
+            const midY = (a!.y + b!.y) / 2 - rect.top
+            state.scale = nextScale
+            state.offsetX = midX - (pinch.startMidX - pinch.startOffsetX) * k
+            state.offsetY = midY - (pinch.startMidY - pinch.startOffsetY) * k
+            emit(state.scale, state.offsetX, state.offsetY)
+            return
+          }
+          if (!state.dragging) {
+            return
+          }
+          state.offsetX += e.clientX - state.lastX
+          state.offsetY += e.clientY - state.lastY
+          state.lastX = e.clientX
+          state.lastY = e.clientY
+          emit(state.scale, state.offsetX, state.offsetY)
+        }
+        const onUp = (e: PointerEvent) => {
+          pointers.delete(e.pointerId)
+          if (pointers.size === 0) {
+            state.dragging = false
+            pinch = null
+            stage.releasePointerCapture(e.pointerId)
+          } else if (pointers.size === 1) {
+            // One finger lifted: the remaining one takes over the pan,
+            // anchored where it is so the image doesn't jump.
+            pinch = null
+            state.dragging = true
+            const [rest] = [...pointers.values()]
+            state.lastX = rest!.x
+            state.lastY = rest!.y
+          }
+        }
 
-          yield* Effect.acquireRelease(
+        // Re-fit when the stage resizes, as long as the user hasn't panned or
+        // zoomed since the last fit.
+        const resizeObserver = new ResizeObserver(refit)
+        resizeObserver.observe(stage)
+        // The canvas itself resizes when the compare mode changes (Side by
+        // side doubles the canvas width) — the stage does not. Observe the
+        // content container so the wider strip is re-fitted into view. The
+        // observer's initial callback re-emits the mount-time fit, which is
+        // a no-op (same values).
+        const container = stage.firstElementChild
+        const contentObserver = container ? new ResizeObserver(refit) : null
+        if (contentObserver && container) {
+          contentObserver.observe(container)
+        }
+
+        yield* Effect.acquireRelease(
+          Effect.sync(() => {
+            stage.addEventListener('wheel', onWheel, { passive: false })
+            stage.addEventListener('pointerdown', onDown)
+            stage.addEventListener('pointermove', onMove)
+            stage.addEventListener('pointerup', onUp)
+            stage.addEventListener('pointercancel', onUp)
+            // Mouse double-click zooms too (touch double-tap is handled in
+            // onDown — browsers don't fire dblclick for touch reliably).
+            stage.addEventListener('dblclick', toggleZoom)
+            return { contentObserver, onDown, onMove, onUp, onWheel, resizeObserver }
+          }),
+          ({ onWheel, onDown, onMove, onUp, resizeObserver, contentObserver }) =>
             Effect.sync(() => {
-              stage.addEventListener('wheel', onWheel, { passive: false })
-              stage.addEventListener('pointerdown', onDown)
-              stage.addEventListener('pointermove', onMove)
-              stage.addEventListener('pointerup', onUp)
-              stage.addEventListener('pointercancel', onUp)
-              // Mouse double-click zooms too (touch double-tap is handled in
-              // onDown — browsers don't fire dblclick for touch reliably).
-              stage.addEventListener('dblclick', toggleZoom)
-              return { contentObserver, onDown, onMove, onUp, onWheel, resizeObserver }
+              stage.removeEventListener('wheel', onWheel)
+              stage.removeEventListener('pointerdown', onDown)
+              stage.removeEventListener('pointermove', onMove)
+              stage.removeEventListener('pointerup', onUp)
+              stage.removeEventListener('pointercancel', onUp)
+              stage.removeEventListener('dblclick', toggleZoom)
+              resizeObserver.disconnect()
+              contentObserver?.disconnect()
             }),
-            ({ onWheel, onDown, onMove, onUp, resizeObserver, contentObserver }) =>
-              Effect.sync(() => {
-                stage.removeEventListener('wheel', onWheel)
-                stage.removeEventListener('pointerdown', onDown)
-                stage.removeEventListener('pointermove', onMove)
-                stage.removeEventListener('pointerup', onUp)
-                stage.removeEventListener('pointercancel', onUp)
-                stage.removeEventListener('dblclick', toggleZoom)
-                resizeObserver.disconnect()
-                contentObserver?.disconnect()
-              }),
-          )
-          return yield* Effect.never
-        }),
-      ),
-)
+        )
+        return yield* Effect.never
+      }),
+    ),
+})
 
 /**
  * One-shot mount on the render canvas: registers the element in the shared
@@ -339,17 +336,16 @@ export const PanZoom = Mount.defineStream(
  * does not include the `resources` layer — the service is only visible to
  * Commands and Subscriptions.
  */
-export const RegisterCanvas = Mount.define(
-  'RegisterCanvas',
-  EditorMessage.CanvasRegistered,
-)((element) =>
-  Effect.gen(function* () {
-    if (element instanceof HTMLCanvasElement) {
-      yield* registerCanvas(canvasRef, element)
-    }
-    return EditorMessage.CanvasRegistered()
-  }),
-)
+export const RegisterCanvas = Mount.define('RegisterCanvas', {
+  messages: [EditorMessage.CanvasRegistered],
+  execute: ({ element }) =>
+    Effect.gen(function* () {
+      if (element instanceof HTMLCanvasElement) {
+        yield* registerCanvas(canvasRef, element)
+      }
+      return EditorMessage.CanvasRegistered()
+    }),
+})
 
 // compare (before/after viewing)
 
@@ -361,65 +357,64 @@ export const RegisterCanvas = Mount.define(
  * the photo. Pointer events are stopped at the element so the stage's
  * pan/zoom drag never starts while grabbing the divider.
  */
-export const CompareDivider = Mount.defineStream(
-  'CompareDivider',
-  EditorMessage.ChangedSplitPosition,
-)((element) =>
-  Stream.callback<typeof EditorMessage.ChangedSplitPosition.Type>((queue) =>
-    Effect.gen(function* () {
-      const divider = asHtmlElement(element)
-      const container = divider.parentElement
-      const emit = (position: number) =>
-        Queue.offerUnsafe(queue, EditorMessage.ChangedSplitPosition({ position }))
+export const CompareDivider = Mount.defineStream('CompareDivider', {
+  messages: [EditorMessage.ChangedSplitPosition],
+  execute: ({ element }) =>
+    Stream.callback<typeof EditorMessage.ChangedSplitPosition.Type>((queue) =>
+      Effect.gen(function* () {
+        const divider = asHtmlElement(element)
+        const container = divider.parentElement
+        const emit = (position: number) =>
+          Queue.offerUnsafe(queue, EditorMessage.ChangedSplitPosition({ position }))
 
-      let dragging = false
+        let dragging = false
 
-      const onDown = (e: PointerEvent) => {
-        if (e.button !== 0) {
-          return
+        const onDown = (e: PointerEvent) => {
+          if (e.button !== 0) {
+            return
+          }
+          // The stage's pan/zoom mount listens on the stage element; stopping
+          // the event here keeps a divider grab from becoming a pan.
+          e.stopPropagation()
+          dragging = true
+          divider.setPointerCapture(e.pointerId)
         }
-        // The stage's pan/zoom mount listens on the stage element; stopping
-        // the event here keeps a divider grab from becoming a pan.
-        e.stopPropagation()
-        dragging = true
-        divider.setPointerCapture(e.pointerId)
-      }
-      const onMove = (e: PointerEvent) => {
-        if (!dragging || !container) {
-          return
+        const onMove = (e: PointerEvent) => {
+          if (!dragging || !container) {
+            return
+          }
+          const rect = container.getBoundingClientRect()
+          if (rect.width === 0) {
+            return
+          }
+          emit((e.clientX - rect.left) / rect.width)
         }
-        const rect = container.getBoundingClientRect()
-        if (rect.width === 0) {
-          return
+        const onUp = (e: PointerEvent) => {
+          dragging = false
+          divider.releasePointerCapture(e.pointerId)
         }
-        emit((e.clientX - rect.left) / rect.width)
-      }
-      const onUp = (e: PointerEvent) => {
-        dragging = false
-        divider.releasePointerCapture(e.pointerId)
-      }
-      const onDblClick = () => emit(0.5)
+        const onDblClick = () => emit(0.5)
 
-      yield* Effect.acquireRelease(
-        Effect.sync(() => {
-          divider.addEventListener('pointerdown', onDown)
-          divider.addEventListener('pointermove', onMove)
-          divider.addEventListener('pointerup', onUp)
-          divider.addEventListener('dblclick', onDblClick)
-          return { onDblClick, onDown, onMove, onUp }
-        }),
-        ({ onDown, onMove, onUp, onDblClick }) =>
+        yield* Effect.acquireRelease(
           Effect.sync(() => {
-            divider.removeEventListener('pointerdown', onDown)
-            divider.removeEventListener('pointermove', onMove)
-            divider.removeEventListener('pointerup', onUp)
-            divider.removeEventListener('dblclick', onDblClick)
+            divider.addEventListener('pointerdown', onDown)
+            divider.addEventListener('pointermove', onMove)
+            divider.addEventListener('pointerup', onUp)
+            divider.addEventListener('dblclick', onDblClick)
+            return { onDblClick, onDown, onMove, onUp }
           }),
-      )
-      return yield* Effect.never
-    }),
-  ),
-)
+          ({ onDown, onMove, onUp, onDblClick }) =>
+            Effect.sync(() => {
+              divider.removeEventListener('pointerdown', onDown)
+              divider.removeEventListener('pointermove', onMove)
+              divider.removeEventListener('pointerup', onUp)
+              divider.removeEventListener('dblclick', onDblClick)
+            }),
+        )
+        return yield* Effect.never
+      }),
+    ),
+})
 
 /**
  * The Split-mode divider: a draggable strip (with a visible 1px line and a
@@ -517,8 +512,11 @@ const compareView = (mode: CompareMode, hasImage: boolean, h: HtmlBuilder<Editor
     }),
   )
 
-const compareControl = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel, hasImage: boolean): Html =>
-  lazyCompare(compareView, [model.compareMode, hasImage, h])!
+const compareControl = (
+  h: HtmlBuilder<EditorMessage>,
+  model: CanvasStageModel,
+  hasImage: boolean,
+): Html => lazyCompare(compareView, [model.compareMode, hasImage, h])!
 
 const emptyStage = (h: HtmlBuilder<EditorMessage>) =>
   h.div(

@@ -53,7 +53,7 @@ const loaded = () => ({
 /** Settle the in-flight render the way RenderedFrame does, so the next
  *  renderNow dispatches a fresh RenderChain (assertable in tests). */
 const settled = (model: Model): Model =>
-  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
+  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision })).model
 
 // update flow (docs/adr/0010-editor-ui.md)
 
@@ -63,42 +63,48 @@ describe('mobile bottom sheets', () => {
   })
 
   it('ToggledMobileSheet opens the tapped sheet', () => {
-    const [model] = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'tools' }))
+    const { model } = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'tools' }))
     expect(model.mobileSheet).toBe('tools')
   })
 
   it('tapping the active tab closes the sheet', () => {
-    const [opened] = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
-    const [model] = update(opened, EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
+    const { model: opened } = update(
+      loaded(),
+      EditorMessage.ToggledMobileSheet({ sheet: 'layers' }),
+    )
+    const { model } = update(opened, EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
     expect(model.mobileSheet).toBeNull()
   })
 
   it('tapping the other tab switches the sheet', () => {
-    const [opened] = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'tools' }))
-    const [model] = update(opened, EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
+    const { model: opened } = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'tools' }))
+    const { model } = update(opened, EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
     expect(model.mobileSheet).toBe('layers')
   })
 
   it('picking a tool follows the draft to the Layers sheet', () => {
-    const [model] = selectTool(loaded(), 'exposure')
+    const { model } = selectTool(loaded(), 'exposure')
     expect(model.phase._tag).toBe('Drafting')
     expect(model.mobileSheet).toBe('layers')
   })
 
   it('selecting a layer opens the Layers sheet', () => {
-    const [withDraft] = selectTool(loaded(), 'exposure')
-    const [committed] = update(withDraft, EditorMessage.ConfirmedDraft())
+    const { model: withDraft } = selectTool(loaded(), 'exposure')
+    const { model: committed } = update(withDraft, EditorMessage.ConfirmedDraft())
     const layer = committed.chain[0]
     if (!layer) {
       throw new Error('fixture: expected a committed layer')
     }
-    const [model] = update(committed, EditorMessage.SelectedLayer({ id: layer.id }))
+    const { model } = update(committed, EditorMessage.SelectedLayer({ id: layer.id }))
     expect(model.mobileSheet).toBe('layers')
   })
 
   it('a new image closes the sheets', () => {
-    const [withSheet] = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
-    const [model] = update(
+    const { model: withSheet } = update(
+      loaded(),
+      EditorMessage.ToggledMobileSheet({ sheet: 'layers' }),
+    )
+    const { model } = update(
       withSheet,
       EditorMessage.ImageDecoded({
         bitmap: new MockImageBitmap(200, 150),
@@ -111,14 +117,20 @@ describe('mobile bottom sheets', () => {
   })
 
   it('ClearedImage closes the sheets', () => {
-    const [withSheet] = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
-    const [model] = update(withSheet, EditorMessage.ClearedImage())
+    const { model: withSheet } = update(
+      loaded(),
+      EditorMessage.ToggledMobileSheet({ sheet: 'layers' }),
+    )
+    const { model } = update(withSheet, EditorMessage.ClearedImage())
     expect(model.mobileSheet).toBeNull()
   })
 
   it('EditLoaded closes the sheets', () => {
-    const [withSheet] = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'tools' }))
-    const [model] = update(
+    const { model: withSheet } = update(
+      loaded(),
+      EditorMessage.ToggledMobileSheet({ sheet: 'tools' }),
+    )
+    const { model } = update(
       withSheet,
       EditorMessage.EditLoaded({
         bitmap: new MockImageBitmap(200, 150),
@@ -162,7 +174,7 @@ describe('mobile tab bar view', () => {
   })
 
   it('the LUT tab appears only while a LUT target exists and reflects the bar', () => {
-    const lutDraft = settled(selectTool(loaded(), 'lut')[0])
+    const lutDraft = settled(selectTool(loaded(), 'lut').model)
     scene(
       sceneConfig,
       given(lutDraft),

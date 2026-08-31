@@ -42,13 +42,13 @@ const loaded = () => ({
 /** Settle the in-flight render the way RenderedFrame does, so the next
  *  renderNow dispatches a fresh RenderChain (assertable in tests). */
 const settled = (model: Model): Model =>
-  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision }))[0]
+  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision })).model
 
 /** A Tone Curve draft (Drafting phase, no render in flight). */
-const curveDraft = () => settled(selectTool(loaded(), 'toneCurve')[0])
+const curveDraft = () => settled(selectTool(loaded(), 'toneCurve').model)
 
 /** A committed Tone Curve layer (Selected phase, no render in flight). */
-const selectedCurve = () => settled(update(curveDraft(), EditorMessage.ConfirmedDraft())[0])
+const selectedCurve = () => settled(update(curveDraft(), EditorMessage.ConfirmedDraft()).model)
 
 const draftLayer = (model: Model) => (model.phase._tag === 'Drafting' ? model.phase.layer : null)
 
@@ -59,7 +59,7 @@ const drag = (model: Model, index: number, x: number, y: number) =>
 
 describe('Tone Curve layer flow', () => {
   it('creates a Tone Curve draft as the identity curve', () => {
-    const [model] = selectTool(loaded(), 'toneCurve')
+    const { model } = selectTool(loaded(), 'toneCurve')
     expect(model.phase._tag).toBe('Drafting')
     const layer = draftLayer(model)
     expect(layer?.type).toBe('toneCurve')
@@ -76,7 +76,7 @@ describe('Tone Curve layer flow', () => {
 
   it('a drag moves the draft point through the machine and re-renders', () => {
     // An S-curve start: pull the mid-lights point up.
-    const [model, commands] = drag(curveDraft(), 3, 0.75, 0.9)
+    const { model, commands = [] } = drag(curveDraft(), 3, 0.75, 0.9)
     expect(model.phase._tag).toBe('Drafting')
     const layer = draftLayer(model)
     if (layer?.type === 'toneCurve') {
@@ -86,9 +86,9 @@ describe('Tone Curve layer flow', () => {
   })
 
   it('a drag clamps the draft point between its neighbors', () => {
-    const [withDraft] = selectTool(loaded(), 'toneCurve')
+    const { model: withDraft } = selectTool(loaded(), 'toneCurve')
     // Dragging p1 far right must stop before p2's x.
-    const [model] = drag(withDraft, 1, 0.9, 0.5)
+    const { model } = drag(withDraft, 1, 0.9, 0.5)
     const layer = draftLayer(model)
     if (layer?.type === 'toneCurve') {
       const points = curvePointsOf(layer)
@@ -101,21 +101,21 @@ describe('Tone Curve layer flow', () => {
   })
 
   it('confirm commits the moved curve to the chain', () => {
-    const [withDraft] = drag(curveDraft(), 2, 0.5, 0.7)
-    const [model] = update(withDraft, EditorMessage.ConfirmedDraft())
+    const { model: withDraft } = drag(curveDraft(), 2, 0.5, 0.7)
+    const { model } = update(withDraft, EditorMessage.ConfirmedDraft())
     expect(model.chain).toHaveLength(1)
     expect(pointsOf(model)[2]).toEqual({ x: 0.5, y: 0.7 })
   })
 
   it('a drag on the focused chain layer updates it directly', () => {
-    const [model] = drag(selectedCurve(), 2, 0.5, 0.7)
+    const { model } = drag(selectedCurve(), 2, 0.5, 0.7)
     expect(model.phase._tag).toBe('Selected')
     expect(pointsOf(model)[2]).toEqual({ x: 0.5, y: 0.7 })
   })
 
   it('reset returns the draft to the identity curve', () => {
-    const [withDraft] = drag(curveDraft(), 2, 0.5, 0.7)
-    const [model] = update(withDraft, EditorMessage.CurveReset())
+    const { model: withDraft } = drag(curveDraft(), 2, 0.5, 0.7)
+    const { model } = update(withDraft, EditorMessage.CurveReset())
     const layer = draftLayer(model)
     if (layer?.type === 'toneCurve') {
       expect(curvePointsOf(layer)).toEqual([
@@ -129,8 +129,8 @@ describe('Tone Curve layer flow', () => {
   })
 
   it('reset returns the committed layer to the identity curve', () => {
-    const [withDrag] = drag(selectedCurve(), 0, 0, 0.1)
-    const [model] = update(withDrag, EditorMessage.CurveReset())
+    const { model: withDrag } = drag(selectedCurve(), 0, 0, 0.1)
+    const { model } = update(withDrag, EditorMessage.CurveReset())
     expect(pointsOf(model)[0]).toEqual({ x: 0, y: 0 })
     expect(pointsOf(model)).toEqual([
       { x: 0, y: 0 },
@@ -144,19 +144,19 @@ describe('Tone Curve layer flow', () => {
   it('drags and resets are ignored without a toneCurve target', () => {
     // No image / no selection: a stray drag changes nothing.
     const idleModel = loaded()
-    const [idle, idleCommands] = drag(idleModel, 2, 0.5, 0.7)
+    const { model: idle, commands: idleCommands = [] } = drag(idleModel, 2, 0.5, 0.7)
     expect(idle).toBe(idleModel)
     expect(idleCommands).toHaveLength(0)
 
     // A non-curve selection is not a drag target either.
-    const [withExposure] = selectTool(loaded(), 'exposure')
-    const [confirmed] = update(withExposure, EditorMessage.ConfirmedDraft())
+    const { model: withExposure } = selectTool(loaded(), 'exposure')
+    const { model: confirmed } = update(withExposure, EditorMessage.ConfirmedDraft())
     const exposure = settled(confirmed)
-    const [afterDrag, commands] = drag(exposure, 2, 0.5, 0.7)
+    const { model: afterDrag, commands = [] } = drag(exposure, 2, 0.5, 0.7)
     expect(afterDrag.chain[0]).toBe(exposure.chain[0])
     expect(commands).toHaveLength(0)
 
-    const [afterReset] = update(afterDrag, EditorMessage.CurveReset())
+    const { model: afterReset } = update(afterDrag, EditorMessage.CurveReset())
     expect(afterReset.chain[0]).toBe(exposure.chain[0])
   })
 })
@@ -233,7 +233,7 @@ describe('Tone Curve view', () => {
 
   it('the reset button returns the curve to the diagonal', () => {
     const dragged = settled(
-      update(curveDraft(), EditorMessage.CurvePointDragged({ index: 2, x: 0.5, y: 0.7 }))[0],
+      update(curveDraft(), EditorMessage.CurvePointDragged({ index: 2, x: 0.5, y: 0.7 })).model,
     )
     scene(
       sceneConfig,
@@ -256,7 +256,7 @@ describe('Tone Curve view', () => {
 
   it('a committed curve shows the widget when selected, with the Custom summary', () => {
     const withDrag = settled(
-      update(selectedCurve(), EditorMessage.CurvePointDragged({ index: 1, x: 0.3, y: 0.2 }))[0],
+      update(selectedCurve(), EditorMessage.CurvePointDragged({ index: 1, x: 0.3, y: 0.2 })).model,
     )
     scene(
       sceneConfig,

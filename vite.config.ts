@@ -26,7 +26,7 @@ export default defineConfig({
     jsPlugins: [
       {
         name: 'anti-slop',
-        specifier: './tools/oxlint/anti-slop/index.ts',
+        specifier: './tools/oxlint/anti-slop/index.js',
       },
       {
         name: 'foldkit',

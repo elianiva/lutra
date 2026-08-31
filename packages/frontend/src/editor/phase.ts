@@ -1,7 +1,7 @@
 import { Option, Schema as S } from 'effect'
 import { Machine } from 'foldkit/experimental'
 import { otherwise, to, when } from 'foldkit/experimental/machine'
-import { ts } from 'foldkit/schema'
+import { taggedStruct } from 'foldkit/schema'
 import { Layer, LayerIdSchema, moveCurvePoint, resetCurve } from '@lutra/engine'
 import { CreateLayer, DecodeImage } from './command'
 import { EditorMessage } from './message'
@@ -21,23 +21,23 @@ import { EditorMessage } from './message'
 // structurally impossible without an image or while another draft is active.
 
 /** No image yet — the upload zone is showing and the editor is blocked. */
-export const Empty = ts('Empty')
+export const Empty = taggedStruct('Empty')
 /** A decode is in flight — the editor is blocked. */
-export const Loading = ts('Loading')
+export const Loading = taggedStruct('Loading')
 /** The decode failed — the error stage is showing and the editor is blocked. */
-export const ErrorState = ts('Error')
+export const ErrorState = taggedStruct('Error')
 /** An image is loaded and nothing is mid-flight — tools are available. */
-export const Idle = ts('Idle')
+export const Idle = taggedStruct('Idle')
 /** A layer factory is running. Tool selection is blocked until the command
  *  reports either a constructed draft or a typed creation failure. */
-export const Creating = ts('Creating', { selectedLayerId: S.NullOr(LayerIdSchema) })
+export const Creating = taggedStruct('Creating', { selectedLayerId: S.NullOr(LayerIdSchema) })
 /** A draft layer is active: the drawer shows its slider and tool/layer
  *  selection are blocked until the draft is confirmed or cancelled. The
  *  draft layer lives in the state (not the model) so the machine owns every
  *  draft mutation. */
-export const Drafting = ts('Drafting', { layer: Layer })
+export const Drafting = taggedStruct('Drafting', { layer: Layer })
 /** A committed layer is focused in the drawer. */
-export const Selected = ts('Selected', { layerId: LayerIdSchema })
+export const Selected = taggedStruct('Selected', { layerId: LayerIdSchema })
 
 export const EditorPhase = S.Union([Empty, Loading, ErrorState, Idle, Creating, Drafting, Selected])
 export type EditorPhase = typeof EditorPhase.Type

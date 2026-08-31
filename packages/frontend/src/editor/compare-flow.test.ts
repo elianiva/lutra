@@ -31,7 +31,7 @@ const presented = (commands: readonly { readonly name: string; readonly args?: P
 
 describe('compare flow', () => {
   it('entering Toggle reveals the source and presents without rendering', () => {
-    const [model, commands] = update(
+    const { model, commands = [] } = update(
       loadedModel(),
       EditorMessage.ChangedCompareMode({ mode: 'toggle' }),
     )
@@ -43,17 +43,26 @@ describe('compare flow', () => {
   })
 
   it('clicking the active Toggle segment flips back to the graded output', () => {
-    const [toggled] = update(loadedModel(), EditorMessage.ChangedCompareMode({ mode: 'toggle' }))
-    const [model, commands] = update(toggled, EditorMessage.ChangedCompareMode({ mode: 'toggle' }))
+    const { model: toggled } = update(
+      loadedModel(),
+      EditorMessage.ChangedCompareMode({ mode: 'toggle' }),
+    )
+    const { model, commands = [] } = update(
+      toggled,
+      EditorMessage.ChangedCompareMode({ mode: 'toggle' }),
+    )
     expect(model.compareMode).toBe('toggle')
     expect(model.compareToggleBefore).toBe(false)
     expect(presented(commands)).toEqual({ mode: 'toggle', showBefore: false, splitAt: 0.5 })
   })
 
   it('switching modes keeps the split position and shows the graded side', () => {
-    const [split] = update(loadedModel(), EditorMessage.ChangedCompareMode({ mode: 'split' }))
-    const [moved] = update(split, EditorMessage.ChangedSplitPosition({ position: 0.3 }))
-    const [model] = update(moved, EditorMessage.ChangedCompareMode({ mode: 'off' }))
+    const { model: split } = update(
+      loadedModel(),
+      EditorMessage.ChangedCompareMode({ mode: 'split' }),
+    )
+    const { model: moved } = update(split, EditorMessage.ChangedSplitPosition({ position: 0.3 }))
+    const { model } = update(moved, EditorMessage.ChangedCompareMode({ mode: 'off' }))
     expect(model.compareMode).toBe('off')
     expect(model.compareSplitAt).toBe(0.3)
   })
@@ -63,7 +72,7 @@ describe('compare flow', () => {
       fc.property(
         fc.double({ max: 1_000_000, min: -1_000_000, noDefaultInfinity: true, noNaN: true }),
         (position) => {
-          const [model] = update(loadedModel(), EditorMessage.ChangedSplitPosition({ position }))
+          const { model } = update(loadedModel(), EditorMessage.ChangedSplitPosition({ position }))
           expect(model.compareSplitAt).toBeGreaterThanOrEqual(0)
           expect(model.compareSplitAt).toBeLessThanOrEqual(1)
           // Positions already in range pass through untouched (-0 clamps to +0,
@@ -77,7 +86,7 @@ describe('compare flow', () => {
   })
 
   it('does not present without an image', () => {
-    const [model, commands] = update(
+    const { model, commands = [] } = update(
       initialModel(),
       EditorMessage.ChangedCompareMode({ mode: 'split' }),
     )
@@ -86,18 +95,24 @@ describe('compare flow', () => {
   })
 
   it('a new image resets the split position but keeps the mode', () => {
-    const [split] = update(loadedModel(), EditorMessage.ChangedCompareMode({ mode: 'split' }))
-    const [moved] = update(split, EditorMessage.ChangedSplitPosition({ position: 0.7 }))
-    const [cleared] = update(moved, EditorMessage.ClearedImage())
+    const { model: split } = update(
+      loadedModel(),
+      EditorMessage.ChangedCompareMode({ mode: 'split' }),
+    )
+    const { model: moved } = update(split, EditorMessage.ChangedSplitPosition({ position: 0.7 }))
+    const { model: cleared } = update(moved, EditorMessage.ClearedImage())
     expect(cleared.compareMode).toBe('split')
     expect(cleared.compareSplitAt).toBe(0.5)
   })
 
   it('carries the compare state into every chain render', () => {
-    const [split] = update(loadedModel(), EditorMessage.ChangedCompareMode({ mode: 'split' }))
-    const [moved] = update(split, EditorMessage.ChangedSplitPosition({ position: 0.3 }))
-    const [toggled] = update(moved, EditorMessage.ChangedCompareMode({ mode: 'toggle' }))
-    const [, commands] = update(
+    const { model: split } = update(
+      loadedModel(),
+      EditorMessage.ChangedCompareMode({ mode: 'split' }),
+    )
+    const { model: moved } = update(split, EditorMessage.ChangedSplitPosition({ position: 0.3 }))
+    const { model: toggled } = update(moved, EditorMessage.ChangedCompareMode({ mode: 'toggle' }))
+    const { commands = [] } = update(
       toggled,
       EditorMessage.RemovedLayer({ id: Effect.runSync(createLayerFor('exposure')).id }),
     )

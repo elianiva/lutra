@@ -1,5 +1,4 @@
-import type { Command } from 'foldkit'
-import { Command as CommandModule } from 'foldkit'
+import { Command as CommandModule, Update } from 'foldkit'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import type { CollageStore, EditStore } from '@lutra/store'
 import * as ExportDialog from '../export-dialog'
@@ -27,14 +26,11 @@ const toSelf = (message: ExportDialog.Message): CollageMessage =>
 
 const settings = [CommandModule.mapMessage(ExportDialog.LoadExportSettings(), toSelf)]
 
-export type InitReturn = readonly [
-  Model,
-  readonly Command.Command<CollageMessage, never, Resource>[],
-]
+export type InitReturn = Update.Return<Model, CollageMessage, Resource>
 export const init = (route: AppRoute): InitReturn => {
   const commands =
     route._tag === 'Collage' && route.collageId !== null
       ? [LoadCollage({ id: route.collageId }), ...settings]
       : settings
-  return [initialModel(), commands]
+  return { model: initialModel(), commands }
 }

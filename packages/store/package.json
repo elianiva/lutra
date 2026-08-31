@@ -8,9 +8,9 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@effect/platform-browser": "4.0.0-rc.111",
+    "@effect/platform-browser": "4.0.0-rc.112",
     "@lutra/engine": "workspace:*",
-    "effect": "4.0.0-rc.111"
+    "effect": "4.0.0-rc.112"
   },
   "devDependencies": {
     "fake-indexeddb": "^6.2.5",

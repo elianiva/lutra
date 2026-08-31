@@ -172,7 +172,7 @@ export const view = (model: Model, h: HtmlBuilder<AppMessage>): Document => {
 // strip appears or disappears. Nothing renders once the library is ready
 // (the toast announced it) — and nothing renders in the editor; the fill is
 // housekeeping, the editor is for grading.
-const offlineCardImpl = (offline: Model['offline'], h: HtmlBuilder<AppMessage>) => {
+const offlineCardImpl = (offline: Model['offline'], h: HtmlBuilder<AppMessage>): Html => {
   // offline passed as slice for lazy === check
   const pct = offline.total > 0 ? Math.round((offline.downloaded / offline.total) * 100) : 0
   const frame = (content: readonly Html[]) =>
@@ -255,6 +255,9 @@ const offlineCardImpl = (offline: Model['offline'], h: HtmlBuilder<AppMessage>) 
         : null
     }
     case 'Ready': {
+      return null
+    }
+    default: {
       return null
     }
   }

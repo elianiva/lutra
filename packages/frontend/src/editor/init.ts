@@ -1,4 +1,4 @@
-import { Command } from 'foldkit'
+import { Command, Update } from 'foldkit'
 import type { GpuBackend } from '../gpu/backend'
 import type { CanvasRef } from '../gpu/canvas-ref'
 import type { LutStore } from '../luts/store'
@@ -30,7 +30,7 @@ type Resource =
  * lands), plus — when the route attaches an Edit (`/edit/:id`) — the
  * `LoadEdit` that hydrates the editor from the gallery's open-photo flow.
  */
-export type InitReturn = [Model, readonly Command.Command<EditorMessage, never, Resource>[]]
+export type InitReturn = Update.Return<Model, EditorMessage, Resource>
 export const init = (route: AppRoute): InitReturn => {
   const settings = [
     Command.mapMessage(ExportDialog.LoadExportSettings(), (message) =>
@@ -39,5 +39,5 @@ export const init = (route: AppRoute): InitReturn => {
   ]
   const boot = [LoadCatalog(), ...settings, LoadLutRecents()]
   const commands = route._tag === 'Editor' ? [LoadEdit({ id: route.editId }), ...boot] : boot
-  return [initialModel(), commands]
+  return { model: initialModel(), commands }
 }

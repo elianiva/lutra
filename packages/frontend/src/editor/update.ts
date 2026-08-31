@@ -1,5 +1,5 @@
 import { Array, Match, Option, pipe } from 'effect'
-import { Command } from 'foldkit'
+import { Command, Update } from 'foldkit'
 import * as ExportDialog from '../export-dialog'
 import type { GpuBackend } from '../gpu/backend'
 import type { CanvasRef } from '../gpu/canvas-ref'
@@ -27,15 +27,12 @@ import type { EditStore } from '@lutra/store'
 import type { Model } from './model'
 import { EditorMessage, EditorOutMessage } from './message'
 
-export type UpdateReturn = readonly [
+export type UpdateReturn = Update.ReturnWithOutMessage<
   Model,
-  readonly Command.Command<
-    EditorMessage,
-    never,
-    GpuBackend | LutStore | CanvasRef | ImageEncoder | KeyValueStore | EditStore | LutThumbnailer
-  >[],
-  Option.Option<EditorOutMessage>,
-]
+  EditorMessage,
+  EditorOutMessage,
+  GpuBackend | LutStore | CanvasRef | ImageEncoder | KeyValueStore | EditStore | LutThumbnailer
+>
 
 const ensureFieldIndex = (index: Record<LayerId, number>, layerId: LayerId) =>
   index[layerId] === undefined ? { ...index, [layerId]: 0 } : index
@@ -62,7 +59,7 @@ const presentState = (model: Model) => ({
  *  applied, so a leaked value can never corrupt a non-LUT render. */
 const renderNow = (model: Model): UpdateReturn => {
   if (!model.source.bitmap) {
-    return [model, [], Option.none()]
+    return { model }
   }
   // The draft lives in the phase machine (Drafting); the render pipeline
   // still receives it as a plain layer appended after the chain.
@@ -84,11 +81,11 @@ const renderNow = (model: Model): UpdateReturn => {
   const next: Model = { ...model, revision: model.revision + 1 }
   const stamp = next.revision
   if (model.renderPending) {
-    return [next, [], Option.none()]
+    return { model: next }
   }
-  return [
-    { ...next, renderPending: true },
-    [
+  return {
+    model: { ...next, renderPending: true },
+    commands: [
       RenderChain({
         bitmap: model.source.bitmap,
         draft: draftLayer,
@@ -97,8 +94,7 @@ const renderNow = (model: Model): UpdateReturn => {
         stamp,
       }),
     ],
-    Option.none(),
-  ]
+  }
 }
 
 /**
@@ -113,15 +109,15 @@ const renderNow = (model: Model): UpdateReturn => {
 const startSave = (model: Model, fork: boolean): UpdateReturn => {
   const attached = model.attachedEdit
   if (!model.source.bitmap || !model.lastRender || !attached) {
-    return [model, [], Option.none()]
+    return { model }
   }
   if (model.saveStatus._tag === 'saving') {
-    return [model, [], Option.none()]
+    return { model }
   }
   const id = fork ? null : attached.id
-  return [
-    { ...model, saveStatus: { _tag: 'saving' } },
-    [
+  return {
+    model: { ...model, saveStatus: { _tag: 'saving' } },
+    commands: [
       SaveEdit({
         chain: model.chain,
         handle: model.lastRender,
@@ -129,8 +125,7 @@ const startSave = (model: Model, fork: boolean): UpdateReturn => {
         source: attached.source,
       }),
     ],
-    Option.none(),
-  ]
+  }
 }
 
 /** Most-recently-applied lutIds, newest first, deduped, capped at 12. The
@@ -202,7 +197,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
     message.type === 'lut' &&
     (model.catalog === null || model.catalog.length === 0)
   ) {
-    return [model, [], Option.none()]
+    return { model }
   }
 
   // Step the phase machine. `from` is the pre-step state: the branches that
@@ -220,70 +215,60 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       // Toggle the tapped sheet: tapping the active tab closes it, tapping
       // the other switches. Desktop never reads this — the panels render
       // side-by-side there regardless (the sheet classes are `lg:`-scoped).
-      ToggledMobileSheet: ({ sheet }) => [
-        { ...model, mobileSheet: model.mobileSheet === sheet ? null : sheet, phase },
-        [],
-        Option.none(),
-      ],
+      ToggledMobileSheet: ({ sheet }) => ({
+        model: { ...model, mobileSheet: model.mobileSheet === sheet ? null : sheet, phase },
+      }),
 
       // The mount already wrote the element into the CanvasRef service; the
       // acknowledgment exists for observability (DevTools, Scene, replay).
-      CanvasRegistered: () => [model, [], Option.none()],
+      CanvasRegistered: () => ({ model }),
 
-      FilePickRequested: () => [model, [PickImageFile()], Option.none()],
-      FilePickCancelled: () => [model, [], Option.none()],
+      FilePickRequested: () => ({ model, commands: [PickImageFile()] }),
+      FilePickCancelled: () => ({ model }),
 
       // The load result drives the LUT card's status slot (plan 06): a
       // failure records the error (the card shows "LUTs unavailable" with
       // the message as its title); a success clears it.
-      CatalogLoaded: ({ catalog }) => [
-        { ...model, catalog, catalogError: null, phase },
-        [],
-        Option.none(),
-      ],
-      CatalogFailed: ({ error }) => [{ ...model, catalogError: error, phase }, [], Option.none()],
+      CatalogLoaded: ({ catalog }) => ({
+        model: { ...model, catalog, catalogError: null, phase },
+      }),
+      CatalogFailed: ({ error }) => ({ model: { ...model, catalogError: error, phase } }),
 
       // offline library (the LUT bar's per-row states, docs/adr/0007-offline)
       // Root-delegated facts; the editor machine has no edges for them, so
       // the phase passes through untouched. A cube file's fetch began: the
       // bar row shows its spinner.
-      OfflineFileFetching: ({ lutId }) => [
-        {
+      OfflineFileFetching: ({ lutId }) => ({
+        model: {
           ...model,
           lutDownloads: { ...model.lutDownloads, [lutId]: 'fetching' },
           phase,
         },
-        [],
-        Option.none(),
-      ],
+      }),
       // A cube landed in the offline library: the row is downloadable — and
       // any "not downloaded yet" notice is moot.
-      OfflineFileDownloaded: ({ lutId }) => [
-        {
+      OfflineFileDownloaded: ({ lutId }) => ({
+        model: {
           ...model,
           lutDownloads: { ...model.lutDownloads, [lutId]: 'downloaded' },
           offlineLutNotice: null,
           phase,
         },
-        [],
-        Option.none(),
-      ],
+      }),
       // The browser's online state flipped (dimming flag for the bar).
-      OfflineConnectivityChanged: ({ online }) => [{ ...model, online, phase }, [], Option.none()],
+      OfflineConnectivityChanged: ({ online }) => ({ model: { ...model, online, phase } }),
       // An undownloaded row was clicked while offline: the bar's name line
       // shows the distinct connect-once notice (the commit is blocked — the
       // click never reaches the chain).
       OfflineLutUnavailable: ({ lutId }) => {
         const name = model.catalog?.find((entry) => entry.lut_file === lutId)?.name ?? lutId
-        return [
-          {
+        return {
+          model: {
             ...model,
             offlineLutNotice: `${name} isn't downloaded yet — connect once and the offline library finishes preparing.`,
             phase,
           },
-          [],
-          Option.none(),
-        ]
+        }
       },
 
       // The machine's edge already dispatched DecodeImage (its args come from
@@ -291,13 +276,12 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       // selection anywhere but Empty/Error/Loading is ignored.
       SelectedImageFile: () => {
         if (!transitioned) {
-          return [model, [], Option.none()]
+          return { model }
         }
-        return [
-          { ...model, phase, source: { ...model.source, error: null } },
-          machineCommands,
-          Option.none(),
-        ]
+        return {
+          model: { ...model, phase, source: { ...model.source, error: null } },
+          commands: machineCommands,
+        }
       },
       // A decode can only land while Loading (or re-land in Idle/Error for
       // the double-pick race). A completion that lands in Empty — after a
@@ -306,12 +290,12 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       // unattached source record (id null) that Save creates an Edit from.
       ImageDecoded: ({ bitmap, width, height, source }) => {
         if (!transitioned) {
-          return [model, [], Option.none()]
+          return { model }
         }
         // A new photo invalidates the previous one's per-photo LUT previews
         // (docs/adr/0002-lut-library): clear the map and revoke the old blob URLs.
         const urls = Object.values(model.lutThumbs)
-        const [next, commands] = renderNow({
+        const { model: next, commands = [] } = renderNow({
           ...model,
           phase,
           source: { bitmap, error: null, height, width },
@@ -323,17 +307,16 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           // canvas is the first thing on screen (docs/adr/0010-editor-ui.md).
           mobileSheet: null,
         })
-        return [
-          next,
-          urls.length > 0 ? [...commands, RevokeLutThumbs({ urls })] : commands,
-          Option.none(),
-        ]
+        return {
+          model: next,
+          commands: urls.length > 0 ? [...commands, RevokeLutThumbs({ urls })] : commands,
+        }
       },
       ImageFailedToDecode: ({ error }) => {
         if (!transitioned) {
-          return [model, [], Option.none()]
+          return { model }
         }
-        return [{ ...model, phase, source: { ...model.source, error } }, [], Option.none()]
+        return { model: { ...model, phase, source: { ...model.source, error } } }
       },
       // The machine moves the phase (draft/selection discarded); the branch
       // resets the model data that only makes sense with an image. In Empty
@@ -342,8 +325,8 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         // The image is gone: its per-photo LUT previews are dead too —
         // clear the map and revoke the blob URLs (docs/adr/0002-lut-library).
         const urls = Object.values(model.lutThumbs)
-        return [
-          {
+        return {
+          model: {
             ...model,
             phase,
             source: { bitmap: null, error: null, height: 0, width: 0 },
@@ -367,9 +350,8 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             saveStatus: { _tag: 'idle' },
             lutThumbs: {},
           },
-          urls.length > 0 ? [RevokeLutThumbs({ urls })] : [],
-          Option.none(),
-        ]
+          commands: urls.length > 0 ? [RevokeLutThumbs({ urls })] : [],
+        }
       },
 
       // attached edit (gallery → /edit/:id)
@@ -380,12 +362,12 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       // become the attached record that Save writes back through.
       EditLoaded: ({ id, chain, bitmap, width, height, source }) => {
         if (!transitioned) {
-          return [model, [], Option.none()]
+          return { model }
         }
         // A new photo invalidates the previous one's per-photo LUT previews
         // (docs/adr/0002-lut-library): clear the map and revoke the old blob URLs.
         const urls = Object.values(model.lutThumbs)
-        const [next, commands] = renderNow({
+        const { model: next, commands = [] } = renderNow({
           ...model,
           phase,
           chain,
@@ -406,18 +388,17 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           saveStatus: { _tag: 'idle' },
           lutThumbs: {},
         })
-        return [
-          next,
-          urls.length > 0 ? [...commands, RevokeLutThumbs({ urls })] : commands,
-          Option.none(),
-        ]
+        return {
+          model: next,
+          commands: urls.length > 0 ? [...commands, RevokeLutThumbs({ urls })] : commands,
+        }
       },
       EditLoadFailed: ({ error }) => {
         if (!transitioned) {
-          return [model, [], Option.none()]
+          return { model }
         }
-        return [
-          {
+        return {
+          model: {
             ...model,
             activeFieldIndex: {},
             activeMixerColor: {},
@@ -425,9 +406,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             phase,
             source: { ...model.source, error },
           },
-          [],
-          Option.none(),
-        ]
+        }
       },
 
       // Save/export while a bar preview is active dismisses the preview
@@ -444,42 +423,39 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         // Edit. An in-place save keeps the URL it already addresses.
         const attached = model.attachedEdit
         if (!attached) {
-          return [model, [], Option.none()]
+          return { model: { ...model, phase } }
         }
         const out =
           attached.id === id ? Option.none() : Option.some(EditorOutMessage.EditCreated({ id }))
-        return [
+        return Update.withOutMessage(
           {
-            ...model,
-            attachedEdit: { ...attached, id },
-            phase,
-            saveStatus: { _tag: 'saved', at: savedAt },
+            model: {
+              ...model,
+              attachedEdit: { ...attached, id },
+              phase,
+              saveStatus: { _tag: 'saved', at: savedAt },
+            },
           },
-          [],
-          out,
-        ]
+          Option.isSome(out) ? out.value : undefined,
+        )
       },
-      SaveFailed: ({ error }) => [
-        { ...model, phase, saveStatus: { _tag: 'failed', error } },
-        [],
-        Option.none(),
-      ],
+      SaveFailed: ({ error }) => ({
+        model: { ...model, phase, saveStatus: { _tag: 'failed', error } },
+      }),
 
-      ScaledCanvas: ({ scale, offsetX, offsetY }) => [
-        { ...model, offsetX, offsetY, phase, scale },
-        [],
-        Option.none(),
-      ],
+      ScaledCanvas: ({ scale, offsetX, offsetY }) => ({
+        model: { ...model, offsetX, offsetY, phase, scale },
+      }),
 
       SelectedTool: () => {
         // The machine moved into Creating and attached CreateLayer as its
         // command. Keep the old visual context until that Effect reports;
         // the command is the only caller that consumes createLayerFor.
         if (!transitioned || phase._tag !== 'Creating') {
-          return [model, [], Option.none()]
+          return { model }
         }
-        return [
-          {
+        return {
+          model: {
             ...model,
             layerCreationError: null,
             lutBarOpen: false,
@@ -487,15 +463,14 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             phase,
             previewLut: null,
           },
-          machineCommands,
-          Option.none(),
-        ]
+          commands: machineCommands,
+        }
       },
       LayerCreated: () => {
         // The machine accepts a result only while the matching creation is
         // pending, then installs the validated layer as the draft.
         if (!transitioned || from._tag !== 'Creating' || phase._tag !== 'Drafting') {
-          return [model, [], Option.none()]
+          return { model }
         }
         const { layer } = phase
         let next: Model = {
@@ -511,7 +486,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           // has a catalog. Keep the check at this boundary for stale startup
           // messages rather than indexing an absent entry.
           if (!catalog || catalog.length === 0) {
-            return [model, [], Option.none()]
+            return { model }
           }
           next = {
             ...next,
@@ -525,18 +500,18 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           ...next,
           activeFieldIndex: ensureFieldIndex(model.activeFieldIndex, layer.id),
         }
-        const [after, commands] = renderNow(rendered)
-        return [after, [...commands, ...generateThumbCommands(rendered)], Option.none()]
+        const { model: after, commands = [] } = renderNow(rendered)
+        return { model: after, commands: [...commands, ...generateThumbCommands(rendered)] }
       },
       LayerCreationFailed: ({ error }) => {
         if (!transitioned || from._tag !== 'Creating') {
-          return [model, [], Option.none()]
+          return { model }
         }
-        return [{ ...model, layerCreationError: error, phase }, [], Option.none()]
+        return { model: { ...model, layerCreationError: error, phase } }
       },
       ConfirmedDraft: () => {
         if (!transitioned || from._tag !== 'Drafting') {
-          return [model, [], Option.none()]
+          return { model }
         }
         // The machine moved the phase to Selected (focused on the draft); the
         // branch commits the draft layer into the chain.
@@ -550,7 +525,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       },
       CancelledDraft: () => {
         if (!transitioned || from._tag !== 'Drafting') {
-          return [model, [], Option.none()]
+          return { model }
         }
         const { [from.layer.id]: _removed, ...restIndex } = model.activeFieldIndex
         const { [from.layer.id]: _removedColor, ...restMixer } = model.activeMixerColor
@@ -567,7 +542,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         // The machine already applied the param to the draft layer in the
         // new phase; the branch only re-renders.
         if (!transitioned || phase._tag !== 'Drafting') {
-          return [model, [], Option.none()]
+          return { model }
         }
         return renderNow({ ...model, phase })
       },
@@ -576,19 +551,18 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       // picks only, the `catalog[0]` auto-default never bumps (D6).
       ChangedDraftLut: ({ lutId }) => {
         if (!transitioned || phase._tag !== 'Drafting') {
-          return [model, [], Option.none()]
+          return { model }
         }
         const next = bumpRecents({ ...model, phase, previewLut: null }, lutId)
-        const [rendered, commands] = renderNow(next)
-        return [
-          rendered,
-          [...commands, SaveLutRecents({ recents: next.lutRecents })],
-          Option.none(),
-        ]
+        const { model: rendered, commands = [] } = renderNow(next)
+        return {
+          model: rendered,
+          commands: [...commands, SaveLutRecents({ recents: next.lutRecents })],
+        }
       },
       ToggledLutPicker: () => {
         if (Option.isNone(lutTarget(model.phase, model.chain))) {
-          return [model, [], Option.none()]
+          return { model }
         }
         const open = !model.lutBarOpen
         // Closing also clears the hover preview; opening has nothing to
@@ -600,7 +574,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           phase,
           previewLut: open ? model.previewLut : null,
         }
-        return [next, open ? generateThumbCommands(next) : [], Option.none()]
+        return { model: next, commands: open ? generateThumbCommands(next) : [] }
       },
 
       // LUT bar (bottom filmstrip picker, docs/adr/0002-lut-library)
@@ -610,13 +584,13 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       // skips redundant renders while scrubbing across the strip.
       PreviewedLut: ({ lutId }) => {
         if (!model.source.bitmap) {
-          return [model, [], Option.none()]
+          return { model }
         }
         if (Option.isNone(lutTarget(model.phase, model.chain))) {
-          return [model, [], Option.none()]
+          return { model }
         }
         if (model.previewLut === lutId) {
-          return [model, [], Option.none()]
+          return { model }
         }
         return renderNow({ ...model, offlineLutNotice: null, phase, previewLut: lutId })
       },
@@ -625,15 +599,11 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       // revisit after a failure retries the missing LUTs.
       SelectedLutTab: ({ tab }) => {
         const next = { ...model, lutTab: tab, offlineLutNotice: null, phase }
-        return [next, generateThumbCommands(next), Option.none()]
+        return { model: next, commands: generateThumbCommands(next) }
       },
       // Recents restored from localStorage at boot.
-      LutRecentsLoaded: ({ recents }) => [
-        { ...model, lutRecents: recents, phase },
-        [],
-        Option.none(),
-      ],
-      LutRecentsSaved: () => [model, [], Option.none()],
+      LutRecentsLoaded: ({ recents }) => ({ model: { ...model, lutRecents: recents, phase } }),
+      LutRecentsSaved: () => ({ model }),
 
       // per-photo LUT thumbnails (filmstrip previews, docs/adr/0002-lut-library)
       // A thumb landed. One that belongs to a previous photo (the bitmap
@@ -641,19 +611,15 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       // the map only ever holds the current photo's previews.
       LutThumbGenerated: ({ lutId, url, bitmap }) => {
         if (model.source.bitmap !== bitmap) {
-          return [model, [RevokeLutThumbs({ urls: [url] })], Option.none()]
+          return { model, commands: [RevokeLutThumbs({ urls: [url] })] }
         }
-        return [
-          { ...model, lutThumbs: { ...model.lutThumbs, [lutId]: url }, phase },
-          [],
-          Option.none(),
-        ]
+        return { model: { ...model, lutThumbs: { ...model.lutThumbs, [lutId]: url }, phase } }
       },
       // A thumb failed (cube fetch, downscale, worker, encode): the
       // vendored generic jpg stays — previews are presentation-only, so
       // failures are not user-visible.
-      LutThumbFailed: () => [model, [], Option.none()],
-      LutThumbsRevoked: () => [model, [], Option.none()],
+      LutThumbFailed: () => ({ model }),
+      LutThumbsRevoked: () => ({ model }),
 
       SelectedLayer: () => {
         // The machine moved to Selected; the branch closes the bar (a
@@ -661,15 +627,13 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         // gone). A selection without an image (or while a draft is active)
         // has no edge and is ignored.
         if (!transitioned) {
-          return [model, [], Option.none()]
+          return { model }
         }
         // Selecting a layer opens its sliders: on mobile the sheet follows
         // to the layer drawer (docs/adr/0010-editor-ui.md).
-        return [
-          { ...model, lutBarOpen: false, mobileSheet: 'layers', phase, previewLut: null },
-          [],
-          Option.none(),
-        ]
+        return {
+          model: { ...model, lutBarOpen: false, mobileSheet: 'layers', phase, previewLut: null },
+        }
       },
       RemovedLayer: ({ id }) => {
         const { [id]: _r, ...restIndex } = model.activeFieldIndex
@@ -689,12 +653,12 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       },
       ReorderedLayer: ({ from: fromIndex, to }) => {
         if (fromIndex === to) {
-          return [model, [], Option.none()]
+          return { model }
         }
         const arr = [...model.chain]
         const [moved] = arr.splice(fromIndex, 1)
         if (!moved) {
-          return [model, [], Option.none()]
+          return { model }
         }
         arr.splice(to, 0, moved)
         return renderNow({ ...model, chain: arr, phase })
@@ -737,26 +701,25 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           },
           lutId,
         )
-        const [rendered, commands] = renderNow(next)
-        return [
-          rendered,
-          [...commands, SaveLutRecents({ recents: next.lutRecents })],
-          Option.none(),
-        ]
+        const { model: rendered, commands = [] } = renderNow(next)
+        return {
+          model: rendered,
+          commands: [...commands, SaveLutRecents({ recents: next.lutRecents })],
+        }
       },
       CycledToggledField: ({ id }) => {
         const layer = model.chain.find((l) => l.id === id)
         if (!layer) {
-          return [model, [], Option.none()]
+          return { model }
         }
         const ui = LAYER_UI[layer.type]
         if (!ui.toggled) {
-          return [model, [], Option.none()]
+          return { model }
         }
         const keys = Object.keys(ui.fields)
         const current = model.activeFieldIndex[id] ?? 0
-        return [
-          {
+        return {
+          model: {
             ...model,
             activeFieldIndex: {
               ...model.activeFieldIndex,
@@ -764,15 +727,13 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             },
             phase,
           },
-          [],
-          Option.none(),
-        ]
+        }
       },
       // The mixer swatch row's selection: which of the 8 hue ranges the
       // drawer shows. Presentation-only (like CycledToggledField) — the
       // sliders are already bound to their fields; no render needed.
-      SelectedMixerColor: ({ id, color }) => [
-        {
+      SelectedMixerColor: ({ id, color }) => ({
+        model: {
           ...model,
           activeMixerColor: {
             ...model.activeMixerColor,
@@ -780,9 +741,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           },
           phase,
         },
-        [],
-        Option.none(),
-      ],
+      }),
 
       // tone curve widget (docs/adr/0003-adjustment-layers)
       // A chain-layer drag is a plain data op (the machine has no edge from
@@ -796,7 +755,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           const id = model.phase.layerId
           const layer = model.chain.find((l) => l.id === id)
           if (!layer || layer.type !== 'toneCurve') {
-            return [model, [], Option.none()]
+            return { model }
           }
           return renderNow({
             ...model,
@@ -805,7 +764,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           })
         }
         if (!transitioned) {
-          return [model, [], Option.none()]
+          return { model }
         }
         return renderNow({ ...model, phase })
       },
@@ -818,7 +777,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           const id = model.phase.layerId
           const layer = model.chain.find((l) => l.id === id)
           if (!layer || layer.type !== 'toneCurve') {
-            return [model, [], Option.none()]
+            return { model }
           }
           return renderNow({
             ...model,
@@ -827,13 +786,13 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           })
         }
         if (!transitioned) {
-          return [model, [], Option.none()]
+          return { model }
         }
         return renderNow({ ...model, phase })
       },
 
-      StartedLayerReorder: () => [model, [], Option.none()],
-      MovedLayerReorder: () => [model, [], Option.none()],
+      StartedLayerReorder: () => ({ model }),
+      MovedLayerReorder: () => ({ model }),
 
       // compare (before/after viewing)
       // Presentation-only state (docs/adr/0010-editor-ui): mode and split changes
@@ -841,7 +800,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       // graded side keeps showing the last rendered frame.
       ChangedCompareMode: ({ mode }) => {
         if (!model.source.bitmap) {
-          return [model, [], Option.none()]
+          return { model }
         }
         // The Toggle segment is a flip button while active: selecting Toggle
         // again flips the canvas between the source image and the graded
@@ -851,20 +810,20 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           mode === 'toggle' && model.compareMode === 'toggle'
             ? { ...model, compareToggleBefore: !model.compareToggleBefore, phase }
             : { ...model, compareMode: mode, compareToggleBefore: mode === 'toggle', phase }
-        return [next, [PresentFrame({ present: presentState(next) })], Option.none()]
+        return { model: next, commands: [PresentFrame({ present: presentState(next) })] }
       },
       ChangedSplitPosition: ({ position }) => {
         if (!model.source.bitmap) {
-          return [model, [], Option.none()]
+          return { model }
         }
         const next = {
           ...model,
           compareSplitAt: Math.min(1, Math.max(0, position)),
           phase,
         }
-        return [next, [PresentFrame({ present: presentState(next) })], Option.none()]
+        return { model: next, commands: [PresentFrame({ present: presentState(next) })] }
       },
-      FramePresented: () => [model, [], Option.none()],
+      FramePresented: () => ({ model }),
 
       RenderedFrame: ({ stamp, handle }) => {
         // A newer mutation arrived while this render was in flight — render
@@ -874,37 +833,44 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         // runs for the stale frame so its per-render bins buffer is consumed
         // (destroyed) rather than leaked; the stale bins are dropped below.
         if (stamp < model.revision) {
-          const [next, commands] = renderNow({ ...model, phase, renderPending: false })
-          return [next, [...commands, ReadHistogram({ handle, stamp })], Option.none()]
+          const { model: next, commands = [] } = renderNow({
+            ...model,
+            phase,
+            renderPending: false,
+          })
+          return { model: next, commands: [...commands, ReadHistogram({ handle, stamp })] }
         }
-        return [
-          { ...model, lastRender: handle, phase, renderPending: false, renderedStamp: stamp },
-          [ReadHistogram({ handle, stamp })],
-          Option.none(),
-        ]
+        return {
+          model: {
+            ...model,
+            lastRender: handle,
+            phase,
+            renderPending: false,
+            renderedStamp: stamp,
+          },
+          commands: [ReadHistogram({ handle, stamp })],
+        }
       },
-      RenderFailed: ({ error }) => [
-        {
+      RenderFailed: ({ error }) => ({
+        model: {
           ...model,
           phase,
           renderPending: false,
           source: { ...model.source, error },
         },
-        [],
-        Option.none(),
-      ],
+      }),
       // Bins for the frame that's on screen — or a stale readback that
       // landed after a newer mutation, which is dropped (the buffer was
       // already consumed by the ReadHistogram command).
       HistogramComputed: ({ bins, stamp }) => {
         if (stamp < model.revision) {
-          return [model, [], Option.none()]
+          return { model }
         }
-        return [{ ...model, bins, phase }, [], Option.none()]
+        return { model: { ...model, bins, phase } }
       },
       // Readback failure is observability only — the frame is already on
       // the canvas; a 1KB map cannot be retried or shown.
-      HistogramFailed: () => [model, [], Option.none()],
+      HistogramFailed: () => ({ model }),
 
       // export dialog (the shared machine owns encode/download/settings)
       ExportRequested: () => {
@@ -917,21 +883,22 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         // snapshot readback happens once per open; the dialog encodes from
         // the slotted ImageData when the user presses Export.
         if (model.renderedStamp === 0 || !model.lastRender) {
-          return [model, [], Option.none()]
+          return { model }
         }
-        const [dialogModel, dialogCommands] = ExportDialog.open(model.exportDialog)
-        return [
-          { ...model, exportDialog: dialogModel, phase },
-          [
+        const { model: dialogModel, commands: dialogCommands = [] } = ExportDialog.open(
+          model.exportDialog,
+        )
+        return {
+          model: { ...model, exportDialog: dialogModel, phase },
+          commands: [
             ...Command.mapMessages(dialogCommands, toExportDialogMessage),
             SnapshotForExport({ handle: model.lastRender }),
           ],
-          Option.none(),
-        ]
+        }
       },
       GotExportDialogMessage: ({ message }) => delegateToExportDialog(model, phase, message),
       // Which tool card the custom tooltip shows for — presentation-only.
-      HoveredToolChanged: ({ type }) => [{ ...model, hoveredTool: type }, [], Option.none()],
+      HoveredToolChanged: ({ type }) => ({ model: { ...model, hoveredTool: type } }),
       // The readback landed; readiness and late-result guards live in the
       // machine. A failure surfaces as the dialog's status line.
       ExportSnapshotted: () =>
@@ -955,10 +922,9 @@ const delegateToExportDialog = (
   phase: Model['phase'],
   message: ExportDialog.Message,
 ): UpdateReturn => {
-  const [dialogModel, commands] = ExportDialog.update(model.exportDialog, message)
-  return [
-    { ...model, exportDialog: dialogModel, phase },
-    Command.mapMessages(commands, toExportDialogMessage),
-    Option.none(),
-  ]
+  const { model: dialogModel, commands = [] } = ExportDialog.update(model.exportDialog, message)
+  return {
+    model: { ...model, exportDialog: dialogModel, phase },
+    commands: Command.mapMessages(commands, toExportDialogMessage),
+  }
 }

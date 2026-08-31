@@ -181,7 +181,7 @@ describe('layer reorder semantics (property-based)', () => {
 
             // The real update path.
             const to = click.dir === 'up' ? chainIndex + 1 : chainIndex - 1
-            ;[model] = update(model, EditorMessage.ReorderedLayer({ from: chainIndex, to }))
+            model = update(model, EditorMessage.ReorderedLayer({ from: chainIndex, to })).model
 
             vitestExpect(model.chain.map((l) => l.id).reverse()).toEqual(rendered)
             // The chain is always a permutation of the original layers.

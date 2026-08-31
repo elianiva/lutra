@@ -38,11 +38,7 @@ export const lutTarget = (phase: Model['phase'], chain: Model['chain']) =>
  *  target exists, so the phase/chain still carries the lut layer), but the
  *  type-checker can't see that invariant — the callers treat it as optional
  *  instead of fabricating a `catalog[0]` fallback. */
-export const currentLutId = (
-  phase: Model['phase'],
-  chain: Model['chain'],
-  target: LutTarget,
-) =>
+export const currentLutId = (phase: Model['phase'], chain: Model['chain'], target: LutTarget) =>
   Match.value(target).pipe(
     Match.withReturnType<Option.Option<LutId>>(),
     Match.when({ kind: 'draft' }, () =>

@@ -1,8 +1,8 @@
 import { Option, Schema as S } from 'effect'
 import { Machine } from 'foldkit/experimental'
 import { to, when } from 'foldkit/experimental/machine'
-import { ts } from 'foldkit/schema'
-import { AppMessage } from '../root/message'
+import { taggedStruct } from 'foldkit/schema'
+import { OfflineMessage } from './messages'
 
 // The offline library's fill state machine (CONTEXT.md "Offline fill"). One
 // state union owning the fill's lifecycle — the main menu's progress card
@@ -18,21 +18,21 @@ import { AppMessage } from '../root/message'
 
 /** Nothing has been downloaded this session (or the library is already
  *  complete from a previous session — the fill no-ops then). */
-export const Idle = ts('Idle')
+export const Idle = taggedStruct('Idle')
 /** A fill run is in flight — the loop is mirroring the missing files. */
-export const Filling = ts('Filling')
+export const Filling = taggedStruct('Filling')
 /** The device went offline mid-run; the loop waits and resumes on its own. */
-export const Paused = ts('Paused')
+export const Paused = taggedStruct('Paused')
 /** Every downloadable file is cached — the app works offline. */
-export const Ready = ts('Ready')
+export const Ready = taggedStruct('Ready')
 /** Storage is full; the run stopped and a persist()-granted retry is due. */
-export const QuotaError = ts('QuotaError')
+export const QuotaError = taggedStruct('QuotaError')
 
 export const OfflinePhase = S.Union([Idle, Filling, Paused, Ready, QuotaError])
 export type OfflinePhase = typeof OfflinePhase.Type
 
 export const offlineMachine = Machine.define({
-  message: AppMessage,
+  message: OfflineMessage,
   state: OfflinePhase,
 })({
   initial: Idle(),
