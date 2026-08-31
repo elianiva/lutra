@@ -16,16 +16,16 @@ export type LutTarget =
   | { readonly kind: 'draft' }
   | { readonly kind: 'layer'; readonly id: LayerId }
 
-export const lutTarget = (model: Model) =>
-  Match.value(model.phase).pipe(
+export const lutTarget = (phase: Model['phase'], chain: Model['chain']) =>
+  Match.value(phase).pipe(
     Match.withReturnType<Option.Option<LutTarget>>(),
     Match.when(S.is(Drafting), (phase) =>
       pipe(Option.some(phase.layer), Option.filter(S.is(LutLayer)), Option.as({ kind: 'draft' })),
     ),
-    Match.when(S.is(Selected), (phase) =>
+    Match.when(S.is(Selected), (selected) =>
       pipe(
-        model.chain,
-        Array.findFirst((layer) => layer.id === phase.layerId),
+        chain,
+        Array.findFirst((layer) => layer.id === selected.layerId),
         Option.filter(S.is(LutLayer)),
         Option.map((layer) => ({ id: layer.id, kind: 'layer' })),
       ),
@@ -38,16 +38,20 @@ export const lutTarget = (model: Model) =>
  *  target exists, so the phase/chain still carries the lut layer), but the
  *  type-checker can't see that invariant — the callers treat it as optional
  *  instead of fabricating a `catalog[0]` fallback. */
-export const currentLutId = (model: Model, target: LutTarget) =>
+export const currentLutId = (
+  phase: Model['phase'],
+  chain: Model['chain'],
+  target: LutTarget,
+) =>
   Match.value(target).pipe(
     Match.withReturnType<Option.Option<LutId>>(),
     Match.when({ kind: 'draft' }, () =>
       pipe(
-        Option.some(model.phase),
+        Option.some(phase),
         Option.filter(S.is(Drafting)),
-        Option.flatMap((phase) =>
+        Option.flatMap((drafting) =>
           pipe(
-            Option.some(phase.layer),
+            Option.some(drafting.layer),
             Option.filter(S.is(LutLayer)),
             Option.map((layer) => layer.lutId),
           ),
@@ -56,7 +60,7 @@ export const currentLutId = (model: Model, target: LutTarget) =>
     ),
     Match.when({ kind: 'layer' }, ({ id }) =>
       pipe(
-        model.chain,
+        chain,
         Array.findFirst((layer) => layer.id === id),
         Option.filter(S.is(LutLayer)),
         Option.map((layer) => layer.lutId),

@@ -24,63 +24,68 @@ const isImageFileForPaste = (file: File): boolean =>
   file.type.startsWith('image/') ||
   /\.(jpe?g|png|webp|avif|gif|bmp|tiff|heic|heif)$/i.test(file.name)
 
+const pasteTarget = (): EventTarget =>
+  'window' in globalThis ? globalThis.window : document
+
+interface ClipboardLike extends Event {
+  clipboardData: DataTransfer | null
+}
+
+const isClipboardEvent = (event: Event): event is ClipboardLike => 'clipboardData' in event
+
 export const subscriptions = Subscription.aggregate<Model, AppMessage, OfflineFill>()(
   Subscription.make<Model, AppMessage, OfflineFill>()((entry) => ({
-    galleryPaste: entry(
-      { routeTag: S.String },
-      {
-        modelToDependencies: (model: Model) => ({ routeTag: model.route._tag }),
-        dependenciesToStream: ({ routeTag }: { routeTag: string }) =>
-          Stream.when(
-            Subscription.fromEventFilterMap({
-              target: (): EventTarget => globalThis.window ?? document,
-              type: 'paste',
-              options: { passive: false },
-              toMessage: (event: Event): Option.Option<AppMessage> => {
-                if (!(event instanceof ClipboardEvent)) {
-                  return Option.none()
+    galleryPaste: entry({ routeTag: S.String }, {
+      modelToDependencies: (model: Model) => ({ routeTag: model.route._tag }),
+      dependenciesToStream: ({ routeTag }: { routeTag: string }) =>
+        Stream.when(
+          Subscription.fromEventFilterMap({
+            target: pasteTarget,
+            type: 'paste',
+            options: { passive: false },
+            toMessage: (event: Event): Option.Option<AppMessage> => {
+              if (!isClipboardEvent(event)) {
+                return Option.none()
+              }
+              const dt = event.clipboardData
+              if (!dt) {
+                return Option.none()
+              }
+              const files: File[] = []
+              for (let i = 0; i < dt.files.length; i++) {
+                const f = dt.files.item(i)
+                if (f) {
+                  files.push(f)
                 }
-                const e = event
-                const dt = e.clipboardData
-                if (!dt) {
-                  return Option.none()
-                }
-                const files: File[] = []
-                for (let i = 0; i < dt.files.length; i++) {
-                  const f = dt.files.item(i)
-                  if (f) {
-                    files.push(f)
-                  }
-                }
-                if (files.length === 0) {
-                  for (const item of Array.from(dt.items ?? [])) {
-                    if (item.kind === 'file') {
-                      const f = item.getAsFile()
-                      if (f) {
-                        files.push(f)
-                      }
+              }
+              if (files.length === 0) {
+                for (const item of Array.from(dt.items ?? [])) {
+                  if (item.kind === 'file') {
+                    const f = item.getAsFile()
+                    if (f) {
+                      files.push(f)
                     }
                   }
                 }
-                if (files.length === 0) {
-                  return Option.none()
-                }
-                const images = files.filter(isImageFileForPaste)
-                if (images.length === 0) {
-                  return Option.none()
-                }
-                e.preventDefault()
-                return Option.some(
-                  RootMessage.GotGalleryMessage({
-                    message: GalleryMessage.FilesPasted({ files: images }),
-                  }),
-                )
-              },
-            }),
-            Effect.sync(() => routeTag === 'Gallery'),
-          ),
-      },
-    ),
+              }
+              if (files.length === 0) {
+                return Option.none()
+              }
+              const images = files.filter(isImageFileForPaste)
+              if (images.length === 0) {
+                return Option.none()
+              }
+              event.preventDefault()
+              return Option.some(
+                RootMessage.GotGalleryMessage({
+                  message: GalleryMessage.FilesPasted({ files: images }),
+                }),
+              )
+            },
+          }),
+          Effect.sync(() => routeTag === 'Gallery'),
+        ),
+    }),
     connectivity: Subscription.persistent(
       Stream.callback<AppMessage>((queue) =>
         Effect.gen(function* () {

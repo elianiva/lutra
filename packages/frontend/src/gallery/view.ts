@@ -25,6 +25,13 @@ const lazyTile = createKeyedLazy()
 const lazyCollageCard = createKeyedLazy()
 const lazyCollageSection = createLazy()
 
+type CollagesSectionSlice = Pick<
+  Model,
+  'collages' | 'grid' | 'collageThumbSizes' | 'confirmingCollageDelete'
+>
+
+type CollageCardSlice = Pick<Model, 'grid' | 'collageThumbSizes' | 'confirmingCollageDelete'>
+
 const headerView = (selectedCount: number, h: HtmlBuilder<GalleryMessage>): Html =>
   header(h, selectedCount)
 const noticeView = (message: string | null, h: HtmlBuilder<GalleryMessage>): Html =>
@@ -71,17 +78,8 @@ const collagesSectionView = (
   thumbSizes: Model['collageThumbSizes'],
   confirming: Model['confirmingCollageDelete'],
   h: HtmlBuilder<GalleryMessage>,
-): Html => {
-  // SAFETY: narrow slice for lazy memoization — only fields the view island reads
-  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
-  const m = {
-    collages,
-    grid,
-    collageThumbSizes: thumbSizes,
-    confirmingCollageDelete: confirming,
-  } as unknown as Model
-  return collagesSection(h, m)
-}
+): Html =>
+  collagesSection(h, { collages, grid, collageThumbSizes: thumbSizes, confirmingCollageDelete: confirming })
 
 const notice = (message: string | null, h: HtmlBuilder<GalleryMessage>) =>
   message === null
@@ -181,7 +179,10 @@ const dropOverlay = (h: HtmlBuilder<GalleryMessage>, active: boolean): Html =>
             ],
             [icon(h, Upload, 'Drop photos', 28)],
           ),
-          h.p([h.Class('text-sm font-semibold tracking-wide text-accent')], ['Drop photos to add']),
+          h.p(
+            [h.Class('text-sm font-semibold tracking-wide text-accent')],
+            ['Drop photos to add'],
+          ),
           h.p([h.Class('text-xs text-muted')], ['Release to add them to your gallery']),
         ],
       )
@@ -209,10 +210,7 @@ const emptyState = (h: HtmlBuilder<GalleryMessage>) =>
           h.span([h.Class('text-xs text-muted')], ['or drop images here']),
         ],
       ),
-      h.p(
-        [h.Class('text-xs text-muted')],
-        ['Paste (⌘V / Ctrl+V) also works. Your edits will appear here.'],
-      ),
+      h.p([h.Class('text-xs text-muted')], ['Paste (⌘V / Ctrl+V) also works. Your edits will appear here.']),
     ],
   )
 
@@ -356,20 +354,20 @@ const tileThumb = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) => {
  * thumbnails — no pixels are copied; the record is the summary. Hidden
  * entirely while the store holds no collages.
  */
-const collagesSection = (h: HtmlBuilder<GalleryMessage>, model: Model) =>
-  AsyncData.match(model.collages, {
+const collagesSection = (h: HtmlBuilder<GalleryMessage>, slice: CollagesSectionSlice) =>
+  AsyncData.match(slice.collages, {
     onFailure: () => null,
     onIdle: () => null,
     onLoading: () => null,
     onRefreshing: () => null,
     onStale: () => null,
-    onSuccess: (collages) => (collages.length === 0 ? null : collageCards(h, collages, model)),
+    onSuccess: (collages) => (collages.length === 0 ? null : collageCards(h, collages, slice)),
   })
 
 const collageCards = (
   h: HtmlBuilder<GalleryMessage>,
   collages: readonly CollageRecord[],
-  model: Model,
+  slice: CollagesSectionSlice,
 ) =>
   h.section(
     [h.DataAttribute('collages-section', 'true'), h.Class('border-t border-border p-4')],
@@ -383,9 +381,9 @@ const collageCards = (
         collages.map((collage) =>
           lazyCollageCard(collage.id, collageCardView, [
             collage,
-            model.grid,
-            model.collageThumbSizes,
-            model.confirmingCollageDelete,
+            slice.grid,
+            slice.collageThumbSizes,
+            slice.confirmingCollageDelete,
             h,
           ])!,
         ),
@@ -399,20 +397,16 @@ const collageCardView = (
   thumbSizes: Model['collageThumbSizes'],
   confirmingId: Model['confirmingCollageDelete'],
   h: HtmlBuilder<GalleryMessage>,
-): Html => {
-  // SAFETY: narrow slice for lazy memoization — only fields the view island reads
-  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
-  const m = {
+): Html =>
+  collageCard(h, collage, {
     grid,
     collageThumbSizes: thumbSizes,
     confirmingCollageDelete: confirmingId,
-  } as unknown as Model
-  return collageCard(h, collage, m)
-}
+  })
 
-const collageCard = (h: HtmlBuilder<GalleryMessage>, collage: CollageRecord, model: Model) => {
-  const byId = new Map(model.grid._tag === 'Success' ? model.grid.data.map((s) => [s.id, s]) : [])
-  const confirming = model.confirmingCollageDelete === collage.id
+const collageCard = (h: HtmlBuilder<GalleryMessage>, collage: CollageRecord, slice: CollageCardSlice) => {
+  const byId = new Map(slice.grid._tag === 'Success' ? slice.grid.data.map((s) => [s.id, s]) : [])
+  const confirming = slice.confirmingCollageDelete === collage.id
   return h.div(
     [
       h.Key(collage.id),
@@ -433,7 +427,7 @@ const collageCard = (h: HtmlBuilder<GalleryMessage>, collage: CollageRecord, mod
           h.DataAttribute('open-collage-id', collage.id),
           h.Class('absolute inset-0'),
         ],
-        [miniPreview(h, collage, byId, model.collageThumbSizes)],
+        [miniPreview(h, collage, byId, slice.collageThumbSizes)],
       ),
       h.div(
         [

@@ -12,6 +12,7 @@ import { Download, RotateCcw, X } from 'lucide'
 import { CollageMessage } from './message'
 import type { Model } from './model'
 import type { Collage, EditId, TileFraming } from '@lutra/store'
+import { EditId as toEditId } from '@lutra/store'
 import { photoUrl } from '../photo-url'
 import { icon } from '../components/icon'
 import { cellSize, effectiveRowCount } from './compose'
@@ -140,9 +141,7 @@ const ghostView = (
     onSome: (style) => {
       const dragged = Option.match(DragAndDrop.maybeDraggedItemId(drag), {
         onNone: () => null,
-        // SAFETY: EditId brand is string at runtime; DragAndDrop stores it as string
-        // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
-        onSome: (id) => photoById.get(id as unknown as EditId) ?? null,
+        onSome: (id) => photoById.get(toEditId(id)) ?? null,
       })
       const draggedUrl = dragged && photoUrl(dragged.id, dragged.source)
       if (!dragged || !draggedUrl) return null
@@ -160,19 +159,6 @@ const ghostView = (
       )
     },
   })
-}
-
-// (ghost superseded by ghostView)
-
-const controlsWrapper = (
-  mode: Model['mode'],
-  collage: Collage,
-  h: HtmlBuilder<CollageMessage>,
-): Html => {
-  // SAFETY: narrow slice for lazy memoization — only fields the view island reads
-  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
-  const m = { mode } as unknown as Model
-  return controls(h, m, collage)
 }
 
 const body = (h: HtmlBuilder<CollageMessage>, model: Model) =>
@@ -303,28 +289,28 @@ const ratioInput = (
     }),
   ])
 
-const modeToggle = (h: HtmlBuilder<CollageMessage>, model: Model) =>
+const modeToggle = (h: HtmlBuilder<CollageMessage>, mode: Model['mode']) =>
   h.div(
     [h.Class('flex border border-border'), h.DataAttribute('control', 'mode')],
-    (['arrange', 'frame'] as const).map((mode, i) =>
+    (['arrange', 'frame'] as const).map((option, i) =>
       h.button(
         [
-          h.OnClick(CollageMessage.ModeChanged({ mode })),
-          h.AriaLabel(mode === 'arrange' ? 'Arrange photos' : 'Frame photos'),
-          h.DataAttribute('mode-button', mode),
-          h.AriaPressed(String(model.mode === mode)),
+          h.OnClick(CollageMessage.ModeChanged({ mode: option })),
+          h.AriaLabel(option === 'arrange' ? 'Arrange photos' : 'Frame photos'),
+          h.DataAttribute('mode-button', option),
+          h.AriaPressed(String(mode === option)),
           h.Class(
             `px-2 py-0.5 text-xs capitalize ${i === 0 ? 'border-r border-border' : ''} ${
-              model.mode === mode ? 'bg-accent text-ink' : 'text-muted hover:text-ink'
+              mode === option ? 'bg-accent text-ink' : 'text-muted hover:text-ink'
             }`,
           ),
         ],
-        [mode],
+        [option],
       ),
     ),
   )
 
-const controls = (h: HtmlBuilder<CollageMessage>, model: Model, collage: Collage) =>
+const controls = (h: HtmlBuilder<CollageMessage>, mode: Model['mode'], collage: Collage) =>
   h.div(
     [h.Class('flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted')],
     [
@@ -404,9 +390,15 @@ const controls = (h: HtmlBuilder<CollageMessage>, model: Model, collage: Collage
         ],
         [`Background: ${collage.layout.background}`],
       ),
-      modeToggle(h, model),
+      modeToggle(h, mode),
     ],
   )
+
+const controlsWrapper = (
+  mode: Model['mode'],
+  collage: Collage,
+  h: HtmlBuilder<CollageMessage>,
+): Html => controls(h, mode, collage)
 
 const gridView = (
   columns: number,
@@ -425,9 +417,7 @@ const gridView = (
   // Maps for O(1) lookups during per-tile render — avoids linear find per tile
   // on every rAF-throttled PanMoved. Created once per grid render, not per cell.
   const photoById = new Map(photos.map((p) => [p.id, p]))
-  // SAFETY: EditId brand is string at runtime; Map keys are plain strings
-  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
-  const sizeById = new Map(sizes.map((s) => [s.editId as string, s]))
+  const sizeById = new Map(sizes.map((s) => [s.editId, s]))
   // An explicit M×N grid renders its spare capacity as background cells
   // (docs/adr/0009-collage) — non-interactive placeholders past the last tile.
   const capacity = columns * rows
@@ -478,13 +468,11 @@ const tileCellView = (
   cellAspect: number,
   mode: Model['mode'],
   drag: Model['drag'],
-  photoById: Map<string, Model['photos'][number]>,
-  sizeById: Map<string, Model['sizes'][number]>,
+  photoById: Map<EditId, Model['photos'][number]>,
+  sizeById: Map<EditId, Model['sizes'][number]>,
   h: HtmlBuilder<CollageMessage>,
 ): Html => {
-  // SAFETY: EditId brand is string at runtime; Map keys are plain strings
-  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
-  const photo = photoById.get(editId as string)
+  const photo = photoById.get(editId)
   const url = photo === undefined ? null : photoUrl(photo.id, photo.source)
   const arrange = mode === 'arrange'
   const dropTarget = Option.match(DragAndDrop.maybeDropTarget(drag), {
@@ -601,11 +589,9 @@ const framedPhotoCached = (
   editId: EditId,
   framing: TileFraming,
   cellAspect: number,
-  sizeById: Map<string, Model['sizes'][number]>,
+  sizeById: Map<EditId, Model['sizes'][number]>,
 ): Html => {
-  // SAFETY: EditId brand is string at runtime; Map keys are plain strings
-  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
-  const size = sizeById.get(editId as string)
+  const size = sizeById.get(editId)
   const imageAspect = !size || size.width <= 0 || size.height <= 0 ? null : size.width / size.height
   if (imageAspect === null)
     return h.img([

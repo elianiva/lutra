@@ -561,7 +561,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         }
       },
       ToggledLutPicker: () => {
-        if (Option.isNone(lutTarget(model))) {
+        if (Option.isNone(lutTarget(model.phase, model.chain))) {
           return { model }
         }
         const open = !model.lutBarOpen
@@ -586,7 +586,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         if (!model.source.bitmap) {
           return { model }
         }
-        if (Option.isNone(lutTarget(model))) {
+        if (Option.isNone(lutTarget(model.phase, model.chain))) {
           return { model }
         }
         if (model.previewLut === lutId) {

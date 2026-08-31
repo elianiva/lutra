@@ -27,6 +27,21 @@ const lazyThumb = createKeyedLazy()
 type FilmstripEntry = LutCatalogEntry
 type DownloadState = LutDownloadState
 
+export type LutBarSlice = Pick<
+  Model,
+  | 'lutBarOpen'
+  | 'catalog'
+  | 'previewLut'
+  | 'lutTab'
+  | 'lutRecents'
+  | 'lutThumbs'
+  | 'lutDownloads'
+  | 'online'
+  | 'offlineLutNotice'
+  | 'phase'
+  | 'chain'
+>
+
 const nameLineView = (
   previewLut: Model['previewLut'],
   current: Option.Option<LutId>,
@@ -98,7 +113,7 @@ const filmstripView = (
   online: boolean,
   current: Option.Option<LutId>,
   commitKind: 'draft' | 'layer',
-  commitId: string | null,
+  commitId: LayerId | null,
   h: HtmlBuilder<EditorMessage>,
 ): Html => {
   const entries = visibleEntries(catalog, lutTab, lutRecents)
@@ -129,7 +144,7 @@ const thumbView = (
   downloadState: DownloadState,
   online: boolean,
   commitKind: 'draft' | 'layer',
-  commitId: string | null,
+  commitId: LayerId | null,
   h: HtmlBuilder<EditorMessage>,
 ): Html =>
   thumb(h, entry, src, current, downloadState, online, () => {
@@ -143,15 +158,16 @@ const thumbView = (
     if (commitKind === 'draft') {
       return EditorMessage.ChangedDraftLut({ lutId: entry.lut_file })
     }
-    // SAFETY: commitId is LayerId when commitKind is 'layer' (barView guarantees targetId non-null)
-    // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
-    return EditorMessage.ChangedLayerLut({ id: commitId as LayerId, lutId: entry.lut_file })
+    if (commitId === null) {
+      return EditorMessage.ChangedDraftLut({ lutId: entry.lut_file })
+    }
+    return EditorMessage.ChangedLayerLut({ id: commitId, lutId: entry.lut_file })
   })
 
 const barView = (
   catalog: NonNullable<Model['catalog']>,
   targetKind: 'draft' | 'layer',
-  targetId: string | null,
+  targetId: LayerId | null,
   lutBarOpen: boolean,
   previewLut: Model['previewLut'],
   lutTab: Model['lutTab'],
@@ -164,30 +180,12 @@ const barView = (
   chain: Model['chain'],
   h: HtmlBuilder<EditorMessage>,
 ): Html => {
-  // SAFETY: narrow slice for lazy memoization — only fields the view island reads
-  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/no-chained-type-assertions
-  const m = {
-    previewLut,
-    lutTab,
-    lutRecents,
-    lutThumbs,
-    lutDownloads,
-    online,
-    offlineLutNotice: offlineNotice,
-    phase,
-    chain,
-    catalog,
-  } as unknown as Model
-  const current = (() => {
-    if (targetKind === 'draft') {
-      return currentLutId(m, { kind: 'draft' })
-    } else if (targetId !== null) {
-      // SAFETY: targetId is LayerId when targetKind is 'layer' (guarded by targetId !== null)
-      // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
-      return currentLutId(m, { kind: 'layer', id: targetId as LayerId })
-    }
-    return Option.none<LutId>()
-  })()
+  const current =
+    targetKind === 'draft'
+      ? currentLutId(phase, chain, { kind: 'draft' })
+      : targetId !== null
+        ? currentLutId(phase, chain, { kind: 'layer', id: targetId })
+        : Option.none<LutId>()
 
   return h.div(
     [
@@ -227,28 +225,28 @@ const barView = (
  * rows toggles this bar. Renders only while a LUT target exists, the bar is
  * open, and the catalog has loaded.
  */
-export const lutBar = (h: HtmlBuilder<EditorMessage>, model: Model): Html | null => {
-  const targetOpt = lutTarget(model)
-  if (!model.lutBarOpen || Option.isNone(targetOpt) || model.catalog === null) {
+export const lutBar = (h: HtmlBuilder<EditorMessage>, slice: LutBarSlice): Html | null => {
+  const targetOpt = lutTarget(slice.phase, slice.chain)
+  if (!slice.lutBarOpen || Option.isNone(targetOpt) || slice.catalog === null) {
     return null
   }
-  const catalog = model.catalog
+  const catalog = slice.catalog
   const target = targetOpt.value
   const targetId = target.kind === 'layer' ? target.id : null
   return lazyBarRoot(barView, [
     catalog,
     target.kind,
     targetId,
-    model.lutBarOpen,
-    model.previewLut,
-    model.lutTab,
-    model.lutRecents,
-    model.lutThumbs,
-    model.lutDownloads,
-    model.online,
-    model.offlineLutNotice,
-    model.phase,
-    model.chain,
+    slice.lutBarOpen,
+    slice.previewLut,
+    slice.lutTab,
+    slice.lutRecents,
+    slice.lutThumbs,
+    slice.lutDownloads,
+    slice.online,
+    slice.offlineLutNotice,
+    slice.phase,
+    slice.chain,
     h,
   ])
 }

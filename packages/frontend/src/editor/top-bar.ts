@@ -19,9 +19,14 @@ import type { Model } from './model'
  * editor has an attached Edit to fork from. Both are disabled while a save
  * is in flight (at most one at a time) and while no image is loaded.
  */
-export const topBar = (h: HtmlBuilder<EditorMessage>, model: Model, hasImage: boolean) => {
-  const saving = model.saveStatus._tag === 'saving'
-  const attachedId = model.attachedEdit?.id ?? null
+export const topBar = (
+  h: HtmlBuilder<EditorMessage>,
+  saveStatus: Model['saveStatus'],
+  attachedEdit: Model['attachedEdit'],
+  hasImage: boolean,
+) => {
+  const saving = saveStatus._tag === 'saving'
+  const attachedId = attachedEdit?.id ?? null
   return h.header(
     [h.Class('flex items-center justify-between border-b border-border bg-panel px-4 py-2')],
     [
@@ -29,7 +34,7 @@ export const topBar = (h: HtmlBuilder<EditorMessage>, model: Model, hasImage: bo
       h.div(
         [h.Class('flex items-center gap-1')],
         [
-          saveStatusText(h, model),
+          saveStatusText(h, saveStatus),
           h.button(
             [
               h.OnClick(EditorMessage.SaveRequested()),
@@ -93,8 +98,8 @@ export const topBar = (h: HtmlBuilder<EditorMessage>, model: Model, hasImage: bo
  * tile carries the same `savedAt`) or the last failure's reason. Nothing
  * while idle or saving — the Save button's "Saving…" label covers that.
  */
-const saveStatusText = (h: HtmlBuilder<EditorMessage>, model: Model) =>
-  Match.value(model.saveStatus).pipe(
+const saveStatusText = (h: HtmlBuilder<EditorMessage>, saveStatus: Model['saveStatus']) =>
+  Match.value(saveStatus).pipe(
     Match.withReturnType<Html>(),
     Match.when({ _tag: 'saved' }, (status) =>
       h.span(
