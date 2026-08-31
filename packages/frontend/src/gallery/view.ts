@@ -79,7 +79,12 @@ const collagesSectionView = (
   confirming: Model['confirmingCollageDelete'],
   h: HtmlBuilder<GalleryMessage>,
 ): Html =>
-  collagesSection(h, { collages, grid, collageThumbSizes: thumbSizes, confirmingCollageDelete: confirming })
+  collagesSection(h, {
+    collages,
+    grid,
+    collageThumbSizes: thumbSizes,
+    confirmingCollageDelete: confirming,
+  })
 
 const notice = (message: string | null, h: HtmlBuilder<GalleryMessage>) =>
   message === null
@@ -179,10 +184,7 @@ const dropOverlay = (h: HtmlBuilder<GalleryMessage>, active: boolean): Html =>
             ],
             [icon(h, Upload, 'Drop photos', 28)],
           ),
-          h.p(
-            [h.Class('text-sm font-semibold tracking-wide text-accent')],
-            ['Drop photos to add'],
-          ),
+          h.p([h.Class('text-sm font-semibold tracking-wide text-accent')], ['Drop photos to add']),
           h.p([h.Class('text-xs text-muted')], ['Release to add them to your gallery']),
         ],
       )
@@ -210,7 +212,10 @@ const emptyState = (h: HtmlBuilder<GalleryMessage>) =>
           h.span([h.Class('text-xs text-muted')], ['or drop images here']),
         ],
       ),
-      h.p([h.Class('text-xs text-muted')], ['Paste (⌘V / Ctrl+V) also works. Your edits will appear here.']),
+      h.p(
+        [h.Class('text-xs text-muted')],
+        ['Paste (⌘V / Ctrl+V) also works. Your edits will appear here.'],
+      ),
     ],
   )
 
@@ -404,7 +409,11 @@ const collageCardView = (
     confirmingCollageDelete: confirmingId,
   })
 
-const collageCard = (h: HtmlBuilder<GalleryMessage>, collage: CollageRecord, slice: CollageCardSlice) => {
+const collageCard = (
+  h: HtmlBuilder<GalleryMessage>,
+  collage: CollageRecord,
+  slice: CollageCardSlice,
+) => {
   const byId = new Map(slice.grid._tag === 'Success' ? slice.grid.data.map((s) => [s.id, s]) : [])
   const confirming = slice.confirmingCollageDelete === collage.id
   return h.div(

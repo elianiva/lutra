@@ -512,8 +512,11 @@ const compareView = (mode: CompareMode, hasImage: boolean, h: HtmlBuilder<Editor
     }),
   )
 
-const compareControl = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel, hasImage: boolean): Html =>
-  lazyCompare(compareView, [model.compareMode, hasImage, h])!
+const compareControl = (
+  h: HtmlBuilder<EditorMessage>,
+  model: CanvasStageModel,
+  hasImage: boolean,
+): Html => lazyCompare(compareView, [model.compareMode, hasImage, h])!
 
 const emptyStage = (h: HtmlBuilder<EditorMessage>) =>
   h.div(

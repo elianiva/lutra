@@ -38,9 +38,7 @@ export const detectWebGpu = Effect.gen(function* () {
       }
       const adapter = await navigator.gpu.requestAdapter()
       if (adapter === null) {
-        return unsupportedWebGpu(
-          'WebGPU is present but requestAdapter() returned no GPU adapter.',
-        )
+        return unsupportedWebGpu('WebGPU is present but requestAdapter() returned no GPU adapter.')
       }
       return webGpuSupported
     },

@@ -185,7 +185,11 @@ const chainRowView = (
  * column at `lg`+, and a full-width bottom sheet below `lg` — `open` is the
  * mobile sheet state (visible only while its tab is active).
  */
-export const layerDrawer = (h: HtmlBuilder<EditorMessage>, slice: LayerDrawerSlice, open: boolean) =>
+export const layerDrawer = (
+  h: HtmlBuilder<EditorMessage>,
+  slice: LayerDrawerSlice,
+  open: boolean,
+) =>
   h.aside(
     [
       h.Class(
@@ -374,9 +378,7 @@ const chainRowImpl = (
       selected
         ? h.div(
             [h.Class('flex flex-col gap-3 px-4 pb-4')],
-            [
-              ...(() => layerSliders(h, rowSlice, layer, ui, 'chain'))(),
-            ],
+            [...(() => layerSliders(h, rowSlice, layer, ui, 'chain'))()],
           )
         : null,
     ],

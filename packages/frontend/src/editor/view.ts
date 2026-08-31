@@ -196,12 +196,7 @@ const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
         model.chain,
         h,
       ]),
-      lazyMobileTabBar(mobileTabBarView, [
-        model.mobileSheet,
-        model.lutBarOpen,
-        hasLutTarget,
-        h,
-      ]),
+      lazyMobileTabBar(mobileTabBarView, [model.mobileSheet, model.lutBarOpen, hasLutTarget, h]),
       lazyExportDialog(exportDialogView, [model.exportDialog, h]),
     ],
   )
