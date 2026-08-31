@@ -5,6 +5,17 @@ import { CollageMessage } from './message'
 import type { Model } from './model'
 import { ScreenMode } from './model'
 
+type CoalescedLike = {
+  screenX: number
+  screenY: number
+  getCoalescedEvents?: () => readonly PointerEvent[]
+}
+
+const coalescedPointerSource = (event: PointerEvent): PointerEvent => {
+  const candidate: CoalescedLike = event
+  return candidate.getCoalescedEvents?.().at(-1) ?? event
+}
+
 /**
  * The Collage Submodel's subscriptions (docs/adr/0009-collage), lifted into the
  * root's context (docs/adr/0006-frontend-architecture):
@@ -63,12 +74,7 @@ const own = Subscription.make<Model, CollageMessage>()((entry) => ({
                 }
               }
               const onMove = (event: PointerEvent) => {
-                // SAFETY: getCoalescedEvents is a standard PointerEvent API missing from older lib.dom; intersect to access it optionally.
-                const anyEvent = event as PointerEvent & {
-                  getCoalescedEvents?: () => PointerEvent[]
-                }
-                const coalesced = anyEvent.getCoalescedEvents?.()
-                const source = coalesced?.at(-1) ?? event
+                const source = coalescedPointerSource(event)
                 pending = { screenX: source.screenX, screenY: source.screenY }
                 if (raf === 0) raf = requestAnimationFrame(flush)
               }

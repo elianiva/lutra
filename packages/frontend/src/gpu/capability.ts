@@ -20,6 +20,8 @@ export type WebGpuCapability = Schema.Schema.Type<typeof WebGpuCapability>
 
 export const webGpuSupported: WebGpuCapability = { supported: true, reason: '' }
 
+const unsupportedWebGpu = (reason: string): WebGpuCapability => ({ supported: false, reason })
+
 /**
  * Probe for WebGPU once at boot. Never fails: any failure (no `navigator.gpu`,
  * `requestAdapter()` returning null, an unexpected throw) is folded into an
@@ -27,21 +29,18 @@ export const webGpuSupported: WebGpuCapability = { supported: true, reason: '' }
  */
 export const detectWebGpu = Effect.gen(function* () {
   const capability = yield* Effect.tryPromise({
-    catch: () =>
-      ({ supported: false, reason: 'WebGPU probe threw an unexpected error.' }) as WebGpuCapability,
+    catch: () => unsupportedWebGpu('WebGPU probe threw an unexpected error.'),
     try: async () => {
       if (navigator.gpu === undefined) {
-        return {
-          supported: false,
-          reason: 'navigator.gpu is undefined — this browser does not expose WebGPU.',
-        } as WebGpuCapability
+        return unsupportedWebGpu(
+          'navigator.gpu is undefined — this browser does not expose WebGPU.',
+        )
       }
       const adapter = await navigator.gpu.requestAdapter()
       if (adapter === null) {
-        return {
-          supported: false,
-          reason: 'WebGPU is present but requestAdapter() returned no GPU adapter.',
-        } as WebGpuCapability
+        return unsupportedWebGpu(
+          'WebGPU is present but requestAdapter() returned no GPU adapter.',
+        )
       }
       return webGpuSupported
     },

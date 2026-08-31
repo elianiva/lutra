@@ -16,28 +16,35 @@ import { toneCurveWidget } from './tone-curve'
 import { FieldKey, numField } from '@lutra/engine'
 import type { Layer, LayerId, LayerType } from '@lutra/engine'
 
+type LayerRowSlice = Pick<Model, 'catalog' | 'lutBarOpen' | 'activeFieldIndex' | 'activeMixerColor'>
+
+export type LayerDrawerSlice = Pick<
+  Model,
+  'chain' | 'phase' | 'lutBarOpen' | 'catalog' | 'activeFieldIndex' | 'activeMixerColor'
+>
+
 /** Read a numeric field off a heterogeneous layer. */
 const num = (layer: Layer, key: FieldKey): number => numField(layer, key)
 
 /** One-line drawer summary: "Fuji Velvia 50 · 65%" for LUT layers. */
-const summary = (model: Model, layer: Layer, ui: (typeof LAYER_UI)[LayerType]) =>
+const summary = (slice: LayerRowSlice, layer: Layer, ui: (typeof LAYER_UI)[LayerType]) =>
   layer.type === 'colorMixer'
-    ? mixerSummary(model, layer)
+    ? mixerSummary(slice, layer)
     : layer.type === 'lut'
-      ? `${lutName(model.catalog, layer.lutId)} · ${ui.formatValue(layer)}`
+      ? `${lutName(slice.catalog, layer.lutId)} · ${ui.formatValue(layer)}`
       : ui.formatValue(layer)
 
 /** The active hue range of a Color Mixer layer's drawer (0..7). */
-const activeMixerColorFor = (model: Model, layerId: LayerId) =>
-  Math.min(7, Math.max(0, Math.round(model.activeMixerColor[layerId] ?? 0)))
+const activeMixerColorFor = (slice: LayerRowSlice, layerId: LayerId) =>
+  Math.min(7, Math.max(0, Math.round(slice.activeMixerColor[layerId] ?? 0)))
 
 /**
  * One-line drawer summary for a Color Mixer layer: the active range's name
  * plus its non-default slider values (the same numbers the open sliders
  * show). A pristine layer reads just "Red".
  */
-const mixerSummary = (model: Model, layer: Layer) => {
-  const color = MIXER_COLORS[activeMixerColorFor(model, layer.id)]!
+const mixerSummary = (slice: LayerRowSlice, layer: Layer) => {
+  const color = MIXER_COLORS[activeMixerColorFor(slice, layer.id)]!
   const value = (suffix: string) => numField(layer, FieldKey(`${color.key}${suffix}`))
   const parts: string[] = [color.name]
   if (value('Hue') !== 0) {
@@ -111,13 +118,13 @@ const mixerSliders = (
  */
 const layerSliders = (
   h: HtmlBuilder<EditorMessage>,
-  model: Model,
+  slice: LayerRowSlice,
   layer: Layer,
   ui: (typeof LAYER_UI)[LayerType],
   kind: 'draft' | 'chain',
 ) => {
   if (layer.type === 'colorMixer') {
-    const color = activeMixerColorFor(model, layer.id)
+    const color = activeMixerColorFor(slice, layer.id)
     return [
       mixerSwatches(h, color, (index) =>
         EditorMessage.SelectedMixerColor({ color: index, id: layer.id }),
@@ -135,7 +142,7 @@ const layerSliders = (
   return Object.keys(ui.fields).map((field) =>
     kind === 'draft'
       ? draftSlider(h, layer, FieldKey(field), ui)
-      : chainSlider(h, layer, FieldKey(field), ui, model),
+      : chainSlider(h, layer, FieldKey(field), ui, slice),
   )
 }
 
@@ -151,15 +158,13 @@ const draftView = (
   activeMixer: number | undefined,
   h: HtmlBuilder<EditorMessage>,
 ): Html => {
-  // Narrow model for the draft row
-  const m = {
+  const slice: LayerRowSlice = {
     catalog,
     lutBarOpen,
     activeFieldIndex: activeField !== undefined ? { [layer.id]: activeField } : {},
     activeMixerColor: activeMixer !== undefined ? { [layer.id]: activeMixer } : {},
-    // SAFETY: narrow slice for lazy memoization — only fields the view island reads
-  } as unknown as Model
-  return draftRow(h, m, layer)
+  }
+  return draftRow(h, slice, layer)
 }
 
 const chainRowView = (
@@ -180,7 +185,7 @@ const chainRowView = (
  * column at `lg`+, and a full-width bottom sheet below `lg` — `open` is the
  * mobile sheet state (visible only while its tab is active).
  */
-export const layerDrawer = (h: HtmlBuilder<EditorMessage>, model: Model, open: boolean) =>
+export const layerDrawer = (h: HtmlBuilder<EditorMessage>, slice: LayerDrawerSlice, open: boolean) =>
   h.aside(
     [
       h.Class(
@@ -197,41 +202,41 @@ export const layerDrawer = (h: HtmlBuilder<EditorMessage>, model: Model, open: b
         ],
         [
           h.span([], ['Layers']),
-          h.span([h.Class('tnum text-muted')], [String(model.chain.length)]),
+          h.span([h.Class('tnum text-muted')], [String(slice.chain.length)]),
         ],
       ),
       h.div(
         [h.Class('flex flex-col overflow-y-auto')],
         [
-          ...(model.phase._tag === 'Drafting'
+          ...(slice.phase._tag === 'Drafting'
             ? [
                 lazyDraft(draftView, [
-                  model.phase.layer,
-                  model.lutBarOpen,
-                  model.catalog,
-                  model.activeFieldIndex[model.phase.layer.id],
-                  model.activeMixerColor[model.phase.layer.id],
+                  slice.phase.layer,
+                  slice.lutBarOpen,
+                  slice.catalog,
+                  slice.activeFieldIndex[slice.phase.layer.id],
+                  slice.activeMixerColor[slice.phase.layer.id],
                   h,
                 ]),
               ]
             : []),
-          ...model.chain
+          ...slice.chain
             .map((layer, index) => {
-              const selected = model.phase._tag === 'Selected' && model.phase.layerId === layer.id
+              const selected = slice.phase._tag === 'Selected' && slice.phase.layerId === layer.id
               return lazyRow(layer.id, chainRowView, [
                 layer,
                 index,
-                model.chain.length,
+                slice.chain.length,
                 selected,
-                model.lutBarOpen,
-                model.catalog,
-                model.activeFieldIndex[layer.id],
-                model.activeMixerColor[layer.id],
+                slice.lutBarOpen,
+                slice.catalog,
+                slice.activeFieldIndex[layer.id],
+                slice.activeMixerColor[layer.id],
                 h,
               ])!
             })
             .reverse(),
-          ...(model.chain.length === 0 && model.phase._tag !== 'Drafting' ? [emptyState(h)] : []),
+          ...(slice.chain.length === 0 && slice.phase._tag !== 'Drafting' ? [emptyState(h)] : []),
         ],
       ),
     ],
@@ -243,7 +248,7 @@ const emptyState = (h: HtmlBuilder<EditorMessage>) =>
     ['No adjustments yet. Pick one from the left.'],
   )
 
-const draftRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer) => {
+const draftRow = (h: HtmlBuilder<EditorMessage>, slice: LayerRowSlice, layer: Layer) => {
   const ui = LAYER_UI[layer.type]
   return h.div(
     [h.Class('border-b border-border bg-panel-alt'), h.AriaLabel(`${ui.label} draft`)],
@@ -253,12 +258,12 @@ const draftRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer) => 
         [
           icon(h, ui.icon, ui.label),
           h.span([h.Class('min-w-0 flex-1 truncate text-sm font-medium')], [ui.label]),
-          ...(layer.type === 'lut' ? [lutBarToggle(h, model)] : []),
+          ...(layer.type === 'lut' ? [lutBarToggleImpl(h, slice.lutBarOpen)] : []),
         ],
       ),
       h.div(
         [h.Class('flex flex-col gap-3 px-4 pb-3')],
-        [...layerSliders(h, model, layer, ui, 'draft')],
+        [...layerSliders(h, slice, layer, ui, 'draft')],
       ),
       h.div(
         [h.Class('flex items-center justify-end gap-2 px-4 py-2')],
@@ -299,20 +304,6 @@ const draftSlider = (
   )
 }
 
-// Legacy entry used by tests / non-memoized path — delegates to impl
-const chainRow = (h: HtmlBuilder<EditorMessage>, model: Model, layer: Layer, index: number) =>
-  chainRowImpl(
-    h,
-    layer,
-    index,
-    model.chain.length,
-    model.phase._tag === 'Selected' && model.phase.layerId === layer.id,
-    model.lutBarOpen,
-    model.catalog,
-    model.activeFieldIndex[layer.id],
-    model.activeMixerColor[layer.id],
-  )
-
 const chainRowImpl = (
   h: HtmlBuilder<EditorMessage>,
   layer: Layer,
@@ -325,13 +316,12 @@ const chainRowImpl = (
   activeMixer: number | undefined,
 ) => {
   const ui = LAYER_UI[layer.type]
-  const fakeModel = {
+  const rowSlice: LayerRowSlice = {
     catalog,
+    lutBarOpen,
     activeFieldIndex: activeField !== undefined ? { [layer.id]: activeField } : {},
     activeMixerColor: activeMixer !== undefined ? { [layer.id]: activeMixer } : {},
-    lutBarOpen,
-    // SAFETY: narrow slice for lazy memoization — only fields the view island reads
-  } as unknown as Model
+  }
   return h.div(
     [
       h.Key(layer.id),
@@ -357,7 +347,7 @@ const chainRowImpl = (
           h.span([h.Class('min-w-0 flex-1 truncate text-sm')], [ui.label]),
           h.span(
             [h.Class('tnum min-w-0 truncate text-xs text-muted')],
-            [summary(fakeModel, layer, ui)],
+            [summary(rowSlice, layer, ui)],
           ),
           h.div(
             [h.Class('flex items-center gap-0.5')],
@@ -385,16 +375,7 @@ const chainRowImpl = (
         ? h.div(
             [h.Class('flex flex-col gap-3 px-4 pb-4')],
             [
-              ...(() => {
-                // Chain sliders need a Model with activeFieldIndex/activeMixerColor
-                const m = {
-                  catalog,
-                  activeFieldIndex: activeField !== undefined ? { [layer.id]: activeField } : {},
-                  activeMixerColor: activeMixer !== undefined ? { [layer.id]: activeMixer } : {},
-                  // SAFETY: narrow slice for lazy memoization — only fields the view island reads
-                } as unknown as Model
-                return layerSliders(h, m, layer, ui, 'chain')
-              })(),
+              ...(() => layerSliders(h, rowSlice, layer, ui, 'chain'))(),
             ],
           )
         : null,
@@ -407,14 +388,14 @@ const chainSlider = (
   layer: Layer,
   field: FieldKey,
   ui: (typeof LAYER_UI)[LayerType],
-  model: Model,
+  slice: LayerRowSlice,
 ) => {
   const fieldUi = ui.fields[field]!
   const { min, max } = fieldBounds(layer.type, field)
   const value = num(layer, field)
   if (ui.toggled) {
     const keys = Object.keys(ui.fields)
-    const activeIndex = model.activeFieldIndex[layer.id] ?? 0
+    const activeIndex = slice.activeFieldIndex[layer.id] ?? 0
     if (keys[activeIndex] !== field) {
       return null
     }
@@ -453,9 +434,6 @@ const reorderButton = (
   )
 
 /** The chevron on a drawer LUT row: expands/collapses the bottom LUT bar */
-const lutBarToggle = (h: HtmlBuilder<EditorMessage>, model: Model) =>
-  lutBarToggleImpl(h, model.lutBarOpen)
-
 const lutBarToggleImpl = (h: HtmlBuilder<EditorMessage>, open: boolean) =>
   h.button(
     [

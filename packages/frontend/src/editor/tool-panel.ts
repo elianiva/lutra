@@ -36,9 +36,17 @@ const toolCardView = (
   h: HtmlBuilder<EditorMessage>,
 ): Html => toolCardInner(h, type, count, editable, lutEnabled, catalogError, hoveredTool)
 
-export const toolPanel = (h: HtmlBuilder<EditorMessage>, model: Model, open: boolean) => {
-  const editable = canPickTool(model.phase)
-  const lutEnabled = model.catalog !== null
+export const toolPanel = (
+  h: HtmlBuilder<EditorMessage>,
+  chain: Model['chain'],
+  catalog: Model['catalog'],
+  catalogError: Model['catalogError'],
+  phase: Model['phase'],
+  hoveredTool: Model['hoveredTool'],
+  open: boolean,
+) => {
+  const editable = canPickTool(phase)
+  const lutEnabled = catalog !== null
   return h.aside(
     [
       h.Class(
@@ -60,11 +68,11 @@ export const toolPanel = (h: HtmlBuilder<EditorMessage>, model: Model, open: boo
         LAYER_TYPES_ORDER.map((type) =>
           lazyCard(type, toolCardView, [
             type,
-            chainCount(model, type),
+            chainCount(chain, type),
             editable,
             lutEnabled,
-            model.catalogError,
-            model.hoveredTool,
+            catalogError,
+            hoveredTool,
             h,
           ]),
         ),
@@ -80,8 +88,8 @@ const canPickTool = (phase: EditorPhase) => phase._tag === 'Idle' || phase._tag 
 
 /** How many committed chain layers of this type are in the edit — the
  *  card's "in your edit" badge (docs/adr/0010-editor-ui.md D4). */
-export const chainCount = (model: Model, type: LayerType): number =>
-  model.chain.filter((layer) => layer.type === type).length
+export const chainCount = (chain: Model['chain'], type: LayerType): number =>
+  chain.filter((layer) => layer.type === type).length
 
 const toolCardInner = (
   h: HtmlBuilder<EditorMessage>,

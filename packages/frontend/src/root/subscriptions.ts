@@ -24,6 +24,15 @@ const isImageFileForPaste = (file: File): boolean =>
   file.type.startsWith('image/') ||
   /\.(jpe?g|png|webp|avif|gif|bmp|tiff|heic|heif)$/i.test(file.name)
 
+const pasteTarget = (): EventTarget =>
+  'window' in globalThis ? globalThis.window : document
+
+interface ClipboardLike extends Event {
+  clipboardData: DataTransfer | null
+}
+
+const isClipboardEvent = (event: Event): event is ClipboardLike => 'clipboardData' in event
+
 export const subscriptions = Subscription.aggregate<Model, AppMessage, OfflineFill>()(
   Subscription.make<Model, AppMessage, OfflineFill>()((entry) => ({
     galleryPaste: entry({ routeTag: S.String }, {
@@ -31,15 +40,14 @@ export const subscriptions = Subscription.aggregate<Model, AppMessage, OfflineFi
       dependenciesToStream: ({ routeTag }: { routeTag: string }) =>
         Stream.when(
           Subscription.fromEventFilterMap({
-            target: (): EventTarget =>
-              // happy-dom in tests provides window; fall back to document for SSR
-              // or environments without window.
-              typeof window !== 'undefined' ? window : document,
+            target: pasteTarget,
             type: 'paste',
             options: { passive: false },
             toMessage: (event: Event): Option.Option<AppMessage> => {
-              const e = event as ClipboardEvent
-              const dt = e.clipboardData
+              if (!isClipboardEvent(event)) {
+                return Option.none()
+              }
+              const dt = event.clipboardData
               if (!dt) {
                 return Option.none()
               }
@@ -67,7 +75,7 @@ export const subscriptions = Subscription.aggregate<Model, AppMessage, OfflineFi
               if (images.length === 0) {
                 return Option.none()
               }
-              e.preventDefault()
+              event.preventDefault()
               return Option.some(
                 RootMessage.GotGalleryMessage({
                   message: GalleryMessage.FilesPasted({ files: images }),

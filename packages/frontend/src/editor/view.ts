@@ -9,6 +9,7 @@ import { topBar } from './top-bar'
 import { toolPanel } from './tool-panel'
 import { layerDrawer } from './layer-drawer'
 import { canvasStage } from './canvas-stage'
+import type { CanvasStageModel } from './canvas-stage'
 import { lutBar } from './lut-bar'
 import { lutTarget } from './lut-bar/target'
 import * as ExportDialog from '../export-dialog'
@@ -31,19 +32,14 @@ const lazyExportDialog = createLazy()
 // Module-scope view helpers — stable fn refs for lazy (ADR 0006).
 // Each helper takes only the slice refs the island actually reads, so a
 // `ScaledCanvas` burst (scale/offset) doesn't invalidate `toolPanel` which
-// only cares about chain/catalog/phase. Helpers synthesize a narrow Model
-// for the underlying view only on cache miss — cache hit skips them entirely.
+// only cares about chain/catalog/phase.
 const topBarView = (
   saveStatus: Model['saveStatus'],
   attachedEdit: Model['attachedEdit'],
   hasImage: boolean,
   h: HtmlBuilder<EditorMessage>,
-): Html => {
-  // oxlint-disable-next-line no-unsafe-type-assertion
-  // SAFETY: narrow slice for lazy memoization — only fields the view island reads
-  const m = { saveStatus, attachedEdit } as unknown as Model
-  return topBar(h, m, hasImage)
-}
+): Html => topBar(h, saveStatus, attachedEdit, hasImage)
+
 const toolPanelView = (
   chain: Model['chain'],
   catalog: Model['catalog'],
@@ -52,12 +48,8 @@ const toolPanelView = (
   hoveredTool: Model['hoveredTool'],
   toolsOpen: boolean,
   h: HtmlBuilder<EditorMessage>,
-): Html => {
-  // oxlint-disable-next-line no-unsafe-type-assertion
-  // SAFETY: narrow slice for lazy memoization — only fields the view island reads
-  const m = { chain, catalog, catalogError, phase, hoveredTool } as unknown as Model
-  return toolPanel(h, m, toolsOpen)
-}
+): Html => toolPanel(h, chain, catalog, catalogError, phase, hoveredTool, toolsOpen)
+
 const canvasStageView = (
   source: Model['source'],
   scale: number,
@@ -70,8 +62,7 @@ const canvasStageView = (
   phase: Model['phase'],
   h: HtmlBuilder<EditorMessage>,
 ): Html => {
-  // oxlint-disable-next-line no-unsafe-type-assertion
-  const m = {
+  const slice: CanvasStageModel = {
     source,
     scale,
     offsetX,
@@ -81,10 +72,10 @@ const canvasStageView = (
     compareToggleBefore,
     bins,
     phase,
-    // SAFETY: narrow slice for lazy memoization — only fields the view island reads
-  } as unknown as Model
-  return canvasStage(h, m)
+  }
+  return canvasStage(h, slice)
 }
+
 const layerDrawerView = (
   chain: Model['chain'],
   phase: Model['phase'],
@@ -94,19 +85,13 @@ const layerDrawerView = (
   catalog: Model['catalog'],
   layersOpen: boolean,
   h: HtmlBuilder<EditorMessage>,
-): Html => {
-  // oxlint-disable-next-line no-unsafe-type-assertion
-  const m = {
-    chain,
-    phase,
-    activeFieldIndex,
-    activeMixerColor,
-    lutBarOpen,
-    catalog,
-    // SAFETY: narrow slice for lazy memoization — only fields the view island reads
-  } as unknown as Model
-  return layerDrawer(h, m, layersOpen)
-}
+): Html =>
+  layerDrawer(
+    h,
+    { chain, phase, activeFieldIndex, activeMixerColor, lutBarOpen, catalog },
+    layersOpen,
+  )
+
 const lutBarView = (
   catalog: Model['catalog'],
   lutBarOpen: boolean,
@@ -120,9 +105,8 @@ const lutBarView = (
   phase: Model['phase'],
   chain: Model['chain'],
   h: HtmlBuilder<EditorMessage>,
-): Html => {
-  // oxlint-disable-next-line no-unsafe-type-assertion
-  const m = {
+): Html | null =>
+  lutBar(h, {
     catalog,
     lutBarOpen,
     previewLut,
@@ -134,23 +118,14 @@ const lutBarView = (
     offlineLutNotice,
     phase,
     chain,
-    // SAFETY: narrow slice for lazy memoization — only fields the view island reads
-  } as unknown as Model
-  return lutBar(h, m)
-}
+  })
+
 const mobileTabBarView = (
   mobileSheet: Model['mobileSheet'],
   lutBarOpen: boolean,
   hasLutTarget: boolean,
-  phase: Model['phase'],
-  chain: Model['chain'],
   h: HtmlBuilder<EditorMessage>,
-): Html => {
-  // oxlint-disable-next-line no-unsafe-type-assertion
-  // SAFETY: narrow slice for lazy memoization — only fields the view island reads
-  const m = { mobileSheet, lutBarOpen, phase, chain } as unknown as Model
-  return mobileTabBarImpl(m, hasLutTarget, h)
-}
+): Html => mobileTabBarImpl(mobileSheet, lutBarOpen, hasLutTarget, h)
 const exportDialogView = (dialog: Model['exportDialog'], h: HtmlBuilder<EditorMessage>): Html =>
   ExportDialog.exportDialogView(h, dialog, (message) =>
     EditorMessage.GotExportDialogMessage({ message }),
@@ -166,7 +141,7 @@ export const view = Submodel.defineView<Model, EditorMessage>((model, h) => layo
 
 const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
   const imageLoaded = hasImage(model.phase)
-  const hasLutTarget = Option.isSome(lutTarget(model))
+  const hasLutTarget = Option.isSome(lutTarget(model.phase, model.chain))
   return h.div(
     [h.Class('flex h-full flex-col bg-bg text-ink')],
     [
@@ -225,8 +200,6 @@ const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
         model.mobileSheet,
         model.lutBarOpen,
         hasLutTarget,
-        model.phase,
-        model.chain,
         h,
       ]),
       lazyExportDialog(exportDialogView, [model.exportDialog, h]),
@@ -234,7 +207,12 @@ const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
   )
 }
 
-const mobileTabBarImpl = (model: Model, hasLutTarget: boolean, h: HtmlBuilder<EditorMessage>) => {
+const mobileTabBarImpl = (
+  mobileSheet: Model['mobileSheet'],
+  lutBarOpen: boolean,
+  hasLutTarget: boolean,
+  h: HtmlBuilder<EditorMessage>,
+) => {
   const panelTab = (label: string, Icon: IconNode, active: boolean, onClick: () => EditorMessage) =>
     h.button(
       [
@@ -257,16 +235,16 @@ const mobileTabBarImpl = (model: Model, hasLutTarget: boolean, h: HtmlBuilder<Ed
       h.AriaLabel('Editor panels'),
     ],
     [
-      panelTab('Adjustments', SlidersHorizontal, model.mobileSheet === 'tools', () =>
+      panelTab('Adjustments', SlidersHorizontal, mobileSheet === 'tools', () =>
         EditorMessage.ToggledMobileSheet({ sheet: 'tools' }),
       ),
-      panelTab('Layers', LayersIcon, model.mobileSheet === 'layers', () =>
+      panelTab('Layers', LayersIcon, mobileSheet === 'layers', () =>
         EditorMessage.ToggledMobileSheet({ sheet: 'layers' }),
       ),
       // The LUT tab only exists while a LUT target exists (a drafting LUT
       // layer or a selected chain LUT layer) — same gate as the LUT bar.
-      ...(Option.isSome(lutTarget(model))
-        ? [panelTab('LUT', Boxes, model.lutBarOpen, () => EditorMessage.ToggledLutPicker())]
+      ...(hasLutTarget
+        ? [panelTab('LUT', Boxes, lutBarOpen, () => EditorMessage.ToggledLutPicker())]
         : []),
     ],
   )
