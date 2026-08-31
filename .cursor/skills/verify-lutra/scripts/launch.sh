@@ -63,4 +63,7 @@ for _ in $(seq 1 60); do
 done
 echo "Dev server did not become ready within 60s; log follows:" >&2
 tail -20 "$LOG" >&2
+kill "$SERVER_PID" 2>/dev/null || true
+wait "$SERVER_PID" 2>/dev/null || true
+rm -f "$LOG"
 exit 1
