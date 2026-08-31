@@ -58,10 +58,10 @@ const settled = (model: Model): Model =>
 
 /** An edit with two committed Exposure layers (the ×2 badge fixture). */
 const twoExposureLayers = () => {
-  const [a] = selectTool(loaded(), 'exposure')
-  const [b] = update(a, EditorMessage.ConfirmedDraft())
-  const [c] = selectTool(b, 'exposure')
-  const [d] = update(c, EditorMessage.ConfirmedDraft())
+  const { model: a } = selectTool(loaded(), 'exposure')
+  const { model: b } = update(a, EditorMessage.ConfirmedDraft())
+  const { model: c } = selectTool(b, 'exposure')
+  const { model: d } = update(c, EditorMessage.ConfirmedDraft())
   return d
 }
 
@@ -175,8 +175,8 @@ describe('tool panel cards', () => {
   })
 
   it('a single committed layer shows ×1', () => {
-    const [withDraft] = selectTool(loaded(), 'vignette')
-    const [committed] = update(withDraft, EditorMessage.ConfirmedDraft())
+    const { model: withDraft } = selectTool(loaded(), 'vignette')
+    const { model: committed } = update(withDraft, EditorMessage.ConfirmedDraft())
     scene(
       sceneConfig,
       given(committed),

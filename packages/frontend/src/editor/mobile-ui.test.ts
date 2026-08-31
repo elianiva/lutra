@@ -63,42 +63,42 @@ describe('mobile bottom sheets', () => {
   })
 
   it('ToggledMobileSheet opens the tapped sheet', () => {
-    const [model] = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'tools' }))
+    const { model } = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'tools' }))
     expect(model.mobileSheet).toBe('tools')
   })
 
   it('tapping the active tab closes the sheet', () => {
-    const [opened] = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
-    const [model] = update(opened, EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
+    const { model: opened } = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
+    const { model } = update(opened, EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
     expect(model.mobileSheet).toBeNull()
   })
 
   it('tapping the other tab switches the sheet', () => {
-    const [opened] = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'tools' }))
-    const [model] = update(opened, EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
+    const { model: opened } = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'tools' }))
+    const { model } = update(opened, EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
     expect(model.mobileSheet).toBe('layers')
   })
 
   it('picking a tool follows the draft to the Layers sheet', () => {
-    const [model] = selectTool(loaded(), 'exposure')
+    const { model } = selectTool(loaded(), 'exposure')
     expect(model.phase._tag).toBe('Drafting')
     expect(model.mobileSheet).toBe('layers')
   })
 
   it('selecting a layer opens the Layers sheet', () => {
-    const [withDraft] = selectTool(loaded(), 'exposure')
-    const [committed] = update(withDraft, EditorMessage.ConfirmedDraft())
+    const { model: withDraft } = selectTool(loaded(), 'exposure')
+    const { model: committed } = update(withDraft, EditorMessage.ConfirmedDraft())
     const layer = committed.chain[0]
     if (!layer) {
       throw new Error('fixture: expected a committed layer')
     }
-    const [model] = update(committed, EditorMessage.SelectedLayer({ id: layer.id }))
+    const { model } = update(committed, EditorMessage.SelectedLayer({ id: layer.id }))
     expect(model.mobileSheet).toBe('layers')
   })
 
   it('a new image closes the sheets', () => {
-    const [withSheet] = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
-    const [model] = update(
+    const { model: withSheet } = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
+    const { model } = update(
       withSheet,
       EditorMessage.ImageDecoded({
         bitmap: new MockImageBitmap(200, 150),
@@ -111,14 +111,14 @@ describe('mobile bottom sheets', () => {
   })
 
   it('ClearedImage closes the sheets', () => {
-    const [withSheet] = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
-    const [model] = update(withSheet, EditorMessage.ClearedImage())
+    const { model: withSheet } = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
+    const { model } = update(withSheet, EditorMessage.ClearedImage())
     expect(model.mobileSheet).toBeNull()
   })
 
   it('EditLoaded closes the sheets', () => {
-    const [withSheet] = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'tools' }))
-    const [model] = update(
+    const { model: withSheet } = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'tools' }))
+    const { model } = update(
       withSheet,
       EditorMessage.EditLoaded({
         bitmap: new MockImageBitmap(200, 150),

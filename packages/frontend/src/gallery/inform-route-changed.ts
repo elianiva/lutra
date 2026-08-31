@@ -1,4 +1,4 @@
-import type { Command } from 'foldkit'
+import { Update } from 'foldkit'
 import type { EditStore, CollageStore } from '@lutra/store'
 import type { AppRoute } from '../route'
 import type { Model } from './model'
@@ -14,11 +14,8 @@ import { ListCollages, ListEdits } from './command'
  */
 type Resource = EditStore | CollageStore
 
-export type RouteChangedReturn = readonly [
-  Model,
-  readonly Command.Command<GalleryMessage, never, Resource>[],
-]
-export const informRouteChanged = (model: Model, _route: AppRoute): RouteChangedReturn => [
+export type RouteChangedReturn = Update.Return<Model, GalleryMessage, Resource>
+export const informRouteChanged = (model: Model, _route: AppRoute): RouteChangedReturn => ({
   model,
-  [ListEdits(), ListCollages()],
-]
+  commands: [ListEdits(), ListCollages()],
+})

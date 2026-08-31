@@ -15,7 +15,7 @@ const config = {
 // Resolve the dialog's internal ShowDialog command.
 const openDialog = [
   Command.expectHas(Dialog.ShowDialog),
-  Command.resolve(Dialog.ShowDialog, Dialog.Message.CompletedShowDialog()),
+  Command.resolve(Dialog.ShowDialog, Dialog.Message.SucceededShowDialog()),
 ]
 
 describe('gallery: settings dialog', () => {
@@ -72,30 +72,30 @@ describe('gallery: settings dialog', () => {
   })
 
   it('the toggle updates only the experimental flag in the model', () => {
-    const [model] = update(
+    const { model } = update(
       initialModel(),
       GalleryMessage.ToggledInfiniteCanvas({ isEnabled: true }),
     )
     vitestExpect(model.experimental.infiniteCanvas).toBe(true)
 
-    const [back, commands, out] = update(
+    const { model: back, commands = [], outMessage: out } = update(
       model,
       GalleryMessage.ToggledInfiniteCanvas({ isEnabled: false }),
     )
     vitestExpect(back.experimental.infiniteCanvas).toBe(false)
     vitestExpect(commands).toEqual([])
-    vitestExpect(Option.isNone(out)).toBe(true)
+    vitestExpect(out).toBeUndefined()
   })
 
   it('SettingsRequested opens the dialog submodel', () => {
-    const [model, commands] = update(initialModel(), GalleryMessage.SettingsRequested())
+    const { model, commands = [] } = update(initialModel(), GalleryMessage.SettingsRequested())
     vitestExpect(model.settingsDialog.isOpen).toBe(true)
     vitestExpect(commands.map((c) => c.name)).toEqual(['ShowDialog'])
   })
 
   it('delegates dialog messages to Dialog.update', () => {
-    const [opened] = update(initialModel(), GalleryMessage.SettingsRequested())
-    const [closed] = update(
+    const { model: opened } = update(initialModel(), GalleryMessage.SettingsRequested())
+    const { model: closed } = update(
       opened,
       GalleryMessage.GotSettingsDialogMessage({ message: Dialog.Message.RequestedClose() }),
     )

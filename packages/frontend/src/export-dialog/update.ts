@@ -1,5 +1,5 @@
-import { Match as M, Option } from 'effect'
-import { Command } from 'foldkit'
+import { Match as M } from 'effect'
+import { Command, Update } from 'foldkit'
 import { Dialog } from '@foldkit/ui'
 import { ExportDialogMessage as Message } from './message'
 import { ExportDownload, PrepareExport, RevokeExportUrl, SaveExportSettings } from './command'
@@ -7,7 +7,7 @@ import type { Resource } from './command'
 import type { Model } from './model'
 import { clearFrame } from './frame'
 
-export type UpdateReturn = readonly [Model, readonly Command.Command<Message, never, Resource>[]]
+export type UpdateReturn = Update.Return<Model, Message, Resource>
 
 /** The dialog's filename in header and download: `<stem>.<format>`. */
 export const filenameFor = (model: Model): string => `${model.fileStem}.${model.settings.format}`
@@ -20,8 +20,8 @@ export const filenameFor = (model: Model): string => `${model.fileStem}.${model.
  */
 export const open = (model: Model): UpdateReturn => {
   const fresh: Model = { ...model, downloaded: false, error: null, ready: false }
-  const [dialog, dialogCommands] = Dialog.open(fresh.dialog)
-  return [{ ...fresh, dialog }, dialogCommands.map(wrapDialogCommand)]
+  const { model: dialog, commands: dialogCommands = [] } = Dialog.open(fresh.dialog)
+  return { model: { ...fresh, dialog }, commands: dialogCommands.map(wrapDialogCommand) }
 }
 
 /**
@@ -40,11 +40,13 @@ export const update = (model: Model, message: Message): UpdateReturn =>
       FrameReady: () => {
         if (!model.dialog.isOpen) {
           clearFrame()
-          return [model, []]
+          return { model }
         }
-        return [{ ...model, error: null, ready: true }, []]
+        return { model: { ...model, error: null, ready: true } }
       },
-      FrameFailed: ({ message }) => [{ ...model, error: model.dialog.isOpen ? message : null }, []],
+      FrameFailed: ({ message }) => ({
+        model: { ...model, error: model.dialog.isOpen ? message : null },
+      }),
 
       // settings: persist; the encode waits for the Export press
       ChangedFormat: ({ format }) =>
@@ -55,15 +57,15 @@ export const update = (model: Model, message: Message): UpdateReturn =>
         }),
       ChangedQuality: ({ quality }) => settingsChanged(model, { ...model.settings, quality }),
       ChangedScale: ({ scale }) => settingsChanged(model, { ...model.settings, scale }),
-      SettingsLoaded: ({ settings }) => [{ ...model, settings }, []],
+      SettingsLoaded: ({ settings }) => ({ model: { ...model, settings } }),
 
       EncodeRequested: () => {
         // The encode runs here, on Export press — not on settings change.
         if (!model.ready || model.encoding) {
-          return [model, []]
+          return { model }
         }
-        return [
-          {
+        return {
+          model: {
             ...model,
             downloaded: false,
             encoding: true,
@@ -71,41 +73,41 @@ export const update = (model: Model, message: Message): UpdateReturn =>
             size: null,
             url: null,
           },
-          [PrepareExport({ previousUrl: model.url, settings: model.settings })],
-        ]
+          commands: [PrepareExport({ previousUrl: model.url, settings: model.settings })],
+        }
       },
       EncodePrepared: ({ sizeBytes, url }) => {
         // An encode that completed after the dialog closed has no consumer.
         if (!model.dialog.isOpen) {
-          return [model, [RevokeExportUrl({ url })]]
+          return { model, commands: [RevokeExportUrl({ url })] }
         }
-        return [
-          { ...model, encoding: false, error: null, size: sizeBytes, url },
-          [ExportDownload({ filename: filenameFor(model), url })],
-        ]
+        return {
+          model: { ...model, encoding: false, error: null, size: sizeBytes, url },
+          commands: [ExportDownload({ filename: filenameFor(model), url })],
+        }
       },
       // The failure stays on screen; Export re-encodes for a retry.
-      EncodeFailed: ({ message }) => [{ ...model, encoding: false, error: message }, []],
+      EncodeFailed: ({ message }) => ({ model: { ...model, encoding: false, error: message } }),
       Downloaded: ({ url }) => {
         // Ignore downloads of a replaced blob (an encode finished after a
         // newer Export press).
         if (model.url !== url) {
-          return [model, []]
+          return { model }
         }
-        return [{ ...model, downloaded: true }, []]
+        return { model: { ...model, downloaded: true } }
       },
 
       // acks (observability only)
-      SettingsSaved: () => [model, []],
-      UrlRevoked: () => [model, []],
+      SettingsSaved: () => ({ model }),
+      UrlRevoked: () => ({ model }),
     }),
     M.exhaustive,
   )
 
-const settingsChanged = (model: Model, settings: Model['settings']): UpdateReturn => [
-  { ...model, downloaded: false, settings },
-  [SaveExportSettings({ settings })],
-]
+const settingsChanged = (model: Model, settings: Model['settings']): UpdateReturn => ({
+  model: { ...model, downloaded: false, settings },
+  commands: [SaveExportSettings({ settings })],
+})
 
 /**
  * Run the @foldkit/ui Dialog submodel and lift its results. On close: drop
@@ -113,17 +115,20 @@ const settingsChanged = (model: Model, settings: Model['settings']): UpdateRetur
  * persist across sessions.
  */
 const delegateToDialog = (model: Model, message: Dialog.Message): UpdateReturn => {
-  const [dialog, dialogCommands, out] = Dialog.update(model.dialog, message)
+  const { model: dialog, commands: dialogCommands = [], outMessage: out } = Dialog.update(
+    model.dialog,
+    message,
+  )
   let next: Model = { ...model, dialog }
   let commands = dialogCommands.map(wrapDialogCommand)
-  if (Option.isSome(out) && out.value._tag === 'Closed') {
+  if (out?._tag === 'Closed') {
     clearFrame()
     next = { ...next, encoding: false, error: null, ready: false, size: null, url: null }
     if (model.url !== null) {
       commands = [...commands, RevokeExportUrl({ url: model.url })]
     }
   }
-  return [next, commands]
+  return { model: next, commands }
 }
 
 const wrapDialogCommand = (

@@ -19,7 +19,7 @@ const loadedModel = () => ({ ...initialModel(), phase: Idle() })
 
 describe('histogram flow', () => {
   it('dispatches ReadHistogram for a rendered frame and stores the handle', () => {
-    const [model, commands] = update(
+    const { model, commands = [] } = update(
       loadedModel(),
       EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: 1 }),
     )
@@ -31,24 +31,24 @@ describe('histogram flow', () => {
   })
 
   it('stores bins when the readback lands fresh', () => {
-    const [withFrame] = update(
+    const { model: withFrame } = update(
       loadedModel(),
       EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: 1 }),
     )
     const bins = new Uint32Array(256)
     bins[128] = 42
-    const [model] = update(withFrame, EditorMessage.HistogramComputed({ bins, stamp: 1 }))
+    const { model } = update(withFrame, EditorMessage.HistogramComputed({ bins, stamp: 1 }))
     expect(model.bins).toBe(bins)
   })
 
   it('drops bins that landed after a newer mutation', () => {
-    const [withFrame] = update(
+    const { model: withFrame } = update(
       loadedModel(),
       EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: 1 }),
     )
     // A mutation bumped the revision to 2 while the readback was in flight.
     const newer = { ...withFrame, revision: 2 }
-    const [model, commands] = update(
+    const { model, commands = [] } = update(
       newer,
       EditorMessage.HistogramComputed({ bins: new Uint32Array(256), stamp: 1 }),
     )
@@ -66,7 +66,7 @@ describe('histogram flow', () => {
       revision: 2,
       source: { bitmap: new MockImageBitmap(200, 150), error: null, height: 150, width: 200 },
     }
-    const [next, commands] = update(
+    const { model: next, commands = [] } = update(
       model,
       EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: 1 }),
     )
@@ -78,16 +78,16 @@ describe('histogram flow', () => {
   })
 
   it('resets bins when the image is cleared', () => {
-    const [withFrame] = update(
+    const { model: withFrame } = update(
       loadedModel(),
       EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: 1 }),
     )
-    const [withBins] = update(
+    const { model: withBins } = update(
       withFrame,
       EditorMessage.HistogramComputed({ bins: new Uint32Array(256), stamp: 1 }),
     )
     expect(withBins.bins).not.toBeNull()
-    const [cleared] = update(withBins, EditorMessage.ClearedImage())
+    const { model: cleared } = update(withBins, EditorMessage.ClearedImage())
     expect(cleared.bins).toBeNull()
   })
 })

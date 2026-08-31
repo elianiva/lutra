@@ -1,5 +1,5 @@
 import type { Url } from 'foldkit'
-import { Command } from 'foldkit'
+import { Command, Update } from 'foldkit'
 import { Match, Schema as S } from 'effect'
 import type { GpuBackend } from '../gpu/backend'
 import type { CanvasRef } from '../gpu/canvas-ref'
@@ -30,7 +30,7 @@ type Resource =
   | LutThumbnailer
   | OfflineFill
 
-export type InitReturn = readonly [Model, readonly Command.Command<AppMessage, never, Resource>[]]
+export type InitReturn = Update.Return<Model, AppMessage, Resource>
 
 /**
  * The root's cold-load `init` (docs/adr/0006-frontend-architecture, routing-and-navigation). Parses
@@ -46,9 +46,9 @@ export type InitReturn = readonly [Model, readonly Command.Command<AppMessage, n
 export const init = (capability: WebGpuCapability, url: Url.Url): InitReturn => {
   const route = parseRoute(url)
 
-  const [gallery, galleryCommands] = Gallery.init(route)
-  const [editor, editorCommands] = Editor.init(route)
-  const [collage, collageCommands] = Collage.init(route)
+  const { model: gallery, commands: galleryCommands = [] } = Gallery.init(route)
+  const { model: editor, commands: editorCommands = [] } = Editor.init(route)
+  const { model: collage, commands: collageCommands = [] } = Collage.init(route)
   const offline = initialOffline()
 
   const commands = Match.value(route).pipe(
@@ -65,8 +65,8 @@ export const init = (capability: WebGpuCapability, url: Url.Url): InitReturn => 
     Match.orElse(() => []),
   )
 
-  return [
-    {
+  return {
+    model: {
       editor,
       gallery,
       collage,
@@ -78,6 +78,6 @@ export const init = (capability: WebGpuCapability, url: Url.Url): InitReturn => 
     // asked for reduced data usage — then the card's manual start button
     // is the only path in, and `start` stays idempotent for both. The
     // persist() request rides along ungated (a bonus, not a precondition).
-    offline.saveData ? commands : [...commands, StartOfflineFill({ requirePersist: false })],
-  ]
+    commands: offline.saveData ? commands : [...commands, StartOfflineFill({ requirePersist: false })],
+  }
 }

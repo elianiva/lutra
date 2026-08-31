@@ -34,7 +34,7 @@ describe('editor phase machine', () => {
   })
 
   it('ignores tool selection while no image is loaded', () => {
-    const [model, commands] = update(
+    const { model, commands = [] } = update(
       initialModel(),
       EditorMessage.SelectedTool({ type: 'exposure' }),
     )
@@ -43,33 +43,33 @@ describe('editor phase machine', () => {
   })
 
   it('ignores tool selection while a decode is in flight', () => {
-    const [loading] = update(initialModel(), EditorMessage.SelectedImageFile({ file: file() }))
+    const { model: loading } = update(initialModel(), EditorMessage.SelectedImageFile({ file: file() }))
     expect(loading.phase._tag).toBe('Loading')
-    const [model, commands] = update(loading, EditorMessage.SelectedTool({ type: 'exposure' }))
+    const { model, commands = [] } = update(loading, EditorMessage.SelectedTool({ type: 'exposure' }))
     expect(model.phase._tag).toBe('Loading')
     expect(commands).toEqual([])
   })
 
   it('ignores tool selection after a decode failure', () => {
-    const [loading] = update(initialModel(), EditorMessage.SelectedImageFile({ file: file() }))
-    const [errored] = update(
+    const { model: loading } = update(initialModel(), EditorMessage.SelectedImageFile({ file: file() }))
+    const { model: errored } = update(
       loading,
       EditorMessage.ImageFailedToDecode({ error: new ImageDecodeError({ message: 'Corrupt' }) }),
     )
     expect(errored.phase._tag).toBe('Error')
-    const [model] = update(errored, EditorMessage.SelectedTool({ type: 'exposure' }))
+    const { model } = update(errored, EditorMessage.SelectedTool({ type: 'exposure' }))
     expect(model.phase._tag).toBe('Error')
   })
 
   it('runs layer creation as a command and installs its result', () => {
-    const [pending, commands] = update(
+    const { model: pending, commands = [] } = update(
       loadedModel(),
       EditorMessage.SelectedTool({ type: 'exposure' }),
     )
     expect(pending.phase._tag).toBe('Creating')
     expect(commands.map((command) => command.name)).toEqual(['CreateLayer'])
 
-    const [model] = update(
+    const { model } = update(
       pending,
       EditorMessage.LayerCreated({ layer: Effect.runSync(createLayerFor('exposure')) }),
     )
@@ -78,9 +78,9 @@ describe('editor phase machine', () => {
   })
 
   it('restores the idle phase and records a layer creation failure', () => {
-    const [pending] = update(loadedModel(), EditorMessage.SelectedTool({ type: 'exposure' }))
+    const { model: pending } = update(loadedModel(), EditorMessage.SelectedTool({ type: 'exposure' }))
     const error = new LayerCreationError({ message: 'registry failure' })
-    const [model, commands] = update(pending, EditorMessage.LayerCreationFailed({ error }))
+    const { model, commands = [] } = update(pending, EditorMessage.LayerCreationFailed({ error }))
     expect(model.phase._tag).toBe('Idle')
     expect(model.layerCreationError).toMatchObject({
       _tag: 'LayerCreationError',
@@ -90,7 +90,7 @@ describe('editor phase machine', () => {
   })
 
   it('creates a draft from a tool pick once an image is loaded', () => {
-    const [model] = selectTool(loadedModel(), 'exposure')
+    const { model } = selectTool(loadedModel(), 'exposure')
     expect(model.phase._tag).toBe('Drafting')
     expect(draftOf(model)?.type).toBe('exposure')
   })
@@ -98,25 +98,25 @@ describe('editor phase machine', () => {
   it('blocks tool selection and layer selection while a draft is active', () => {
     const layer = Effect.runSync(createLayerFor('saturation'))
     const withChain = { ...loadedModel(), chain: [layer] }
-    const [withDraft] = selectTool(withChain, 'exposure')
+    const { model: withDraft } = selectTool(withChain, 'exposure')
     expect(draftOf(withDraft)?.type).toBe('exposure')
 
-    const [m1] = selectTool(withDraft, 'contrast')
+    const { model: m1 } = selectTool(withDraft, 'contrast')
     expect(m1.phase._tag).toBe('Drafting')
     expect(draftOf(m1)?.type).toBe('exposure')
 
     // Selecting a chain layer while a draft is active is blocked — the draft
     // is not silently cancelled (context.md: the editor blocks other
     // interactions while a draft is active).
-    const [m2] = update(withDraft, EditorMessage.SelectedLayer({ id: layer.id }))
+    const { model: m2 } = update(withDraft, EditorMessage.SelectedLayer({ id: layer.id }))
     expect(m2.phase._tag).toBe('Drafting')
     expect(draftOf(m2)?.type).toBe('exposure')
   })
 
   it('confirms the draft into the chain and focuses it', () => {
-    const [withDraft] = selectTool(loadedModel(), 'exposure')
+    const { model: withDraft } = selectTool(loadedModel(), 'exposure')
     const layer = draftOf(withDraft)!
-    const [model] = update(withDraft, EditorMessage.ConfirmedDraft())
+    const { model } = update(withDraft, EditorMessage.ConfirmedDraft())
     expect(model.phase._tag).toBe('Selected')
     expect(model.chain).toEqual([layer])
     if (model.phase._tag === 'Selected') {
@@ -125,16 +125,16 @@ describe('editor phase machine', () => {
   })
 
   it('cancelling the draft returns to Idle and discards it', () => {
-    const [withDraft] = selectTool(loadedModel(), 'exposure')
-    const [model] = update(withDraft, EditorMessage.CancelledDraft())
+    const { model: withDraft } = selectTool(loadedModel(), 'exposure')
+    const { model } = update(withDraft, EditorMessage.CancelledDraft())
     expect(model.phase._tag).toBe('Idle')
     expect(model.chain).toEqual([])
     expect(draftOf(model)).toBeNull()
   })
 
   it('updates the draft layer in place through the machine', () => {
-    const [withDraft] = selectTool(loadedModel(), 'exposure')
-    const [model] = update(
+    const { model: withDraft } = selectTool(loadedModel(), 'exposure')
+    const { model } = update(
       withDraft,
       EditorMessage.UpdatedDraftParam({ field: FieldKey('stops'), value: 1.5 }),
     )
@@ -142,10 +142,10 @@ describe('editor phase machine', () => {
   })
 
   it('drops a stale decode that lands after the image was cleared', () => {
-    const [loading] = update(initialModel(), EditorMessage.SelectedImageFile({ file: file() }))
-    const [cleared] = update(loading, EditorMessage.ClearedImage())
+    const { model: loading } = update(initialModel(), EditorMessage.SelectedImageFile({ file: file() }))
+    const { model: cleared } = update(loading, EditorMessage.ClearedImage())
     expect(cleared.phase._tag).toBe('Empty')
-    const [model] = update(
+    const { model } = update(
       cleared,
       EditorMessage.ImageDecoded({ bitmap: bitmap(1, 1), height: 1, source: bytes(), width: 1 }),
     )
@@ -154,9 +154,9 @@ describe('editor phase machine', () => {
   })
 
   it('drops a stale decode failure that lands after the image was cleared', () => {
-    const [loading] = update(initialModel(), EditorMessage.SelectedImageFile({ file: file() }))
-    const [cleared] = update(loading, EditorMessage.ClearedImage())
-    const [model] = update(
+    const { model: loading } = update(initialModel(), EditorMessage.SelectedImageFile({ file: file() }))
+    const { model: cleared } = update(loading, EditorMessage.ClearedImage())
+    const { model } = update(
       cleared,
       EditorMessage.ImageFailedToDecode({
         error: new ImageDecodeError({ message: 'Late failure' }),
@@ -167,18 +167,18 @@ describe('editor phase machine', () => {
   })
 
   it('last completion wins when two files are selected while loading', () => {
-    const [loading] = update(initialModel(), EditorMessage.SelectedImageFile({ file: file() }))
-    const [stillLoading] = update(loading, EditorMessage.SelectedImageFile({ file: file() }))
+    const { model: loading } = update(initialModel(), EditorMessage.SelectedImageFile({ file: file() }))
+    const { model: stillLoading } = update(loading, EditorMessage.SelectedImageFile({ file: file() }))
     expect(stillLoading.phase._tag).toBe('Loading')
 
     // First pick succeeds, second fails: the current pick's failure shows.
     const b1 = bitmap(1, 1)
-    const [first] = update(
+    const { model: first } = update(
       stillLoading,
       EditorMessage.ImageDecoded({ bitmap: b1, height: 1, source: bytes(), width: 1 }),
     )
     expect(first.source.bitmap).toBe(b1)
-    const [failed] = update(
+    const { model: failed } = update(
       first,
       EditorMessage.ImageFailedToDecode({
         error: new ImageDecodeError({ message: 'Second pick failed' }),
@@ -187,12 +187,12 @@ describe('editor phase machine', () => {
     expect(failed.phase._tag).toBe('Error')
 
     // Both succeed: the last one to land wins.
-    const [m2] = update(
+    const { model: m2 } = update(
       stillLoading,
       EditorMessage.ImageDecoded({ bitmap: b1, height: 1, source: bytes(), width: 1 }),
     )
     const b2 = bitmap(2, 2)
-    const [second] = update(
+    const { model: second } = update(
       m2,
       EditorMessage.ImageDecoded({ bitmap: b2, height: 2, source: bytes(), width: 2 }),
     )
@@ -200,14 +200,14 @@ describe('editor phase machine', () => {
     expect(second.phase._tag).toBe('Idle')
 
     // First pick fails, second succeeds: the success still lands.
-    const [errored] = update(
+    const { model: errored } = update(
       stillLoading,
       EditorMessage.ImageFailedToDecode({
         error: new ImageDecodeError({ message: 'First pick failed' }),
       }),
     )
     expect(errored.phase._tag).toBe('Error')
-    const [recovered] = update(
+    const { model: recovered } = update(
       errored,
       EditorMessage.ImageDecoded({ bitmap: b2, height: 2, source: bytes(), width: 2 }),
     )
@@ -216,8 +216,8 @@ describe('editor phase machine', () => {
   })
 
   it('clearing the image discards the draft and resets the chain', () => {
-    const [withDraft] = selectTool(loadedModel(), 'exposure')
-    const [model] = update(withDraft, EditorMessage.ClearedImage())
+    const { model: withDraft } = selectTool(loadedModel(), 'exposure')
+    const { model } = update(withDraft, EditorMessage.ClearedImage())
     expect(model.phase._tag).toBe('Empty')
     expect(model.source.bitmap).toBeNull()
     expect(model.chain).toEqual([])
@@ -226,9 +226,9 @@ describe('editor phase machine', () => {
   it('removing the focused layer deselects it', () => {
     const layer = Effect.runSync(createLayerFor('exposure'))
     const withChain = { ...loadedModel(), chain: [layer] }
-    const [withSelected] = update(withChain, EditorMessage.SelectedLayer({ id: layer.id }))
+    const { model: withSelected } = update(withChain, EditorMessage.SelectedLayer({ id: layer.id }))
     expect(withSelected.phase._tag).toBe('Selected')
-    const [model] = update(withSelected, EditorMessage.RemovedLayer({ id: layer.id }))
+    const { model } = update(withSelected, EditorMessage.RemovedLayer({ id: layer.id }))
     expect(model.phase._tag).toBe('Idle')
     expect(model.chain).toEqual([])
   })
@@ -237,15 +237,15 @@ describe('editor phase machine', () => {
     const a = Effect.runSync(createLayerFor('exposure'))
     const b = Effect.runSync(createLayerFor('contrast'))
     const withChain = { ...loadedModel(), chain: [a, b] }
-    const [withSelected] = update(withChain, EditorMessage.SelectedLayer({ id: a.id }))
+    const { model: withSelected } = update(withChain, EditorMessage.SelectedLayer({ id: a.id }))
     expect(withSelected.phase._tag).toBe('Selected')
-    const [model] = update(withSelected, EditorMessage.RemovedLayer({ id: b.id }))
+    const { model } = update(withSelected, EditorMessage.RemovedLayer({ id: b.id }))
     expect(model.phase._tag).toBe('Selected')
     expect(model.chain).toEqual([a])
   })
 
   it('dispatches DecodeImage from the machine edge when a file is selected', () => {
-    const [model, commands] = update(
+    const { model, commands = [] } = update(
       initialModel(),
       EditorMessage.SelectedImageFile({ file: file() }),
     )
@@ -255,7 +255,7 @@ describe('editor phase machine', () => {
   })
 
   it('file selection is ignored once an image is loaded (must clear first)', () => {
-    const [model, commands] = update(
+    const { model, commands = [] } = update(
       loadedModel(),
       EditorMessage.SelectedImageFile({ file: file() }),
     )
@@ -264,10 +264,10 @@ describe('editor phase machine', () => {
   })
 
   it('draft confirm/cancel outside Drafting is ignored', () => {
-    const [m1, c1] = update(loadedModel(), EditorMessage.ConfirmedDraft())
+    const { model: m1, commands: c1 = [] } = update(loadedModel(), EditorMessage.ConfirmedDraft())
     expect(m1.phase._tag).toBe('Idle')
     expect(c1).toEqual([])
-    const [m2, c2] = update(loadedModel(), EditorMessage.CancelledDraft())
+    const { model: m2, commands: c2 = [] } = update(loadedModel(), EditorMessage.CancelledDraft())
     expect(m2.phase._tag).toBe('Idle')
     expect(c2).toEqual([])
   })

@@ -18,7 +18,7 @@ const editorRoute = { _tag: 'Editor', editId: id() } as const
 
 describe('attached edit load (gallery → /edit/:id)', () => {
   it('init fires LoadEdit when the boot route attaches an Edit', () => {
-    const [, commands] = init(editorRoute)
+    const { commands = [] } = init(editorRoute)
     const names = commands.map((c) => c.name)
     expect(names).toContain('LoadEdit')
     expect(names).toContain('LoadCatalog')
@@ -27,18 +27,18 @@ describe('attached edit load (gallery → /edit/:id)', () => {
   })
 
   it('init does not fire LoadEdit when the boot route is the gallery', () => {
-    const [, commands] = init({ _tag: 'Gallery' })
+    const { commands = [] } = init({ _tag: 'Gallery' })
     expect(commands.map((c) => c.name)).not.toContain('LoadEdit')
   })
 
   it('informRouteChanged re-fires LoadEdit for a route change onto an Edit', () => {
-    const [, commands] = informRouteChanged(initialModel(), editorRoute)
+    const { commands = [] } = informRouteChanged(initialModel(), editorRoute)
     expect(commands.map((c) => c.name)).toContain('LoadEdit')
   })
 
   it('EditLoaded seeds the chain + source bitmap and lands Idle, then renders', () => {
     const exposure = Effect.runSync(createLayerFor('exposure'))
-    const [model, commands] = update(
+    const { model, commands = [] } = update(
       initialModel(),
       EditorMessage.EditLoaded({
         bitmap: bitmap(),
@@ -70,11 +70,11 @@ describe('attached edit load (gallery → /edit/:id)', () => {
       phase: Idle(),
       source: { bitmap: bitmap(), error: null, height: 480, width: 640 },
     }
-    const [drafting] = selectTool(withDraft, 'exposure')
+    const { model: drafting } = selectTool(withDraft, 'exposure')
     expect(drafting.phase._tag).toBe('Drafting')
 
     // …is discarded when EditLoaded lands (the machine edge Drafting → Idle).
-    const [model] = update(
+    const { model } = update(
       drafting,
       EditorMessage.EditLoaded({
         bitmap: bitmap(),
@@ -91,7 +91,7 @@ describe('attached edit load (gallery → /edit/:id)', () => {
   })
 
   it('EditLoadFailed lands the error stage with the reason', () => {
-    const [model, commands] = update(
+    const { model, commands = [] } = update(
       initialModel(),
       EditorMessage.EditLoadFailed({ error: new EditNotFoundError({ message: 'edit not found' }) }),
     )

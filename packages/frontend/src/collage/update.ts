@@ -1,6 +1,6 @@
 import { DragAndDrop } from '@foldkit/ui'
-import { Match as M, Option } from 'effect'
-import { Command } from 'foldkit'
+import { Match as M } from 'effect'
+import { Command, Update } from 'foldkit'
 import type { GpuBackend } from '../gpu/backend'
 import type { LutStore } from '../luts/store'
 import type { ImageEncoder } from '@lutra/engine'
@@ -24,11 +24,7 @@ import { isDefaultFraming, panned, sameFraming, zoomed } from './framing'
 
 type Resource = GpuBackend | LutStore | ImageEncoder | KeyValueStore | CollageStore | EditStore
 
-export type UpdateReturn = readonly [
-  Model,
-  readonly Command.Command<CollageMessage, never, Resource>[],
-  Option.Option<never>,
-]
+export type UpdateReturn = Update.Return<Model, CollageMessage, Resource>
 
 /** The loaded collage behind a model, or null — every handler's precondition. */
 const collageOf = (model: Model): Collage | null =>
@@ -42,14 +38,13 @@ const collageOf = (model: Model): Collage | null =>
 const mutate = (model: Model, f: (collage: Collage) => Collage): UpdateReturn => {
   const collage = collageOf(model)
   if (!collage) {
-    return [model, [], Option.none()]
+    return { model }
   }
   const next = f(collage)
-  return [
-    { ...model, collage: loadedCollage.Success({ data: next }) },
-    [SaveCollage({ collage: next })],
-    Option.none(),
-  ]
+  return {
+    model: { ...model, collage: loadedCollage.Success({ data: next }) },
+    commands: [SaveCollage({ collage: next })],
+  }
 }
 
 /**
@@ -64,13 +59,13 @@ const mutateWithUndo = (
 ): UpdateReturn => {
   const collage = collageOf(model)
   if (!collage) {
-    return [model, [], Option.none()]
+    return { model }
   }
   const previous = collage.tiles
   const next = f(collage)
   const seq = model.undoSeq + 1
-  return [
-    {
+  return {
+    model: {
       ...model,
       collage: loadedCollage.Success({ data: next }),
       undo: { seq, tiles: previous },
@@ -80,9 +75,8 @@ const mutateWithUndo = (
       // removal that emptied the collage sets it at its own edge below).
       userEmptied: false,
     },
-    [SaveCollage({ collage: next }), ScheduleUndoExpiry({ seq })],
-    Option.none(),
-  ]
+    commands: [SaveCollage({ collage: next }), ScheduleUndoExpiry({ seq })],
+  }
 }
 
 /**
@@ -93,18 +87,18 @@ const mutateWithUndo = (
 const commitDraft = (model: Model): UpdateReturn => {
   const collage = collageOf(model)
   if (!collage || !model.framingDraft) {
-    return [{ ...model, framingDraft: null, pan: null }, [], Option.none()]
+    return { model: { ...model, framingDraft: null, pan: null } }
   }
   const { index, framing } = model.framingDraft
   const tile = collage.tiles[index]
   if (!tile || sameFraming(tile.framing, framing)) {
-    return [{ ...model, framingDraft: null, pan: null }, [], Option.none()]
+    return { model: { ...model, framingDraft: null, pan: null } }
   }
-  const next = mutateWithUndo(model, 'Photo reframed', (c) => ({
+  const { model: nextModel, commands = [] } = mutateWithUndo(model, 'Photo reframed', (c) => ({
     ...c,
     tiles: c.tiles.map((t, i) => (i === index ? { ...t, framing } : t)),
   }))
-  return [{ ...next[0], framingDraft: null, pan: null }, next[1], next[2]]
+  return { model: { ...nextModel, framingDraft: null, pan: null }, commands }
 }
 
 /** The measured aspect of one Edit's photo; unknown sizes read as square. */
@@ -143,12 +137,11 @@ const delegate = (
   message: ExportDialog.Message,
   notice: string | null = model.notice,
 ): UpdateReturn => {
-  const [dialogModel, commands] = ExportDialog.update(model.exportDialog, message)
-  return [
-    { ...model, exportDialog: dialogModel, notice },
-    Command.mapMessages(commands, toExportDialogMessage),
-    Option.none(),
-  ]
+  const { model: dialogModel, commands = [] } = ExportDialog.update(model.exportDialog, message)
+  return {
+    model: { ...model, exportDialog: dialogModel, notice },
+    commands: Command.mapMessages(commands, toExportDialogMessage),
+  }
 }
 
 const toExportDialogMessage = (message: ExportDialog.Message): CollageMessage =>
@@ -169,8 +162,8 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
     M.tags({
       CollageLoaded: ({ collage, photos, dropped }) => {
         const photoIds = new Set(photos.map((p) => p.id))
-        return [
-          {
+        return {
+          model: {
             ...model,
             collage: loadedCollage.Success({ data: collage }),
             photos,
@@ -187,33 +180,28 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
             userEmptied: false,
           },
           // Aspect measurement rides the load (docs/adr/0009-collage).
-          [MeasureThumbs({ photos })],
-          Option.none(),
-        ]
+          commands: [MeasureThumbs({ photos })],
+        }
       },
 
-      ThumbsMeasured: ({ sizes }): UpdateReturn => [
-        {
+      ThumbsMeasured: ({ sizes }): UpdateReturn => ({
+        model: {
           ...model,
           sizes: [
             ...model.sizes.filter((s) => !sizes.some((n) => n.editId === s.editId)),
             ...sizes,
           ],
         },
-        [],
-        Option.none(),
-      ],
+      }),
 
-      LoadFailed: ({ error }) => [
-        { ...model, collage: loadedCollage.Failure({ error }) },
-        [],
-        Option.none(),
-      ],
+      LoadFailed: ({ error }) => ({
+        model: { ...model, collage: loadedCollage.Failure({ error }) },
+      }),
       // The id was well-formed but the record is gone: show the same failure
       // state with a plain-language reason (a synthetic StoreError carries
       // the message; there is no backend behind it).
-      CollageMissing: () => [
-        {
+      CollageMissing: () => ({
+        model: {
           ...model,
           collage: loadedCollage.Failure({
             error: new StoreErrorClass({
@@ -221,9 +209,7 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
             }),
           }),
         },
-        [],
-        Option.none(),
-      ],
+      }),
 
       // layout (bounds live in model.ts; layout changes take no undo)
       ChangedColumns: ({ columns }) =>
@@ -269,43 +255,42 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
 
       ModeChanged: ({ mode }) =>
         mode === model.mode
-          ? [model, [], Option.none()]
+          ? { model }
           : mode === 'frame'
-            ? [{ ...model, mode }, [], Option.none()]
+            ? { model: { ...model, mode } }
             : commitDraft({ ...model, mode }),
 
       RemovedTile: ({ index }) => {
         const collage = collageOf(model)
         if (!collage) {
-          return [model, [], Option.none()]
+          return { model }
         }
         const emptied = collage.tiles.length === 1
-        const [nextModel, commands] = mutateWithUndo(model, 'Removed photo', (c) => ({
+        const { model: nextModel, commands = [] } = mutateWithUndo(model, 'Removed photo', (c) => ({
           ...c,
           tiles: removeTile(c.tiles, index),
         }))
-        return [emptied ? { ...nextModel, userEmptied: true } : nextModel, commands, Option.none()]
+        return { model: emptied ? { ...nextModel, userEmptied: true } : nextModel, commands }
       },
 
       // drag-and-drop reorder (docs/adr/0009-collage)
       GotDragMessage: ({ message }) => {
-        const [drag, dragCommands, out] = DragAndDrop.update(model.drag, message)
-        const base: UpdateReturn = [
-          { ...model, drag },
-          Command.mapMessages(dragCommands, toDragMessage),
-          Option.none(),
-        ]
-        return Option.isSome(out)
-          ? M.value(out.value).pipe(
+        const { model: drag, commands: dragCommands = [], outMessage: out } = DragAndDrop.update(model.drag, message)
+        const base: UpdateReturn = {
+          model: { ...model, drag },
+          commands: Command.mapMessages(dragCommands, toDragMessage),
+        }
+        return out !== undefined
+          ? M.value(out).pipe(
               M.withReturnType<UpdateReturn>(),
               M.tag('Reordered', ({ itemId, fromIndex, toContainerId, toIndex }) => {
-                const collage = collageOf(base[0])
+                const collage = collageOf(base.model)
                 const sourceIndex =
                   collage?.tiles.findIndex((t) => t.editId === itemId) ?? fromIndex
                 if (!collage || sourceIndex < 0) {
                   return base
                 }
-                return mutateWithUndo(base[0], 'Photos reordered', (c) => ({
+                return mutateWithUndo(base.model, 'Photos reordered', (c) => ({
                   ...c,
                   tiles: applyReorder(c.tiles, sourceIndex, toContainerId, toIndex),
                 }))
@@ -320,14 +305,14 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
       PanStarted: ({ index, screenX, screenY }) => {
         const collage = collageOf(model)
         if (!collage || model.mode !== 'frame') {
-          return [model, [], Option.none()]
+          return { model }
         }
         const tile = collage.tiles[index]
         if (!tile) {
-          return [model, [], Option.none()]
+          return { model }
         }
-        return [
-          {
+        return {
+          model: {
             ...model,
             framingDraft:
               model.framingDraft?.index === index
@@ -335,22 +320,20 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
                 : { index, framing: tile.framing },
             pan: { index, screenX, screenY },
           },
-          [],
-          Option.none(),
-        ]
+        }
       },
       PanMoved: ({ screenX, screenY }) => {
         if (!model.pan || !model.framingDraft || !model.cellPx) {
-          return [model, [], Option.none()]
+          return { model }
         }
         // rAF coalescing may deliver duplicate positions; skip no-op.
         if (screenX === model.pan.screenX && screenY === model.pan.screenY) {
-          return [model, [], Option.none()]
+          return { model }
         }
         const collage = collageOf(model)
         const tile = collage?.tiles[model.pan.index]
         if (!collage || !tile) {
-          return [model, [], Option.none()]
+          return { model }
         }
         const imageAspect = aspectOf(model, tile.editId)
         const cellAspect = model.cellPx.width / Math.max(1, model.cellPx.height)
@@ -360,36 +343,32 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         // so the next delta is measured from the latest pointer, but don't
         // trigger a view diff.
         if (Math.abs(dx) < 1e-4 && Math.abs(dy) < 1e-4) {
-          return [
-            { ...model, pan: { index: model.pan.index, screenX, screenY } },
-            [],
-            Option.none(),
-          ]
+          return {
+            model: { ...model, pan: { index: model.pan.index, screenX, screenY } },
+          }
         }
         const framing = panned(model.framingDraft.framing, imageAspect, cellAspect, dx, dy)
         const nextPan = { index: model.pan.index, screenX, screenY }
         if (sameFraming(framing, model.framingDraft.framing)) {
-          return [{ ...model, pan: nextPan }, [], Option.none()]
+          return { model: { ...model, pan: nextPan } }
         }
-        return [
-          {
+        return {
+          model: {
             ...model,
             framingDraft: { index: model.pan.index, framing },
             pan: nextPan,
           },
-          [],
-          Option.none(),
-        ]
+        }
       },
       PanEnded: () => commitDraft(model),
       WheelZoomed: ({ index, deltaY }) => {
         const collage = collageOf(model)
         if (!collage || model.mode !== 'frame') {
-          return [model, [], Option.none()]
+          return { model }
         }
         const tile = collage.tiles[index]
         if (!tile) {
-          return [model, [], Option.none()]
+          return { model }
         }
         const imageAspect = aspectOf(model, tile.editId)
         const cellAspect = model.cellPx ? model.cellPx.width / Math.max(1, model.cellPx.height) : 1
@@ -397,22 +376,21 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
           model.framingDraft?.index === index ? model.framingDraft.framing : tile.framing
         const framing = zoomed(start, Math.exp(-deltaY * 0.002), imageAspect, cellAspect)
         const seq = model.zoomSeq + 1
-        return [
-          { ...model, framingDraft: { index, framing }, zoomSeq: seq },
-          [ScheduleZoomCommit({ seq })],
-          Option.none(),
-        ]
+        return {
+          model: { ...model, framingDraft: { index, framing }, zoomSeq: seq },
+          commands: [ScheduleZoomCommit({ seq })],
+        }
       },
       ZoomSettled: (settled) =>
-        settled.seq === model.zoomSeq ? commitDraft(model) : [model, [], Option.none()],
+        settled.seq === model.zoomSeq ? commitDraft(model) : { model },
       ResetFraming: ({ index }) => {
         const collage = collageOf(model)
         if (!collage || model.mode !== 'frame') {
-          return [model, [], Option.none()]
+          return { model }
         }
         const tile = collage.tiles[index]
         if (!tile || isDefaultFraming(tile.framing)) {
-          return [model, [], Option.none()]
+          return { model }
         }
         return mutateWithUndo(model, 'Framing reset', (c) => ({
           ...c,
@@ -424,58 +402,54 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
           model.cellPx &&
           Math.abs(model.cellPx.width - width) < 0.5 &&
           Math.abs(model.cellPx.height - height) < 0.5
-        return [same ? model : { ...model, cellPx: { width, height } }, [], Option.none()]
+        return { model: same ? model : { ...model, cellPx: { width, height } } }
       },
 
       // undo (docs/adr/0009-collage)
       UndoPressed: () => {
         const collage = collageOf(model)
         if (!collage || !model.undo) {
-          return [model, [], Option.none()]
+          return { model }
         }
         const restored: Collage = { ...collage, tiles: model.undo.tiles }
-        return [
-          {
+        return {
+          model: {
             ...model,
             collage: loadedCollage.Success({ data: restored }),
             undo: null,
             undoLabel: null,
             userEmptied: false,
           },
-          [SaveCollage({ collage: restored })],
-          Option.none(),
-        ]
+          commands: [SaveCollage({ collage: restored })],
+        }
       },
       UndoExpired: ({ seq }) =>
         model.undo?.seq === seq
-          ? [{ ...model, undo: null, undoLabel: null }, [], Option.none()]
-          : [model, [], Option.none()],
+          ? { model: { ...model, undo: null, undoLabel: null } }
+          : { model },
 
-      CollageSaved: () => [model, [], Option.none()],
-      SaveFailed: ({ error }) => [
-        { ...model, notice: `Could not save the collage: ${error.message}` },
-        [],
-        Option.none(),
-      ],
+      CollageSaved: () => ({ model }),
+      SaveFailed: ({ error }) => ({
+        model: { ...model, notice: `Could not save the collage: ${error.message}` },
+      }),
 
       // export (docs/adr/0009-collage: compose on open, encode on press)
       ExportRequested: () => {
         const collage = collageOf(model)
         if (!collage) {
-          return [model, [], Option.none()]
+          return { model }
         }
-        const [dialogModel, dialogCommands] = ExportDialog.open(model.exportDialog)
-        return [
-          { ...model, exportDialog: dialogModel },
-          [
+        const { model: dialogModel, commands: dialogCommands = [] } = ExportDialog.open(model.exportDialog)
+        return {
+          model: { ...model, exportDialog: dialogModel },
+          commands: [
             ...Command.mapMessages(dialogCommands, toExportDialogMessage),
             SnapshotCollageExport({
               tiles: collage.tiles,
               layout: collage.layout,
             }),
           ],
-          Option.none(),
-        ]
+        }
       },
       // A failed-tile count surfaces as a notice before the machine takes
       // over; the readiness flag and late-result guards live in the machine.
@@ -490,9 +464,9 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
       CollageExportSnapshotFailed: ({ message }) =>
         delegate(model, ExportDialog.Message.FrameFailed({ message }), model.notice),
 
-      BackRequested: () => [model, [NavigateMenu()], Option.none()],
+      BackRequested: () => ({ model, commands: [NavigateMenu()] }),
       // Observability only — the URL change drives the route transition.
-      NavigatedBack: () => [model, [], Option.none()],
+      NavigatedBack: () => ({ model }),
       GotCollageExportDialogMessage: ({ message }) => delegate(model, message),
     }),
     M.exhaustive,

@@ -47,7 +47,7 @@ const mountLoadedStage = [
 // Resolve the dialog's internal ShowDialog command.
 const openDialog = [
   Command.expectHas(Dialog.ShowDialog),
-  Command.resolve(Dialog.ShowDialog, Dialog.Message.CompletedShowDialog()),
+  Command.resolve(Dialog.ShowDialog, Dialog.Message.SucceededShowDialog()),
 ]
 
 describe('Export dialog', () => {
@@ -250,7 +250,7 @@ describe('Export dialog', () => {
     ;[model] = update(model, dialogMessage(Dialog.Message.CompletedCloseDialog()))
     vitestExpect(model.exportDialog.dialog.isOpen).toBe(false)
 
-    const [after, commands] = update(model, EditorMessage.ExportSnapshotted())
+    const { model: after, commands = [] } = update(model, EditorMessage.ExportSnapshotted())
     vitestExpect(after.exportDialog.ready).toBe(false)
     vitestExpect(commands).toHaveLength(0)
   })
@@ -270,7 +270,7 @@ describe('Export dialog', () => {
     ;[model] = update(model, dialogMessage(Dialog.Message.RequestedClose()))
     ;[model] = update(model, dialogMessage(Dialog.Message.CompletedCloseDialog()))
 
-    const [after, commands] = update(
+    const { model: after, commands = [] } = update(
       model,
       EditorMessage.GotExportDialogMessage({
         message: ExportDialog.Message.EncodePrepared({ sizeBytes: 100, url: 'blob:late' }),
