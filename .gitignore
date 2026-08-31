@@ -29,3 +29,6 @@ Thumbs.db
 
 # Alchemy
 .alchemy
+
+# Verification skill scratch evidence (see .cursor/skills/verify-lutra)
+.verify-artifacts/
