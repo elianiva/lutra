@@ -3,6 +3,7 @@ import { Submodel } from 'foldkit'
 import { type Html, type HtmlBuilder, createLazy } from 'foldkit/html'
 import { Boxes, Layers as LayersIcon, SlidersHorizontal } from 'lucide'
 import type { IconNode } from 'lucide'
+import { button } from '@/components/ui/button'
 import { hasImage } from './phase'
 import type { Model } from './model'
 import { topBar } from './top-bar'
@@ -209,18 +210,17 @@ const mobileTabBarImpl = (
   h: HtmlBuilder<EditorMessage>,
 ) => {
   const panelTab = (label: string, Icon: IconNode, active: boolean, onClick: () => EditorMessage) =>
-    h.button(
-      [
-        h.OnClick(onClick()),
-        h.AriaPressed(String(active)),
-        h.AriaLabel(label),
-        h.Class(
-          `flex flex-1 items-center justify-center gap-2 py-2.5 text-xs ${
-            active ? 'bg-panel-alt text-ink' : 'text-muted hover:text-ink'
-          }`,
-        ),
-      ],
+    button(
+      {
+        onClick: onClick(),
+        variant: active ? 'secondary' : 'ghost',
+        className: `flex flex-1 items-center justify-center gap-2 py-2.5 text-xs ${
+          active ? 'bg-panel-alt text-ink' : 'text-muted hover:text-ink'
+        }`,
+        attributes: [h.AriaPressed(String(active)), h.AriaLabel(label)],
+      },
       [icon(h, Icon, label, 16), h.span([], [label])],
+      h,
     )
   return h.nav(
     // pb-[env(...)]: the home-indicator safe area on notched phones — the

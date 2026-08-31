@@ -1,4 +1,8 @@
 import { type Html, type HtmlBuilder, createKeyedLazy } from 'foldkit/html'
+import { button } from '@/components/ui/button'
+import { badge } from '@/components/ui/badge'
+import { tooltipContentClass } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 import { icon } from '../components/icon'
 import { LAYER_UI, LAYER_TYPES_ORDER } from './layer-meta'
 import { EditorMessage } from './message'
@@ -116,22 +120,23 @@ const toolCardInner = (
   return h.div(
     [h.Class('relative')],
     [
-      h.button(
-        [
-          h.Key(type),
-          h.OnClick(EditorMessage.SelectedTool({ type })),
-          h.OnMouseEnter(show),
-          h.OnMouseLeave(hide),
-          h.OnFocus(show),
-          h.OnBlur(hide),
-          ...(disabled ? [h.AriaDisabled(true)] : []),
-          h.AriaLabel(`Add ${ui.label} adjustment`),
-          h.Class(
-            disabled
-              ? 'flex w-full cursor-not-allowed flex-col gap-1.5 border-b border-border px-4 py-3 text-left opacity-40 transition-colors lg:items-center lg:gap-0 lg:px-0'
-              : 'flex w-full flex-col gap-1.5 border-b border-border px-4 py-3 text-left transition-colors hover:bg-panel-alt lg:items-center lg:gap-0 lg:px-0',
-          ),
-        ],
+      button(
+        {
+          onClick: EditorMessage.SelectedTool({ type }),
+          isDisabled: disabled,
+          variant: 'ghost',
+          className: disabled
+            ? 'flex w-full cursor-not-allowed flex-col gap-1.5 border-b border-border px-4 py-3 text-left opacity-40 transition-colors lg:items-center lg:gap-0 lg:px-0'
+            : 'flex w-full flex-col gap-1.5 border-b border-border px-4 py-3 text-left transition-colors hover:bg-panel-alt lg:items-center lg:gap-0 lg:px-0',
+          attributes: [
+            h.Key(type),
+            h.OnMouseEnter(show),
+            h.OnMouseLeave(hide),
+            h.OnFocus(show),
+            h.OnBlur(hide),
+            h.AriaLabel(`Add ${ui.label} adjustment`),
+          ],
+        },
         [
           h.div(
             [h.Class('flex items-center gap-3 lg:justify-center')],
@@ -157,19 +162,23 @@ const toolCardInner = (
           // first-time user sees nothing (docs/adr/0010-editor-ui.md D4).
           ...(count > 0
             ? [
-                h.span(
-                  [
-                    h.AriaLabel(`In your edit: ${count}`),
-                    h.Attribute('data-testid', 'in-edit-badge'),
-                    h.Class(
-                      'absolute right-1.5 top-1.5 shrink-0 rounded-sm border border-border bg-panel px-1 py-0.5 text-[10px] leading-none text-muted',
-                    ),
-                  ],
+                badge(
+                  {
+                    variant: 'secondary',
+                    className:
+                      'absolute right-1.5 top-1.5 border-border bg-panel text-[10px] leading-none text-muted',
+                    attributes: [
+                      h.AriaLabel(`In your edit: ${count}`),
+                      h.Attribute('data-testid', 'in-edit-badge'),
+                    ],
+                  },
                   [`×${count}`],
+                  h,
                 ),
               ]
             : []),
         ],
+        h,
       ),
       // The custom tooltip: floats to the right of the rail while this card
       // is hovered/focused. Hidden below `lg` — touch has no hover, and
@@ -180,7 +189,10 @@ const toolCardInner = (
               [
                 h.Attribute('data-testid', 'tool-tooltip'),
                 h.Class(
-                  'absolute left-full top-0 z-[70] hidden w-56 border border-border bg-panel px-3 py-2 text-xs leading-snug text-muted shadow-lg lg:block',
+                  cn(
+                    tooltipContentClass,
+                    'absolute left-full top-0 z-[70] hidden w-56 border border-border bg-panel px-3 py-2 text-xs leading-snug text-muted shadow-lg lg:block',
+                  ),
                 ),
               ],
               [

@@ -1,6 +1,6 @@
 import { Match as M, Option } from 'effect'
 import { Command, Update } from 'foldkit'
-import { Dialog } from '@foldkit/ui'
+import * as Dialog from '@/components/ui/dialog'
 import type { EditStore, CollageStore, EditSummary } from '@lutra/store'
 import { GalleryMessage, GalleryOutMessage, PhotoCreateError } from './message'
 import {

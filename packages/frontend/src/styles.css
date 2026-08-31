@@ -1,4 +1,7 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
 
 /*
  * Lutra — dark, hard-cornered, Leica/Fuji-styled (mirrors lutra-mobile).
@@ -6,6 +9,11 @@
  * use 0 radius. Thin 1px borders delineate regions on an off-black body;
  * a single red (#cc0000, the mobile app's primary) is the accent — the
  * slider thumbs, the active fills, and the wordmark.
+ *
+ * foldcn/shadcn CSS variables (:root below) power @/components/ui primitives.
+ * Lutra Tailwind tokens (--color-panel, text-ink, bg-accent, …) stay separate
+ * so existing views keep their look; foldcn uses primary/muted-foreground, not
+ * Lutra's text-muted token.
  */
 @theme {
   --color-bg: #111111;
@@ -19,6 +27,53 @@
 
   --font-sans: 'Electrolize', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-4xl: 0;
+}
+
+:root {
+  --radius: 0;
+  --background: #111111;
+  --foreground: #fafafa;
+  --card: #1f1f1f;
+  --card-foreground: #fafafa;
+  --popover: #1f1f1f;
+  --popover-foreground: #fafafa;
+  --primary: #cc0000;
+  --primary-foreground: #fafafa;
+  --secondary: #262626;
+  --secondary-foreground: #fafafa;
+  --muted: #262626;
+  --muted-foreground: #a3a3a3;
+  --accent: #262626;
+  --accent-foreground: #fafafa;
+  --destructive: #cc0000;
+  --destructive-foreground: #fafafa;
+  --border: #262626;
+  --input: #262626;
+  --ring: #525252;
 }
 
 html,
@@ -27,9 +82,6 @@ body,
   height: 100%;
 }
 
-/* The app shell tracks the DYNAMIC viewport (docs/adr/0024-mobile-ui): on phones the
- * URL bar collapses on scroll, and a `100%` root would leave the canvas cut
- * off under the remaining chrome. Browsers without dvh fall back to 100%. */
 #root {
   height: 100%;
   height: 100dvh;
@@ -42,11 +94,9 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  /* Dark scrollbars and native controls (range inputs, file pickers). */
   color-scheme: dark;
 }
 
-/* Range inputs rendered as bare tracks with a hard-edged thumb. */
 input[type='range'].lutra-range {
   -webkit-appearance: none;
   appearance: none;
@@ -81,15 +131,11 @@ input[type='range'].lutra-range::-moz-range-thumb {
   border-radius: 0;
 }
 
-/* Numeric readouts use tabular figures so values don't jitter while dragging. */
 .tnum {
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum';
 }
 
-/* Touch devices (docs/adr/0024-mobile-ui): the 16px desktop thumb is fine under a
- * cursor, too small for a finger. A coarse pointer gets a bigger thumb and
- * a taller hit area; `pointer: fine` devices keep the compact slider. */
 @media (pointer: coarse) {
   input[type='range'].lutra-range {
     height: 36px;
@@ -103,4 +149,27 @@ input[type='range'].lutra-range::-moz-range-thumb {
     width: 24px;
     height: 24px;
   }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  [data-leave] {
+    --tw-animation-fill-mode: both;
+  }
+}
+
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+/*
+ ---break---
+ */
+@theme inline {
+  --font-heading: var(--font-heading);
 }

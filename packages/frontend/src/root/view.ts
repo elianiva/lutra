@@ -7,6 +7,7 @@ import { GalleryRoute, EditorRoute, CollageRoute, CollageHomeRoute } from '../ro
 import * as Gallery from '../gallery'
 import * as Editor from '../editor'
 import * as Collage from '../collage'
+import { button } from '@/components/ui/button'
 
 /**
  * The root's view (docs/adr/0006-frontend-architecture). Emits a whole-document shell and embeds
@@ -196,15 +197,16 @@ const offlineCardImpl = (offline: Model['offline'], h: HtmlBuilder<AppMessage>):
     [`${offline.downloaded} / ${offline.total} files`],
   )
   const actionButton = (label: string, ariaLabel: string) =>
-    h.button(
-      [
-        h.OnClick(OfflineMessage.OfflineFillRequested()),
-        h.AriaLabel(ariaLabel),
-        h.Class(
-          'rounded border border-accent px-2 py-0.5 text-accent hover:border-ink hover:text-ink',
-        ),
-      ],
-      [label],
+    button(
+      {
+        onClick: OfflineMessage.OfflineFillRequested(),
+        variant: 'outline',
+        size: 'xs',
+        className: 'border-accent text-accent hover:border-ink hover:text-ink',
+        attributes: [h.AriaLabel(ariaLabel)],
+      },
+      label,
+      h,
     )
   const titleRow = (title: string, trailing: string | null) =>
     h.div(

@@ -6,6 +6,7 @@
     "lib": ["ES2022", "DOM"],
     "types": ["@webgpu/types"],
     "paths": {
+      "@/*": ["./src/*"],
       "@lutra/engine": ["../engine/src/index.ts"],
       "@lutra/store": ["../store/src/index.ts"]
     }

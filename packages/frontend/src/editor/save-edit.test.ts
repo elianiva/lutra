@@ -119,7 +119,7 @@ describe('editor: save flow (Save / Save as)', () => {
     expect(model.attachedEdit).toEqual({ id: id(), source: source() })
     expect(model.saveStatus).toEqual({ _tag: 'saved', at: 1234 })
     expect(commands).toEqual([])
-    expect(out).toEqual(Option.some(EditorOutMessage.EditCreated({ id: id() })))
+    expect(out).toEqual(EditorOutMessage.EditCreated({ id: id() }))
   })
 
   it('an in-place save keeps the attachment and emits no EditCreated', () => {
@@ -137,7 +137,7 @@ describe('editor: save flow (Save / Save as)', () => {
       EditorMessage.EditSaved({ id: otherId(), savedAt: 5 }),
     )
     expect(model.attachedEdit).toEqual({ id: otherId(), source: source() })
-    expect(out).toEqual(Option.some(EditorOutMessage.EditCreated({ id: otherId() })))
+    expect(out).toEqual(EditorOutMessage.EditCreated({ id: otherId() }))
   })
 
   it('SaveFailed records the reason for the top bar', () => {

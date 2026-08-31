@@ -1,6 +1,6 @@
 import { Match as M } from 'effect'
 import { Command, Update } from 'foldkit'
-import { Dialog } from '@foldkit/ui'
+import * as Dialog from '@/components/ui/dialog'
 import { ExportDialogMessage as Message } from './message'
 import { ExportDownload, PrepareExport, RevokeExportUrl, SaveExportSettings } from './command'
 import type { Resource } from './command'

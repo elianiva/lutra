@@ -7,8 +7,11 @@ import {
   createLazy,
   createKeyedLazy,
 } from 'foldkit/html'
-import { DragAndDrop } from '@foldkit/ui'
+import * as DragAndDrop from '@/components/ui/drag-and-drop'
+import { dragGhostClass } from '@/components/ui/drag-and-drop'
+import { cn } from '@/lib/utils'
 import { Download, RotateCcw, X } from 'lucide'
+import { button } from '@/components/ui/button'
 import { CollageMessage } from './message'
 import type { Model } from './model'
 import type { Collage, EditId, TileFraming } from '@lutra/store'
@@ -78,26 +81,28 @@ const header = (h: HtmlBuilder<CollageMessage>) =>
       h.div(
         [h.Class('flex items-center gap-3')],
         [
-          h.button(
-            [
-              h.OnClick(CollageMessage.BackRequested()),
-              h.AriaLabel('Back to the main menu'),
-              h.Class('px-2 text-xs text-muted hover:text-ink'),
-            ],
-            ['← Menu'],
+          button(
+            {
+              onClick: CollageMessage.BackRequested(),
+              variant: 'ghost',
+              size: 'xs',
+              attributes: [h.AriaLabel('Back to the main menu')],
+            },
+            '← Menu',
+            h,
           ),
           h.h1([h.Class('text-sm font-semibold tracking-[0.3em] text-accent')], ['COLLAGE']),
         ],
       ),
-      h.button(
-        [
-          h.OnClick(CollageMessage.ExportRequested()),
-          h.AriaLabel('Export this collage'),
-          // Icon-only, like the editor's top bar — the dialog's Export
-          // button stays the only visible 'Export' text on the screen.
-          h.Class('grid size-8 place-items-center text-muted hover:text-ink'),
-        ],
+      button(
+        {
+          onClick: CollageMessage.ExportRequested(),
+          variant: 'ghost',
+          size: 'icon-sm',
+          attributes: [h.AriaLabel('Export this collage')],
+        },
         [icon(h, Download, 'Export this collage')],
+        h,
       ),
     ],
   )
@@ -117,14 +122,18 @@ const undoToastView = (
     ],
     [
       h.span([h.Class('text-muted')], [undoLabel]),
-      h.button(
-        [
-          h.OnClick(CollageMessage.UndoPressed()),
-          h.AriaLabel(`Undo: ${undoLabel.toLowerCase()}`),
-          h.DataAttribute('undo-button', 'true'),
-          h.Class('rounded bg-accent px-2 py-0.5 text-ink hover:opacity-80'),
-        ],
-        ['Undo'],
+      button(
+        {
+          onClick: CollageMessage.UndoPressed(),
+          size: 'xs',
+          className: 'px-2 py-0.5',
+          attributes: [
+            h.AriaLabel(`Undo: ${undoLabel.toLowerCase()}`),
+            h.DataAttribute('undo-button', 'true'),
+          ],
+        },
+        'Undo',
+        h,
       ),
     ],
   )
@@ -148,7 +157,7 @@ const ghostView = (
       return h.div(
         [
           h.Style(style),
-          h.Class('-translate-x-1/2 -translate-y-1/2 overflow-hidden rounded border border-accent'),
+          h.Class(cn('-translate-x-1/2 -translate-y-1/2 overflow-hidden border border-accent', dragGhostClass)),
         ],
         [
           h.div(
@@ -160,6 +169,12 @@ const ghostView = (
     },
   })
 }
+
+const controlsWrapper = (
+  mode: Model['mode'],
+  collage: Collage,
+  h: HtmlBuilder<CollageMessage>,
+): Html => controls(h, mode, collage)
 
 const body = (h: HtmlBuilder<CollageMessage>, model: Model) =>
   AsyncData.match(model.collage, {
@@ -208,16 +223,16 @@ const stepperButton = (
   ariaLabel: string,
   onClick: CollageMessage,
 ) =>
-  h.button(
-    [
-      h.OnClick(onClick),
-      h.AriaLabel(ariaLabel),
-      h.DataAttribute('layout-control', label),
-      h.Class(
-        'grid size-6 place-items-center rounded border border-border text-xs text-muted hover:border-muted hover:text-ink',
-      ),
-    ],
-    [label],
+  button(
+    {
+      onClick,
+      variant: 'outline',
+      size: 'icon-sm',
+      className: 'grid place-items-center border-border text-xs text-muted hover:border-muted hover:text-ink',
+      attributes: [h.AriaLabel(ariaLabel), h.DataAttribute('layout-control', label)],
+    },
+    label,
+    h,
   )
 
 const controlLabel = (h: HtmlBuilder<CollageMessage>, text: string) =>
@@ -237,19 +252,24 @@ const frameRatioControl = (h: HtmlBuilder<CollageMessage>, collage: Collage) => 
       h.div(
         [h.Class('flex border border-border')],
         FRAME_PRESETS.map(({ label, value }, i) =>
-          h.button(
-            [
-              h.OnClick(CollageMessage.ChangedFrameRatio({ frameRatio: value })),
-              h.AriaLabel(`Frame ratio ${label}`),
-              h.DataAttribute('frame-preset', label),
-              h.AriaPressed(String(matchesPreset(ratio, value))),
-              h.Class(
-                `px-2 py-0.5 text-xs ${i < FRAME_PRESETS.length - 1 ? 'border-r border-border' : ''} ${
-                  matchesPreset(ratio, value) ? 'bg-accent text-ink' : 'text-muted hover:text-ink'
-                }`,
+          button(
+            {
+              onClick: CollageMessage.ChangedFrameRatio({ frameRatio: value }),
+              size: 'xs',
+              variant: matchesPreset(ratio, value) ? 'default' : 'ghost',
+              className: cn(
+                'px-2 py-0.5 text-xs',
+                i < FRAME_PRESETS.length - 1 ? 'border-r border-border' : '',
+                matchesPreset(ratio, value) ? 'bg-accent text-ink' : 'text-muted hover:text-ink',
               ),
-            ],
-            [label],
+              attributes: [
+                h.AriaLabel(`Frame ratio ${label}`),
+                h.DataAttribute('frame-preset', label),
+                h.AriaPressed(String(matchesPreset(ratio, value))),
+              ],
+            },
+            label,
+            h,
           ),
         ),
       ),
@@ -293,19 +313,24 @@ const modeToggle = (h: HtmlBuilder<CollageMessage>, mode: Model['mode']) =>
   h.div(
     [h.Class('flex border border-border'), h.DataAttribute('control', 'mode')],
     (['arrange', 'frame'] as const).map((option, i) =>
-      h.button(
-        [
-          h.OnClick(CollageMessage.ModeChanged({ mode: option })),
-          h.AriaLabel(option === 'arrange' ? 'Arrange photos' : 'Frame photos'),
-          h.DataAttribute('mode-button', option),
-          h.AriaPressed(String(mode === option)),
-          h.Class(
-            `px-2 py-0.5 text-xs capitalize ${i === 0 ? 'border-r border-border' : ''} ${
-              mode === option ? 'bg-accent text-ink' : 'text-muted hover:text-ink'
-            }`,
+      button(
+        {
+          onClick: CollageMessage.ModeChanged({ mode: option }),
+          size: 'xs',
+          variant: mode === option ? 'default' : 'ghost',
+          className: cn(
+            'px-2 py-0.5 text-xs capitalize',
+            i === 0 ? 'border-r border-border' : '',
+            mode === option ? 'bg-accent text-ink' : 'text-muted hover:text-ink',
           ),
-        ],
-        [option],
+          attributes: [
+            h.AriaLabel(option === 'arrange' ? 'Arrange photos' : 'Frame photos'),
+            h.DataAttribute('mode-button', option),
+            h.AriaPressed(String(mode === option)),
+          ],
+        },
+        option,
+        h,
       ),
     ),
   )
@@ -379,26 +404,23 @@ const controls = (h: HtmlBuilder<CollageMessage>, mode: Model['mode'], collage: 
           ),
         ],
       ),
-      h.button(
-        [
-          h.OnClick(CollageMessage.ToggledBackground()),
-          h.AriaLabel('Switch the background between dark and light'),
-          h.DataAttribute('control', 'background'),
-          h.Class(
-            'rounded border border-border px-2 py-0.5 text-xs text-muted hover:border-muted hover:text-ink',
-          ),
-        ],
-        [`Background: ${collage.layout.background}`],
+      button(
+        {
+          onClick: CollageMessage.ToggledBackground(),
+          variant: 'outline',
+          size: 'xs',
+          className: 'px-2 py-0.5 text-muted hover:border-muted hover:text-ink',
+          attributes: [
+            h.AriaLabel('Switch the background between dark and light'),
+            h.DataAttribute('control', 'background'),
+          ],
+        },
+        `Background: ${collage.layout.background}`,
+        h,
       ),
       modeToggle(h, mode),
     ],
   )
-
-const controlsWrapper = (
-  mode: Model['mode'],
-  collage: Collage,
-  h: HtmlBuilder<CollageMessage>,
-): Html => controls(h, mode, collage)
 
 const gridView = (
   columns: number,
@@ -545,27 +567,35 @@ const tileCellView = (
             )
           : framedPhotoCached(h, url, editId, framing, cellAspect, sizeById),
         arrange
-          ? h.button(
-              [
-                h.OnClick(CollageMessage.RemovedTile({ index })),
-                h.AriaLabel(`Remove photo ${index + 1}`),
-                h.DataAttribute('remove-tile', `${index}`),
-                h.Class(
-                  'absolute right-0 top-0 z-10 grid size-7 place-items-center bg-black/50 text-[10px] text-white/80 hover:text-white',
-                ),
-              ],
+          ? button(
+              {
+                onClick: CollageMessage.RemovedTile({ index }),
+                variant: 'ghost',
+                size: 'icon-sm',
+                className:
+                  'absolute right-0 top-0 z-10 grid place-items-center bg-black/50 p-0 text-[10px] text-white/80 hover:text-white',
+                attributes: [
+                  h.AriaLabel(`Remove photo ${index + 1}`),
+                  h.DataAttribute('remove-tile', `${index}`),
+                ],
+              },
               [icon(h, X, `Remove photo ${index + 1}`, 12)],
+              h,
             )
-          : h.button(
-              [
-                h.OnClick(CollageMessage.ResetFraming({ index })),
-                h.AriaLabel(`Reset framing of photo ${index + 1}`),
-                h.DataAttribute('reset-framing', `${index}`),
-                h.Class(
-                  'absolute right-0 top-0 z-10 grid size-7 place-items-center bg-black/50 text-white/80 hover:text-white',
-                ),
-              ],
+          : button(
+              {
+                onClick: CollageMessage.ResetFraming({ index }),
+                variant: 'ghost',
+                size: 'icon-sm',
+                className:
+                  'absolute right-0 top-0 z-10 grid place-items-center bg-black/50 p-0 text-white/80 hover:text-white',
+                attributes: [
+                  h.AriaLabel(`Reset framing of photo ${index + 1}`),
+                  h.DataAttribute('reset-framing', `${index}`),
+                ],
+              },
               [icon(h, RotateCcw, `Reset framing of photo ${index + 1}`, 12)],
+              h,
             ),
         dropTarget !== null
           ? h.div(

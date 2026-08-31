@@ -1,6 +1,7 @@
 import { DateTime, Match } from 'effect'
 import type { Html, HtmlBuilder } from 'foldkit/html'
 import { CopyPlus, Download, Plus } from 'lucide'
+import { button } from '@/components/ui/button'
 import { icon } from '../components/icon'
 import { EditorMessage } from './message'
 import type { Model } from './model'
@@ -35,24 +36,26 @@ export const topBar = (
         [h.Class('flex items-center gap-1')],
         [
           saveStatusText(h, saveStatus),
-          h.button(
-            [
-              h.OnClick(EditorMessage.SaveRequested()),
-              h.Disabled(!hasImage || saving),
-              h.AriaLabel('Save edit'),
-              h.Class(
-                'rounded bg-accent px-3 py-1 text-xs text-ink hover:opacity-80 disabled:opacity-30',
-              ),
-            ],
-            [saving ? 'Saving…' : 'Save'],
+          button(
+            {
+              onClick: EditorMessage.SaveRequested(),
+              isDisabled: !hasImage || saving,
+              size: 'xs',
+              className: 'disabled:opacity-30',
+              attributes: [h.AriaLabel('Save edit')],
+            },
+            saving ? 'Saving…' : 'Save',
+            h,
           ),
-          h.button(
-            [
-              h.OnClick(EditorMessage.SaveAsRequested()),
-              h.Disabled(!hasImage || saving || attachedId === null),
-              h.AriaLabel('Save as a new edit'),
-              h.Class('px-2 py-1 text-xs text-muted hover:text-ink disabled:opacity-30'),
-            ],
+          button(
+            {
+              onClick: EditorMessage.SaveAsRequested(),
+              isDisabled: !hasImage || saving || attachedId === null,
+              variant: 'ghost',
+              size: 'xs',
+              className: 'disabled:opacity-30',
+              attributes: [h.AriaLabel('Save as a new edit')],
+            },
             [
               h.span([h.Class('hidden sm:inline')], ['Save as']),
               h.span(
@@ -60,25 +63,29 @@ export const topBar = (
                 [icon(h, CopyPlus, 'Save as a new edit')],
               ),
             ],
+            h,
           ),
-          h.button(
-            [
-              h.OnClick(EditorMessage.ExportRequested()),
-              h.Disabled(!hasImage),
-              h.AriaLabel('Export image'),
-              h.Class(
-                'grid size-8 place-items-center text-muted hover:text-ink disabled:opacity-30',
-              ),
-            ],
+          button(
+            {
+              onClick: EditorMessage.ExportRequested(),
+              isDisabled: !hasImage,
+              variant: 'ghost',
+              size: 'icon-sm',
+              className: 'disabled:opacity-30',
+              attributes: [h.AriaLabel('Export image')],
+            },
             [icon(h, Download, 'Export')],
+            h,
           ),
-          h.button(
-            [
-              h.OnClick(EditorMessage.ClearedImage()),
-              h.Disabled(!hasImage),
-              h.AriaLabel('Start over'),
-              h.Class('px-2 py-1 text-xs text-muted hover:text-ink disabled:opacity-30'),
-            ],
+          button(
+            {
+              onClick: EditorMessage.ClearedImage(),
+              isDisabled: !hasImage,
+              variant: 'ghost',
+              size: 'xs',
+              className: 'disabled:opacity-30',
+              attributes: [h.AriaLabel('Start over')],
+            },
             [
               h.span([h.Class('hidden sm:inline')], ['New']),
               h.span(
@@ -86,6 +93,7 @@ export const topBar = (
                 [icon(h, Plus, 'Start over')],
               ),
             ],
+            h,
           ),
         ],
       ),

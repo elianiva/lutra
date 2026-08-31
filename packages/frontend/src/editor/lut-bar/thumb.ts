@@ -4,6 +4,7 @@ import { EditorMessage } from '../message'
 import type { LutCatalogEntry } from '../../luts/store'
 import type { LutDownloadState } from '../../offline/model'
 import { icon } from '../../components/icon'
+import { button } from '@/components/ui/button'
 
 /**
  * One filmstrip thumb. `src` is the per-photo preview (docs/adr/0002-lut-library) once
@@ -31,29 +32,27 @@ export const thumb = (
   onPick: () => EditorMessage,
 ) => {
   const unavailable = !online && downloadState !== 'downloaded'
-  return h.button(
-    [
-      h.OnClick(onPick()),
-      h.OnMouseEnter(EditorMessage.PreviewedLut({ lutId: entry.lut_file })),
-      h.OnMouseLeave(EditorMessage.PreviewedLut({ lutId: null })),
-      h.AriaLabel(
-        unavailable
-          ? `Apply ${entry.name} — not downloaded, needs a connection`
-          : `Apply ${entry.name}`,
-      ),
-      h.Title(unavailable ? `${entry.name} — not downloaded yet` : entry.name),
-      h.AriaPressed(String(current)),
-      // Keyed by lutId: the Recents strip reorders on every commit (MRU
-      // bump), and an unkeyed list would patch DOM nodes positionally —
-      // the node under the cursor would silently start representing a
-      // different LUT, so hover/click commit the wrong entry. With the
-      // key, snabbdom moves each thumb's node to its data position and
-      // hover state stays glued to the LUT it shows.
-      h.Key(entry.lut_file),
-      h.Class(
-        `relative size-24 shrink-0 overflow-hidden border-2 border-bg ${current ? 'border-accent' : 'border-border'}`,
-      ),
-    ],
+  return button(
+    {
+      onClick: onPick(),
+      size: 'icon-lg',
+      variant: 'ghost',
+      className: `relative size-24 shrink-0 overflow-hidden border-2 border-bg p-0 ${
+        current ? 'border-accent' : 'border-border'
+      }`,
+      attributes: [
+        h.OnMouseEnter(EditorMessage.PreviewedLut({ lutId: entry.lut_file })),
+        h.OnMouseLeave(EditorMessage.PreviewedLut({ lutId: null })),
+        h.AriaLabel(
+          unavailable
+            ? `Apply ${entry.name} — not downloaded, needs a connection`
+            : `Apply ${entry.name}`,
+        ),
+        h.Title(unavailable ? `${entry.name} — not downloaded yet` : entry.name),
+        h.AriaPressed(String(current)),
+        h.Key(entry.lut_file),
+      ],
+    },
     [
       h.img([
         h.Src(src),
@@ -115,5 +114,6 @@ export const thumb = (
           ]
         : []),
     ],
+    h,
   )
 }

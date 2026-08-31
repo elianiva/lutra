@@ -1,6 +1,6 @@
 import { Schema as S } from 'effect'
 import { AsyncData } from 'foldkit'
-import { DragAndDrop } from '@foldkit/ui'
+import * as DragAndDrop from '@/components/ui/drag-and-drop'
 import { Collage, CollageTile, EditIdSchema, StoreError, TileFraming } from '@lutra/store'
 import * as ExportDialog from '../export-dialog'
 

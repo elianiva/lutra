@@ -1,6 +1,9 @@
 import type { HtmlBuilder } from 'foldkit/html'
 import { EXPORT_FORMATS, EXPORT_SCALES, isLossy } from '@lutra/engine'
 import type { ExportSettings } from '@lutra/engine'
+import { lutraRangeRow } from '@/components/lutra-range-row'
+import { button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 /**
  * The export dialog's presentational settings sections — format, quality
@@ -30,22 +33,21 @@ export const segmentedRow = <M, T extends string | number>(
   h.div(
     [h.Class('grid grid-cols-4 border border-border')],
     options.map(({ label, value }) =>
-      h.button(
-        [
-          h.OnClick(onSelect(value)),
-          // Segmented rows read as toggle buttons; expose the pressed state.
-          h.AriaPressed(String(value === selected)),
-          // Foldkit's builder overwrites on repeated Class attributes (last
-          // one wins) — keep the whole class list in a single call.
-          h.Class(
-            `border-r border-border px-1 py-1.5 text-xs last:border-r-0 ${
-              value === selected
-                ? 'bg-accent text-ink'
-                : 'bg-panel text-muted hover:bg-panel-alt hover:text-ink'
-            }`,
+      button(
+        {
+          onClick: onSelect(value),
+          size: 'xs',
+          variant: value === selected ? 'default' : 'ghost',
+          className: cn(
+            'border-r border-border px-1 py-1.5 last:border-r-0',
+            value === selected
+              ? 'bg-accent text-ink'
+              : 'bg-panel text-muted hover:bg-panel-alt hover:text-ink',
           ),
-        ],
-        [label],
+          attributes: [h.AriaPressed(String(value === selected))],
+        },
+        label,
+        h,
       ),
     ),
   )
@@ -78,22 +80,15 @@ export const qualitySection = <M>(
     ? h.div(
         [h.Class('flex flex-col gap-1.5')],
         [
-          h.div(
-            [h.Class('flex items-baseline justify-between')],
-            [
-              h.span([h.Class('text-[10px] uppercase tracking-[0.14em] text-muted')], ['Quality']),
-              h.span([h.Class('tnum text-xs text-ink')], [String(quality ?? 75)]),
-            ],
-          ),
-          h.input([
-            h.Type('range'),
-            h.Class('lutra-range'),
-            h.Min('0'),
-            h.Max('100'),
-            h.Step('1'),
-            h.Value(String(quality ?? 75)),
-            h.OnInput((raw) => onChangedQuality(Number(raw))),
-          ]),
+          lutraRangeRow(h, {
+            label: 'Quality',
+            display: String(quality ?? 75),
+            min: 0,
+            max: 100,
+            step: 1,
+            value: quality ?? 75,
+            onInput: onChangedQuality,
+          }),
         ],
       )
     : null
