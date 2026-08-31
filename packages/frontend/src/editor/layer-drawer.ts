@@ -1,5 +1,7 @@
 import { type Html, type HtmlBuilder, createKeyedLazy, createLazy } from 'foldkit/html'
 import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, Eye, EyeOff, Trash2, X, Check } from 'lucide'
+import { button } from '@/components/ui/button'
+import { lutraRangeRow } from '@/components/lutra-range-row'
 import { icon } from '../components/icon'
 import {
   LAYER_UI,
@@ -72,19 +74,22 @@ const mixerSwatches = (
   h.div(
     [h.Class('flex items-center gap-1.5'), h.AriaLabel('Color ranges')],
     MIXER_COLORS.map((color, index) =>
-      h.button(
-        [
-          h.OnClick(onSelect(index)),
-          h.AriaLabel(`Select ${color.name}`),
-          h.AriaPressed(String(index === active)),
-          h.Class(
-            `size-5 shrink-0 rounded-full border ${
-              index === active ? 'border-ink ring-1 ring-ink' : 'border-border hover:border-muted'
-            }`,
-          ),
-          h.Style({ background: `hsl(${color.hue} 100% 50%)` }),
-        ],
+      button(
+        {
+          onClick: onSelect(index),
+          size: 'icon-xs',
+          variant: 'ghost',
+          className: `size-5 shrink-0 rounded-full border p-0 ${
+            index === active ? 'border-ink ring-1 ring-ink' : 'border-border hover:border-muted'
+          }`,
+          attributes: [
+            h.AriaLabel(`Select ${color.name}`),
+            h.AriaPressed(String(index === active)),
+            h.Style({ background: `hsl(${color.hue} 100% 50%)` }),
+          ],
+        },
         [],
+        h,
       ),
     ),
   )
@@ -272,21 +277,26 @@ const draftRow = (h: HtmlBuilder<EditorMessage>, slice: LayerRowSlice, layer: La
       h.div(
         [h.Class('flex items-center justify-end gap-2 px-4 py-2')],
         [
-          h.button(
-            [
-              h.OnClick(EditorMessage.CancelledDraft()),
-              h.AriaLabel('Cancel draft'),
-              h.Class('grid size-7 place-items-center text-muted hover:text-ink'),
-            ],
+          button(
+            {
+              onClick: EditorMessage.CancelledDraft(),
+              variant: 'ghost',
+              size: 'icon-sm',
+              className: 'grid place-items-center',
+              attributes: [h.AriaLabel('Cancel draft')],
+            },
             [icon(h, X, 'Cancel draft')],
+            h,
           ),
-          h.button(
-            [
-              h.OnClick(EditorMessage.ConfirmedDraft()),
-              h.AriaLabel('Confirm draft'),
-              h.Class('grid size-7 place-items-center bg-accent text-ink'),
-            ],
+          button(
+            {
+              onClick: EditorMessage.ConfirmedDraft(),
+              size: 'icon-sm',
+              className: 'grid place-items-center',
+              attributes: [h.AriaLabel('Confirm draft')],
+            },
             [icon(h, Check, 'Confirm draft')],
+            h,
           ),
         ],
       ),
@@ -339,13 +349,16 @@ const chainRowImpl = (
           h.OnClick(EditorMessage.SelectedLayer({ id: layer.id })),
         ],
         [
-          h.button(
-            [
-              h.OnClick(EditorMessage.ToggledLayerVisibility({ id: layer.id })),
-              h.AriaLabel(layer.visible ? 'Hide layer' : 'Show layer'),
-              h.Class('grid size-6 place-items-center text-muted hover:text-ink'),
-            ],
+          button(
+            {
+              onClick: EditorMessage.ToggledLayerVisibility({ id: layer.id }),
+              variant: 'ghost',
+              size: 'icon-sm',
+              className: 'grid place-items-center',
+              attributes: [h.AriaLabel(layer.visible ? 'Hide layer' : 'Show layer')],
+            },
             [icon(h, layer.visible ? Eye : EyeOff, layer.visible ? 'Hide' : 'Show')],
+            h,
           ),
           icon(h, ui.icon, ui.label),
           h.span([h.Class('min-w-0 flex-1 truncate text-sm')], [ui.label]),
@@ -363,13 +376,16 @@ const chainRowImpl = (
               reorderButton(h, 'Move down', ArrowDown, index === 0, () =>
                 EditorMessage.ReorderedLayer({ from: index, to: index - 1 }),
               ),
-              h.button(
-                [
-                  h.OnClick(EditorMessage.RemovedLayer({ id: layer.id })),
-                  h.AriaLabel('Delete layer'),
-                  h.Class('grid size-6 place-items-center text-muted hover:text-ink'),
-                ],
+              button(
+                {
+                  onClick: EditorMessage.RemovedLayer({ id: layer.id }),
+                  variant: 'ghost',
+                  size: 'icon-sm',
+                  className: 'grid place-items-center',
+                  attributes: [h.AriaLabel('Delete layer')],
+                },
                 [icon(h, Trash2, 'Delete layer')],
+                h,
               ),
             ],
           ),
@@ -425,26 +441,31 @@ const reorderButton = (
   disabled: boolean,
   onClick: () => EditorMessage,
 ) =>
-  h.button(
-    [
-      h.OnClick(onClick()),
-      h.Disabled(disabled),
-      h.AriaLabel(label),
-      h.Class('grid size-6 place-items-center text-muted hover:text-ink disabled:opacity-30'),
-    ],
+  button(
+    {
+      onClick: onClick(),
+      isDisabled: disabled,
+      variant: 'ghost',
+      size: 'icon-sm',
+      className: 'grid place-items-center disabled:opacity-30',
+      attributes: [h.AriaLabel(label)],
+    },
     [icon(h, node, label)],
+    h,
   )
 
 /** The chevron on a drawer LUT row: expands/collapses the bottom LUT bar */
 const lutBarToggleImpl = (h: HtmlBuilder<EditorMessage>, open: boolean) =>
-  h.button(
-    [
-      h.OnClick(EditorMessage.ToggledLutPicker()),
-      h.AriaExpanded(open),
-      h.AriaLabel('Toggle LUT bar'),
-      h.Class('grid size-6 place-items-center text-muted hover:text-ink'),
-    ],
+  button(
+    {
+      onClick: EditorMessage.ToggledLutPicker(),
+      variant: 'ghost',
+      size: 'icon-sm',
+      className: 'grid place-items-center',
+      attributes: [h.AriaExpanded(open), h.AriaLabel('Toggle LUT bar')],
+    },
     [icon(h, open ? ChevronUp : ChevronDown, 'Toggle LUT bar')],
+    h,
   )
 
 export const sliderControl = (
@@ -461,29 +482,15 @@ export const sliderControl = (
   h.div(
     [h.Class('flex flex-col gap-1')],
     [
-      h.div(
-        [h.Class('flex items-baseline justify-between')],
-        [
-          h.button(
-            [
-              ...(toggledLabel && onToggleLabel ? [h.OnClick(onToggleLabel())] : []),
-              h.Class(
-                `text-[10px] uppercase tracking-[0.14em] text-muted ${toggledLabel ? 'hover:text-ink' : 'cursor-default'}`,
-              ),
-            ],
-            toggledLabel ? [`⇅ ${label}`] : [label],
-          ),
-          h.span([h.Class('tnum text-xs text-ink')], [display]),
-        ],
-      ),
-      h.input([
-        h.Type('range'),
-        h.Class('lutra-range'),
-        h.Min(String(min)),
-        h.Max(String(max)),
-        h.Step('0.01'),
-        h.Value(String(value)),
-        h.OnInput((raw) => onChange(Number(raw))),
-      ]),
+      lutraRangeRow(h, {
+        label: toggledLabel ? `⇅ ${label}` : label,
+        display,
+        min,
+        max,
+        step: 0.01,
+        value,
+        onInput: onChange,
+        ...(toggledLabel && onToggleLabel ? { labelOnClick: onToggleLabel } : {}),
+      }),
     ],
   )

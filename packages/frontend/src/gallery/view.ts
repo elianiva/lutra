@@ -2,6 +2,7 @@ import { DateTime } from 'effect'
 import { Submodel, AsyncData } from 'foldkit'
 import { type Html, type HtmlBuilder, createLazy, createKeyedLazy } from 'foldkit/html'
 import { Check, Undo2, Upload, X } from 'lucide'
+import { button } from '@/components/ui/button'
 import { GalleryMessage } from './message'
 import type { Model } from './model'
 import type { Collage as CollageRecord, EditSummary, EditId, StoreError } from '@lutra/store'
@@ -103,45 +104,53 @@ const header = (h: HtmlBuilder<GalleryMessage>, selectedCount: number) =>
           // (docs/adr/0009-collage): below that there is nothing to arrange.
           ...(selectedCount >= 2
             ? [
-                h.button(
-                  [
-                    h.OnClick(GalleryMessage.CreateCollageRequested()),
-                    h.AriaLabel(`Create a collage from ${selectedCount} selected edits`),
-                    h.DataAttribute('create-collage', 'true'),
-                    h.Class('rounded bg-accent px-3 py-1 text-xs text-ink hover:opacity-80'),
-                  ],
-                  [`Create collage (${selectedCount})`],
+                button(
+                  {
+                    onClick: GalleryMessage.CreateCollageRequested(),
+                    size: 'xs',
+                    attributes: [
+                      h.AriaLabel(`Create a collage from ${selectedCount} selected edits`),
+                      h.DataAttribute('create-collage', 'true'),
+                    ],
+                  },
+                  `Create collage (${selectedCount})`,
+                  h,
                 ),
               ]
             : []),
-          h.button(
-            [
-              h.OnClick(GalleryMessage.OpenPhotoRequested()),
-              h.AriaLabel('Open a photo to start a new edit'),
-              h.Class(
-                'rounded border border-accent px-3 py-1 text-xs text-accent hover:border-ink hover:text-ink',
-              ),
-            ],
-            ['Open photo'],
+          button(
+            {
+              onClick: GalleryMessage.OpenPhotoRequested(),
+              variant: 'outline',
+              size: 'xs',
+              className: 'border-accent text-accent hover:border-ink hover:text-ink',
+              attributes: [h.AriaLabel('Open a photo to start a new edit')],
+            },
+            'Open photo',
+            h,
           ),
-          h.button(
-            [
-              h.OnClick(GalleryMessage.RefreshRequested()),
-              h.AriaLabel('Refresh'),
-              h.Class('px-2 text-xs text-muted hover:text-ink'),
-            ],
-            ['Refresh'],
+          button(
+            {
+              onClick: GalleryMessage.RefreshRequested(),
+              variant: 'ghost',
+              size: 'xs',
+              attributes: [h.AriaLabel('Refresh')],
+            },
+            'Refresh',
+            h,
           ),
-          // Same utility-action styling as "Refresh" — settings is chrome,
-          // not a primary CTA like "Open photo".
-          h.button(
-            [
-              h.OnClick(GalleryMessage.SettingsRequested()),
-              h.AriaLabel('Open settings'),
-              h.DataAttribute('open-settings', 'true'),
-              h.Class('px-2 text-xs text-muted hover:text-ink'),
-            ],
-            ['Settings'],
+          button(
+            {
+              onClick: GalleryMessage.SettingsRequested(),
+              variant: 'ghost',
+              size: 'xs',
+              attributes: [
+                h.AriaLabel('Open settings'),
+                h.DataAttribute('open-settings', 'true'),
+              ],
+            },
+            'Settings',
+            h,
           ),
         ],
       ),
@@ -201,13 +210,14 @@ const emptyState = (h: HtmlBuilder<GalleryMessage>) =>
       h.div(
         [h.Class('flex flex-wrap items-center justify-center gap-2')],
         [
-          h.button(
-            [
-              h.OnClick(GalleryMessage.OpenPhotoRequested()),
-              h.AriaLabel('Open a photo to start a new edit'),
-              h.Class('rounded bg-accent px-4 py-2 text-xs text-ink hover:opacity-80'),
-            ],
-            ['Open a photo to start editing'],
+          button(
+            {
+              onClick: GalleryMessage.OpenPhotoRequested(),
+              size: 'sm',
+              attributes: [h.AriaLabel('Open a photo to start a new edit')],
+            },
+            'Open a photo to start editing',
+            h,
           ),
           h.span([h.Class('text-xs text-muted')], ['or drop images here']),
         ],
@@ -224,12 +234,14 @@ const errorState = (h: HtmlBuilder<GalleryMessage>, error: string) =>
     [h.Class('flex flex-1 flex-col items-center justify-center gap-3 text-sm text-muted')],
     [
       h.p([], [`Could not load your gallery: ${error}`]),
-      h.button(
-        [
-          h.OnClick(GalleryMessage.RefreshRequested()),
-          h.Class('cursor-pointer text-ink underline underline-offset-2'),
-        ],
-        ['Try again'],
+      button(
+        {
+          onClick: GalleryMessage.RefreshRequested(),
+          variant: 'link',
+          className: 'h-auto p-0',
+        },
+        'Try again',
+        h,
       ),
     ],
   )
@@ -270,33 +282,40 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary, selected: bo
     [
       // Click target for opening the edit — must not include the select or
       // delete buttons so those clicks don't bubble up into ClickedEdit.
-      h.button(
-        [
-          h.OnClick(GalleryMessage.ClickedEdit({ id: summary.id })),
-          h.AriaLabel(`Open saved edit`),
-          h.Class('absolute inset-0'),
-        ],
+      button(
+        {
+          onClick: GalleryMessage.ClickedEdit({ id: summary.id }),
+          variant: 'ghost',
+          className: 'absolute inset-0 h-auto p-0',
+          attributes: [h.AriaLabel('Open saved edit')],
+        },
         [tileThumb(h, summary)],
+        h,
       ),
       // The collage-select control (docs/adr/0009-collage): an overlay like the
       // delete control — no separate "select mode" to enter or leave; the
       // header CTA appears at two or more. Hidden until hover/focus like
       // the rest of the tile's overlays — except once selected, where it
       // stays put so the picked state remains visible without hover.
-      h.button(
-        [
-          h.OnClick(GalleryMessage.ToggledSelection({ id: summary.id })),
-          h.AriaLabel(selected ? 'Remove from collage selection' : 'Add to collage selection'),
-          h.DataAttribute('select-edit-id', summary.id),
-          h.Class(
-            `absolute left-1 top-1 z-10 grid size-7 place-items-center rounded-full border ${
-              selected
-                ? 'border-accent bg-accent text-ink'
-                : `border-white/60 bg-black/40 text-white/80 hover:text-white ${hoverReveal}`
-            }`,
-          ),
-        ],
+      button(
+        {
+          onClick: GalleryMessage.ToggledSelection({ id: summary.id }),
+          variant: 'ghost',
+          size: 'icon-sm',
+          className: `absolute left-1 top-1 z-10 grid place-items-center rounded-full border p-0 ${
+            selected
+              ? 'border-accent bg-accent text-ink'
+              : `border-white/60 bg-black/40 text-white/80 hover:text-white ${hoverReveal}`
+          }`,
+          attributes: [
+            h.AriaLabel(
+              selected ? 'Remove from collage selection' : 'Add to collage selection',
+            ),
+            h.DataAttribute('select-edit-id', summary.id),
+          ],
+        },
         selected ? [icon(h, Check, 'Selected')] : [],
+        h,
       ),
       // Caption + delete ✕: hidden until hover/focus (the ✕ opens the
       // delete-confirmation dialog, ADR-0010 superseded).
@@ -318,18 +337,20 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary, selected: bo
           h.div(
             [h.Class('flex items-center gap-1')],
             [
-              h.button(
-                [
-                  h.OnClick(GalleryMessage.DeleteConfirmRequested({ id: summary.id })),
-                  h.AriaLabel('Delete saved edit'),
-                  // size-7: a finger-sized hit target on touch screens
-                  // (docs/adr/0010-editor-ui.md).
-                  h.Class(
-                    'relative z-10 grid size-7 place-items-center text-white/80 hover:text-white',
-                  ),
-                  h.DataAttribute('delete-edit-id', summary.id),
-                ],
+              button(
+                {
+                  onClick: GalleryMessage.DeleteConfirmRequested({ id: summary.id }),
+                  variant: 'ghost',
+                  size: 'icon-sm',
+                  className:
+                    'relative z-10 grid place-items-center p-0 text-white/80 hover:text-white',
+                  attributes: [
+                    h.AriaLabel('Delete saved edit'),
+                    h.DataAttribute('delete-edit-id', summary.id),
+                  ],
+                },
                 [icon(h, X, 'Delete saved edit')],
+                h,
               ),
             ],
           ),
@@ -429,14 +450,18 @@ const collageCard = (
     [
       // The mini-preview doubles as the open click target; the confirm and
       // delete controls sit above it so their clicks don't bubble.
-      h.button(
-        [
-          h.OnClick(GalleryMessage.CollageOpenRequested({ id: collage.id })),
-          h.AriaLabel(`Open collage with ${collage.tiles.length} photos`),
-          h.DataAttribute('open-collage-id', collage.id),
-          h.Class('absolute inset-0'),
-        ],
+      button(
+        {
+          onClick: GalleryMessage.CollageOpenRequested({ id: collage.id }),
+          variant: 'ghost',
+          className: 'absolute inset-0 h-auto p-0',
+          attributes: [
+            h.AriaLabel(`Open collage with ${collage.tiles.length} photos`),
+            h.DataAttribute('open-collage-id', collage.id),
+          ],
+        },
         [miniPreview(h, collage, byId, slice.collageThumbSizes)],
+        h,
       ),
       h.div(
         [
@@ -465,34 +490,49 @@ const collageCard = (
             confirming
               ? [
                   // ADR-0010's two-step inline confirm: red confirm + undo.
-                  h.button(
-                    [
-                      h.OnClick(GalleryMessage.CollageDeleteRequested({ id: collage.id })),
-                      h.AriaLabel('Confirm deleting this collage'),
-                      h.DataAttribute('confirm-delete-collage-id', collage.id),
-                      h.Class('grid size-7 place-items-center text-red-400 hover:text-red-300'),
-                    ],
+                  button(
+                    {
+                      onClick: GalleryMessage.CollageDeleteRequested({ id: collage.id }),
+                      variant: 'ghost',
+                      size: 'icon-sm',
+                      className: 'grid place-items-center p-0 text-red-400 hover:text-red-300',
+                      attributes: [
+                        h.AriaLabel('Confirm deleting this collage'),
+                        h.DataAttribute('confirm-delete-collage-id', collage.id),
+                      ],
+                    },
                     [icon(h, X, 'Confirm deleting this collage')],
+                    h,
                   ),
-                  h.button(
-                    [
-                      h.OnClick(GalleryMessage.CollageDeleteConfirmCancelled()),
-                      h.AriaLabel('Cancel deleting this collage'),
-                      h.DataAttribute('cancel-delete-collage-id', collage.id),
-                      h.Class('grid size-7 place-items-center text-white/80 hover:text-white'),
-                    ],
+                  button(
+                    {
+                      onClick: GalleryMessage.CollageDeleteConfirmCancelled(),
+                      variant: 'ghost',
+                      size: 'icon-sm',
+                      className: 'grid place-items-center p-0 text-white/80 hover:text-white',
+                      attributes: [
+                        h.AriaLabel('Cancel deleting this collage'),
+                        h.DataAttribute('cancel-delete-collage-id', collage.id),
+                      ],
+                    },
                     [icon(h, Undo2, 'Cancel deleting this collage')],
+                    h,
                   ),
                 ]
               : [
-                  h.button(
-                    [
-                      h.OnClick(GalleryMessage.ToggledCollageDeleteConfirm({ id: collage.id })),
-                      h.AriaLabel('Delete this collage'),
-                      h.DataAttribute('delete-collage-id', collage.id),
-                      h.Class('grid size-7 place-items-center text-white/80 hover:text-white'),
-                    ],
+                  button(
+                    {
+                      onClick: GalleryMessage.ToggledCollageDeleteConfirm({ id: collage.id }),
+                      variant: 'ghost',
+                      size: 'icon-sm',
+                      className: 'grid place-items-center p-0 text-white/80 hover:text-white',
+                      attributes: [
+                        h.AriaLabel('Delete this collage'),
+                        h.DataAttribute('delete-collage-id', collage.id),
+                      ],
+                    },
                     [icon(h, X, 'Delete this collage')],
+                    h,
                   ),
                 ],
           ),

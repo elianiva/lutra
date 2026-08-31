@@ -1,6 +1,6 @@
 import { Schema as S } from 'effect'
 import { defineMessageUnion } from 'foldkit/message'
-import { Dialog } from '@foldkit/ui'
+import * as Dialog from '@/components/ui/dialog'
 import { ExportFormat, ExportQuality, ExportScale, ExportSettings } from '@lutra/engine'
 
 /**

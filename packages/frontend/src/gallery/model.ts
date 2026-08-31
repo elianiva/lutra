@@ -1,6 +1,6 @@
 import { Schema as S } from 'effect'
 import { AsyncData } from 'foldkit'
-import { Dialog } from '@foldkit/ui'
+import * as Dialog from '@/components/ui/dialog'
 import { EditSummary, StoreError, EditIdSchema, Collage, CollageIdSchema } from '@lutra/store'
 
 /**

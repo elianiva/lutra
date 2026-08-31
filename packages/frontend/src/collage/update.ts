@@ -1,4 +1,4 @@
-import { DragAndDrop } from '@foldkit/ui'
+import * as DragAndDrop from '@/components/ui/drag-and-drop'
 import { Match as M } from 'effect'
 import { Command, Update } from 'foldkit'
 import type { GpuBackend } from '../gpu/backend'

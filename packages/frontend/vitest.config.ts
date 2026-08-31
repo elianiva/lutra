@@ -6,6 +6,7 @@ const here = import.meta.dirname
 export default defineConfig({
   resolve: {
     alias: {
+      '@': path.resolve(here, 'src'),
       '@lutra/engine': path.resolve(here, '../engine/src/index.ts'),
       '@lutra/store': path.resolve(here, '../store/src/index.ts'),
     },

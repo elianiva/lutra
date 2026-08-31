@@ -1,6 +1,6 @@
 import { Schema as S } from 'effect'
 import { defineMessageUnion } from 'foldkit/message'
-import { Dialog } from '@foldkit/ui'
+import * as Dialog from '@/components/ui/dialog'
 import { EditSummary, EditIdSchema, StoreError, CollageIdSchema, Collage } from '@lutra/store'
 import { ImageDecodeError, ThumbnailEncodeError } from '../errors'
 

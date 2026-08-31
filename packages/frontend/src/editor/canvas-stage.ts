@@ -3,6 +3,7 @@ import { Mount } from 'foldkit'
 import { type Html, type HtmlBuilder, createLazy } from 'foldkit/html'
 import { Eye, EyeOff, SquareSplitHorizontal, Columns2 } from 'lucide'
 import type { IconNode } from 'lucide'
+import { button } from '@/components/ui/button'
 import { EditorMessage, type CompareMode } from './message'
 import { Empty, ErrorState, hasImage, Loading } from './phase'
 import { canvasRef, registerCanvas } from '../gpu/canvas-ref'
@@ -494,20 +495,18 @@ const compareView = (mode: CompareMode, hasImage: boolean, h: HtmlBuilder<Editor
     ],
     COMPARE_MODES.map(({ mode: m, label, icon: Icon }) => {
       const active = mode === m
-      return h.button(
-        [
-          h.Key(m),
-          h.Class(
-            active
-              ? 'flex items-center gap-1.5 bg-accent px-3 py-1.5 text-ink'
-              : 'flex items-center gap-1.5 px-3 py-1.5 text-muted hover:bg-panel-alt hover:text-ink',
-          ),
-          h.Disabled(!hasImage),
-          h.OnClick(EditorMessage.ChangedCompareMode({ mode: m })),
-          h.AriaLabel(label),
-          h.Title(label),
-        ],
+      return button(
+        {
+          onClick: EditorMessage.ChangedCompareMode({ mode: m }),
+          isDisabled: !hasImage,
+          variant: active ? 'default' : 'ghost',
+          className: active
+            ? 'flex items-center gap-1.5 bg-accent px-3 py-1.5 text-ink'
+            : 'flex items-center gap-1.5 px-3 py-1.5 text-muted hover:bg-panel-alt hover:text-ink',
+          attributes: [h.Key(m), h.AriaLabel(label), h.Title(label)],
+        },
         [icon(h, Icon, label, 14), h.span([h.Class('hidden text-xs sm:inline')], [label])],
+        h,
       )
     }),
   )
@@ -537,12 +536,14 @@ const emptyStage = (h: HtmlBuilder<EditorMessage>) =>
         [],
         [
           'Drop an image here, or ',
-          h.button(
-            [
-              h.Class('cursor-pointer text-ink underline underline-offset-2'),
-              h.OnClick(EditorMessage.FilePickRequested()),
-            ],
-            ['browse'],
+          button(
+            {
+              onClick: EditorMessage.FilePickRequested(),
+              variant: 'link',
+              className: 'h-auto p-0',
+            },
+            'browse',
+            h,
           ),
         ],
       ),
@@ -555,12 +556,14 @@ const errorStage = (h: HtmlBuilder<EditorMessage>, error: string) =>
     [h.Class('flex flex-col items-center justify-center gap-2 text-sm text-muted')],
     [
       h.p([], [`Failed to load image: ${error}`]),
-      h.button(
-        [
-          h.Class('cursor-pointer text-ink underline underline-offset-2'),
-          h.OnClick(EditorMessage.FilePickRequested()),
-        ],
-        ['Try another'],
+      button(
+        {
+          onClick: EditorMessage.FilePickRequested(),
+          variant: 'link',
+          className: 'h-auto p-0',
+        },
+        'Try another',
+        h,
       ),
     ],
   )

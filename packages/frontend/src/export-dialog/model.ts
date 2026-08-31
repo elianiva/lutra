@@ -1,5 +1,5 @@
 import { Schema as S } from 'effect'
-import { Dialog } from '@foldkit/ui'
+import * as Dialog from '@/components/ui/dialog'
 import { ExportSettings, defaultExportSettings } from '@lutra/engine'
 
 /**

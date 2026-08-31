@@ -1,6 +1,6 @@
 import { Effect, Option, Queue, Schema as S, Stream } from 'effect'
 import { Subscription } from 'foldkit'
-import { DragAndDrop } from '@foldkit/ui'
+import * as DragAndDrop from '@/components/ui/drag-and-drop'
 import { CollageMessage } from './message'
 import type { Model } from './model'
 import { ScreenMode } from './model'

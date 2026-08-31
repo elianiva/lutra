@@ -1,6 +1,13 @@
 import { Option, pipe } from 'effect'
-import type { ChildAttribute, HtmlBuilder } from 'foldkit/html'
-import { Dialog } from '@foldkit/ui'
+import type { HtmlBuilder } from 'foldkit/html'
+import * as Dialog from '@/components/ui/dialog'
+import {
+  lutraDialogFooterClass,
+  lutraDialogSectionClass,
+  lutraDialogTitleClass,
+  lutraDialogViewInputs,
+} from '@/components/lutra-dialog-shell'
+import { button } from '@/components/ui/button'
 import { ExportDialogMessage as Message } from './message'
 import { filenameFor } from './update'
 import type { Model } from './model'
@@ -10,10 +17,6 @@ import { peekFrame } from './frame'
 /**
  * The shared export dialog view (docs/adr/0004-export): the format / quality /
  * resolution sections with the status line and `<stem>.<format>` filename.
- * Encoding runs only when Export is pressed — the frame is snapshotted once
- * when the dialog opens, then re-encoded per press. The owning screen
- * embeds it via `h.submodel`, wrapping machine messages into its own
- * boundary through `toParent`.
  */
 export const exportDialogView = <P>(
   h: HtmlBuilder<P>,
@@ -25,60 +28,75 @@ export const exportDialogView = <P>(
     slotId: model.dialog.id,
     toParentMessage: (message) => toParent(Message.GotDialogMessage({ message })),
     view: Dialog.view,
-    viewInputs: {
-      toView: ({ dialog, backdrop, panel, title, closeButton, isVisible }) =>
-        h.dialog(
-          [...dialog, h.Class('relative')],
-          isVisible
-            ? [
-                // The dialog is `position: relative`; the backdrop and panel
-                // are positioned against it (see @foldkit/ui-showcase).
-                h.div([...backdrop, h.Class('fixed inset-0 z-[59] bg-black/60')], []),
-                h.div(
-                  [
-                    ...panel,
-                    // Full-width on phones (docs/adr/0010-editor-ui.md): the fixed 420px
-                    // panel would overflow a ~360px viewport. Capped in
-                    // height with an internal scroll so a landscape phone
-                    // can still reach the Export button.
-                    h.Class(
-                      'fixed left-1/2 top-1/2 z-[60] w-[min(420px,calc(100vw-2rem))] max-h-[85dvh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto border border-border bg-panel shadow-lg',
-                    ),
-                  ],
-                  [
-                    header(h, model, title),
-                    h.div(
-                      [h.Class('flex flex-col gap-4 px-4 py-4')],
-                      [
-                        formatSection(h, model.settings, (format) =>
-                          toParent(Message.ChangedFormat({ format })),
-                        ),
-                        qualitySection(h, model.settings, (quality) =>
-                          toParent(Message.ChangedQuality({ quality })),
-                        ),
-                        resolutionSection(h, model.settings, peekFrame(), (scale) =>
-                          toParent(Message.ChangedScale({ scale })),
-                        ),
-                        statusSection(h, model),
-                      ],
-                    ),
-                    footer(h, model, closeButton, toParent),
-                  ],
-                ),
-              ]
-            : [],
-        ),
-    },
+    viewInputs: lutraDialogViewInputs(
+      {
+        panelClass:
+          'fixed left-1/2 top-1/2 z-[60] w-[min(420px,calc(100vw-2rem))] max-h-[85dvh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto border border-border bg-panel shadow-lg rounded-none',
+        content: ({ title, closeButton }, dialogH) => [
+          Dialog.header(
+            {
+              className:
+                'flex items-baseline justify-between border-b border-border px-4 py-3',
+            },
+            [
+              Dialog.title(
+                { attributes: title, className: lutraDialogTitleClass },
+                ['EXPORT'],
+                dialogH,
+              ),
+              dialogH.span(
+                [dialogH.Class('text-[10px] uppercase tracking-[0.14em] text-muted')],
+                [filenameFor(model)],
+              ),
+            ],
+            dialogH,
+          ),
+          dialogH.div(
+            [dialogH.Class(lutraDialogSectionClass)],
+            [
+              formatSection(dialogH, model.settings, (format) =>
+                toParent(Message.ChangedFormat({ format })),
+              ),
+              qualitySection(dialogH, model.settings, (quality) =>
+                toParent(Message.ChangedQuality({ quality })),
+              ),
+              resolutionSection(dialogH, model.settings, peekFrame(), (scale) =>
+                toParent(Message.ChangedScale({ scale })),
+              ),
+              statusSection(dialogH, model),
+            ],
+          ),
+          Dialog.footer(
+            { className: lutraDialogFooterClass },
+            [
+              button(
+                {
+                  attributes: [...closeButton],
+                  variant: 'ghost',
+                  size: 'xs',
+                  className: 'text-muted hover:text-ink',
+                },
+                'Cancel',
+                dialogH,
+              ),
+              button(
+                {
+                  onClick: toParent(Message.EncodeRequested()),
+                  isDisabled: !model.ready || model.encoding,
+                  size: 'xs',
+                  className: 'px-4 disabled:opacity-30',
+                },
+                model.encoding ? 'Encoding…' : 'Export',
+                dialogH,
+              ),
+            ],
+            dialogH,
+          ),
+        ],
+      },
+      h,
+    ),
   })
-
-const header = <P>(h: HtmlBuilder<P>, model: Model, title: ReadonlyArray<ChildAttribute>) =>
-  h.div(
-    [h.Class('flex items-baseline justify-between border-b border-border px-4 py-3')],
-    [
-      h.h2([...title, h.Class('text-sm font-semibold tracking-[0.14em]')], ['EXPORT']),
-      h.span([h.Class('text-[10px] uppercase tracking-[0.14em] text-muted')], [filenameFor(model)]),
-    ],
-  )
 
 const statusSection = <P>(h: HtmlBuilder<P>, model: Model) =>
   h.div(
@@ -89,33 +107,6 @@ const statusSection = <P>(h: HtmlBuilder<P>, model: Model) =>
     ],
   )
 
-const footer = <P>(
-  h: HtmlBuilder<P>,
-  model: Model,
-  closeButton: ReadonlyArray<ChildAttribute>,
-  toParent: (message: Message) => P,
-) =>
-  h.div(
-    [h.Class('flex justify-end gap-2 border-t border-border px-4 py-3')],
-    [
-      h.button(
-        [...closeButton, h.Class('px-3 py-1.5 text-xs text-muted hover:text-ink')],
-        ['Cancel'],
-      ),
-      h.button(
-        [
-          h.OnClick(toParent(Message.EncodeRequested())),
-          h.Disabled(!model.ready || model.encoding),
-          h.Class('bg-accent px-4 py-1.5 text-xs text-ink hover:opacity-90 disabled:opacity-30'),
-        ],
-        [model.encoding ? 'Encoding…' : 'Export'],
-      ),
-    ],
-  )
-
-/** The size line: the snapshot/encode error's reason, "Encoding…" while an
- *  encode runs, the downloaded size after a download, else a placeholder —
- *  no size exists before the first export (encoding happens on Export press). */
 const statusText = (model: Model) =>
   pipe(
     Option.fromNullishOr(model.error),

@@ -1,6 +1,6 @@
 import { Schema as S } from 'effect'
 import { defineMessageUnion } from 'foldkit/message'
-import { DragAndDrop } from '@foldkit/ui'
+import * as DragAndDrop from '@/components/ui/drag-and-drop'
 import * as ExportDialog from '../export-dialog'
 import { Collage, EditIdSchema, StoreError } from '@lutra/store'
 import { CollagePhoto } from './model'
