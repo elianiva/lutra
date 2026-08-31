@@ -20,9 +20,10 @@ Preconditions:
 
 - A photo is open in the editor (see open-photo). The `adjust` scenario does this first.
 
-- **Open Exposure.** Run `node scripts/verify.mjs --scenario adjust`. The harness clicks `button[aria-label="Add Exposure adjustment"]` (`exposure-tool-open` step).
+- **Open Exposure.** Run `node .cursor/skills/verify-lutra/scripts/verify.mjs --scenario adjust`. The harness clicks `button[aria-label="Add Exposure adjustment"]` (`exposure-tool-open` step).
 - **Result — controls shown.** The `exposure-panel` step asserts the `EXPOSURE` control is visible in the panel.
-- **Proof.** `adjust-exposure.png` shows the Exposure control; `adjust-result.json` records the step outcomes.
+- **Change the value.** The harness locates the `input[type=range].lutra-range`, sets it to the opposite end, and dispatches a real `input` event (foldkit's `OnInput`). The `exposure-changed` step reads the on-screen `.tnum` readout before and after and asserts it changed, proving the edit took effect (not just that the tool opened).
+- **Proof.** `adjust-exposure.png` shows the Exposure control after the move; `adjust-result.json` records the readout transition (e.g. `+0.00 EV -> +5.00 EV`).
 - **Other tools.** Swap the aria-label to drive a different tool, e.g. `Add Contrast adjustment` or `Add White Balance adjustment`; the panel labels change accordingly (`CONTRAST`, `TEMPERATURE`/`TINT`).
 
 ## Gotchas

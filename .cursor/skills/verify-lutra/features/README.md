@@ -4,9 +4,11 @@ The maintained source for verifying Lutra's user-facing behavior. Read this inde
 
 ## Baseline preconditions
 
-- Launch Lutra with `scripts/launch.sh`; it serves `http://localhost:5173` (override with `LUTRA_PORT`).
-- Run `scripts/doctor.sh` and require `READY` before driving.
-- The harness (`scripts/verify.mjs`) launches its own isolated Chrome with software-WebGPU flags on the X display (`DISPLAY`, default `:1`); it never drives the computer-use browser.
+All commands below are written from the repository root; the skill lives at `.cursor/skills/verify-lutra/`.
+
+- Launch Lutra with `.cursor/skills/verify-lutra/scripts/launch.sh`; it serves `http://localhost:5173` (override with `LUTRA_PORT`).
+- Run `.cursor/skills/verify-lutra/scripts/doctor.sh` and require `READY` before driving.
+- The harness (`.cursor/skills/verify-lutra/scripts/verify.mjs`) launches its own isolated Chrome with software-WebGPU flags on the X display (`DISPLAY`, default `:1`); it never drives the computer-use browser.
 - Only drive an instance this run started. Never kill Chrome by process name.
 
 ## Driving conventions
@@ -19,7 +21,8 @@ The maintained source for verifying Lutra's user-facing behavior. Read this inde
 ## Proof and skip reporting
 
 - Capture the user action and the resulting state, not only the final screen.
-- Prove image processing via the LUT filmstrip previews / the applied `LAYERS` entry, plus the `/edit/:id` URL change — **not** the main canvas (black under software WebGPU; see SKILL.md).
+- Prove app/state flow via the applied `LAYERS` entry plus the `/edit/:id` URL change — **not** the main canvas (black under software WebGPU; see SKILL.md).
+- The LUT filmstrip is CPU-rendered (`applyLutCpu`), so it validates LUT/app correctness, not the WebGPU pipeline; validating GPU render needs real hardware.
 - Record the feature ID and the entry point used with every artifact.
 - Report an unreachable path with the attempted command and the unmet precondition; never report a skipped entry point as verified through another path.
 

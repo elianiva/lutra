@@ -1,13 +1,13 @@
 # Apply a LUT
 
-A LUT layer applies a film-stock look to the photo. The user opens the LUT tool, picks a film emulation from the bottom filmstrip, and the look becomes a committed layer in the chain (shown in the right-hand `LAYERS` panel with a `STRENGTH` slider). The filmstrip thumbnails are live WebGPU previews of the user's own photo under each film stock.
+A LUT layer applies a film-stock look to the photo. The user opens the LUT tool, picks a film emulation from the bottom filmstrip, and the look becomes a committed layer in the chain (shown in the right-hand `LAYERS` panel with a `STRENGTH` slider). The filmstrip thumbnails are previews of the user's own photo under each film stock, rendered on the CPU (`applyLutCpu`) — not through the WebGPU pipeline.
 
 ## Sub-features
 
 - `lut-open` opens the LUT tool and reveals the filmstrip.
 - `lut-pick` applies one film emulation to the photo.
 - `lut-layer` the applied LUT appears as a layer with an adjustable `STRENGTH`.
-- `lut-preview` filmstrip thumbnails render the loaded photo under each LUT (image-processing proof).
+- `lut-preview` filmstrip thumbnails render the loaded photo under each LUT (CPU-rendered; proves LUT/app correctness, not the GPU pipeline).
 
 ## How to get to it (user POV)
 
@@ -20,10 +20,10 @@ Preconditions:
 
 - A photo is open in the editor (see open-photo). The `smoke`/`lut` scenarios do this first.
 
-- **Open LUT tool.** Run `node scripts/verify.mjs --scenario lut`. The harness clicks `button[aria-label="Add LUT adjustment"]` (`lut-tool-open` step).
+- **Open LUT tool.** Run `node .cursor/skills/verify-lutra/scripts/verify.mjs --scenario lut`. The harness clicks `button[aria-label="Add LUT adjustment"]` (`lut-tool-open` step).
 - **Pick a preset.** It then clicks the first filmstrip thumbnail `button[aria-label^="Apply "]` (`lut-preset-applied` step records the name, e.g. `Apply Kodak 2393 Cuspclip`).
 - **Result — layer committed.** The `lut-layer-present` step asserts the `LAYERS` panel shows a LUT layer with `STRENGTH`.
-- **Proof.** `smoke-lut-applied.png` shows the applied `LUT` layer (STRENGTH 100%) and the filmstrip rendering the photo through ~13 film emulations; `lut-result.json` records the applied preset name.
+- **Proof.** `lut-lut-applied.png` shows the applied `LUT` layer (STRENGTH 100%) and the filmstrip rendering the photo through the film emulations (CPU); `lut-result.json` records the applied preset name.
 
 ## Gotchas
 

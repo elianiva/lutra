@@ -55,8 +55,8 @@ Screenshots and a `<scenario>-result.json` land in `--out` (default `/opt/cursor
 Proof standards for this app:
 
 - Exercise the real path (drop/click), never internal state setters or test-only hooks.
-- Capture the action **and** the resulting state: the applied LUT layer in `LAYERS` and the film-graded filmstrip thumbnails, plus the URL change to `/edit/:id`.
-- **WebGPU caveat (critical):** on a GPU-less VM the SwiftShader adapter runs **compute** (the LUT filmstrip renders real, graded previews of the loaded photo — that is your image-processing proof), but the WebGPU **swapchain canvas does not composite**, so the large main preview and a `createImageBitmap(mainCanvas)` readback come back **black/empty**. Do not treat the black main canvas as a failure and do not use it as proof; prove processing via the filmstrip/applied layer instead. On real hardware the main canvas renders normally.
+- Capture the action **and** the resulting state: the applied LUT layer in `LAYERS` and the graded filmstrip thumbnails, plus the URL change to `/edit/:id`.
+- **WebGPU caveat (critical):** on a GPU-less VM the `--enable-unsafe-*` flags expose a SwiftShader adapter, so the app boots and its UI/state flow is verifiable — but the WebGPU **render pipeline cannot be validated here**. The swapchain canvas does not composite (the large main preview stays black and a `createImageBitmap(mainCanvas)` readback is empty), so do not treat the black main canvas as a failure and never use it as proof. Note the LUT filmstrip thumbnails are **CPU-rendered** by `applyLutCpu` (`packages/frontend/src/thumbs/worker.ts`), not WebGPU: they prove LUT/app correctness, not the GPU pipeline. This harness therefore verifies app/UI/state flow (open, layer add, controls) plus CPU LUT rendering; validating WebGPU compute/render itself needs real GPU hardware. On real hardware the main canvas renders normally.
 
 ## Cleanup
 

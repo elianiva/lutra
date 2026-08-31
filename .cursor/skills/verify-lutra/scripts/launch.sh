@@ -13,9 +13,22 @@ PORT="${LUTRA_PORT:-5173}"
 URL="http://localhost:${PORT}/"
 cd "$REPO_ROOT"
 
+# A bare 200 is not enough — some other app could own the port. Require the
+# response to look like Lutra (its index.html sets the app title / manifest).
+is_lutra() {
+  local body
+  body="$(curl -fsS "$URL" 2>/dev/null)" || return 1
+  printf '%s' "$body" | grep -qiE 'lutra|/src/entry\.ts|manifest\.webmanifest'
+}
+
 if curl -fsS -o /dev/null "$URL" 2>/dev/null; then
-  echo "Dev server already up at $URL"
-  exit 0
+  if is_lutra; then
+    echo "Dev server already up (Lutra) at $URL"
+    exit 0
+  fi
+  echo "Port ${PORT} is owned by another service (response is not Lutra)." >&2
+  echo "Set LUTRA_PORT to a free port and retry." >&2
+  exit 1
 fi
 
 # bun is needed by the build/icon/sw scripts; the dev server itself doesn't
@@ -32,13 +45,13 @@ fi
 
 echo "Starting Vite dev server on :${PORT}…"
 LOG="$(mktemp /tmp/lutra-dev.XXXXXX.log)"
-( cd packages/frontend && exec ./node_modules/.bin/vite --host 0.0.0.0 --port "$PORT" ) >"$LOG" 2>&1 &
+( cd packages/frontend && exec ./node_modules/.bin/vite --host 0.0.0.0 --port "$PORT" --strictPort ) >"$LOG" 2>&1 &
 SERVER_PID=$!
 echo "  pid=$SERVER_PID  log=$LOG"
 
 for _ in $(seq 1 60); do
-  if curl -fsS -o /dev/null "$URL" 2>/dev/null; then
-    echo "Dev server ready at $URL"
+  if is_lutra; then
+    echo "Dev server ready (Lutra) at $URL"
     exit 0
   fi
   if ! kill -0 "$SERVER_PID" 2>/dev/null; then

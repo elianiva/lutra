@@ -15,7 +15,7 @@
 
 import { spawn, spawnSync } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, resolve, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -31,7 +31,12 @@ const opt = (name, def) => {
   return i >= 0 && args[i + 1] ? args[i + 1] : def
 }
 const has = (name) => args.includes(`--${name}`)
+const SCENARIOS = ['smoke', 'open', 'lut', 'adjust']
 const SCENARIO = opt('scenario', 'smoke')
+if (!SCENARIOS.includes(SCENARIO)) {
+  console.error(`unsupported --scenario "${SCENARIO}"; expected one of: ${SCENARIOS.join(', ')}`)
+  process.exit(2)
+}
 const APP = opt('url', process.env.LUTRA_URL || 'http://localhost:5173/')
 const IMAGE = resolve(opt('image', join(SKILL_DIR, 'fixtures', 'sample.png')))
 const OUT = resolve(
@@ -115,16 +120,29 @@ try {
   await new Promise((r, j) => { ws.on('open', r); ws.on('error', j) })
   let id = 0
   const pending = new Map()
+  // If the socket drops mid-command, reject every awaiter so the run fails
+  // fast and reaches `finally` cleanup instead of hanging forever.
+  const rejectAll = (reason) => {
+    for (const [, p] of pending) { clearTimeout(p.timer); p.reject(new Error(reason)) }
+    pending.clear()
+  }
+  ws.on('close', () => rejectAll('CDP socket closed'))
+  ws.on('error', (e) => rejectAll('CDP socket error: ' + (e?.message || e)))
   ws.on('message', (d) => {
     const m = JSON.parse(d.toString())
-    if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id) }
+    if (m.id && pending.has(m.id)) { const p = pending.get(m.id); clearTimeout(p.timer); p.resolve(m); pending.delete(m.id) }
     else if (m.method === 'Log.entryAdded' && ['error', 'warning'].includes(m.params.entry.level)) {
       const t = (m.params.entry.text || '').slice(0, 200)
       if (!/apple-mobile-web-app-capable|willReadFrequently/.test(t)) result.consoleErrors.push(`[${m.params.entry.level}] ${t}`)
     }
     else if (m.method === 'Runtime.exceptionThrown') result.consoleErrors.push('[exception] ' + (m.params.exceptionDetails?.exception?.description || m.params.exceptionDetails?.text || '').slice(0, 200))
   })
-  const send = (method, params = {}) => new Promise((res) => { const mid = ++id; pending.set(mid, res); ws.send(JSON.stringify({ id: mid, method, params })) })
+  const send = (method, params = {}) => new Promise((resolve, reject) => {
+    const mid = ++id
+    const timer = setTimeout(() => { pending.delete(mid); reject(new Error(`CDP command timed out: ${method}`)) }, 30000)
+    pending.set(mid, { resolve, reject, timer })
+    ws.send(JSON.stringify({ id: mid, method, params }))
+  })
   const evalp = async (expr, awaitPromise = true) => {
     const r = await send('Runtime.evaluate', { expression: expr, awaitPromise, returnByValue: true })
     if (r.result?.exceptionDetails) return { error: JSON.stringify(r.result.exceptionDetails).slice(0, 300) }
@@ -202,6 +220,31 @@ try {
     await sleep(2500)
     const panel = (await evalp(`(document.body.innerText||'')`)).value || ''
     record('exposure-panel', /EXPOSURE/i.test(panel), 'EXPOSURE control visible')
+
+    // Actually move the slider: set the range to the opposite end and fire a
+    // real `input` event (foldkit's OnInput handler), then read the on-screen
+    // numeric readout to prove the edit took effect.
+    const before = await evalp(`(() => {
+      const r = document.querySelector('input[type=range].lutra-range') || document.querySelector('input[type=range]');
+      if (!r) return JSON.stringify({ ok:false });
+      const disp = r.parentElement && r.parentElement.querySelector('.tnum');
+      const min = parseFloat(r.min||'-5'), max = parseFloat(r.max||'5'), cur = parseFloat(r.value||'0');
+      const target = (cur <= (min+max)/2) ? max : min;
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
+      setter.call(r, String(target));
+      r.dispatchEvent(new Event('input',{bubbles:true}));
+      r.dispatchEvent(new Event('change',{bubbles:true}));
+      return JSON.stringify({ ok:true, display:(disp&&disp.textContent)||null, value:r.value, target });
+    })()`)
+    await sleep(1500)
+    const after = await evalp(`(() => {
+      const r = document.querySelector('input[type=range].lutra-range') || document.querySelector('input[type=range]');
+      const disp = r && r.parentElement && r.parentElement.querySelector('.tnum');
+      return JSON.stringify({ value: r && r.value, display: (disp&&disp.textContent)||null });
+    })()`)
+    let b = {}, a = {}
+    try { b = JSON.parse(before.value || '{}'); a = JSON.parse(after.value || '{}') } catch {}
+    record('exposure-changed', b.ok === true && a.display != null && a.display !== b.display, `readout ${b.display} -> ${a.display} (value ${a.value})`)
     await shot('exposure')
   }
 
@@ -215,8 +258,15 @@ try {
   writeFileSync(summary, JSON.stringify(result, null, 2))
   console.log('RESULT', summary, '=>', result.ok ? 'OK' : 'FAILED')
   if (ws) try { ws.close() } catch {}
-  if (!KEEP_OPEN) { try { chrome.kill('SIGKILL') } catch {} }
-  else console.log('Chrome left open (pid', chrome.pid + ') on', DISPLAY, 'debug port', port)
-  await sleep(300)
+  if (!KEEP_OPEN) {
+    try { chrome.kill('SIGKILL') } catch {}
+    await sleep(300)
+    // Remove the throwaway Chrome profile so repeated runs don't accumulate
+    // cache under the temp dir. Evidence in --out is never touched.
+    try { rmSync(profileDir, { recursive: true, force: true }) } catch {}
+  } else {
+    console.log('Chrome left open (pid', chrome.pid + ') on', DISPLAY, 'debug port', port, '— profile', profileDir)
+  }
+  await sleep(200)
   process.exit(result.ok ? 0 : 1)
 }
