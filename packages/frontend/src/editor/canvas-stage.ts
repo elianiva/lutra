@@ -10,6 +10,19 @@ import { MountElementError } from '../errors'
 import type { Model } from './model'
 import { icon } from '../components/icon'
 
+export type CanvasStageModel = Pick<
+  Model,
+  | 'source'
+  | 'scale'
+  | 'offsetX'
+  | 'offsetY'
+  | 'compareMode'
+  | 'compareSplitAt'
+  | 'compareToggleBefore'
+  | 'bins'
+  | 'phase'
+>
+
 const ZOOM_SPEED = 0.01
 
 /** Foldkit mounts on any Element; the stage needs HTMLElement APIs (the
@@ -454,7 +467,7 @@ const splitDividerView = (splitAt: number, scale: number, h: HtmlBuilder<EditorM
     ],
   )
 
-const splitDivider = (h: HtmlBuilder<EditorMessage>, model: Model): Html =>
+const splitDivider = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel): Html =>
   lazySplitDivider(splitDividerView, [model.compareSplitAt, model.scale, h])!
 
 const COMPARE_MODES: readonly {
@@ -504,7 +517,7 @@ const compareView = (mode: CompareMode, hasImage: boolean, h: HtmlBuilder<Editor
     }),
   )
 
-const compareControl = (h: HtmlBuilder<EditorMessage>, model: Model, hasImage: boolean): Html =>
+const compareControl = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel, hasImage: boolean): Html =>
   lazyCompare(compareView, [model.compareMode, hasImage, h])!
 
 const emptyStage = (h: HtmlBuilder<EditorMessage>) =>
@@ -630,7 +643,7 @@ const histogramView = (bins: Uint32Array | null, h: HtmlBuilder<EditorMessage>):
 const histogramOverlay = (h: HtmlBuilder<EditorMessage>, bins: Uint32Array | null): Html =>
   lazyHistogram(histogramView, [bins, h])
 
-const loadedStage = (h: HtmlBuilder<EditorMessage>, model: Model) => {
+const loadedStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel) => {
   const src = model.source
   // Side by side shows both halves at native resolution: the canvas is 2×
   // the image width (source left, graded right), so neither side is
@@ -698,7 +711,7 @@ const loadedStage = (h: HtmlBuilder<EditorMessage>, model: Model) => {
  *  order-1/min-h-0: in the mobile column layout (docs/adr/0010-editor-ui.md) the stage
  *  is the flex-1 child above the bottom sheets; `lg:` restores the side
  *  column order. */
-export const canvasStage = (h: HtmlBuilder<EditorMessage>, model: Model) => {
+export const canvasStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel) => {
   const imageLoaded = hasImage(model.phase)
   return h.main(
     [

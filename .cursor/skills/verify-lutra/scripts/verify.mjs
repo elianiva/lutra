@@ -182,7 +182,7 @@ try {
   if (NEEDS_EDITOR) {
     // --- open a photo via the reliable drop path ---
     const b64 = readFileSync(IMAGE).toString('base64')
-    const drop = await evalp(`(() => {
+    const _drop = await evalp(`(() => {
       const bin = atob(${JSON.stringify(b64)});
       const arr = new Uint8Array(bin.length);
       for (let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);

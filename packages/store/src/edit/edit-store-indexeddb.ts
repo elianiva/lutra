@@ -6,7 +6,6 @@ import { EditTable } from './edit-table'
 import type { Edit as EditType } from './edit'
 import type { EditSummary } from './edit-summary'
 import { EditStore } from './edit-store'
-import type { EditStoreContract } from './edit-store'
 import type { StoreError } from './store-error'
 
 /**
