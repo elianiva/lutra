@@ -184,8 +184,6 @@ function layerPass({
   const structDef = uniforms.length > 0 ? `struct LayerParams {\n${structFields}\n}` : ''
 
   // WGSL struct members are only in scope through the struct variable, but
-  // bodies reference their params unqualified (e.g. `l0_stops`). Bind each
-  // member to the bare name inside `main` before the body is inlined.
   const uniformAliases = uniforms
     .map((u) => `  let l${u.layerIndex}_${u.field} = u_params.l${u.layerIndex}_${u.field};`)
     .join('\n')
@@ -193,10 +191,6 @@ function layerPass({
   const usesFrame = body.includes('u_frame') || helpers.includes('u_frame')
   // Structural flag, not WGSL text sniffing: a body that samples its
   // input with `textureLoad` (chromatic aberration) still sets
-  // `samplesInput` for the linearize pass, but only `usesSampler`
-  // bodies get the binding-5 sampler declaration — the auto pipeline
-  // layout omits declared-but-unused bindings, so an entry for a
-  // sampler the shader never references fails bind-group validation.
   const usesSampler = needsSampler
   const colorspace = linearize || encode ? SRGB_TO_LINEAR : ''
   const srcExpr = linearize ? 'srgbToLinear(src.rgb)' : 'src.rgb'
@@ -299,9 +293,7 @@ function lutPass({
   const paramsDecl =
     uniforms.length > 0 ? '@group(0) @binding(4) var<uniform> u_params: LayerParams;\n' : ''
 
-  // The body does its own trilinear interpolation over texel coordinates
   // (textureLoad; 32-bit float textures are not filterable in WebGPU), so
-  // the pass only bakes the cube size for the texel-space mapping.
   const sizeConst = `const LUT_SIZE: f32 = ${lutSize}.0;`
 
   const source = `
@@ -360,9 +352,6 @@ export const generateChainSource = Effect.fn('generateChainSource')(function* (
   }
 
   const bodies = layers.map((layer, i) => normalizeBody(layer.body(i)))
-  // Sampling bodies read their pass input at neighbor offsets: the first
-  // pass's input is the sRGB source, so it needs a linearize pass ahead of
-  // it to keep sampled texels in linear light (CA at continuous radial
   // offsets, clarity in a 9-tap blur — both via textureSampleLevel).
   // Declared structurally by the body, never sniffed from WGSL text.
   const firstBodySamplesSource = bodies[0]!.samplesInput === true
@@ -383,9 +372,6 @@ export const generateChainSource = Effect.fn('generateChainSource')(function* (
     }
     const isLast = li === layers.length - 1
     if (body.needsLut) {
-      // LUT passes invert the color-space boundaries: the body operates
-      // on sRGB-encoded values, so decode on the way in and re-encode on
-      // the way out, skipping either end when it is already sRGB.
       const { lut } = layer
       if (!lut) {
         return yield* Effect.fail(

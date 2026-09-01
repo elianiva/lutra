@@ -1,6 +1,6 @@
 # RAW decode
 
-**Status**: decided; **not yet implemented** (`packages/raw-decoder` does not exist yet).
+**Status**: decided (`packages/raw-decoder` does not exist yet).
 
 RAW files (CR2/CR3, NEF, ARW, RW2, ORF, RAF, DNG) decode client-side at full resolution via an **owned LibRaw wasm build** in `packages/raw-decoder` — our fork of LibRaw-Wasm (C++ wrapper + Emscripten build script + committed dist + TypeScript client), rebuilt via `bun run build:raw`. Owning the build buys progress callbacks, LibRaw version freedom, and flag control; the cost is maintaining the wrapper and version bumps.
 

@@ -1,6 +1,6 @@
 # Depth of field
 
-**Status**: decided (focal-plane model, layer shape); the blur pass model has a recommendation but is not final. **Not yet implemented.**
+**Status**: decided (focal-plane model, layer shape); the blur pass model has a recommendation but is not final.
 
 Mimic real lens depth of field: blur radius varies per pixel by scene depth, so the focal region stays sharp while nearer and farther regions soften — continuous variation, with edges like hair handled by depth, not object-isolation masking. Fully client-side (WebGPU compute + in-browser depth estimation), matching the app's posture.
 

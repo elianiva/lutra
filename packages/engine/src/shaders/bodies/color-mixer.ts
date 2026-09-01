@@ -1,38 +1,10 @@
 import type { BodyRenderer } from '../types'
 
 // Color Mixer (Lightroom-style HSL panel, docs/adr/0003-adjustment-layers): eight hue
-// ranges, each with hue / saturation / luminance adjustments. The math
-// follows GIMP's hue-saturation operation (the best-documented
-// implementation of this UI):
 //
-// - HSL is computed on sRGB-encoded values (GIMP works in "HSLA float"
-//   in sRGB space; hue classification in linear light would drift from
-//   what the display shows), so the body round-trips the linear-light
-//   pixel through sRGB with its own curve helpers. The helpers are
-//   prefixed `mixer*` because the pass template only embeds the
-//   SRGB_TO_LINEAR helpers at chain ends — a middle-of-chain mixer must
-//   be self-contained, and duplicate function names would fail to
 //   compile.
-// - Each pixel belongs to one or two adjacent ranges. Range weights are
-//   the GIMP overlap scheme extended from 6 sectors to Lightroom's 8:
-//   full weight between a range's midpoint boundaries, a linear
-//   crossfade to the neighbor over a 10° band past each boundary, and —
-//   crucially — the two neighbors' weights sum to exactly 1 everywhere
-//   (a partition of unity), so slider movements never double-apply at
 //   range edges.
-// - Adjustments are applied to the blended deltas (one HSL→RGB
-//   conversion instead of GIMP's per-range conversions; visually
-//   equivalent for the small deltas around identity):
-//   hue additive with wrap (slider ±1 → ±90°), saturation multiplicative
-//   (slider ±1 → ×0..×2), luminance asymmetric (negative compresses
-//   toward black, positive lifts toward white — GIMP's formula).
-// - Pixels with essentially zero saturation (hue is undefined for them)
-//   are left untouched: no hue range can claim a neutral pixel, and
-//   applying a range's luminance to it would be wrong.
 //
-// Range boundaries are the midpoints between the 8 hue-wheel centers
-// (red 0°, orange 30°, yellow 60°, green 120°, aqua 180°, blue 240°,
-// purple 270°, magenta 300°); red crosses the 0/360 seam.
 const RANGES = [
   { key: 'red', left: 330, right: 15 },
   { key: 'orange', left: 15, right: 45 },
@@ -124,12 +96,6 @@ fn mixerHslToRgb(hsl: vec3<f32>) -> vec3<f32> {
   return rgb + vec3<f32>(m);
 }
 
-// Weight of the range [left, right] (degrees, midpoint boundaries) at
-// hue h. Full weight between the boundaries, linear crossfade to the
-// neighbor over a MIX_OVERLAP-wide band past each boundary. Adjacent
-// ranges' weights sum to 1 everywhere, so blended adjustments never
-// double-apply at range edges. The range that crosses the 0/360 seam
-// (red) unwraps h into its own frame.
 fn mixerWeight(h: f32, left: f32, right: f32) -> f32 {
   var hh = h;
   var ll = left;

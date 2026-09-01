@@ -60,11 +60,8 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
       }),
       RefreshRequested: () => ({ model, commands: [ListEdits()] }),
 
-      // A tile clicked: surface the fact upward and let the root navigate.
       ClickedEdit: ({ id }) => ({ model, outMessage: GalleryOutMessage.OpenedEdit({ id }) }),
 
-      // A tile's ✕: arm the pending delete and open the confirmation
-      // dialog (ADR-0010, superseded to a dialog).
       DeleteConfirmRequested: ({ id }) => {
         const { model: deleteDialog, commands: dialogCommands = [] } = Dialog.open(
           model.deleteDialog,
@@ -74,8 +71,6 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
           commands: Command.mapMessages(dialogCommands, toDeleteDialogMessage),
         }
       },
-      // Confirmed in the dialog: fire the store delete and dismiss the
-      // dialog right away — a failure re-surfaces through the notice.
       DeleteRequested: ({ id }) => {
         const { model: deleteDialog, commands: dialogCommands = [] } = Dialog.close(
           model.deleteDialog,
@@ -105,8 +100,6 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
         model,
         commands: [CreateCollage({ editIds: model.selection })],
       }),
-      // Persisted: surface it upward — the root pushes `/collage/:id` — and
-      // clear the selection (the arrangement now lives in its own record).
       CollageCreated: ({ id }) => ({
         model: { ...model, selection: [] },
         outMessage: GalleryOutMessage.CreatedCollage({ id }),
@@ -117,9 +110,7 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
 
       // collage section (docs/adr/0009-collage): list + open + delete
       CollagesListed: ({ collages }) => {
-        // Custom-framed tiles need their thumbnails' aspects before the
         // mini-previews can mirror the framing (docs/adr/0009-collage); the grid's
-        // summaries carry the bytes. Default-framed tiles stay cover.
         const byId = new Map(
           model.grid._tag === 'Success' ? model.grid.data.map((s) => [s.id, s] as const) : [],
         )
@@ -149,14 +140,10 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
       CollageListFailed: ({ error }) => ({
         model: { ...model, collages: collageList.Failure({ error }) },
       }),
-      // A collage card clicked: surface the fact upward — the root pushes
-      // `/collage/:id`, exactly as for a created collage.
       CollageOpenRequested: ({ id }) => ({
         model,
         outMessage: GalleryOutMessage.OpenedCollage({ id }),
       }),
-      // ADR-0010's inline two-step confirm: first ✕ arms the card; arming a
-      // different card moves the state; ✗ or re-tap disarms.
       ToggledCollageDeleteConfirm: ({ id }) => ({
         model: {
           ...model,
@@ -188,17 +175,11 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
       }),
       FilesPasted: ({ files }) => ({ model, commands: [AddFiles({ files: [...files] })] }),
       PhotoPickCancelled: () => ({ model }),
-      // A single new Edit persisted: surface it upward — the root pushes the
-      // editor URL, exactly as if the user had clicked the tile.
       PhotoCreated: ({ id }) => ({ model, outMessage: GalleryOutMessage.OpenedEdit({ id }) }),
       PhotoCreateFailed: ({ error }) => ({
         model: { ...model, notice: `Could not open photo: ${error.message}` },
       }),
       // Several photos opened at once (docs/adr/0010-editor-ui): stay here — no editor
-      // navigation; the user edits later by clicking a tile. The command's
-      // listing rides in the message so the grid refreshes right now (a
-      // follow-up ListEdits would land after this arm and wipe the failure
-      // report); when that listing itself failed the grid keeps its state.
       PhotosAdded: ({ added, failed, error, summaries }) => ({
         model: {
           ...(Option.isSome(summaries) ? withSummaries(model, summaries.value) : model),
@@ -228,16 +209,11 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
           commands: Command.mapMessages(dialogCommands, toSettingsDialogMessage),
         }
       },
-      // Delete-dialog delegation. Every dismissal path (Esc, backdrop click,
-      // the Cancel button) arrives as `RequestedClose`, which also disarms
-      // the pending delete so a reopened dialog never confirms a stale id.
       GotDeleteDialogMessage: ({ message }) => {
         const { model: dialog, commands: dialogCommands = [] } = Dialog.update(
           model.deleteDialog,
           message,
         )
-        // Clear the armed delete only when the dialog actually closed; a
-        // conditional spread would hide the omission behind an empty object.
         const next = message._tag === 'RequestedClose' ? { ...model, pendingDelete: null } : model
         return {
           model: {
@@ -247,8 +223,6 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
           commands: Command.mapMessages(dialogCommands, toDeleteDialogMessage),
         }
       },
-      // Experimental toggles are UI-only for now — the flag flips and
-      // nothing else in the app reads it.
       ToggledInfiniteCanvas: ({ isEnabled }) => ({
         model: { ...model, experimental: { ...model.experimental, infiniteCanvas: isEnabled } },
       }),

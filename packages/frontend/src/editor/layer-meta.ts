@@ -37,9 +37,6 @@ import {
 import type { Layer, LayerType, LutId } from '@lutra/engine'
 import { UnknownFieldError } from '../errors'
 
-// The engine registry owns min/max/default per field; the UI metadata below
-// owns only presentation (icon, label, formatter). `fieldBounds` joins them so
-// the slider view gets everything it needs in one lookup.
 export const ENGINE_REGISTRY = makeRegistry({
   chromaticAberration: renderChromaticAberration,
   clarity: renderClarity,
@@ -74,13 +71,9 @@ const formatSigned = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`
 const formatEV = (v: number) => `${formatSigned(v)} EV`
 const formatPercent = (v: number) => `${Math.round(v * 100)}%`
 
-// Color Mixer formatters: hue maps the [-1, 1] slider to ±90° of rotation
-// (GIMP's full-deflection mapping) and saturation/luminance to ±100 points.
 export const formatHue = (v: number) => `${v >= 0 ? '+' : ''}${Math.round(v * 90)}°`
 export const formatPercentSigned = (v: number) => `${v >= 0 ? '+' : ''}${Math.round(v * 100)}%`
 
-// white-balance temperature maps the [-1, 1] slider to Kelvin, matching the
-// mobile mapping so values line up across platforms.
 const formatTemp = (v: number) => {
   const k = v < 0 ? Math.round(6500 - (1 + v) * 4500) : Math.round(6500 + v * 5500)
   return `${k} K`
@@ -110,9 +103,6 @@ export interface LayerUi {
 }
 
 // The Color Mixer's 8 hue ranges (docs/adr/0003-adjustment-layers): UI order, the field-key
-// prefix on the layer, the display name, and the pure-hue CSS color of the
-// range's center on the hue wheel — the same centers the shader classifies
-// with, so a swatch's color is exactly the color its range governs.
 export const MIXER_COLORS = [
   { hue: 0, key: 'red', name: 'Red' },
   { hue: 30, key: 'orange', name: 'Orange' },
@@ -131,8 +121,6 @@ export const MIXER_CHANNELS = ['Hue', 'Saturation', 'Luminance'] as const
 
 const wbK = (v: number) => (v < 0 ? Math.round(6500 - (1 + v) * 4500) : Math.round(6500 + v * 5500))
 
-// Film grain profile presets — each maps to shader parameters.
-// The profile index is stored as a float uniform (0–4), rounded to int in the shader.
 const GRAIN_PROFILES = [
   { name: 'Subtle', grainSize: 0.3, peak: 0.4, rolloff: 0.35, blur: 0.6 },
   { name: 'Medium', grainSize: 0.5, peak: 0.38, rolloff: 0.4, blur: 0.55 },
@@ -170,9 +158,6 @@ export const LAYER_UI = {
     label: 'Color Mixer',
     icon: Droplet,
     toggled: false,
-    // 24 sliders, one per range × channel. The drawer never renders them
-    // generically (it shows the active range's three — layer-drawer.ts);
-    // the entries still carry the labels/formats the mixer sliders read.
     fields: Object.fromEntries(
       MIXER_COLORS.flatMap((color) =>
         MIXER_CHANNELS.map((channel) => [
@@ -184,9 +169,6 @@ export const LAYER_UI = {
         ]),
       ),
     ),
-    // Fallback used nowhere today (the drawer special-cases the summary
-    // with the active range's values — model context the pure function
-    // can't see); kept honest: how many of the 24 sliders moved.
     formatValue: (l) => {
       let moved = 0
       for (const color of MIXER_COLORS) {
@@ -254,8 +236,6 @@ export const LAYER_UI = {
     icon: Boxes,
     toggled: false,
     fields: { amount: { format: formatPercent, label: 'STRENGTH' } },
-    // The drawer renders the picker + "Name · %" summary for LUT layers;
-    // the catalog lookup lives there (the model holds the catalog).
     formatValue: (l) => formatPercent(numField(l, FieldKey('amount'))),
     description: 'Applies the look of a classic film stock.',
     when: 'Give your photo instant analog character.',
@@ -282,17 +262,12 @@ export const LAYER_UI = {
     label: 'Tone Curve',
     icon: Activity,
     toggled: false,
-    // The 10 point fields have no ruler sliders — the drawer renders the
-    // curve widget instead (layer-drawer.ts branches on 'toneCurve'); these
-    // labels exist for the record and for any generic fallback.
     fields: Object.fromEntries(
       Array.from({ length: 5 }, (_, i) => [
         [`p${i}x`, { format: formatPercent, label: `POINT ${i} X` }],
         [`p${i}y`, { format: formatPercent, label: `POINT ${i} Y` }],
       ]).flat(),
     ),
-    // The drawer summary: the curve is either the identity or a custom
-    // shape — the reset button's visibility uses the same test.
     formatValue: (l) => (isCurveNeutral(l) ? 'Neutral' : 'Custom'),
     description: 'Shapes brightness across the whole range with a draggable curve.',
     when: 'Bend the tones — an S-curve, lifted blacks, or a custom grade.',
@@ -342,21 +317,14 @@ export const lutName = (
 
 export const LAYER_TYPES_ORDER: readonly LayerType[] = [
   // The app's signature feature leads the picker (docs/adr/0010-editor-ui.md D5): the
-  // novice's most likely intent is "make my photo look like film", and the
-  // LUT library is the fast path to it. Deliberate deviation from the
-  // mobile reference ordering.
   'lut',
   'exposure',
   'contrast',
   'shadows',
   'highlights',
-  // The tonal sibling of Highlights: a free-form bend of the whole range
-  // is the natural next step after the anchored shadows/highlights pulls.
   'toneCurve',
   'whiteBalance',
   'saturation',
-  // The per-color sibling of Saturation: choosing a tone and adjusting it
-  // is the natural next step after a global saturation pull.
   'colorMixer',
   'grain',
   'vignette',

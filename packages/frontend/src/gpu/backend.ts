@@ -98,12 +98,6 @@ export interface GpuBackendContract {
 
 export class GpuBackend extends Context.Service<GpuBackend, GpuBackendContract>()('GpuBackend') {}
 
-// Device acquisition lives inside `GpuBackendLive` now (docs/adr-0029): it is
-// deferred to first use so the Layer builds at boot whether or not a GPU is
-// present — the app never dies on a no-WebGPU device. The root view gates the
-// editor on `WebGpuCapability`, so acquisition only runs once the device is
-// known good; failures surface as `GpuError` for the command to catch.
-
 /**
  * Fullscreen-triangle blit: samples the processed storage texture with
  * bilinear filtering and writes it into the canvas swapchain texture. The
@@ -147,21 +141,12 @@ fn fs(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
   let mode = u_present.x;
   let splitAt = u_present.y;
   if (mode == 3.0) {
-    // Side by side: source in the left half, graded in the right. The
-    // canvas is 2× the image width in this mode, so uv ∈ [0, 1) covers
-    // both halves and the doubled sample coordinates map each half 1:1
-    // (native resolution — the framing view; Split is the full-res
-    // inspection view). Both samples run in uniform control flow (mode is
-    // uniform); the half selection is a select expression, not control
     // flow — textureSample must not be called from flow that depends on
-    // the non-uniform fragment position. Out-of-range coordinates clamp.
     let left = textureSample(srcTex, samp, vec2<f32>(uv.x * 2.0, uv.y));
     let right = textureSample(dstTex, samp, vec2<f32>(uv.x * 2.0 - 1.0, uv.y));
     return select(right, left, uv.x < 0.5);
   }
   if (mode == 2.0) {
-    // Split: source left of the divider, graded right. select evaluates
-    // both samples unconditionally, which is fine (both textures bound).
     return select(
       textureSample(dstTex, samp, uv),
       textureSample(srcTex, samp, uv),
@@ -208,9 +193,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     return;
   }
   let color = textureLoad(srcTex, vec2<i32>(gid.xy), 0);
-  // Rec.709 luma — the same coefficients the engine's shader bodies use.
   let luma = dot(color.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
-  // [0, 1] -> bin 0..255; 1.0 clamps into the top bin.
   let bin = min(u32(luma * 256.0), 255u);
   atomicAdd(&bins[bin], 1u);
 }
@@ -255,7 +238,7 @@ interface Session {
   /**
    * Ping-pong linear-light rgba16float intermediates. Layer passes read
    * the previous pass's output and write the next; only the final pass
-   * writes dstTex (sRGB-encoded rgba8unorm). Lazily allocated (P3) —
+   * writes dstTex (sRGB-encoded rgba8unorm). Lazily allocated —
    * null for passthrough/single-pass chains where the source goes
    * straight to dstTex, saving ~366 MiB on a 6k empty chain.
    */
@@ -302,17 +285,8 @@ export const GpuBackendLive = Layer.effect(
     >({})
     const lutTexturesRef = yield* Ref.make(new Map<string, GPUTexture>())
 
-    // Histogram readback ring cursor: which slot the next render copies
-    // into. Renders are serialized (one in flight — the caller coalesces
-    // via renderPending), so a plain counter is race-free; it just rotates
-    // forever, session rebuilds included.
     let readbackCursor = 0
 
-    // Device acquisition is deferred to first use (docs/adr/0001-rendering-engine): the Layer
-    // builds at boot whether or not a GPU is present, so the app never dies on
-    // a no-WebGPU device. The root view gates the editor on `WebGpuCapability`,
-    // so `getGpu` only runs once the device is known good. Acquisition failures
-    // surface as `GpuError` for the calling command to catch — never as a defect.
     const gpuCtxRef = yield* Ref.make<Option.Option<GpuContext>>(Option.none())
     const acquireGpu = Effect.gen(function* () {
       const adapter = yield* Effect.tryPromise({
@@ -336,16 +310,9 @@ export const GpuBackendLive = Layer.effect(
           }),
       })
       device.addEventListener('uncapturederror', (event) => {
-        // Surface runtime shader errors. Uncaptured errors are the only signal
-        // after a pipeline validates successfully, so they must not vanish.
-        // Background-fork the log: the event bus fires outside the Effect
-        // runtime's stack, so a raw Effect call here would be lost.
         void Effect.runFork(Effect.logError(`[WebGPU uncapturederror] ${event.error.message}`))
       })
-      // P5 hygiene: recover from device loss without a page reload.
       // Dawn/WebGPU may lose the device on driver reset, OOM, or tab
-      // backgrounding — without this the sessionRef points at destroyed
-      // textures and every later execute throws.
       void device.lost.then((info) => {
         void Effect.runFork(
           Effect.gen(function* () {
@@ -393,9 +360,6 @@ export const GpuBackendLive = Layer.effect(
       return ctx
     })
 
-    // Device-scoped LUT texture cache: a cube uploads once per lutId and
-    // survives image changes (session teardown), because the cube is a
-    // property of the layer, not of the image.
     const ensureLutTexture = (
       device: GPUDevice,
       lutId: string,
@@ -408,15 +372,9 @@ export const GpuBackendLive = Layer.effect(
         }
 
         const { size, data } = cube
-        // The cube is rgba32float: it matches the Float32Array upload exactly
         // (16 bytes/texel, no conversion). Chrome's writeTexture f32→f16
-        // conversion is broken (raw f32 bytes land verbatim in f16 textures,
-        // corrupting rows), so rgba16float is not an option. 32-bit float
         // textures are not filterable in WebGPU — the shader body does its
         // own trilinear via textureLoad instead of hardware sampling.
-        // dimension MUST be '3d': without it the texture defaults to a 2D
-        // array (13 layers), which cannot be read as texture_3d and fails
-        // bind-group validation at runtime.
         const tex = device.createTexture({
           dimension: '3d',
           format: 'rgba32float',
@@ -424,7 +382,6 @@ export const GpuBackendLive = Layer.effect(
           usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
         })
 
-        // Stride the size³×3 cube into size³×4 texels (alpha = 1).
         const texels = new Float32Array(size * size * size * 4)
         for (let i = 0; i < size * size * size; i++) {
           texels[i * 4] = data[i * 3]!
@@ -473,7 +430,7 @@ export const GpuBackendLive = Layer.effect(
     }
 
     /**
-     * P2 guard: clamp the canvas drawing-buffer size to the device's
+     * Clamp the canvas drawing-buffer size to the device's
      * `maxTextureDimension2D` before any `configure` or `createTexture`.
      * The view already caps preview side-by-side to 4096, so this is a
      * defensive fallback — on a compat device (max 4096) a stale 12000-wide
@@ -492,7 +449,7 @@ export const GpuBackendLive = Layer.effect(
 
     /**
      * Lazily allocate the ping-pong intermediates for a multi-pass chain
-     * (P3). Called from `execute` when `passes.length > 1` and the session
+     * Called from `execute` when `passes.length > 1` and the session
      * was built without them; a passthrough / single-pass preview holds no
      * 16-bit textures until a second layer is added.
      */
@@ -513,7 +470,7 @@ export const GpuBackendLive = Layer.effect(
      * Allocate every image-scoped resource for one canvas+image pair. Throws
      * `GpuError` when the canvas has no WebGPU context; device calls may
      * throw raw exceptions, which `ensureSession` wraps.
-     * P5: transactional — on any throw, already-created GPU objects are
+     * Transactional — on any throw, already-created GPU objects are
      * destroyed and no leaked session is left behind.
      */
     const buildSession = (
@@ -529,7 +486,6 @@ export const GpuBackendLive = Layer.effect(
       if (!ctx) {
         throw new GpuError({ message: 'WebGPU canvas context unavailable' })
       }
-      // Track allocations for transactional cleanup (P5).
       const owned: Array<{ destroy: () => void }> = []
       const track = <T extends { destroy: () => void }>(obj: T): T => {
         owned.push(obj)
@@ -551,7 +507,6 @@ export const GpuBackendLive = Layer.effect(
           format: swapFormat,
         })
 
-        // Source texture: uploaded once per image. Never re-uploaded per render.
         const srcTex = track(
           device.createTexture({
             format: 'rgba8unorm',
@@ -568,8 +523,6 @@ export const GpuBackendLive = Layer.effect(
           { depthOrArrayLayers: 1, height, width },
         )
 
-        // Destination storage texture: the final compute pass writes it (sRGB),
-        // the blit samples it, and export copies it back to the CPU.
         const dstTex = track(
           device.createTexture({
             format: 'rgba8unorm',
@@ -581,13 +534,8 @@ export const GpuBackendLive = Layer.effect(
           }),
         )
 
-        // P3: intermediates are lazy — a preview session with a passthrough
-        // or single-pass chain holds no 16-bit textures. Allocated on demand
-        // in `execute` when `passes.length > 1`.
         const intermediates: [GPUTexture, GPUTexture] | null = null
 
-        // Uniform buffers. `u_resolution` is written once; `u_frame` is
-        // rewritten every render (grain animates).
         const resolutionBuffer = track(
           device.createBuffer({
             size: 16,
@@ -595,9 +543,6 @@ export const GpuBackendLive = Layer.effect(
           }),
         )
         device.queue.writeBuffer(resolutionBuffer, 0, new Float32Array([width, height]))
-        // Canvas-size uniform for the blit: the swapchain size the blit
-        // derives its uv from (2× the image width in Side by side), which can
-        // differ from the image-sized `u_resolution` the compute passes use.
         const canvasSizeBuffer = track(
           device.createBuffer({
             size: 16,
@@ -612,8 +557,6 @@ export const GpuBackendLive = Layer.effect(
           }),
         )
 
-        // Compare presentation uniform: [wgslMode, splitAt, 0, 0], rewritten
-        // before every blit (chain renders and present-only re-blits alike).
         const presentBuffer = track(
           device.createBuffer({
             size: 16,
@@ -621,10 +564,6 @@ export const GpuBackendLive = Layer.effect(
           }),
         )
 
-        // The blit group mirrors the shader's bindings: dstTex (0), sampler
-        // (1), srcTex (3), the present uniform (4), and the canvas size (5).
-        // Note there is no u_resolution (2) here — the blit derives its uv
-        // from u_canvas, not the image-sized resolution the compute passes use.
         const blitGroup = device.createBindGroup({
           entries: [
             { binding: 0, resource: dstTex.createView() },
@@ -636,19 +575,11 @@ export const GpuBackendLive = Layer.effect(
           layout: blitPipeline.getBindGroupLayout(0),
         })
 
-        // Histogram resources, all session-scoped (created once per image,
-        // never per render): a storage-only bins accumulator — MAP_READ can't
         // combine with STORAGE (WebGPU usage rules), so the bins cross back
-        // via a ring of MAP_READ readback buffers the encoder copies into per
-        // render — and the pass's bind group, which only references
-        // session-scoped resources. All three readback slots start unmapped
-        // with no pending map, so a fresh session's ring is immediately
         // reusable.
         const binsBuffer = track(
           device.createBuffer({
             size: HISTOGRAM_BINS * 4,
-            // COPY_DST for the per-render zeroing writeBuffer; COPY_SRC for the
-            // copy into the readback ring.
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
           }),
         )
@@ -752,9 +683,6 @@ export const GpuBackendLive = Layer.effect(
           }
           return current.value
         }
-        // P5 transactional: build the new session first — on throw the
-        // previous session stays alive and no leaked textures remain
-        // (buildSession's cleanup destroys its partial allocations).
         const s = yield* Effect.try({
           catch: (cause) =>
             cause instanceof GpuError
@@ -819,11 +747,6 @@ export const GpuBackendLive = Layer.effect(
             })
           : null
 
-        // With `layout: 'auto'` the pipeline only exposes bindings the shader
-        // statically uses: binding 3 (frame) exists only when this pass reads
-        // `u_frame` (currently grain), binding 4 (params) only when there
-        // are uniform slots, binding 5 (sampler) when the pass samples, and
-        // binding 6 (the 3D LUT texture) only for LUT passes. Entries must
         // mirror that.
         const entries: GPUBindGroupEntry[] = [
           { binding: 0, resource: src.createView() },
@@ -846,9 +769,7 @@ export const GpuBackendLive = Layer.effect(
               new GpuError({ message: `LUT cube missing for ${pass.lutId}` }),
             )
           }
-          // The view dimension must be explicit: createView() on a 3D
           // texture defaults to e2DArray in Chrome, which fails bind-group
-          // validation against the shader's texture_3d (viewDimension e3D).
           const lutTex = yield* ensureLutTexture(device, pass.lutId, cube)
           entries.push({
             binding: 6,
@@ -924,26 +845,16 @@ export const GpuBackendLive = Layer.effect(
 
           const { passes } = request.shader
 
-          // P3: allocate ping-pong intermediates lazily on first multi-pass
-          // render — a preview session with a passthrough / single pass holds
-          // no 16-bit textures until a second layer is added.
           if (passes.length > 1) {
             ensureIntermediates(gpu.device, s)
           }
 
-          // Cheap per-tick updates: repack each pass's params buffer and the
-          // frame counter once, then dispatch every pass. No allocations, no
-          // texture churn.
           if (request.shader.usesFrame) {
             gpu.device.queue.writeBuffer(s.frameBuffer, 0, new Uint32Array([request.frame >>> 0]))
           }
 
           const encoder = gpu.device.createCommandEncoder()
 
-          // Pass 1..N: each layer runs as its own compute pass. Pass 0 reads
-          // the sRGB source (or the linearize pass output); every later pass
-          // reads the previous pass's output through the ping-pong
-          // intermediates; the last pass writes the sRGB-encoded dstTex.
           for (let i = 0; i < passes.length; i++) {
             const pass = passes[i]!
             const src = i === 0 ? s.srcTex : s.intermediates![(i - 1) % 2]!
@@ -974,20 +885,9 @@ export const GpuBackendLive = Layer.effect(
             computePass.end()
           }
 
-          // Histogram scatter pass: bin the final frame's Rec.709 luma into
-          // 256 atomic bins (full-res, exact). The pass writes the
-          // session-scoped bins accumulator; the bins are then copied into
-          // this frame's slot of the readback ring in the same encoder
-          // (MAP_READ buffers can't receive storage writes, so the copy is
-          // the bridge). The accumulator is zeroed per render — atomics add
-          // across renders, and the previous render's work completed before
-          // this one started (execute resolves on onSubmittedWorkDone).
           const slot = s.readbacks[readbackCursor % HISTOGRAM_SLOTS]!
           readbackCursor += 1
           if (slot.map !== null) {
-            // Abnormal flow: the previous frame on this slot was never
-            // consumed (a dropped RenderedFrame). Wait out its map so we
-            // don't copy into a mapped buffer, then reclaim the slot.
             const pending = slot.map
             yield* Effect.ignore(Effect.promise(async () => await pending))
             slot.buffer.unmap()
@@ -1005,44 +905,27 @@ export const GpuBackendLive = Layer.effect(
           histogramPass.end()
           encoder.copyBufferToBuffer(s.binsBuffer, 0, slot.buffer, 0, HISTOGRAM_BINS * 4)
 
-          // Finally: blit dstTex (or the compare view of srcTex/dstTex) onto
-          // the canvas swapchain texture.
           blit(gpu.device, gpu.blitPipeline, gpu.swapFormat, encoder, s, present)
 
           gpu.device.queue.submit([encoder.finish()])
 
           // Resolve only when the GPU has caught up — lets the caller keep at
-          // most one render in flight (no CPU stall; this is a promise).
           yield* Effect.tryPromise({
             catch: (cause) => new GpuError({ cause, message: 'GPU work failed' }),
             try: async () => await gpu.device.queue.onSubmittedWorkDone(),
           })
 
-          // Issue this slot's map NOW, before any later render can submit:
-          // mapAsync is enqueued on the queue timeline behind every pending
-          // submission, so a map issued later (from the readback command)
-          // would queue behind the next render — and the next after that
-          // during a drag — landing stale and getting dropped. Issued right
-          // after this frame's own submit completed, it resolves before the
-          // frame's RenderedFrame is even handled, and readHistogram
-          // consumes it with no waiting.
           slot.map = slot.buffer.mapAsync(GPUMapMode.READ)
 
           return new RenderHandle(s.dstTex, s.width, s.height, slot)
         }).pipe(
-          // Any unexpected exception (bind group/layout mismatch, browser-
           // specific WGSL rejection) must surface as a GpuError. Without
-          // this, a defect escapes the command's catchTag and renderPending
-          // stays true forever — the app silently stops rendering.
           Effect.catchDefect((cause: unknown) =>
             Effect.fail(new GpuError({ cause, message: 'Unexpected GPU error' })),
           ),
         ),
 
       // Blit-only re-present (docs/adr/0010-editor-ui): re-blit the last rendered
-      // frame with a new compare presentation state, without re-running the
-      // chain. Uses the current session's textures as-is; no-op when no
-      // session exists for the canvas (nothing has rendered yet).
       present: (canvas, present) =>
         Effect.gen(function* () {
           const current = yield* Ref.get(sessionRef)
@@ -1050,11 +933,6 @@ export const GpuBackendLive = Layer.effect(
             return
           }
           const gpu = yield* getGpu
-          // The canvas drawing-buffer size may have changed since the
-          // session was built — Side by side doubles the canvas width.
-          // ensureSession follows the resize in place (swapchain
-          // re-configured, u_canvas rewritten, nothing image-sized
-          // touched), so the graded frame survives and re-presents.
           const session = yield* ensureSession(
             gpu,
             canvas,
@@ -1066,9 +944,6 @@ export const GpuBackendLive = Layer.effect(
           blit(gpu.device, gpu.blitPipeline, gpu.swapFormat, encoder, session, present)
           gpu.device.queue.submit([encoder.finish()])
           // Await GPU completion before FramePresented — otherwise
-          // presentPending clears on submit and the next divider event
-          // submits another blit before the first finished, defeating
-          // coalescing and allowing concurrent submissions.
           yield* Effect.tryPromise({
             catch: (cause) => new GpuError({ cause, message: 'GPU present failed' }),
             try: async () => await gpu.device.queue.onSubmittedWorkDone(),
@@ -1108,7 +983,6 @@ export const GpuBackendLive = Layer.effect(
           })
 
           const mapped = new Uint8Array(readBuffer.getMappedRange())
-          // Un-pad rows into a dense RGBA buffer.
           const dense = new Uint8ClampedArray(width * height * 4)
           for (let y = 0; y < height; y++) {
             const srcOffset = y * bytesPerRowPadded
@@ -1128,15 +1002,9 @@ export const GpuBackendLive = Layer.effect(
           const live = yield* Ref.get(sessionRef)
           const { map } = slot
           if (map === null || Option.isNone(live) || !live.value.readbacks.includes(slot)) {
-            // Consumed already, or the owning session was torn down (its
-            // buffers destroyed — the map would reject). Either way the
-            // frame is stale and its bins would be dropped by the stamp
-            // guard: resolve with empty bins rather than surfacing a
             // spurious failure.
             return new Uint32Array(HISTOGRAM_BINS)
           }
-          // The map was issued by execute after this frame's submit
-          // completed, so it resolves without waiting on any later render.
           yield* Effect.tryPromise({
             catch: (cause) =>
               new GpuError({ cause, message: 'Failed to map histogram bins buffer' }),

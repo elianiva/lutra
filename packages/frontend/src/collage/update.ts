@@ -71,8 +71,6 @@ const mutateWithUndo = (
       undo: { seq, tiles: previous },
       undoLabel: label,
       undoSeq: seq,
-      // Restored photos mean an emptied-by-user state no longer holds (and a
-      // removal that emptied the collage sets it at its own edge below).
       userEmptied: false,
     },
     commands: [SaveCollage({ collage: next }), ScheduleUndoExpiry({ seq })],
@@ -167,7 +165,6 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
             ...model,
             collage: loadedCollage.Success({ data: collage }),
             photos,
-            // Sizes for references that survived stay valid; the rest re-measure.
             sizes: model.sizes.filter((s) => photoIds.has(s.editId)),
             notice:
               dropped > 0
@@ -197,9 +194,6 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
       LoadFailed: ({ error }) => ({
         model: { ...model, collage: loadedCollage.Failure({ error }) },
       }),
-      // The id was well-formed but the record is gone: show the same failure
-      // state with a plain-language reason (a synthetic StoreError carries
-      // the message; there is no backend behind it).
       CollageMissing: () => ({
         model: {
           ...model,
@@ -211,7 +205,6 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         },
       }),
 
-      // layout (bounds live in model.ts; layout changes take no undo)
       ChangedColumns: ({ columns }) =>
         mutate(model, (c) => ({
           ...c,
@@ -330,7 +323,6 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         if (!model.pan || !model.framingDraft || !model.cellPx) {
           return { model }
         }
-        // rAF coalescing may deliver duplicate positions; skip no-op.
         if (screenX === model.pan.screenX && screenY === model.pan.screenY) {
           return { model }
         }
@@ -343,9 +335,6 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         const cellAspect = model.cellPx.width / Math.max(1, model.cellPx.height)
         const dx = (screenX - model.pan.screenX) / model.cellPx.width
         const dy = (screenY - model.pan.screenY) / model.cellPx.height
-        // Sub-pixel jitter that won't change clamped framing — still update pan
-        // so the next delta is measured from the latest pointer, but don't
-        // trigger a view diff.
         if (Math.abs(dx) < 1e-4 && Math.abs(dy) < 1e-4) {
           return {
             model: { ...model, pan: { index: model.pan.index, screenX, screenY } },
@@ -454,8 +443,6 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
           ],
         }
       },
-      // A failed-tile count surfaces as a notice before the machine takes
-      // over; the readiness flag and late-result guards live in the machine.
       CollageExportSnapshotted: ({ failedTiles }) =>
         delegate(
           model,
@@ -468,7 +455,6 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         delegate(model, ExportDialog.Message.FrameFailed({ message }), model.notice),
 
       BackRequested: () => ({ model, commands: [NavigateMenu()] }),
-      // Observability only — the URL change drives the route transition.
       NavigatedBack: () => ({ model }),
       GotCollageExportDialogMessage: ({ message }) => delegate(model, message),
     }),

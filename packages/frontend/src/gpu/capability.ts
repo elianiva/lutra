@@ -55,7 +55,7 @@ export const detectWebGpu = Effect.gen(function* () {
   })
   if (result.maxTextureDimension2D !== null) {
     // Diagnostic: probe uses default adapter, acquireGpu uses high-performance — they may differ.
-    // Logged here so P1's requiredLimits change is observable without changing gating.
+    // Logged here so the requiredLimits change is observable without changing gating.
     yield* Effect.logDebug(
       `[WebGPU] probe maxTextureDimension2D=${result.maxTextureDimension2D}`,
     )
