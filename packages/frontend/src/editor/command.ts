@@ -151,6 +151,8 @@ export const LoadEdit = Command.define('LoadEdit', {
       }
       const edit = maybeEdit.value
       const nativeBitmap = yield* Effect.tryPromise({
+        // SAFETY: the store hands back image bytes over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
+        // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, typescript/consistent-type-assertions -- SAFETY: documented BlobPart boundary
         try: async () => await createImageBitmap(new Blob([edit.source as BlobPart])),
         catch: (cause) =>
           new ImageDecodeError({
@@ -432,6 +434,8 @@ export const SnapshotForExport = Command.define('SnapshotForExport', {
               message: `Failed to decode source for export: ${String(cause)}`,
             }),
           try: async () => {
+            // SAFETY: the store hands back image bytes over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
+            // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, typescript/consistent-type-assertions -- SAFETY: documented BlobPart boundary
             const blob = new Blob([source as BlobPart])
             return await createImageBitmap(blob)
           },
@@ -543,6 +547,8 @@ export const GenerateLutThumb = Command.define('GenerateLutThumb', {
       if (Option.isNone(bytes)) {
         return EditorMessage.LutThumbFailed({ lutId })
       }
+      // SAFETY: the thumbnail bytes are produced over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
+      // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, typescript/consistent-type-assertions -- SAFETY: documented BlobPart boundary
       const blob = new Blob([bytes.value as BlobPart], { type: 'image/jpeg' })
       return EditorMessage.LutThumbGenerated({ bitmap, lutId, url: URL.createObjectURL(blob) })
     }),

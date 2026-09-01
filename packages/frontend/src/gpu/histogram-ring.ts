@@ -16,8 +16,11 @@ export type HistogramSlot = {
   generation: number
 }
 
-export const makeSlot = (buffer: GPUBuffer): HistogramSlot =>
-  ({ buffer, generation: 0, state: { _tag: 'Idle' } }) as HistogramSlot
+export const makeSlot = (buffer: GPUBuffer): HistogramSlot => ({
+  buffer,
+  generation: 0,
+  state: { _tag: 'Idle' },
+})
 
 export const isIdle = (slot: HistogramSlot): boolean => slot.state._tag === 'Idle'
 
@@ -27,15 +30,27 @@ export class HistogramRing {
   constructor(readonly slots: readonly HistogramSlot[]) {}
 
   static create(device: GPUDevice): HistogramRing {
-    const slots = Array.from({ length: HISTOGRAM_SLOTS }, () =>
+    const slots: readonly [HistogramSlot, HistogramSlot, HistogramSlot] = [
       makeSlot(
         device.createBuffer({
           size: HISTOGRAM_BINS * 4,
           usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
         }),
       ),
-    )
-    return new HistogramRing(slots as unknown as readonly [HistogramSlot, HistogramSlot, HistogramSlot])
+      makeSlot(
+        device.createBuffer({
+          size: HISTOGRAM_BINS * 4,
+          usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+        }),
+      ),
+      makeSlot(
+        device.createBuffer({
+          size: HISTOGRAM_BINS * 4,
+          usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+        }),
+      ),
+    ]
+    return new HistogramRing(slots)
   }
 
   destroy(): void {
@@ -82,7 +97,7 @@ export class HistogramRing {
   }
 
   owns(slot: HistogramSlot): boolean {
-    return (this.slots as readonly HistogramSlot[]).includes(slot)
+    return this.slots.includes(slot)
   }
 
   consume(slot: HistogramSlot, expectedGeneration: number): Effect.Effect<Uint32Array<ArrayBuffer>, GpuError> {

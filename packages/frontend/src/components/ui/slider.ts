@@ -433,19 +433,9 @@ export const styledViewInputs = <M>(
   h: HtmlBuilder<M>,
 ): ViewInputs => {
   const orientation = viewInputs.orientation ?? 'horizontal'
-
-  return {
+  const base: ViewInputs = {
     value: viewInputs.value,
     orientation,
-    ...(viewInputs.ariaLabel !== undefined ? { ariaLabel: viewInputs.ariaLabel } : {}),
-    ...(viewInputs.ariaLabelledBy !== undefined
-      ? { ariaLabelledBy: viewInputs.ariaLabelledBy }
-      : {}),
-    ...(viewInputs.formatValue !== undefined ? { formatValue: viewInputs.formatValue } : {}),
-    ...(viewInputs.isDisabled !== undefined ? { isDisabled: viewInputs.isDisabled } : {}),
-    ...(viewInputs.isReadOnly !== undefined ? { isReadOnly: viewInputs.isReadOnly } : {}),
-    ...(viewInputs.name !== undefined ? { name: viewInputs.name } : {}),
-    ...(viewInputs.getTrackRoot !== undefined ? { getTrackRoot: viewInputs.getTrackRoot } : {}),
     toView: (attributes): Html => {
       const maybeHeader: Html =
         viewInputs.label === undefined
@@ -508,5 +498,16 @@ export const styledViewInputs = <M>(
       )
     },
   }
+  const viewInputsWithOptional = Object.assign(
+    base,
+    viewInputs.ariaLabel !== undefined ? { ariaLabel: viewInputs.ariaLabel } : null,
+    viewInputs.ariaLabelledBy !== undefined ? { ariaLabelledBy: viewInputs.ariaLabelledBy } : null,
+    viewInputs.formatValue !== undefined ? { formatValue: viewInputs.formatValue } : null,
+    viewInputs.isDisabled !== undefined ? { isDisabled: viewInputs.isDisabled } : null,
+    viewInputs.isReadOnly !== undefined ? { isReadOnly: viewInputs.isReadOnly } : null,
+    viewInputs.name !== undefined ? { name: viewInputs.name } : null,
+    viewInputs.getTrackRoot !== undefined ? { getTrackRoot: viewInputs.getTrackRoot } : null,
+  )
+  return viewInputsWithOptional
 }
 
