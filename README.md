@@ -38,7 +38,7 @@ pnpm test
 pnpm typecheck
 ```
 
-The dev server uses [portless](https://github.com/nichochar/portless) — it'll pick an available port automatically.
+The dev server runs at `http://localhost:5173` by default.
 
 ## Building
 
