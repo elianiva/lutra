@@ -1,13 +1,8 @@
 import type { BodyRenderer } from '../types'
 
-//
-//
-// Profiles (selected by `profile` uniform, rounded to int in WGSL):
-//
-// Uniforms:
-//   chroma  (0–1)  — color grain strength (0 = monochrome)
-//
-
+export const HIGHLIGHT_ROLLOFF_FACTOR = 0.35 as const
+export const SHADOW_POWER = 0.18 as const
+export const BLACK_CUTOFF = 0.03 as const
 
 export const renderGrain: BodyRenderer = (i) => ({
   helpers: `
@@ -62,11 +57,11 @@ fn grainProfile(profile: i32) -> GrainProfile {
 
 
 fn grainLumaWeight(luma: f32, peak: f32, rolloff: f32) -> f32 {
-  let r = select(rolloff, rolloff * 0.35, luma > peak);
+  let r = select(rolloff, rolloff * ${HIGHLIGHT_ROLLOFF_FACTOR}, luma > peak);
   let d = (luma - peak) / r;
   let bell = exp(-0.5 * d * d);
-  let shadow = min(pow(luma / max(peak, 0.001), 0.18), 1.0)
-             * smoothstep(0.0, 0.03, luma);
+  let shadow = min(pow(luma / max(peak, 0.001), ${SHADOW_POWER}), 1.0)
+             * smoothstep(0.0, ${BLACK_CUTOFF}, luma);
   return bell * shadow;
 }
 
