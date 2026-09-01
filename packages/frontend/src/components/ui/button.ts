@@ -3,6 +3,9 @@ import type { Attribute, ChildAttribute, Html, HtmlBuilder } from 'foldkit/html'
 
 import { cn } from '@/lib/utils'
 
+/** Button variant keys. Sync with `buttonVariants` is compiler-enforced:
+ *  `buttonVariants` is `Record<ButtonVariant, string>` (missing key = error)
+ *  and annotated object literals reject unknown keys. */
 export const buttonVariantKeys = [
   'default',
   'destructive',
@@ -27,6 +30,7 @@ export const buttonVariants: Record<ButtonVariant, string> = {
 
 export type ButtonVariant = (typeof buttonVariantKeys)[number]
 
+/** Button size keys. Sync with `buttonSizes` is compiler-enforced (see above). */
 export const buttonSizeKeys = [
   'default',
   'xs',
