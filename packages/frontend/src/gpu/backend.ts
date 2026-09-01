@@ -3,6 +3,10 @@ import { GpuError, WORKGROUP_SIZE } from '@lutra/engine'
 import type { ChainPass, LutCube, RenderRequest } from '@lutra/engine'
 import { HISTOGRAM_BINS, HistogramRing, makeSlot } from './histogram-ring'
 import type { HistogramSlot } from './histogram-ring'
+import { presentModeToWgsl } from './present-mode'
+import type { ComparePresent } from './present-mode'
+
+export type { ComparePresent } from './present-mode'
 
 export class RenderHandle {
   constructor(
@@ -11,19 +15,6 @@ export class RenderHandle {
     readonly height: number,
     readonly readback: HistogramSlot,
   ) {}
-}
-
-/**
- * The compare presentation state the blit applies (docs/adr/0010-editor-ui): which
- * Compare mode is active, where the Split divider sits (image space, 0..1),
- * and which side Toggle shows. Mirrors the frontend's PresentState schema —
- * the backend stays a plain structural service, so the schema lives at the
- * message boundary only.
- */
-export interface ComparePresent {
-  readonly mode: 'off' | 'toggle' | 'split' | 'side-by-side'
-  readonly splitAt: number
-  readonly showBefore: boolean
 }
 
 interface GpuContext {
@@ -782,16 +773,7 @@ export const GpuBackendLive = Layer.effect(
       s: Session,
       present: ComparePresent,
     ): void => {
-      const wgslMode =
-        present.mode === 'off'
-          ? 0
-          : present.mode === 'toggle'
-            ? present.showBefore
-              ? 1
-              : 0
-            : present.mode === 'split'
-              ? 2
-              : 3
+      const wgslMode = presentModeToWgsl(present)
       device.queue.writeBuffer(
         s.presentBuffer,
         0,
