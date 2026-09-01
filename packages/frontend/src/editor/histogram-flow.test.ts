@@ -12,7 +12,7 @@ import { RenderHandle } from '../gpu/backend'
 // SAFETY: fabricated GPU handle stub — the scene never executes GPU work, so only its type and the bins buffer identity flow through the model; the buffer has no backing storage.
 const stubHandle = () =>
   // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
-  new RenderHandle({} as GPUTexture, 200, 150, { buffer: {} as GPUBuffer, map: null })
+  new RenderHandle({} as GPUTexture, 200, 150, { buffer: {} as GPUBuffer, state: { _tag: 'Idle' } })
 
 // A model in the Idle phase (image loaded) so RenderedFrame lands.
 const loadedModel = () => ({ ...initialModel(), phase: Idle() })

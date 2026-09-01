@@ -1,31 +1,14 @@
 import { Context, Effect, Layer, Option, Ref } from 'effect'
 import { GpuError, WORKGROUP_SIZE } from '@lutra/engine'
 import type { ChainPass, LutCube, RenderRequest } from '@lutra/engine'
+import { HISTOGRAM_BINS, HistogramRing, makeSlot } from './histogram-ring'
+import type { HistogramSlot } from './histogram-ring'
 
-/**
- * One slot of the histogram readback ring. `execute` copies a frame's bins
- * into `buffer` and issues `map` once the frame's submit completed — so the
- * map never queues behind a later render — then `readHistogram` consumes it
- * (read + unmap, `map` back to null), freeing the slot for the ring's next
- * pass. A slot whose `map` is non-null is never copied into.
- */
-interface HistogramSlot {
-  readonly buffer: GPUBuffer
-  map: Promise<void> | null
-}
-
-/**
- * A handle to the frame a render produced: the output storage texture plus
- * its dimensions. `execute` returns one per render; it flows through the app
- * (RenderedFrame message → model) so `snapshot` never reads an implicit
- * "last session" — export snapshots exactly the frame it was handed.
- */
 export class RenderHandle {
   constructor(
     readonly dstTex: GPUTexture,
     readonly width: number,
     readonly height: number,
-    /** This frame's slot on the histogram readback ring (see HistogramSlot). */
     readonly readback: HistogramSlot,
   ) {}
 }
@@ -162,18 +145,6 @@ fn fs(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
 
 const roundUp = (n: number, to: number) => Math.ceil(n / to) * to
 
-/** Bins per channel. Matches the 8-bit sRGB-encoded display texture 1:1. */
-const HISTOGRAM_BINS = 256
-
-/**
- * Readback ring depth. A slot is mapped from the moment `execute` issues
- * the map (after the frame's submit completed) until `readHistogram`
- * consumes it in the same message cycle — three slots give two full cycles
- * of slack before a slot is reused, so a slow consumer can never collide
- * with a copy.
- */
-const HISTOGRAM_SLOTS = 3
-
 /**
  * Scatter-write histogram pass: bins the Rec.709 luma of every texel of the
  * final display texture (sRGB-encoded rgba8unorm) into 256 atomic u32 bins.
@@ -255,8 +226,7 @@ interface Session {
   /** 256 zeroes for the per-render accumulator reset (writeBuffer, 1KB). */
   readonly binsZeros: Uint32Array
   readonly histogramGroup: GPUBindGroup
-  /** Readback ring: per render, the bins are copied into one slot, which is then mapped. */
-  readonly readbacks: [HistogramSlot, HistogramSlot, HistogramSlot]
+  readonly histogramRing: HistogramRing
   /** Per-pass-source params buffer + compute bind group (both reference session resources). */
   readonly compute: Record<string, ComputeEntry>
 }
@@ -284,8 +254,6 @@ export const GpuBackendLive = Layer.effect(
       Record<string, { readonly pipeline: GPUComputePipeline; readonly layout: GPUBindGroupLayout }>
     >({})
     const lutTexturesRef = yield* Ref.make(new Map<string, GPUTexture>())
-
-    let readbackCursor = 0
 
     const gpuCtxRef = yield* Ref.make<Option.Option<GpuContext>>(Option.none())
     const acquireGpu = Effect.gen(function* () {
@@ -421,9 +389,7 @@ export const GpuBackendLive = Layer.effect(
       s.frameBuffer.destroy()
       s.presentBuffer.destroy()
       s.binsBuffer.destroy()
-      for (const slot of s.readbacks) {
-        slot.buffer.destroy()
-      }
+      s.histogramRing.destroy()
       for (const entry of Object.values(s.compute)) {
         entry.paramsBuffer?.destroy()
       }
@@ -590,15 +556,32 @@ export const GpuBackendLive = Layer.effect(
           ],
           layout: histogramPipeline.getBindGroupLayout(0),
         })
-        const makeSlot = (): HistogramSlot => ({
-          buffer: track(
-            device.createBuffer({
-              size: HISTOGRAM_BINS * 4,
-              usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-            }),
+        const histogramRing = new HistogramRing([
+          makeSlot(
+            track(
+              device.createBuffer({
+                size: HISTOGRAM_BINS * 4,
+                usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+              }),
+            ),
           ),
-          map: null,
-        })
+          makeSlot(
+            track(
+              device.createBuffer({
+                size: HISTOGRAM_BINS * 4,
+                usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+              }),
+            ),
+          ),
+          makeSlot(
+            track(
+              device.createBuffer({
+                size: HISTOGRAM_BINS * 4,
+                usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+              }),
+            ),
+          ),
+        ] as const)
 
         return {
           binsBuffer,
@@ -614,9 +597,9 @@ export const GpuBackendLive = Layer.effect(
           frameBuffer,
           height,
           histogramGroup,
+          histogramRing,
           intermediates,
           presentBuffer,
-          readbacks: [makeSlot(), makeSlot(), makeSlot()],
           resolutionBuffer,
           srcBitmap,
           srcTex,
@@ -885,14 +868,7 @@ export const GpuBackendLive = Layer.effect(
             computePass.end()
           }
 
-          const slot = s.readbacks[readbackCursor % HISTOGRAM_SLOTS]!
-          readbackCursor += 1
-          if (slot.map !== null) {
-            const pending = slot.map
-            yield* Effect.ignore(Effect.promise(async () => await pending))
-            slot.buffer.unmap()
-            slot.map = null
-          }
+          const slot = yield* s.histogramRing.acquire()
           gpu.device.queue.writeBuffer(s.binsBuffer, 0, s.binsZeros)
           const histogramPass = encoder.beginComputePass()
           histogramPass.setPipeline(gpu.histogramPipeline)
@@ -915,7 +891,7 @@ export const GpuBackendLive = Layer.effect(
             try: async () => await gpu.device.queue.onSubmittedWorkDone(),
           })
 
-          slot.map = slot.buffer.mapAsync(GPUMapMode.READ)
+          s.histogramRing.occupy(slot, slot.buffer.mapAsync(GPUMapMode.READ))
 
           return new RenderHandle(s.dstTex, s.width, s.height, slot)
         }).pipe(
@@ -1000,21 +976,10 @@ export const GpuBackendLive = Layer.effect(
         Effect.gen(function* () {
           const slot = handle.readback
           const live = yield* Ref.get(sessionRef)
-          const { map } = slot
-          if (map === null || Option.isNone(live) || !live.value.readbacks.includes(slot)) {
-            // spurious failure.
+          if (Option.isNone(live) || !live.value.histogramRing.owns(slot)) {
             return new Uint32Array(HISTOGRAM_BINS)
           }
-          yield* Effect.tryPromise({
-            catch: (cause) =>
-              new GpuError({ cause, message: 'Failed to map histogram bins buffer' }),
-            try: async () => await map,
-          })
-          const bins = new Uint32Array(slot.buffer.getMappedRange())
-          const copy = new Uint32Array(bins)
-          slot.buffer.unmap()
-          slot.map = null
-          return copy
+          return yield* live.value.histogramRing.consume(slot)
         }),
     })
   }),

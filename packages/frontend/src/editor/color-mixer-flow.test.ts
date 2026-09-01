@@ -28,7 +28,7 @@ import type { Model } from './model'
 // SAFETY: fabricated GPU handle stub — tests never execute GPU work, so only its type flows through the model; the buffer has no backing storage and is never read.
 const stubHandle = () =>
   // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
-  new RenderHandle({} as GPUTexture, 200, 150, { buffer: {} as GPUBuffer, map: null })
+  new RenderHandle({} as GPUTexture, 200, 150, { buffer: {} as GPUBuffer, state: { _tag: 'Idle' } })
 
 /** A model in the Idle phase with a loaded image. */
 const loaded = () => ({
