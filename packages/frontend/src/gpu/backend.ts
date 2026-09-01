@@ -326,7 +326,12 @@ export const GpuBackendLive = Layer.effect(
       )
       const device = yield* Effect.tryPromise({
         catch: (cause) => new GpuError({ cause, message: 'Failed to acquire GPU device' }),
-        try: async () => await adapter.requestDevice(),
+        try: async () =>
+          await adapter.requestDevice({
+            requiredLimits: {
+              maxTextureDimension2D: adapter.limits.maxTextureDimension2D,
+            },
+          }),
       })
       device.addEventListener('uncapturederror', (event) => {
         // Surface runtime shader errors. Uncaptured errors are the only signal

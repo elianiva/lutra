@@ -28,20 +28,37 @@ const unsupportedWebGpu = (reason: string): WebGpuCapability => ({ supported: fa
  * unsupported result with a reason string.
  */
 export const detectWebGpu = Effect.gen(function* () {
-  const capability = yield* Effect.tryPromise({
-    catch: () => unsupportedWebGpu('WebGPU probe threw an unexpected error.'),
-    try: async () => {
+  const result = yield* Effect.tryPromise({
+    catch: (): { capability: WebGpuCapability; maxTextureDimension2D: number | null } =>
+      ({ capability: unsupportedWebGpu('WebGPU probe threw an unexpected error.'), maxTextureDimension2D: null }),
+    try: async (): Promise<{ capability: WebGpuCapability; maxTextureDimension2D: number | null }> => {
       if (navigator.gpu === undefined) {
-        return unsupportedWebGpu(
-          'navigator.gpu is undefined — this browser does not expose WebGPU.',
-        )
+        return {
+          capability: unsupportedWebGpu(
+            'navigator.gpu is undefined — this browser does not expose WebGPU.',
+          ),
+          maxTextureDimension2D: null,
+        }
       }
       const adapter = await navigator.gpu.requestAdapter()
       if (adapter === null) {
-        return unsupportedWebGpu('WebGPU is present but requestAdapter() returned no GPU adapter.')
+        return {
+          capability: unsupportedWebGpu('WebGPU is present but requestAdapter() returned no GPU adapter.'),
+          maxTextureDimension2D: null,
+        }
       }
-      return webGpuSupported
+      return {
+        capability: webGpuSupported,
+        maxTextureDimension2D: adapter.limits.maxTextureDimension2D,
+      }
     },
   })
-  return capability
+  if (result.maxTextureDimension2D !== null) {
+    // Diagnostic: probe uses default adapter, acquireGpu uses high-performance — they may differ.
+    // Logged here so P1's requiredLimits change is observable without changing gating.
+    yield* Effect.logDebug(
+      `[WebGPU] probe maxTextureDimension2D=${result.maxTextureDimension2D}`,
+    )
+  }
+  return result.capability
 })
