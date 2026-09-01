@@ -859,13 +859,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           mode === 'toggle' && model.compareMode === 'toggle'
             ? { ...model, compareToggleBefore: !model.compareToggleBefore, phase }
             : { ...model, compareMode: mode, compareToggleBefore: mode === 'toggle', phase }
-        // Mode flips are discrete clicks, not high-frequency drag — present
-        // immediately even if a drag blit is in flight (the mode change
-        // supersedes any coalesced drag position).
-        return {
-          model: { ...next, pendingPresent: null, presentPending: true },
-          commands: [PresentFrame({ present: presentState(next) })],
-        }
+        return presentNow(next, presentState(next))
       },
       ChangedSplitPosition: ({ position }) => {
         if (!model.source.bitmap) {

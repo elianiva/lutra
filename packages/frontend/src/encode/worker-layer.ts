@@ -69,19 +69,32 @@ export const ImageEncoderWorkerLive = Layer.effect(
           const id = yield* Ref.getAndUpdate(nextIdRef, (n) => n + 1)
           const deferred = yield* Deferred.make<Uint8Array, EncodeError>()
           yield* Ref.update(pendingRef, (pending) => new Map(pending).set(id, deferred))
-          const request: EncodeRequest = { id, image, settings }
-          // Transfer the pixel buffer — 24 Mpx of RGBA (~96 MiB) would
-          // otherwise be structured-cloned (memcpy) to the worker. The
-          // ImageData on the main thread is not reused after the encode
-          // (the frame slot keeps the detached buffer, and the encode
-          // promise resolves before the slot is re-read), so neutering it
-          // is safe. Guard SharedArrayBuffer (not transferable).
-          const buffer = image.data.buffer
-          if (buffer instanceof ArrayBuffer && buffer.byteLength > 0) {
+          // Clone before transfer — the slotted export frame (peekFrame)
+          // is retained for tweak-and-re-export, and transferring the
+          // original buffer would detach it (zero-length, second encode
+          // fails). Clone the pixels, transfer the clone's buffer, and
+          // keep the original intact.
+          let request: EncodeRequest = { id, image, settings }
+          let transfer: Transferable[] | undefined
+          try {
+            const cloneData = new Uint8ClampedArray(image.data)
+            const clone = new ImageData(cloneData, image.width, image.height)
+            request = { id, image: clone, settings }
+            const buf = cloneData.buffer
+            if (buf.byteLength > 0) {
+              transfer = [buf]
+            }
+          } catch {
+            // Clone failed (OOM or ImageData unsupported) — fall back to
+            // structured clone of the original (no transfer).
+            request = { id, image, settings }
+            transfer = undefined
+          }
+          if (transfer) {
             try {
-              worker.postMessage(request, [buffer])
+              worker.postMessage(request, transfer)
             } catch {
-              worker.postMessage(request)
+              worker.postMessage({ id, image, settings })
             }
           } else {
             worker.postMessage(request)

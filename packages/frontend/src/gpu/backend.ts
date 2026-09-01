@@ -1065,6 +1065,14 @@ export const GpuBackendLive = Layer.effect(
           const encoder = gpu.device.createCommandEncoder()
           blit(gpu.device, gpu.blitPipeline, gpu.swapFormat, encoder, session, present)
           gpu.device.queue.submit([encoder.finish()])
+          // Await GPU completion before FramePresented — otherwise
+          // presentPending clears on submit and the next divider event
+          // submits another blit before the first finished, defeating
+          // coalescing and allowing concurrent submissions.
+          yield* Effect.tryPromise({
+            catch: (cause) => new GpuError({ cause, message: 'GPU present failed' }),
+            try: async () => await gpu.device.queue.onSubmittedWorkDone(),
+          })
         }).pipe(
           Effect.catchDefect((cause: unknown) =>
             Effect.fail(new GpuError({ cause, message: 'Unexpected GPU error during present' })),
