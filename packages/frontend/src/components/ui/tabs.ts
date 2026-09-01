@@ -36,10 +36,10 @@ export type TabsListVariant = 'default' | 'line'
 const tabsListBaseClass =
   'rounded-lg p-[3px] group-data-horizontal/tabs:h-8 data-[variant=line]:rounded-none group/tabs-list inline-flex w-fit items-center justify-center text-muted-foreground group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col'
 
-const tabsListVariantClasses: Record<TabsListVariant, string> = {
+const tabsListVariantClasses = {
   default: 'bg-muted',
   line: 'gap-1 bg-transparent',
-}
+} satisfies Record<TabsListVariant, string>
 
 export const tabsListClass = (variant: TabsListVariant = 'default') =>
   cn(tabsListBaseClass, tabsListVariantClasses[variant])
@@ -119,14 +119,10 @@ export const styledViewInputs = <M, Value extends string = string>(
 ): ViewInputs<Value> => {
   const isVertical = viewInputs.orientation === 'Vertical'
   const variant = viewInputs.variant ?? 'default'
-  return {
+  const base: ViewInputs<Value> = {
     tabs: viewInputs.tabs,
     selectedValue: viewInputs.selectedValue,
     ariaLabel: viewInputs.ariaLabel,
-    ...(viewInputs.isTabDisabled !== undefined
-      ? { isTabDisabled: viewInputs.isTabDisabled }
-      : {}),
-    ...(viewInputs.orientation !== undefined ? { orientation: viewInputs.orientation } : {}),
     toView: ({ tablist, tabs, activeIndex }) =>
       h.div(
         [
@@ -175,5 +171,19 @@ export const styledViewInputs = <M, Value extends string = string>(
         ],
       ),
   }
+  if (viewInputs.isTabDisabled !== undefined && viewInputs.orientation !== undefined) {
+    return {
+      ...base,
+      isTabDisabled: viewInputs.isTabDisabled,
+      orientation: viewInputs.orientation,
+    }
+  }
+  if (viewInputs.isTabDisabled !== undefined) {
+    return { ...base, isTabDisabled: viewInputs.isTabDisabled }
+  }
+  if (viewInputs.orientation !== undefined) {
+    return { ...base, orientation: viewInputs.orientation }
+  }
+  return base
 }
 

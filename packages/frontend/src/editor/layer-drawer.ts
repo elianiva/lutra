@@ -478,19 +478,19 @@ export const sliderControl = (
   onChange: (v: number) => EditorMessage,
   toggledLabel = false,
   onToggleLabel?: () => EditorMessage,
-) =>
-  h.div(
-    [h.Class('flex flex-col gap-1')],
-    [
-      lutraRangeRow(h, {
-        label: toggledLabel ? `⇅ ${label}` : label,
-        display,
-        min,
-        max,
-        step: 0.01,
-        value,
-        onInput: onChange,
-        ...(toggledLabel && onToggleLabel ? { labelOnClick: onToggleLabel } : {}),
-      }),
-    ],
-  )
+) => {
+  const rangeConfig = {
+    label: toggledLabel ? `⇅ ${label}` : label,
+    display,
+    min,
+    max,
+    step: 0.01,
+    value,
+    onInput: onChange,
+  }
+  const finalConfig =
+    toggledLabel && onToggleLabel
+      ? { ...rangeConfig, labelOnClick: onToggleLabel }
+      : rangeConfig
+  return h.div([h.Class('flex flex-col gap-1')], [lutraRangeRow(h, finalConfig)])
+}

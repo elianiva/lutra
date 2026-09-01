@@ -22,6 +22,11 @@ export const webGpuSupported: WebGpuCapability = { supported: true, reason: '' }
 
 const unsupportedWebGpu = (reason: string): WebGpuCapability => ({ supported: false, reason })
 
+type ProbeResult = {
+  readonly capability: WebGpuCapability
+  readonly maxTextureDimension2D: number | null
+}
+
 /**
  * Probe for WebGPU once at boot. Never fails: any failure (no `navigator.gpu`,
  * `requestAdapter()` returning null, an unexpected throw) is folded into an
@@ -29,9 +34,9 @@ const unsupportedWebGpu = (reason: string): WebGpuCapability => ({ supported: fa
  */
 export const detectWebGpu = Effect.gen(function* () {
   const result = yield* Effect.tryPromise({
-    catch: (): { capability: WebGpuCapability; maxTextureDimension2D: number | null } =>
+    catch: (): ProbeResult =>
       ({ capability: unsupportedWebGpu('WebGPU probe threw an unexpected error.'), maxTextureDimension2D: null }),
-    try: async (): Promise<{ capability: WebGpuCapability; maxTextureDimension2D: number | null }> => {
+    try: async (): Promise<ProbeResult> => {
       if (navigator.gpu === undefined) {
         return {
           capability: unsupportedWebGpu(

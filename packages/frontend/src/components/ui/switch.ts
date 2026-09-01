@@ -51,72 +51,79 @@ export type SwitchConfig<M> = Readonly<{
 }>
 
 /** Styled switch with label and optional description, built on the @foldkit/ui Switch helper. */
-export const switchControl = <M>(config: SwitchConfig<M>, h: HtmlBuilder<M>) =>
-  FoldkitSwitch.view<M>(
-    {
-      id: config.id,
-      isChecked: config.isChecked,
-      onToggle: config.onToggle,
-      ...(config.isDisabled !== undefined ? { isDisabled: config.isDisabled } : {}),
-      ...(config.isReadOnly !== undefined ? { isReadOnly: config.isReadOnly } : {}),
-      ...(config.name !== undefined ? { name: config.name } : {}),
-      ...(config.value !== undefined ? { value: config.value } : {}),
-      toView: (attributes) =>
-        h.div(
-          [
-            h.Class(cn(switchWrapperClass, config.wrapperClass)),
-            ...(config.isDisabled ? [h.DataAttribute('disabled', '')] : []),
-          ],
-          [
-            h.button(
-              [
-                ...attributes.button,
-                h.DataAttribute('slot', 'switch'),
-                h.DataAttribute('size', config.size ?? 'default'),
-                ...(config.isChecked
-                  ? [h.DataAttribute('checked', '')]
-                  : [h.DataAttribute('unchecked', '')]),
-                h.Class(
-                  cn(
-                    switchClass,
-                    config.isChecked
-                      ? 'border-accent bg-accent'
-                      : 'border-border-strong bg-panel-alt',
-                    config.className,
+export const switchControl = <M>(config: SwitchConfig<M>, h: HtmlBuilder<M>) => {
+  let viewInputs: Parameters<typeof FoldkitSwitch.view<M>>[0] = {
+    id: config.id,
+    isChecked: config.isChecked,
+    onToggle: config.onToggle,
+    toView: (attributes) =>
+      h.div(
+        [
+          h.Class(cn(switchWrapperClass, config.wrapperClass)),
+          ...(config.isDisabled ? [h.DataAttribute('disabled', '')] : []),
+        ],
+        [
+          h.button(
+            [
+              ...attributes.button,
+              h.DataAttribute('slot', 'switch'),
+              h.DataAttribute('size', config.size ?? 'default'),
+              ...(config.isChecked
+                ? [h.DataAttribute('checked', '')]
+                : [h.DataAttribute('unchecked', '')]),
+              h.Class(
+                cn(
+                  switchClass,
+                  config.isChecked
+                    ? 'border-accent bg-accent'
+                    : 'border-border-strong bg-panel-alt',
+                  config.className,
+                ),
+              ),
+            ],
+            [
+              h.span([
+                h.DataAttribute('slot', 'switch-thumb'),
+                h.DataAttribute(config.isChecked ? 'checked' : 'unchecked', ''),
+                h.Class(cn(switchThumbClass, config.thumbClass)),
+              ]),
+            ],
+          ),
+          ...(attributes.hiddenInput.length > 0 ? [h.input([...attributes.hiddenInput])] : []),
+          h.div(
+            [h.Class(switchTextWrapperClass)],
+            [
+              h.label(
+                [...attributes.label, h.Class(cn(switchLabelClass, config.labelClass))],
+                [config.label],
+              ),
+              config.description === undefined
+                ? h.empty
+                : h.p(
+                    [
+                      ...attributes.description,
+                      h.Class(cn(switchDescriptionClass, config.descriptionClass)),
+                    ],
+                    [config.description],
                   ),
-                ),
-              ],
-              [
-                h.span([
-                  h.DataAttribute('slot', 'switch-thumb'),
-                  h.DataAttribute(config.isChecked ? 'checked' : 'unchecked', ''),
-                  h.Class(cn(switchThumbClass, config.thumbClass)),
-                ]),
-              ],
-            ),
-            ...(attributes.hiddenInput.length > 0 ? [h.input([...attributes.hiddenInput])] : []),
-            h.div(
-              [h.Class(switchTextWrapperClass)],
-              [
-                h.label(
-                  [...attributes.label, h.Class(cn(switchLabelClass, config.labelClass))],
-                  [config.label],
-                ),
-                config.description === undefined
-                  ? h.empty
-                  : h.p(
-                      [
-                        ...attributes.description,
-                        h.Class(cn(switchDescriptionClass, config.descriptionClass)),
-                      ],
-                      [config.description],
-                    ),
-              ],
-            ),
-          ],
-        ),
-    },
-    h,
-  )
+            ],
+          ),
+        ],
+      ),
+  }
+  if (config.isDisabled !== undefined) {
+    viewInputs = { ...viewInputs, isDisabled: config.isDisabled }
+  }
+  if (config.isReadOnly !== undefined) {
+    viewInputs = { ...viewInputs, isReadOnly: config.isReadOnly }
+  }
+  if (config.name !== undefined) {
+    viewInputs = { ...viewInputs, name: config.name }
+  }
+  if (config.value !== undefined) {
+    viewInputs = { ...viewInputs, value: config.value }
+  }
+  return FoldkitSwitch.view<M>(viewInputs, h)
+}
 
 export const switch_ = switchControl

@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest'
-import { Option } from 'effect'
 import type { Command } from 'foldkit'
 import {
   Command as SceneCommand,

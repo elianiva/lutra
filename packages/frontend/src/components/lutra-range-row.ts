@@ -3,7 +3,6 @@ import { cn } from '@/lib/utils'
 import { button } from '@/components/ui/button'
 import {
   sliderHeaderClass,
-  sliderLabelClass,
   sliderRootClass,
   sliderTrackClass,
   sliderFilledTrackClass,

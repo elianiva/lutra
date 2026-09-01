@@ -32,6 +32,8 @@ export type Offline = typeof Offline.Type
 /** The offline slice at boot. Reads the browser's connectivity/saveData
  *  signals; both degrade to the non-offline posture when absent. */
 export const initialOffline = (): Offline => {
+  // SAFETY: navigator.connection is a non-standard extension; read is guarded by existence check.
+  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, typescript/consistent-type-assertions -- SAFETY: guarded non-standard navigator.connection read
   const { connection } = navigator as Navigator & { connection?: { readonly saveData?: boolean } }
   return {
     downloaded: 0,

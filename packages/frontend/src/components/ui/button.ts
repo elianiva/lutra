@@ -15,7 +15,7 @@ export const buttonVariantKeys = [
   'link',
 ] as const
 
-export const buttonVariants: Record<ButtonVariant, string> = {
+export const buttonVariants = {
   default: 'bg-primary text-primary-foreground hover:bg-primary/80',
   destructive:
     'bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive/40',
@@ -26,7 +26,7 @@ export const buttonVariants: Record<ButtonVariant, string> = {
   ghost:
     'hover:bg-secondary hover:text-foreground aria-expanded:bg-secondary aria-expanded:text-foreground',
   link: 'text-primary underline-offset-4 hover:underline',
-}
+} satisfies Record<ButtonVariant, string>
 
 export type ButtonVariant = (typeof buttonVariantKeys)[number]
 
@@ -42,7 +42,7 @@ export const buttonSizeKeys = [
   'icon-lg',
 ] as const
 
-export const buttonSizes: Record<ButtonSize, string> = {
+export const buttonSizes = {
   default: 'h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
   xs: 'h-6 gap-1 px-2 text-xs has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*=\'size-\'])]:size-3',
   sm: 'h-7 gap-1 px-2.5 text-[0.8rem] has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*=\'size-\'])]:size-3.5',
@@ -51,7 +51,7 @@ export const buttonSizes: Record<ButtonSize, string> = {
   'icon-xs': 'size-6 [&_svg:not([class*=\'size-\'])]:size-3',
   'icon-sm': 'size-7',
   'icon-lg': 'size-9',
-}
+} satisfies Record<ButtonSize, string>
 
 export type ButtonSize = (typeof buttonSizeKeys)[number]
 
@@ -72,30 +72,37 @@ export type ButtonConfig<M> = Readonly<{
 export type ButtonLabel = Html | string | ReadonlyArray<Html | string>
 
 /** Styled button built on the @foldkit/ui Button helper. */
-export const button = <M>(config: ButtonConfig<M>, label: ButtonLabel, h: HtmlBuilder<M>): Html =>
-  FoldkitButton.view<M>(
-    {
-      ...(config.onClick !== undefined ? { onClick: config.onClick } : {}),
-      ...(config.isDisabled !== undefined ? { isDisabled: config.isDisabled } : {}),
-      ...(config.type !== undefined ? { type: config.type } : {}),
-      ...(config.isAutofocus !== undefined ? { isAutofocus: config.isAutofocus } : {}),
-      toView: (attributes) =>
-        h.button(
-          [
-            ...attributes.button,
-            h.Class(
-              cn(
-                buttonBase,
-                buttonVariants[config.variant ?? 'default'],
-                buttonSizes[config.size ?? 'default'],
-                config.className,
-              ),
+export const button = <M>(config: ButtonConfig<M>, label: ButtonLabel, h: HtmlBuilder<M>): Html => {
+  let viewInputs: Parameters<typeof FoldkitButton.view<M>>[0] = {
+    toView: (attributes) =>
+      h.button(
+        [
+          ...attributes.button,
+          h.Class(
+            cn(
+              buttonBase,
+              buttonVariants[config.variant ?? 'default'],
+              buttonSizes[config.size ?? 'default'],
+              config.className,
             ),
-            h.DataAttribute('slot', 'button'),
-            ...(config.attributes ?? []),
-          ],
-          Array.isArray(label) ? label : [label],
-        ),
-    },
-    h,
-  )
+          ),
+          h.DataAttribute('slot', 'button'),
+          ...(config.attributes ?? []),
+        ],
+        Array.isArray(label) ? label : [label],
+      ),
+  }
+  if (config.onClick !== undefined) {
+    viewInputs = { ...viewInputs, onClick: config.onClick }
+  }
+  if (config.isDisabled !== undefined) {
+    viewInputs = { ...viewInputs, isDisabled: config.isDisabled }
+  }
+  if (config.type !== undefined) {
+    viewInputs = { ...viewInputs, type: config.type }
+  }
+  if (config.isAutofocus !== undefined) {
+    viewInputs = { ...viewInputs, isAutofocus: config.isAutofocus }
+  }
+  return FoldkitButton.view<M>(viewInputs, h)
+}
