@@ -69,8 +69,36 @@ export const ImageEncoderWorkerLive = Layer.effect(
           const id = yield* Ref.getAndUpdate(nextIdRef, (n) => n + 1)
           const deferred = yield* Deferred.make<Uint8Array, EncodeError>()
           yield* Ref.update(pendingRef, (pending) => new Map(pending).set(id, deferred))
-          const request: EncodeRequest = { id, image, settings }
-          worker.postMessage(request)
+          // Clone before transfer — the slotted export frame (peekFrame)
+          // is retained for tweak-and-re-export, and transferring the
+          // original buffer would detach it (zero-length, second encode
+          // fails). Clone the pixels, transfer the clone's buffer, and
+          // keep the original intact.
+          let request: EncodeRequest = { id, image, settings }
+          let transfer: Transferable[] | undefined
+          try {
+            const cloneData = new Uint8ClampedArray(image.data)
+            const clone = new ImageData(cloneData, image.width, image.height)
+            request = { id, image: clone, settings }
+            const buf = cloneData.buffer
+            if (buf.byteLength > 0) {
+              transfer = [buf]
+            }
+          } catch {
+            // Clone failed (OOM or ImageData unsupported) — fall back to
+            // structured clone of the original (no transfer).
+            request = { id, image, settings }
+            transfer = undefined
+          }
+          if (transfer) {
+            try {
+              worker.postMessage(request, transfer)
+            } catch {
+              worker.postMessage({ id, image, settings })
+            }
+          } else {
+            worker.postMessage(request)
+          }
           return yield* Deferred.await(deferred)
         }),
     })

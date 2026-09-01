@@ -47,13 +47,34 @@ describe('compare flow', () => {
       loadedModel(),
       EditorMessage.ChangedCompareMode({ mode: 'toggle' }),
     )
+    // First present must complete before second discrete click can dispatch
+    // (present coalesces while in flight — mirrors renderPending).
+    const { model: afterFirst } = update(toggled, EditorMessage.FramePresented())
     const { model, commands = [] } = update(
-      toggled,
+      afterFirst,
       EditorMessage.ChangedCompareMode({ mode: 'toggle' }),
     )
     expect(model.compareMode).toBe('toggle')
     expect(model.compareToggleBefore).toBe(false)
     expect(presented(commands)).toEqual({ mode: 'toggle', showBefore: false, splitAt: 0.5 })
+  })
+
+  it('coalesces rapid Toggle clicks while a present is in flight', () => {
+    const { model: toggled } = update(
+      loadedModel(),
+      EditorMessage.ChangedCompareMode({ mode: 'toggle' }),
+    )
+    // Second click while present pending is coalesced, not dispatched immediately
+    const { model, commands = [] } = update(
+      toggled,
+      EditorMessage.ChangedCompareMode({ mode: 'toggle' }),
+    )
+    expect(model.compareToggleBefore).toBe(false)
+    expect(commands).toHaveLength(0)
+    expect(model.pendingPresent).toEqual({ mode: 'toggle', showBefore: false, splitAt: 0.5 })
+    // Flushing the pending present delivers the latest mode on FramePresented
+    const { commands: flushed = [] } = update(model, EditorMessage.FramePresented())
+    expect(presented(flushed)).toEqual({ mode: 'toggle', showBefore: false, splitAt: 0.5 })
   })
 
   it('switching modes keeps the split position and shows the graded side', () => {

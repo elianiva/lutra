@@ -25,7 +25,7 @@ import type { ImageEncoder, LayerId, LutId } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import type { EditStore } from '@lutra/store'
 import type { Model } from './model'
-import { EditorMessage, EditorOutMessage } from './message'
+import { EditorMessage, EditorOutMessage, type PresentState } from './message'
 
 export type UpdateReturn = Update.ReturnWithOutMessage<
   Model,
@@ -45,6 +45,23 @@ const presentState = (model: Model) => ({
   showBefore: model.compareToggleBefore,
   splitAt: model.compareSplitAt,
 })
+
+/** P6 present coalescing — like renderNow's renderPending guard but for the
+ *  blit-only PresentFrame (divider drag at 60 Hz vs one GPU submit at a
+ *  time). While a present is in flight, overwrites pendingPresent with the
+ *  latest value; FramePresented flushes it. */
+const presentNow = (model: Model, present: PresentState): UpdateReturn => {
+  if (!model.source.bitmap) {
+    return { model }
+  }
+  if (model.presentPending) {
+    return { model: { ...model, pendingPresent: present } }
+  }
+  return {
+    model: { ...model, pendingPresent: null, presentPending: true },
+    commands: [PresentFrame({ present })],
+  }
+}
 
 /** Fire a RenderChain command for the current chain + draft. Bumps `revision`
  *  so stale render results can be dropped. When a render is already in
@@ -316,6 +333,8 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           // A new photo is a new context: close the mobile sheets so the
           // canvas is the first thing on screen (docs/adr/0010-editor-ui.md).
           mobileSheet: null,
+          presentPending: false,
+          pendingPresent: null,
         })
         return {
           model: next,
@@ -354,6 +373,8 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             activeFieldIndex: {},
             activeMixerColor: {},
             renderPending: false,
+            presentPending: false,
+            pendingPresent: null,
             renderedStamp: 0,
             lastRender: null,
             bins: null,
@@ -413,6 +434,8 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           attachedEdit: { id, source },
           saveStatus: { _tag: 'idle' },
           lutThumbs: {},
+          presentPending: false,
+          pendingPresent: null,
         })
         return {
           model: next,
@@ -836,7 +859,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           mode === 'toggle' && model.compareMode === 'toggle'
             ? { ...model, compareToggleBefore: !model.compareToggleBefore, phase }
             : { ...model, compareMode: mode, compareToggleBefore: mode === 'toggle', phase }
-        return { model: next, commands: [PresentFrame({ present: presentState(next) })] }
+        return presentNow(next, presentState(next))
       },
       ChangedSplitPosition: ({ position }) => {
         if (!model.source.bitmap) {
@@ -847,9 +870,18 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           compareSplitAt: Math.min(1, Math.max(0, position)),
           phase,
         }
-        return { model: next, commands: [PresentFrame({ present: presentState(next) })] }
+        return presentNow(next, presentState(next))
       },
-      FramePresented: () => ({ model }),
+      FramePresented: () => {
+        const pending = model.pendingPresent
+        if (pending) {
+          return {
+            model: { ...model, pendingPresent: null, presentPending: true },
+            commands: [PresentFrame({ present: pending })],
+          }
+        }
+        return { model: { ...model, presentPending: false } }
+      },
 
       RenderedFrame: ({ stamp, handle }) => {
         // A newer mutation arrived while this render was in flight — render

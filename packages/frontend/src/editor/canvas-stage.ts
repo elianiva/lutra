@@ -369,6 +369,20 @@ export const CompareDivider = Mount.defineStream('CompareDivider', {
           Queue.offerUnsafe(queue, EditorMessage.ChangedSplitPosition({ position }))
 
         let dragging = false
+        // P6 rAF coalescing: pointermove fires at device rate (often
+        // >60 Hz) while PresentFrame is a GPU blit submit; keep only the
+        // latest position per frame so divider drag emits ≤60 Hz even on
+        // 240 Hz mice. The pending value survives until the frame fires.
+        let pendingPosition: number | null = null
+        let rafId: number | null = null
+        const flushPending = () => {
+          rafId = null
+          if (pendingPosition !== null) {
+            const pos = pendingPosition
+            pendingPosition = null
+            emit(pos)
+          }
+        }
 
         const onDown = (e: PointerEvent) => {
           if (e.button !== 0) {
@@ -388,10 +402,25 @@ export const CompareDivider = Mount.defineStream('CompareDivider', {
           if (rect.width === 0) {
             return
           }
-          emit((e.clientX - rect.left) / rect.width)
+          const next = (e.clientX - rect.left) / rect.width
+          pendingPosition = next
+          if (rafId === null) {
+            rafId = requestAnimationFrame(flushPending)
+          }
         }
         const onUp = (e: PointerEvent) => {
           dragging = false
+          // Flush any pending drag position on release so the final
+          // position lands without waiting for the next frame.
+          if (rafId !== null) {
+            cancelAnimationFrame(rafId)
+            rafId = null
+          }
+          if (pendingPosition !== null) {
+            const pos = pendingPosition
+            pendingPosition = null
+            emit(pos)
+          }
           divider.releasePointerCapture(e.pointerId)
         }
         const onDblClick = () => emit(0.5)
@@ -406,6 +435,9 @@ export const CompareDivider = Mount.defineStream('CompareDivider', {
           }),
           ({ onDown, onMove, onUp, onDblClick }) =>
             Effect.sync(() => {
+              if (rafId !== null) {
+                cancelAnimationFrame(rafId)
+              }
               divider.removeEventListener('pointerdown', onDown)
               divider.removeEventListener('pointermove', onMove)
               divider.removeEventListener('pointerup', onUp)
