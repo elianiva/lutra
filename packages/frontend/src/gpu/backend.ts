@@ -6,6 +6,7 @@ import type { HistogramSlot } from './histogram-ring'
 import { presentModeToWgsl } from './present-mode'
 import type { ComparePresent } from './present-mode'
 import { descriptorCacheKey, pipelineCacheKey, toPassDescriptor } from './pass-descriptor'
+import { canvasDimensionsEqual, canvasDimensionsOf, sessionKeyEquals, toSessionKey } from './session-key'
 
 export type { ComparePresent } from './present-mode'
 
@@ -643,20 +644,17 @@ export const GpuBackendLive = Layer.effect(
     ): Effect.Effect<Session, GpuError> =>
       Effect.gen(function* () {
         const current = yield* Ref.get(sessionRef)
-        if (
-          Option.isSome(current) &&
-          current.value.canvas === canvas &&
-          current.value.width === width &&
-          current.value.height === height &&
-          current.value.srcBitmap === srcBitmap
-        ) {
-          if (
-            current.value.canvasWidth !== canvas.width ||
-            current.value.canvasHeight !== canvas.height
-          ) {
-            resizeCanvas(gpu, current.value)
+        const key = toSessionKey(canvas, width, height, srcBitmap)
+        if (Option.isSome(current)) {
+          const currentKey = toSessionKey(current.value.canvas, current.value.width, current.value.height, current.value.srcBitmap)
+          if (sessionKeyEquals(currentKey, key)) {
+            const storedCanvas = { height: current.value.canvasHeight, width: current.value.canvasWidth }
+            const nextCanvas = canvasDimensionsOf(canvas)
+            if (!canvasDimensionsEqual(storedCanvas, nextCanvas)) {
+              resizeCanvas(gpu, current.value)
+            }
+            return current.value
           }
-          return current.value
         }
         const s = yield* Effect.try({
           catch: (cause) =>
