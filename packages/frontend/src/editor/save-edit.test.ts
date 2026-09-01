@@ -30,7 +30,7 @@ const source = () => new Uint8Array([1, 2, 3])
 // SAFETY: fabricated GPU handle stub — tests never execute GPU work, so only its type flows through the model; the buffer has no backing storage and is never read.
 const handle = () =>
   // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
-  new RenderHandle({} as GPUTexture, 200, 150, { buffer: {} as GPUBuffer, map: null })
+  new RenderHandle({} as GPUTexture, 200, 150, { buffer: {} as GPUBuffer, state: { _tag: 'Idle' }, generation: 0 })
 
 /** An editor with a loaded, rendered image and an attached-edit record. */
 const loaded = (attached: { id: EditId | null; source: Uint8Array }) => ({

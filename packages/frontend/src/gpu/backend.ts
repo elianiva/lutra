@@ -1,46 +1,23 @@
 import { Context, Effect, Layer, Option, Ref } from 'effect'
 import { GpuError, WORKGROUP_SIZE } from '@lutra/engine'
 import type { ChainPass, LutCube, RenderRequest } from '@lutra/engine'
+import { HISTOGRAM_BINS, HistogramRing, makeSlot } from './histogram-ring'
+import type { HistogramSlot } from './histogram-ring'
+import { presentModeToWgsl } from './present-mode'
+import type { ComparePresent } from './present-mode'
+import { descriptorCacheKey, pipelineCacheKey, toPassDescriptor } from './pass-descriptor'
+import { canvasDimensionsEqual, canvasDimensionsOf, sessionKeyEquals, toSessionKey } from './session-key'
 
-/**
- * One slot of the histogram readback ring. `execute` copies a frame's bins
- * into `buffer` and issues `map` once the frame's submit completed — so the
- * map never queues behind a later render — then `readHistogram` consumes it
- * (read + unmap, `map` back to null), freeing the slot for the ring's next
- * pass. A slot whose `map` is non-null is never copied into.
- */
-interface HistogramSlot {
-  readonly buffer: GPUBuffer
-  map: Promise<void> | null
-}
+export type { ComparePresent } from './present-mode'
 
-/**
- * A handle to the frame a render produced: the output storage texture plus
- * its dimensions. `execute` returns one per render; it flows through the app
- * (RenderedFrame message → model) so `snapshot` never reads an implicit
- * "last session" — export snapshots exactly the frame it was handed.
- */
 export class RenderHandle {
   constructor(
     readonly dstTex: GPUTexture,
     readonly width: number,
     readonly height: number,
-    /** This frame's slot on the histogram readback ring (see HistogramSlot). */
     readonly readback: HistogramSlot,
+    readonly generation: number = 0,
   ) {}
-}
-
-/**
- * The compare presentation state the blit applies (docs/adr/0010-editor-ui): which
- * Compare mode is active, where the Split divider sits (image space, 0..1),
- * and which side Toggle shows. Mirrors the frontend's PresentState schema —
- * the backend stays a plain structural service, so the schema lives at the
- * message boundary only.
- */
-export interface ComparePresent {
-  readonly mode: 'off' | 'toggle' | 'split' | 'side-by-side'
-  readonly splitAt: number
-  readonly showBefore: boolean
 }
 
 interface GpuContext {
@@ -162,18 +139,6 @@ fn fs(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
 
 const roundUp = (n: number, to: number) => Math.ceil(n / to) * to
 
-/** Bins per channel. Matches the 8-bit sRGB-encoded display texture 1:1. */
-const HISTOGRAM_BINS = 256
-
-/**
- * Readback ring depth. A slot is mapped from the moment `execute` issues
- * the map (after the frame's submit completed) until `readHistogram`
- * consumes it in the same message cycle — three slots give two full cycles
- * of slack before a slot is reused, so a slow consumer can never collide
- * with a copy.
- */
-const HISTOGRAM_SLOTS = 3
-
 /**
  * Scatter-write histogram pass: bins the Rec.709 luma of every texel of the
  * final display texture (sRGB-encoded rgba8unorm) into 256 atomic u32 bins.
@@ -255,8 +220,7 @@ interface Session {
   /** 256 zeroes for the per-render accumulator reset (writeBuffer, 1KB). */
   readonly binsZeros: Uint32Array
   readonly histogramGroup: GPUBindGroup
-  /** Readback ring: per render, the bins are copied into one slot, which is then mapped. */
-  readonly readbacks: [HistogramSlot, HistogramSlot, HistogramSlot]
+  readonly histogramRing: HistogramRing
   /** Per-pass-source params buffer + compute bind group (both reference session resources). */
   readonly compute: Record<string, ComputeEntry>
 }
@@ -284,8 +248,6 @@ export const GpuBackendLive = Layer.effect(
       Record<string, { readonly pipeline: GPUComputePipeline; readonly layout: GPUBindGroupLayout }>
     >({})
     const lutTexturesRef = yield* Ref.make(new Map<string, GPUTexture>())
-
-    let readbackCursor = 0
 
     const gpuCtxRef = yield* Ref.make<Option.Option<GpuContext>>(Option.none())
     const acquireGpu = Effect.gen(function* () {
@@ -421,9 +383,7 @@ export const GpuBackendLive = Layer.effect(
       s.frameBuffer.destroy()
       s.presentBuffer.destroy()
       s.binsBuffer.destroy()
-      for (const slot of s.readbacks) {
-        slot.buffer.destroy()
-      }
+      s.histogramRing.destroy()
       for (const entry of Object.values(s.compute)) {
         entry.paramsBuffer?.destroy()
       }
@@ -590,15 +550,32 @@ export const GpuBackendLive = Layer.effect(
           ],
           layout: histogramPipeline.getBindGroupLayout(0),
         })
-        const makeSlot = (): HistogramSlot => ({
-          buffer: track(
-            device.createBuffer({
-              size: HISTOGRAM_BINS * 4,
-              usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-            }),
+        const histogramRing = new HistogramRing([
+          makeSlot(
+            track(
+              device.createBuffer({
+                size: HISTOGRAM_BINS * 4,
+                usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+              }),
+            ),
           ),
-          map: null,
-        })
+          makeSlot(
+            track(
+              device.createBuffer({
+                size: HISTOGRAM_BINS * 4,
+                usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+              }),
+            ),
+          ),
+          makeSlot(
+            track(
+              device.createBuffer({
+                size: HISTOGRAM_BINS * 4,
+                usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+              }),
+            ),
+          ),
+        ] as const)
 
         return {
           binsBuffer,
@@ -614,9 +591,9 @@ export const GpuBackendLive = Layer.effect(
           frameBuffer,
           height,
           histogramGroup,
+          histogramRing,
           intermediates,
           presentBuffer,
-          readbacks: [makeSlot(), makeSlot(), makeSlot()],
           resolutionBuffer,
           srcBitmap,
           srcTex,
@@ -668,20 +645,17 @@ export const GpuBackendLive = Layer.effect(
     ): Effect.Effect<Session, GpuError> =>
       Effect.gen(function* () {
         const current = yield* Ref.get(sessionRef)
-        if (
-          Option.isSome(current) &&
-          current.value.canvas === canvas &&
-          current.value.width === width &&
-          current.value.height === height &&
-          current.value.srcBitmap === srcBitmap
-        ) {
-          if (
-            current.value.canvasWidth !== canvas.width ||
-            current.value.canvasHeight !== canvas.height
-          ) {
-            resizeCanvas(gpu, current.value)
+        const key = toSessionKey(canvas, width, height, srcBitmap)
+        if (Option.isSome(current)) {
+          const currentKey = toSessionKey(current.value.canvas, current.value.width, current.value.height, current.value.srcBitmap)
+          if (sessionKeyEquals(currentKey, key)) {
+            const storedCanvas = { height: current.value.canvasHeight, width: current.value.canvasWidth }
+            const nextCanvas = canvasDimensionsOf(canvas)
+            if (!canvasDimensionsEqual(storedCanvas, nextCanvas)) {
+              resizeCanvas(gpu, current.value)
+            }
+            return current.value
           }
-          return current.value
         }
         const s = yield* Effect.try({
           catch: (cause) =>
@@ -715,18 +689,18 @@ export const GpuBackendLive = Layer.effect(
     ): Effect.Effect<ComputeEntry, GpuError> =>
       Effect.gen(function* () {
         const { device, sampler } = gpu
-        const cacheKey =
-          pass.lutId === undefined ? pass.source : `${pass.source}::lut:${pass.lutId}`
+        const descriptor = toPassDescriptor(pass)
+        const cacheKey = descriptorCacheKey(descriptor)
         const cached = s.compute[cacheKey]
         if (cached) {
           return cached
         }
 
         const pipelines = yield* Ref.get(pipelineCacheRef)
-        const cachedPipeline = pipelines[pass.source]
+        const cachedPipeline = pipelines[pipelineCacheKey(descriptor)]
         let compiled = cachedPipeline
         if (!compiled) {
-          const module = device.createShaderModule({ code: pass.source })
+          const module = device.createShaderModule({ code: descriptor.source })
           const pipeline = device.createComputePipeline({
             compute: { entryPoint: 'main', module },
             layout: 'auto',
@@ -735,42 +709,42 @@ export const GpuBackendLive = Layer.effect(
             layout: pipeline.getBindGroupLayout(0),
             pipeline,
           }
-          yield* Ref.update(pipelineCacheRef, (cache) => ({ ...cache, [pass.source]: built }))
+          yield* Ref.update(pipelineCacheRef, (cache) => ({
+            ...cache,
+            [pipelineCacheKey(descriptor)]: built,
+          }))
           compiled = built
         }
 
-        const hasParams = pass.uniforms.length > 0
-        const paramsBuffer = hasParams
+        const paramsBuffer = descriptor.hasParams
           ? device.createBuffer({
               size: roundUp(pass.uniforms.length * 4, 16),
               usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
             })
           : null
 
-        // mirror that.
         const entries: GPUBindGroupEntry[] = [
           { binding: 0, resource: src.createView() },
           { binding: 1, resource: dst.createView() },
           { binding: 2, resource: { buffer: s.resolutionBuffer } },
         ]
-        if (pass.usesFrame) {
+        if (descriptor.usesFrame) {
           entries.push({ binding: 3, resource: { buffer: s.frameBuffer } })
         }
         if (paramsBuffer) {
           entries.push({ binding: 4, resource: { buffer: paramsBuffer } })
         }
-        if (pass.usesSampler) {
+        if (descriptor.usesSampler) {
           entries.push({ binding: 5, resource: sampler })
         }
-        if (pass.lutId !== undefined) {
-          const cube = luts.get(pass.lutId)
+        if (descriptor.lutId !== undefined) {
+          const cube = luts.get(descriptor.lutId)
           if (!cube) {
             return yield* Effect.fail(
-              new GpuError({ message: `LUT cube missing for ${pass.lutId}` }),
+              new GpuError({ message: `LUT cube missing for ${descriptor.lutId}` }),
             )
           }
-          // texture defaults to e2DArray in Chrome, which fails bind-group
-          const lutTex = yield* ensureLutTexture(device, pass.lutId, cube)
+          const lutTex = yield* ensureLutTexture(device, descriptor.lutId, cube)
           entries.push({
             binding: 6,
             resource: lutTex.createView({ dimension: '3d' }),
@@ -799,16 +773,7 @@ export const GpuBackendLive = Layer.effect(
       s: Session,
       present: ComparePresent,
     ): void => {
-      const wgslMode =
-        present.mode === 'off'
-          ? 0
-          : present.mode === 'toggle'
-            ? present.showBefore
-              ? 1
-              : 0
-            : present.mode === 'split'
-              ? 2
-              : 3
+      const wgslMode = presentModeToWgsl(present)
       device.queue.writeBuffer(
         s.presentBuffer,
         0,
@@ -885,14 +850,7 @@ export const GpuBackendLive = Layer.effect(
             computePass.end()
           }
 
-          const slot = s.readbacks[readbackCursor % HISTOGRAM_SLOTS]!
-          readbackCursor += 1
-          if (slot.map !== null) {
-            const pending = slot.map
-            yield* Effect.ignore(Effect.promise(async () => await pending))
-            slot.buffer.unmap()
-            slot.map = null
-          }
+          const slot = yield* s.histogramRing.acquire()
           gpu.device.queue.writeBuffer(s.binsBuffer, 0, s.binsZeros)
           const histogramPass = encoder.beginComputePass()
           histogramPass.setPipeline(gpu.histogramPipeline)
@@ -915,9 +873,9 @@ export const GpuBackendLive = Layer.effect(
             try: async () => await gpu.device.queue.onSubmittedWorkDone(),
           })
 
-          slot.map = slot.buffer.mapAsync(GPUMapMode.READ)
+          s.histogramRing.occupy(slot, slot.buffer.mapAsync(GPUMapMode.READ))
 
-          return new RenderHandle(s.dstTex, s.width, s.height, slot)
+          return new RenderHandle(s.dstTex, s.width, s.height, slot, slot.generation)
         }).pipe(
           // specific WGSL rejection) must surface as a GpuError. Without
           Effect.catchDefect((cause: unknown) =>
@@ -1000,21 +958,10 @@ export const GpuBackendLive = Layer.effect(
         Effect.gen(function* () {
           const slot = handle.readback
           const live = yield* Ref.get(sessionRef)
-          const { map } = slot
-          if (map === null || Option.isNone(live) || !live.value.readbacks.includes(slot)) {
-            // spurious failure.
+          if (Option.isNone(live) || !live.value.histogramRing.owns(slot)) {
             return new Uint32Array(HISTOGRAM_BINS)
           }
-          yield* Effect.tryPromise({
-            catch: (cause) =>
-              new GpuError({ cause, message: 'Failed to map histogram bins buffer' }),
-            try: async () => await map,
-          })
-          const bins = new Uint32Array(slot.buffer.getMappedRange())
-          const copy = new Uint32Array(bins)
-          slot.buffer.unmap()
-          slot.map = null
-          return copy
+          return yield* live.value.histogramRing.consume(slot, handle.generation)
         }),
     })
   }),

@@ -1,11 +1,14 @@
 import type { BodyRenderer } from '../types'
 
-// Color Mixer (Lightroom-style HSL panel, docs/adr/0003-adjustment-layers): eight hue
-//
-//   compile.
-//   range edges.
-//
-const RANGES = [
+export type MixerRange = {
+  readonly key: string
+  readonly left: number
+  readonly right: number
+}
+
+export const MIX_OVERLAP = 10.0 as const
+
+export const RANGES = [
   { key: 'red', left: 330, right: 15 },
   { key: 'orange', left: 15, right: 45 },
   { key: 'yellow', left: 45, right: 90 },
@@ -14,9 +17,36 @@ const RANGES = [
   { key: 'blue', left: 210, right: 255 },
   { key: 'purple', left: 255, right: 285 },
   { key: 'magenta', left: 285, right: 330 },
-] as const
+] as const satisfies readonly MixerRange[]
 
 const CHANNELS = ['Hue', 'Saturation', 'Luminance'] as const
+
+export const wrapHueForRange = (h: number, left: number, right: number): [number, number, number] => {
+  let hh = h
+  let ll = left
+  let rr = right
+  if (ll > rr) {
+    rr = right + 360
+    if (hh < right + MIX_OVERLAP) hh += 360
+  } else if (hh < ll - MIX_OVERLAP) {
+    hh += 360
+    ll += 360
+    rr += 360
+  } else if (hh > rr + MIX_OVERLAP) {
+    hh -= 360
+    ll -= 360
+    rr -= 360
+  }
+  return [hh, ll, rr]
+}
+
+export const overlapWeight = (h: number, left: number, right: number): number => {
+  if (left > right && h >= right + MIX_OVERLAP && h < left - MIX_OVERLAP) return 0
+  const [hh, ll, rr] = wrapHueForRange(h, left, right)
+  const rampIn = Math.min(1, Math.max(0, (hh - (ll - MIX_OVERLAP)) / (2 * MIX_OVERLAP)))
+  const rampOut = Math.min(1, Math.max(0, (rr + MIX_OVERLAP - hh) / (2 * MIX_OVERLAP)))
+  return rampIn * rampOut
+}
 
 /** The normalized slider field name for a range + channel (redHue, ...). */
 const field = (range: (typeof RANGES)[number], channel: (typeof CHANNELS)[number]) =>
@@ -38,7 +68,7 @@ export const renderColorMixer: BodyRenderer = (i) => {
 
   return {
     helpers: `
-const MIX_OVERLAP: f32 = 10.0;
+const MIX_OVERLAP: f32 = ${MIX_OVERLAP}.0;
 
 fn mixerSrgbToLinear(c: vec3<f32>) -> vec3<f32> {
   let lo = c / 12.92;
@@ -96,30 +126,34 @@ fn mixerHslToRgb(hsl: vec3<f32>) -> vec3<f32> {
   return rgb + vec3<f32>(m);
 }
 
-fn mixerWeight(h: f32, left: f32, right: f32) -> f32 {
+fn wrapHueForRange(h: f32, left: f32, right: f32) -> vec3<f32> {
   var hh = h;
   var ll = left;
   var rr = right;
   if (ll > rr) {
-    if (hh >= right + MIX_OVERLAP && hh < left - MIX_OVERLAP) {
-      return 0.0;
-    }
     rr = right + 360.0;
-    if (hh < right + MIX_OVERLAP) {
-      hh += 360.0;
-    }
+    if (hh < right + MIX_OVERLAP) { hh += 360.0; }
   } else if (hh < ll - MIX_OVERLAP) {
-    hh += 360.0;
-    ll += 360.0;
-    rr += 360.0;
+    hh += 360.0; ll += 360.0; rr += 360.0;
   } else if (hh > rr + MIX_OVERLAP) {
-    hh -= 360.0;
-    ll -= 360.0;
-    rr -= 360.0;
+    hh -= 360.0; ll -= 360.0; rr -= 360.0;
   }
+  return vec3<f32>(hh, ll, rr);
+}
+
+fn overlapWeight(h: f32, left: f32, right: f32) -> f32 {
+  let wrapped = wrapHueForRange(h, left, right);
+  let hh = wrapped.x; let ll = wrapped.y; let rr = wrapped.z;
   let rampIn = clamp((hh - (ll - MIX_OVERLAP)) / (2.0 * MIX_OVERLAP), 0.0, 1.0);
   let rampOut = clamp(((rr + MIX_OVERLAP) - hh) / (2.0 * MIX_OVERLAP), 0.0, 1.0);
   return rampIn * rampOut;
+}
+
+fn mixerWeight(h: f32, left: f32, right: f32) -> f32 {
+  if (left > right && h >= right + MIX_OVERLAP && h < left - MIX_OVERLAP) {
+    return 0.0;
+  }
+  return overlapWeight(h, left, right);
 }
 `,
     stmts: `

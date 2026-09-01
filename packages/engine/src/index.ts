@@ -51,7 +51,8 @@ export type { LutCube } from './luts/cube'
 // filmstrip previews render through this in the thumb worker, where the GPU
 // pipeline is not available. Exact match for a LUT-only chain (sRGB in,
 // sRGB out — no colorspace boundary).
-export { applyLutCpu } from './luts/apply'
+export { applyLutCpu, cubeLayoutOf, cubeTexelIndex } from './luts/apply'
+export type { CubeLayout } from './luts/apply'
 
 export {
   generateChainSource,
