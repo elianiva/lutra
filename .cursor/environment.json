@@ -5,7 +5,7 @@
     {
       "name": "dev",
       "command": "cd packages/frontend && exec ./node_modules/.bin/vite --host 0.0.0.0 --port 5173 --strictPort",
-      "description": "Vite dev server for @lutra/frontend on http://localhost:5173. The repo's `pnpm dev` uses portless (needs a privileged local proxy); this runs Vite directly on a fixed port so the app is reachable via port forwarding."
+      "description": "Vite dev server for @lutra/frontend on http://localhost:5173."
     }
   ],
   "ports": [

@@ -3,9 +3,7 @@
 # on a fixed port and wait until it answers. Idempotent — a second run reuses
 # an already-running server. Prints the URL on success.
 #
-# We run Vite directly rather than `pnpm dev`: the repo's dev script uses
-# portless, which needs a privileged local proxy that doesn't fit a headless
-# VM. Vite on a fixed port is reachable and predictable.
+# Run Vite directly on a fixed port so it is reachable and predictable.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"

@@ -888,12 +888,20 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         const { model: dialogModel, commands: dialogCommands = [] } = ExportDialog.open(
           model.exportDialog,
         )
+        const draft = model.phase._tag === 'Drafting' ? model.phase.layer : null
+        const source = model.attachedEdit?.source
+        const snapshotCommand =
+          source !== undefined
+            ? SnapshotForExport({
+                draft,
+                handle: model.lastRender,
+                layers: model.chain,
+                source,
+              })
+            : SnapshotForExport({ handle: model.lastRender })
         return {
           model: { ...model, exportDialog: dialogModel, phase },
-          commands: [
-            ...Command.mapMessages(dialogCommands, toExportDialogMessage),
-            SnapshotForExport({ handle: model.lastRender }),
-          ],
+          commands: [...Command.mapMessages(dialogCommands, toExportDialogMessage), snapshotCommand],
         }
       },
       GotExportDialogMessage: ({ message }) => delegateToExportDialog(model, phase, message),

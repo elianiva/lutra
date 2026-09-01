@@ -137,9 +137,6 @@ importers:
       happy-dom:
         specifier: ^20.12.0
         version: 20.12.0
-      portless:
-        specifier: ^0.15.6
-        version: 0.15.6
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0
@@ -3315,12 +3312,6 @@ packages:
   pngjs@7.0.0:
     resolution: {integrity: sha512-LKWqWJRhstyYo9pGvgor/ivk2w94eSjE3RGVuzLGlr3NmD8bf7RcYGze1mNdEHRP6TRP6rMuDHk5t44hnTRyow==}
     engines: {node: '>=14.19.0'}
-
-  portless@0.15.6:
-    resolution: {integrity: sha512-uOAwWLF32rmyEGFASzSO0VOaqb/AQxFCCzyZbPGd82UNNOfIEvc09zy92nroNibE5HNfzV4oVB0ObKbPXgkM9A==}
-    engines: {node: '>=24'}
-    os: [darwin, linux, win32]
-    hasBin: true
 
   postcss@8.5.26:
     resolution: {integrity: sha512-u82N74LFzG8ca+dD8puPnplTXoGH4fTPpVGuIbt36G3qvNlkvfD0lEAZSxaly3KX8TS/L1A1gsCEmvKmBcVbkQ==}
@@ -6585,8 +6576,6 @@ snapshots:
   pkce-challenge@5.0.1: {}
 
   pngjs@7.0.0: {}
-
-  portless@0.15.6: {}
 
   postcss@8.5.26:
     dependencies:

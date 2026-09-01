@@ -17,7 +17,7 @@ From the repo root:
 .cursor/skills/verify-lutra/scripts/launch.sh
 ```
 
-This installs deps if needed and starts Vite on `http://localhost:5173` (ready when the script prints `Dev server ready`). It runs Vite directly rather than `pnpm dev`, because the repo's `pnpm dev` uses portless (a privileged local proxy that does not fit a headless VM). Override the port with `LUTRA_PORT`.
+This installs deps if needed and starts Vite on `http://localhost:5173` (ready when the script prints `Dev server ready`). It runs Vite directly on a fixed port so the app is reachable. Override the port with `LUTRA_PORT`.
 
 Teardown of the dev server (only if you started it and want it gone): find the `vite` pid printed by `launch.sh` (or in its log line) and `kill <pid>`. Leave it running if the user may keep testing.
 
