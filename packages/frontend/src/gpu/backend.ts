@@ -255,9 +255,11 @@ interface Session {
   /**
    * Ping-pong linear-light rgba16float intermediates. Layer passes read
    * the previous pass's output and write the next; only the final pass
-   * writes dstTex (sRGB-encoded rgba8unorm).
+   * writes dstTex (sRGB-encoded rgba8unorm). Lazily allocated (P3) —
+   * null for passthrough/single-pass chains where the source goes
+   * straight to dstTex, saving ~366 MiB on a 6k empty chain.
    */
-  readonly intermediates: [GPUTexture, GPUTexture]
+  intermediates: [GPUTexture, GPUTexture] | null
   readonly resolutionBuffer: GPUBuffer
   /** Canvas-size uniform for the blit (u_canvas), written once at build. */
   readonly canvasSizeBuffer: GPUBuffer
@@ -339,6 +341,27 @@ export const GpuBackendLive = Layer.effect(
         // Background-fork the log: the event bus fires outside the Effect
         // runtime's stack, so a raw Effect call here would be lost.
         void Effect.runFork(Effect.logError(`[WebGPU uncapturederror] ${event.error.message}`))
+      })
+      // P5 hygiene: recover from device loss without a page reload.
+      // Dawn/WebGPU may lose the device on driver reset, OOM, or tab
+      // backgrounding — without this the sessionRef points at destroyed
+      // textures and every later execute throws.
+      void device.lost.then((info) => {
+        void Effect.runFork(
+          Effect.gen(function* () {
+            yield* Effect.logError(`[WebGPU] device lost: ${info.message} (reason: ${info.reason})`)
+            const current = yield* Ref.get(sessionRef)
+            if (Option.isSome(current)) {
+              try {
+                destroySession(current.value)
+              } catch (cause) {
+                yield* Effect.logDebug(`[WebGPU] destroy on lost failed: ${String(cause)}`)
+              }
+            }
+            yield* Ref.set(sessionRef, Option.none())
+            yield* Ref.set(gpuCtxRef, Option.none())
+          }),
+        )
       })
       const sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' })
       const swapFormat = navigator.gpu.getPreferredCanvasFormat()
@@ -425,10 +448,17 @@ export const GpuBackendLive = Layer.effect(
       })
 
     const destroySession = (s: Session): void => {
+      try {
+        s.srcBitmap.close()
+      } catch (cause) {
+        void Effect.runFork(Effect.logDebug(`[WebGPU] bitmap close skipped: ${String(cause)}`))
+      }
       s.srcTex.destroy()
       s.dstTex.destroy()
-      s.intermediates[0].destroy()
-      s.intermediates[1].destroy()
+      if (s.intermediates) {
+        s.intermediates[0].destroy()
+        s.intermediates[1].destroy()
+      }
       s.resolutionBuffer.destroy()
       s.canvasSizeBuffer.destroy()
       s.frameBuffer.destroy()
@@ -443,9 +473,48 @@ export const GpuBackendLive = Layer.effect(
     }
 
     /**
+     * P2 guard: clamp the canvas drawing-buffer size to the device's
+     * `maxTextureDimension2D` before any `configure` or `createTexture`.
+     * The view already caps preview side-by-side to 4096, so this is a
+     * defensive fallback — on a compat device (max 4096) a stale 12000-wide
+     * canvas would otherwise fail validation. The clamp writes back to the
+     * canvas attributes so the swapchain size matches the uniform.
+     */
+    const clampCanvasToDeviceLimits = (device: GPUDevice, canvas: HTMLCanvasElement): void => {
+      const max = device.limits.maxTextureDimension2D
+      const clampedW = Math.min(canvas.width, max)
+      const clampedH = Math.min(canvas.height, max)
+      if (clampedW !== canvas.width || clampedH !== canvas.height) {
+        canvas.width = clampedW
+        canvas.height = clampedH
+      }
+    }
+
+    /**
+     * Lazily allocate the ping-pong intermediates for a multi-pass chain
+     * (P3). Called from `execute` when `passes.length > 1` and the session
+     * was built without them; a passthrough / single-pass preview holds no
+     * 16-bit textures until a second layer is added.
+     */
+    const ensureIntermediates = (device: GPUDevice, s: Session): void => {
+      if (s.intermediates !== null) {
+        return
+      }
+      const makeIntermediate = (): GPUTexture =>
+        device.createTexture({
+          format: 'rgba16float',
+          size: { depthOrArrayLayers: 1, height: s.height, width: s.width },
+          usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+        })
+      s.intermediates = [makeIntermediate(), makeIntermediate()]
+    }
+
+    /**
      * Allocate every image-scoped resource for one canvas+image pair. Throws
      * `GpuError` when the canvas has no WebGPU context; device calls may
      * throw raw exceptions, which `ensureSession` wraps.
+     * P5: transactional — on any throw, already-created GPU objects are
+     * destroyed and no leaked session is left behind.
      */
     const buildSession = (
       gpu: GpuContext,
@@ -455,145 +524,178 @@ export const GpuBackendLive = Layer.effect(
       srcBitmap: ImageBitmap,
     ): Session => {
       const { device, sampler, swapFormat, blitPipeline, histogramPipeline } = gpu
+      clampCanvasToDeviceLimits(device, canvas)
       const ctx = canvas.getContext('webgpu')
       if (!ctx) {
         throw new GpuError({ message: 'WebGPU canvas context unavailable' })
       }
-      ctx.configure({
-        alphaMode: 'opaque',
-        device,
-        format: swapFormat,
-      })
-
-      // Source texture: uploaded once per image. Never re-uploaded per render.
-      const srcTex = device.createTexture({
-        format: 'rgba8unorm',
-        size: { depthOrArrayLayers: 1, height, width },
-        usage:
-          GPUTextureUsage.TEXTURE_BINDING |
-          GPUTextureUsage.COPY_DST |
-          GPUTextureUsage.RENDER_ATTACHMENT,
-      })
-      device.queue.copyExternalImageToTexture(
-        { flipY: false, source: srcBitmap },
-        { texture: srcTex },
-        { depthOrArrayLayers: 1, height, width },
-      )
-
-      // Destination storage texture: the final compute pass writes it (sRGB),
-      // the blit samples it, and export copies it back to the CPU.
-      const dstTex = device.createTexture({
-        format: 'rgba8unorm',
-        size: { depthOrArrayLayers: 1, height, width },
-        usage:
-          GPUTextureUsage.STORAGE_BINDING |
-          GPUTextureUsage.TEXTURE_BINDING |
-          GPUTextureUsage.COPY_SRC,
-      })
-
-      // Ping-pong linear-light intermediates (rgba16float so multi-pass
-      // grading doesn't band like 8-bit would). Pass i reads the previous
-      // pass's output and writes the other.
-      const makeIntermediate = (): GPUTexture =>
-        device.createTexture({
-          format: 'rgba16float',
-          size: { depthOrArrayLayers: 1, height, width },
-          usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+      // Track allocations for transactional cleanup (P5).
+      const owned: Array<{ destroy: () => void }> = []
+      const track = <T extends { destroy: () => void }>(obj: T): T => {
+        owned.push(obj)
+        return obj
+      }
+      const cleanup = (): void => {
+        for (const obj of owned.reverse()) {
+          try {
+            obj.destroy()
+          } catch (cause) {
+            void Effect.runFork(Effect.logDebug(`[WebGPU] cleanup destroy skipped: ${String(cause)}`))
+          }
+        }
+      }
+      try {
+        ctx.configure({
+          alphaMode: 'opaque',
+          device,
+          format: swapFormat,
         })
-      const intermediates: [GPUTexture, GPUTexture] = [makeIntermediate(), makeIntermediate()]
 
-      // Uniform buffers. `u_resolution` is written once; `u_frame` is
-      // rewritten every render (grain animates).
-      const resolutionBuffer = device.createBuffer({
-        size: 16,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      })
-      device.queue.writeBuffer(resolutionBuffer, 0, new Float32Array([width, height]))
-      // Canvas-size uniform for the blit: the swapchain size the blit
-      // derives its uv from (2× the image width in Side by side), which can
-      // differ from the image-sized `u_resolution` the compute passes use.
-      const canvasSizeBuffer = device.createBuffer({
-        size: 16,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      })
-      device.queue.writeBuffer(canvasSizeBuffer, 0, new Float32Array([canvas.width, canvas.height]))
-      const frameBuffer = device.createBuffer({
-        size: 16,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      })
+        // Source texture: uploaded once per image. Never re-uploaded per render.
+        const srcTex = track(
+          device.createTexture({
+            format: 'rgba8unorm',
+            size: { depthOrArrayLayers: 1, height, width },
+            usage:
+              GPUTextureUsage.TEXTURE_BINDING |
+              GPUTextureUsage.COPY_DST |
+              GPUTextureUsage.RENDER_ATTACHMENT,
+          }),
+        )
+        device.queue.copyExternalImageToTexture(
+          { flipY: false, source: srcBitmap },
+          { texture: srcTex },
+          { depthOrArrayLayers: 1, height, width },
+        )
 
-      // Compare presentation uniform: [wgslMode, splitAt, 0, 0], rewritten
-      // before every blit (chain renders and present-only re-blits alike).
-      const presentBuffer = device.createBuffer({
-        size: 16,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      })
+        // Destination storage texture: the final compute pass writes it (sRGB),
+        // the blit samples it, and export copies it back to the CPU.
+        const dstTex = track(
+          device.createTexture({
+            format: 'rgba8unorm',
+            size: { depthOrArrayLayers: 1, height, width },
+            usage:
+              GPUTextureUsage.STORAGE_BINDING |
+              GPUTextureUsage.TEXTURE_BINDING |
+              GPUTextureUsage.COPY_SRC,
+          }),
+        )
 
-      // The blit group mirrors the shader's bindings: dstTex (0), sampler
-      // (1), srcTex (3), the present uniform (4), and the canvas size (5).
-      // Note there is no u_resolution (2) here — the blit derives its uv
-      // from u_canvas, not the image-sized resolution the compute passes use.
-      const blitGroup = device.createBindGroup({
-        entries: [
-          { binding: 0, resource: dstTex.createView() },
-          { binding: 1, resource: sampler },
-          { binding: 3, resource: srcTex.createView() },
-          { binding: 4, resource: { buffer: presentBuffer } },
-          { binding: 5, resource: { buffer: canvasSizeBuffer } },
-        ],
-        layout: blitPipeline.getBindGroupLayout(0),
-      })
+        // P3: intermediates are lazy — a preview session with a passthrough
+        // or single-pass chain holds no 16-bit textures. Allocated on demand
+        // in `execute` when `passes.length > 1`.
+        const intermediates: [GPUTexture, GPUTexture] | null = null
 
-      // Histogram resources, all session-scoped (created once per image,
-      // never per render): a storage-only bins accumulator — MAP_READ can't
-      // combine with STORAGE (WebGPU usage rules), so the bins cross back
-      // via a ring of MAP_READ readback buffers the encoder copies into per
-      // render — and the pass's bind group, which only references
-      // session-scoped resources. All three readback slots start unmapped
-      // with no pending map, so a fresh session's ring is immediately
-      // reusable.
-      const binsBuffer = device.createBuffer({
-        size: HISTOGRAM_BINS * 4,
-        // COPY_DST for the per-render zeroing writeBuffer; COPY_SRC for the
-        // copy into the readback ring.
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
-      })
-      const histogramGroup = device.createBindGroup({
-        entries: [
-          { binding: 0, resource: dstTex.createView() },
-          { binding: 1, resource: { buffer: binsBuffer } },
-        ],
-        layout: histogramPipeline.getBindGroupLayout(0),
-      })
-      const makeSlot = (): HistogramSlot => ({
-        buffer: device.createBuffer({
-          size: HISTOGRAM_BINS * 4,
-          usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-        }),
-        map: null,
-      })
+        // Uniform buffers. `u_resolution` is written once; `u_frame` is
+        // rewritten every render (grain animates).
+        const resolutionBuffer = track(
+          device.createBuffer({
+            size: 16,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+          }),
+        )
+        device.queue.writeBuffer(resolutionBuffer, 0, new Float32Array([width, height]))
+        // Canvas-size uniform for the blit: the swapchain size the blit
+        // derives its uv from (2× the image width in Side by side), which can
+        // differ from the image-sized `u_resolution` the compute passes use.
+        const canvasSizeBuffer = track(
+          device.createBuffer({
+            size: 16,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+          }),
+        )
+        device.queue.writeBuffer(canvasSizeBuffer, 0, new Float32Array([canvas.width, canvas.height]))
+        const frameBuffer = track(
+          device.createBuffer({
+            size: 16,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+          }),
+        )
 
-      return {
-        binsBuffer,
-        binsZeros: new Uint32Array(HISTOGRAM_BINS),
-        blitGroup,
-        canvas,
-        canvasHeight: canvas.height,
-        canvasSizeBuffer,
-        canvasWidth: canvas.width,
-        compute: {},
-        ctx,
-        dstTex,
-        frameBuffer,
-        height,
-        histogramGroup,
-        intermediates,
-        presentBuffer,
-        readbacks: [makeSlot(), makeSlot(), makeSlot()],
-        resolutionBuffer,
-        srcBitmap,
-        srcTex,
-        width,
+        // Compare presentation uniform: [wgslMode, splitAt, 0, 0], rewritten
+        // before every blit (chain renders and present-only re-blits alike).
+        const presentBuffer = track(
+          device.createBuffer({
+            size: 16,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+          }),
+        )
+
+        // The blit group mirrors the shader's bindings: dstTex (0), sampler
+        // (1), srcTex (3), the present uniform (4), and the canvas size (5).
+        // Note there is no u_resolution (2) here — the blit derives its uv
+        // from u_canvas, not the image-sized resolution the compute passes use.
+        const blitGroup = device.createBindGroup({
+          entries: [
+            { binding: 0, resource: dstTex.createView() },
+            { binding: 1, resource: sampler },
+            { binding: 3, resource: srcTex.createView() },
+            { binding: 4, resource: { buffer: presentBuffer } },
+            { binding: 5, resource: { buffer: canvasSizeBuffer } },
+          ],
+          layout: blitPipeline.getBindGroupLayout(0),
+        })
+
+        // Histogram resources, all session-scoped (created once per image,
+        // never per render): a storage-only bins accumulator — MAP_READ can't
+        // combine with STORAGE (WebGPU usage rules), so the bins cross back
+        // via a ring of MAP_READ readback buffers the encoder copies into per
+        // render — and the pass's bind group, which only references
+        // session-scoped resources. All three readback slots start unmapped
+        // with no pending map, so a fresh session's ring is immediately
+        // reusable.
+        const binsBuffer = track(
+          device.createBuffer({
+            size: HISTOGRAM_BINS * 4,
+            // COPY_DST for the per-render zeroing writeBuffer; COPY_SRC for the
+            // copy into the readback ring.
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+          }),
+        )
+        const histogramGroup = device.createBindGroup({
+          entries: [
+            { binding: 0, resource: dstTex.createView() },
+            { binding: 1, resource: { buffer: binsBuffer } },
+          ],
+          layout: histogramPipeline.getBindGroupLayout(0),
+        })
+        const makeSlot = (): HistogramSlot => ({
+          buffer: track(
+            device.createBuffer({
+              size: HISTOGRAM_BINS * 4,
+              usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+            }),
+          ),
+          map: null,
+        })
+
+        return {
+          binsBuffer,
+          binsZeros: new Uint32Array(HISTOGRAM_BINS),
+          blitGroup,
+          canvas,
+          canvasHeight: canvas.height,
+          canvasSizeBuffer,
+          canvasWidth: canvas.width,
+          compute: {},
+          ctx,
+          dstTex,
+          frameBuffer,
+          height,
+          histogramGroup,
+          intermediates,
+          presentBuffer,
+          readbacks: [makeSlot(), makeSlot(), makeSlot()],
+          resolutionBuffer,
+          srcBitmap,
+          srcTex,
+          width,
+        }
+      } catch (cause) {
+        cleanup()
+        throw cause instanceof GpuError
+          ? cause
+          : new GpuError({ cause, message: 'Failed to prepare canvas' })
       }
     }
 
@@ -606,6 +708,7 @@ export const GpuBackendLive = Layer.effect(
      */
     const resizeCanvas = (gpu: GpuContext, s: Session): void => {
       const { device, swapFormat } = gpu
+      clampCanvasToDeviceLimits(device, s.canvas)
       s.ctx.configure({ alphaMode: 'opaque', device, format: swapFormat })
       device.queue.writeBuffer(
         s.canvasSizeBuffer,
@@ -649,10 +752,9 @@ export const GpuBackendLive = Layer.effect(
           }
           return current.value
         }
-        if (Option.isSome(current)) {
-          destroySession(current.value)
-          yield* Ref.set(sessionRef, Option.none())
-        }
+        // P5 transactional: build the new session first — on throw the
+        // previous session stays alive and no leaked textures remain
+        // (buildSession's cleanup destroys its partial allocations).
         const s = yield* Effect.try({
           catch: (cause) =>
             cause instanceof GpuError
@@ -660,6 +762,9 @@ export const GpuBackendLive = Layer.effect(
               : new GpuError({ cause, message: 'Failed to prepare canvas' }),
           try: () => buildSession(gpu, canvas, width, height, srcBitmap),
         })
+        if (Option.isSome(current)) {
+          destroySession(current.value)
+        }
         yield* Ref.set(sessionRef, Option.some(s))
         return s
       })
@@ -819,6 +924,13 @@ export const GpuBackendLive = Layer.effect(
 
           const { passes } = request.shader
 
+          // P3: allocate ping-pong intermediates lazily on first multi-pass
+          // render — a preview session with a passthrough / single pass holds
+          // no 16-bit textures until a second layer is added.
+          if (passes.length > 1) {
+            ensureIntermediates(gpu.device, s)
+          }
+
           // Cheap per-tick updates: repack each pass's params buffer and the
           // frame counter once, then dispatch every pass. No allocations, no
           // texture churn.
@@ -834,8 +946,8 @@ export const GpuBackendLive = Layer.effect(
           // intermediates; the last pass writes the sRGB-encoded dstTex.
           for (let i = 0; i < passes.length; i++) {
             const pass = passes[i]!
-            const src = i === 0 ? s.srcTex : s.intermediates[(i - 1) % 2]!
-            const dst = i === passes.length - 1 ? s.dstTex : s.intermediates[i % 2]!
+            const src = i === 0 ? s.srcTex : s.intermediates![(i - 1) % 2]!
+            const dst = i === passes.length - 1 ? s.dstTex : s.intermediates![i % 2]!
             const { paramsBuffer, bindGroup, pipeline } = yield* getCompute(
               gpu,
               s,

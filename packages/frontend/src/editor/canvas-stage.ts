@@ -646,10 +646,14 @@ const histogramOverlay = (h: HtmlBuilder<EditorMessage>, bins: Uint32Array | nul
 
 const loadedStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel) => {
   const src = model.source
-  // Side by side shows both halves at native resolution: the canvas is 2×
-  // the image width (source left, graded right), so neither side is
-  // stretched. The GPU backend rebuilds its session on the size change and
-  // the blit maps each half 1:1; PanZoom re-fits to the wider content.
+  // Side by side shows both halves at preview resolution: the canvas is 2×
+  // the preview width (source left, graded right), so neither side is
+  // stretched. The backend follows the size change in place via
+  // `resizeCanvas` (swapchain re-configures, `u_canvas` rewritten, no
+  // image textures rebuilt) and the blit maps each half 1:1; PanZoom
+  // re-fits to the wider content. P2 clamps the drawing buffer to
+  // `device.limits.maxTextureDimension2D` so a compat 4096 cap does not
+  // throw on the 2× width.
   const contentWidth = model.compareMode === 'side-by-side' ? src.width * 2 : src.width
   return h.div(
     [
