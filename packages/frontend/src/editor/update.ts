@@ -292,6 +292,16 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         if (!transitioned) {
           return { model }
         }
+        // P5 hygiene: close the previous decoded bitmap (CPU-side 24Mpx)
+        // before replacing it — otherwise a 6k photo leaks decoded pixels
+        // until the tab is closed.
+        if (model.source.bitmap && model.source.bitmap !== bitmap) {
+          try {
+            model.source.bitmap.close()
+          } catch {
+            void 0
+          }
+        }
         // A new photo invalidates the previous one's per-photo LUT previews
         // (docs/adr/0002-lut-library): clear the map and revoke the old blob URLs.
         const urls = Object.values(model.lutThumbs)
@@ -322,6 +332,15 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       // resets the model data that only makes sense with an image. In Empty
       // the machine ignores the clear and the resets are no-ops.
       ClearedImage: () => {
+        // P5 hygiene: free the decoded bitmap when the image is cleared —
+        // 6k bitmaps are ~70 MiB of CPU memory each.
+        if (model.source.bitmap) {
+          try {
+            model.source.bitmap.close()
+          } catch {
+            void 0
+          }
+        }
         // The image is gone: its per-photo LUT previews are dead too —
         // clear the map and revoke the blob URLs (docs/adr/0002-lut-library).
         const urls = Object.values(model.lutThumbs)
@@ -363,6 +382,13 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       EditLoaded: ({ id, chain, bitmap, width, height, source }) => {
         if (!transitioned) {
           return { model }
+        }
+        if (model.source.bitmap && model.source.bitmap !== bitmap) {
+          try {
+            model.source.bitmap.close()
+          } catch {
+            void 0
+          }
         }
         // A new photo invalidates the previous one's per-photo LUT previews
         // (docs/adr/0002-lut-library): clear the map and revoke the old blob URLs.

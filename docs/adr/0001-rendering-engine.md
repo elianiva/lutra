@@ -27,4 +27,11 @@ A missing WebGPU is a gated capability, never a crash:
 - GPU device acquisition is lazy: the resources Layer builds GPU-free at boot (a Layer build failure would escape as a crash) and acquisition fails with typed `GpuError` on first use instead of dying.
 - A CPU grading fallback is explicitly rejected: no browser-deployable WGSL runtime exists, and CPU pixel work is orders of magnitude too slow to edit with. Revisit only if a viable in-browser path appears.
 
-**Consequences**: browsers without WebGPU get an honest gate screen instead of a boot crash; everywhere else renders identically, from the same shaders, with export matching the displayed frame.
+## 6K / high-resolution hardening (P2+P3+P5)
+
+- **Preview grading (P0) + adapter limits (P1)** are the 6K fix: editor grades at preview resolution (`PREVIEW_LONG_EDGE = 2048`, ~2.8 Mpx vs 24 Mpx) and re-executes at native on export (detached canvas). Device is acquired with `requiredLimits: { maxTextureDimension2D: adapter.limits.maxTextureDimension2D }` so a capable GPU's 8192/16384 cap is actually granted (default is 8192, compat is 4096).
+- **P2 clamp** — `backend.ts` clamps `canvas.width/height` to `device.limits.maxTextureDimension2D` before `ctx.configure()` / `resizeCanvas()`. Defensive: preview side-by-side is 4096 and fits 8192, but a stale 12000-wide canvas (6k side-by-side without P0) or a compat 4096 device would otherwise throw. Blit UV is derived from `u_canvas`, so clamped halves stretch rather than crash.
+- **P3 lazy intermediates** — `Session.intermediates` is `null` for passthrough / single-pass preview; allocated lazily in `execute` when `passes.length > 1`. Saves ~366 MiB on a 6k empty chain; first layer add allocates once.
+- **P5 transactional session + bitmap hygiene + device lost** — `buildSession` tracks allocations and cleans up on throw; `ensureSession` builds before destroying old (no leak on OOM); `destroySession` closes `srcBitmap`; `update.ts` closes `model.source.bitmap` on replace/clear (6k bitmap ≈70 MiB CPU); `device.lost` handler clears `sessionRef` + `gpuCtxRef` so the next `execute` re-acquires without reload.
+
+**Consequences**: browsers without WebGPU get an honest gate screen instead of a boot crash; everywhere else renders identically, from the same shaders, with preview grading matching export at native resolution. 6K photos fit default limits, idle VRAM drops an order of magnitude on empty chains, and a lost device / failed allocation no longer wedges the editor.
