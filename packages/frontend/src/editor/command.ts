@@ -29,9 +29,6 @@ import { EditorMessage, PresentState } from './message'
 import { ENGINE_REGISTRY } from '../editor/layer-meta'
 import { toPreviewBitmap } from '../gpu/preview'
 
-// The frontend consumes the engine's registry directly — no duplicate layer
-// definitions. Layer creation stays an Effect until the CreateLayer command
-// crosses into the foldkit message boundary.
 export const createLayerFor = (type: LayerType) => createLayer(type, ENGINE_REGISTRY)
 
 /**
@@ -96,9 +93,6 @@ export const DecodeImage = Command.define('DecodeImage', {
   args: { file: Schema.instanceOf(File) },
   execute: ({ file }) =>
     Effect.gen(function* () {
-      // Read the picked file's stored bytes alongside the decode: they are
-      // the Edit's source image, so a later Save-as-new can persist them
-      // without holding the File (the store's carrier is bytes).
       const source = yield* Effect.tryPromise({
         catch: (cause) =>
           new ImageDecodeError({
@@ -157,8 +151,6 @@ export const LoadEdit = Command.define('LoadEdit', {
       }
       const edit = maybeEdit.value
       const nativeBitmap = yield* Effect.tryPromise({
-        // SAFETY: the edit's bytes are backed by a transferred ArrayBuffer from the store; TS cannot express that, so the BlobPart cast is the documented boundary.
-        // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
         try: async () => await createImageBitmap(new Blob([edit.source as BlobPart])),
         catch: (cause) =>
           new ImageDecodeError({
@@ -180,7 +172,6 @@ export const LoadEdit = Command.define('LoadEdit', {
         bitmap,
         width: bitmap.width,
         height: bitmap.height,
-        // The stored source bytes: Save writes them back untouched.
         source: edit.source,
       })
     }).pipe(
@@ -221,8 +212,6 @@ const thumbnailFromFrame = (
       if (!ctx) {
         throw new ThumbnailEncodeError({ message: '2d context unavailable' })
       }
-      // ImageData → ImageBitmap (ImageData itself is not a CanvasImageSource
-      // in this TS lib); close the bitmap when the draw is done.
       const bitmap = await createImageBitmap(frame)
       try {
         ctx.drawImage(bitmap, 0, 0, width, height)
@@ -311,23 +300,16 @@ export const LoadCatalog = Command.define('LoadCatalog', {
  */
 export const RenderChain = Command.define('RenderChain', {
   args: {
-    // Decode through the engine's Layer schema so handlers get typed
-    // layers — the chain is user data crossing the message boundary.
     layers: Schema.Array(Layer),
     draft: Schema.NullOr(Layer),
     bitmap: Schema.instanceOf(ImageBitmap),
     stamp: Schema.Number,
     // The compare presentation state (docs/adr/0010-editor-ui): the render's final
-    // blit applies the current mode and split position.
     present: PresentState,
   },
   execute: ({ layers, draft, bitmap, stamp, present }) =>
     Effect.gen(function* () {
       yield* Render.afterCommit
-      // The canvas is registered into the CanvasRef service when it mounts;
-      // resolve it from the app context instead of a global DOM query. The
-      // afterCommit wait guarantees the mount that registered it has run
-      // (mounts fork right after the patch; afterCommit resumes a frame
       // later).
       const canvasRef = yield* CanvasRef
       const canvas = yield* Ref.get(canvasRef)
@@ -348,8 +330,6 @@ export const RenderChain = Command.define('RenderChain', {
       const handle = yield* backend.execute(request, canvas.value, present)
       return EditorMessage.RenderedFrame({ handle, stamp })
     }).pipe(
-      // Every failure of this command surfaces as RenderFailed; the message
-      // schema names the failure set.
       Effect.catchTags({
         GpuError: (err) => Effect.succeed(EditorMessage.RenderFailed({ error: err })),
         LutLoadError: (err) => Effect.succeed(EditorMessage.RenderFailed({ error: err })),
@@ -383,9 +363,6 @@ export const PresentFrame = Command.define('PresentFrame', {
       return EditorMessage.FramePresented()
     }).pipe(
       // A present failure (a defect surfaced as GpuError) is best-effort by
-      // nature: the next render or present re-blits anyway, so there is
-      // nothing to surface and nothing that wedges — unlike a failed
-      // RenderChain, which must clear renderPending.
       Effect.catchTag('GpuError', () => Effect.succeed(EditorMessage.FramePresented())),
     ),
   messages: [EditorMessage.FramePresented],
@@ -425,7 +402,7 @@ const OFF_PRESENT = { mode: 'off', splitAt: 0, showBefore: false } as const
  * dialog's lifetime so pressing Export again re-encodes without another
  * readback — it never rides through the model (docs/adr/0004-export).
  *
- * P0 preview: the editor grades at preview resolution (FHD-class) so the
+ * Preview: the editor grades at preview resolution (FHD-class) so the
  * display `handle` is preview sized. Export must be native. When native
  * `source` + `layers` are provided the command decodes the full-res bytes,
  * re-executes the chain at native size on a detached canvas, and snapshots
@@ -442,9 +419,6 @@ export const SnapshotForExport = Command.define('SnapshotForExport', {
   },
   execute: ({ handle, draft, layers, source }) =>
     Effect.gen(function* () {
-      // Native path: source + layers present -> re-render at native size
-      // on a detached canvas so export is full resolution even though the
-      // editor session is preview sized.
       if (source && layers) {
         const chain: Layer[] = [...layers]
         if (draft) {
@@ -458,9 +432,6 @@ export const SnapshotForExport = Command.define('SnapshotForExport', {
               message: `Failed to decode source for export: ${String(cause)}`,
             }),
           try: async () => {
-            // SAFETY: the stored source is a transferred ArrayBuffer; TS cannot
-            // express that, so the BlobPart cast is the documented boundary.
-            // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/require-safety-comment-for-type-assertion, anti-slop/no-chained-type-assertions
             const blob = new Blob([source as BlobPart])
             return await createImageBitmap(blob)
           },
@@ -483,7 +454,6 @@ export const SnapshotForExport = Command.define('SnapshotForExport', {
           nativeBitmap.close()
           return EditorMessage.ExportSnapshotted()
         } catch (cause) {
-          // Best-effort close; the bitmap is discarded on either path.
           nativeBitmap.close()
           throw cause
         }
@@ -523,7 +493,6 @@ export const LoadLutRecents = Command.define('LoadLutRecents', {
   execute: Effect.gen(function* () {
     const store = yield* Persistence.KeyValueStore
     const schemaStore = Persistence.toSchemaStore(store, Schema.Array(LutIdSchema))
-    // `Effect.option` wraps the success (itself an Option) — flatten.
     const saved = Option.flatten(yield* schemaStore.get(LUT_RECENTS_KEY).pipe(Effect.option))
     return EditorMessage.LutRecentsLoaded({ recents: Option.getOrElse(() => [])(saved) })
   }),
@@ -574,8 +543,6 @@ export const GenerateLutThumb = Command.define('GenerateLutThumb', {
       if (Option.isNone(bytes)) {
         return EditorMessage.LutThumbFailed({ lutId })
       }
-      // SAFETY: the thumb encoder returned its JPEG over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
-      // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
       const blob = new Blob([bytes.value as BlobPart], { type: 'image/jpeg' })
       return EditorMessage.LutThumbGenerated({ bitmap, lutId, url: URL.createObjectURL(blob) })
     }),

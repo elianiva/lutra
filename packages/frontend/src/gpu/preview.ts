@@ -1,6 +1,6 @@
 /**
- * Preview sizing for P0 (6k fix): editor grades at preview resolution,
- * export at native. The preview long edge is capped to FHD-class (~2-3Mpx)
+ * Preview sizing: editor grades at preview resolution, export at native.
+ * The preview long edge is capped to FHD-class (~2-3Mpx)
  * so a 6000×4000 photo dispatches ~2.8Mpx not 24Mpx — the same win the
  * collage path already gets by downsampling to cell size.
  *

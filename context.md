@@ -11,13 +11,13 @@ The pure computational core. Owns the layer registry (what layers exist, their f
 The web application. Owns the WebGPU pipeline setup (device, bind groups, compute passes), the TEA-based UI (foldkit), and all browser-side concerns. Consumes `@lutra/engine` as a library.
 
 **Store** (`@lutra/store`):
-The persistence seam. Owns the **Edit** / **Edit summary** schemas, the **Edit store** service contract (save/load/list/delete), and the browser's IndexedDB `EditStoreLive` implementation (docs/adr/0005-storage). A future server/account-side `EditStoreLive` swaps in behind the same seam. Depends on `@lutra/engine` (for the `Layer` schema); the frontend consumes both engine and store.
+The persistence seam. Owns the **Edit** / **Edit summary** schemas, the **Edit store** service contract (save/load/list/delete), and the browser's IndexedDB `EditStoreLive` implementation (docs/adr/0005-storage). A server/account-side `EditStoreLive` swaps in behind the same seam. Depends on `@lutra/engine` (for the `Layer` schema); the frontend consumes both engine and store.
 
 **Raw decoder** (`@lutra/raw-decoder`):
-The RAW file decoding package (docs/adr/0008-raw-decode; **not yet implemented** — the package does not exist yet). Owns the fork of the LibRaw-Wasm build — the C++ wrapper, the Emscripten build script, the committed wasm dist, and the TypeScript client (`open`/`metadata`/`imageData`/`rawImageData`/`thumbnailData`/`onProgress`/`dispose`) — plus the **RAW decode** settings schema and the **Raw decode error**. Rebuilds via `bun run build:raw`; the frontend consumes it as a workspace package.
+The RAW file decoding package (docs/adr/0008-raw-decode). Owns the fork of the LibRaw-Wasm build — the C++ wrapper, the Emscripten build script, the committed wasm dist, and the TypeScript client (`open`/`metadata`/`imageData`/`rawImageData`/`thumbnailData`/`onProgress`/`dispose`) — plus the **RAW decode** settings schema and the **Raw decode error**. Rebuilds via `bun run build:raw`; the frontend consumes it as a workspace package.
 
 **Frontend structure** (`@lutra/frontend`):
-A **root Submodel** owns the top-level `route` and one Submodel per route arm. **Gallery** is a thin Submodel (list of **Edit summaries**); **Editor** is a Submodel hosting the existing editor (phase machine, chain, draft, render, export). Route-driven state lives in the Submodel: each exposes `init(route)` (cold load) and `informRouteChanged(route)` (navigation) calling the shared route-firing Commands, so reload and in-app navigation behave identically. Editor Messages wrap as `GotEditorMessage`, Gallery as `GotGalleryMessage`. This restructure lands before the store work (docs/adr/0006-frontend-architecture).
+A **root Submodel** owns the top-level `route` and one Submodel per route arm. **Gallery** is a thin Submodel (list of **Edit summaries**); **Editor** is a Submodel hosting the existing editor (phase machine, chain, draft, render, export). Route-driven state lives in the Submodel: each exposes `init(route)` (cold load) and `informRouteChanged(route)` (navigation) calling the shared route-firing Commands, so reload and in-app navigation behave identically. Editor Messages wrap as `GotEditorMessage`, Gallery as `GotGalleryMessage` (docs/adr/0006-frontend-architecture).
 
 **Effect-TS runtime**:
 The engine uses the Effect library (`effect` ^4.x) for its public API. `Effect` models the image processing pipeline (async GPU operations, error handling, resource management). `Schema` defines the layer data model. `Context` provides dependency injection for GPU resources when the engine is hosted in a browser.
@@ -25,7 +25,7 @@ The engine uses the Effect library (`effect` ^4.x) for its public API. `Effect` 
 **Shader porting**:
 Direct port of each SkSL body to WGSL by hand. The mobile SkSL bodies are the reference. No shared IR or transpilation layer — just parallel implementations in two shader dialects.
 
-**Depth of field**: An **adjustment layer** that blurs the image by scene depth (docs/adr/0011-depth-of-field; **not yet implemented** — not in the v1 palette), mimicking real lens depth of field: blur radius at each pixel scales with how far the pixel's depth is from the focal plane, so the focal region stays sharp while nearer and farther regions soften. Two parameters: **focus distance** (where the focal plane sits in depth) and **blur amount** (max blur radius; 0 = no-op). Like every layer, it consumes the result of the previous layer, and order matters.
+**Depth of field**: An **adjustment layer** that blurs the image by scene depth (docs/adr/0011-depth-of-field), mimicking real lens depth of field: blur radius at each pixel scales with how far the pixel's depth is from the focal plane, so the focal region stays sharp while nearer and farther regions soften. Two parameters: **focus distance** (where the focal plane sits in depth) and **blur amount** (max blur radius; 0 = no-op). Like every layer, it consumes the result of the previous layer, and order matters.
 _Avoid_: "portrait mode" (a product-level marketing term; this is a depth-based adjustment), "lens blur" (ambiguous with a plain blur), "bokeh" (bokeh describes the quality of the blur disc, not the adjustment).
 
 **Chromatic aberration**: Implemented (not deferred), radial. Each layer runs as its own compute pass, so CA samples the previous pass's output (the accumulated result of earlier layers) at offsets that grow quadratically from the image center — not the source image. A dedicated linearize pass is inserted ahead of the first sampling layer so sampled texels are always linear light.
@@ -34,7 +34,7 @@ _Avoid_: "portrait mode" (a product-level marketing term; this is a depth-based 
 
 **Clarity**: Implemented as local contrast: a 9-tap bilinear box blur (radius 4 px) of the pass input, then unsharp-mask push away from the local mean, masked to midtones. Radius is fixed — a true wide-radius clarity would need a separable blur or mip pyramid.
 
-**Scaffolding order**:
+**Build layers**:
 
 1. Layer data model (Schema definitions, registry, `createLayer`)
 2. Colorspace + WGSL utilities
@@ -43,7 +43,7 @@ _Avoid_: "portrait mode" (a product-level marketing term; this is a depth-based 
 5. Chain operations (add/remove/reorder/update param)
 6. Render request (`createRenderRequest`, pure: shader + packed uniforms + source + frame)
 7. GPU backend (frontend): persistent per-image resources, compute + blit execution, export snapshot
-8. Tests — written alongside each workstream, not as a separate phase
+8. Tests
 
 **Engine package structure**:
 

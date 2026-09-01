@@ -25,9 +25,6 @@ export interface FieldMeta {
 }
 
 export interface LayerEntry {
-  // Entries own their concrete schemas, but the registry only needs their
-  // decoding contract. A constraint decoder keeps that boundary sound while
-  // allowing every layer schema to participate in the registry.
   readonly schema: Schema.ConstraintDecoder<Layer>
   readonly body: BodyRenderer
   readonly label: string
@@ -53,9 +50,6 @@ const FIELD_META = {
     tint: { default: 0, max: 1, min: -1 },
   },
   saturation: { amount: { default: 0, max: 1, min: -1 } },
-  // The Color Mixer: 24 fields (8 hue ranges × hue/saturation/luminance),
-  // all normalized [-1, 1]. The shader maps hue to ±180° of rotation and
-  // saturation/luminance to multiplicative/asymmetric lightness deltas
   // (docs/adr/0003-adjustment-layers D2).
   colorMixer: {
     aquaHue: { default: 0, max: 1, min: -1 },
@@ -96,16 +90,12 @@ const FIELD_META = {
   chromaticAberration: { amount: { default: 0, max: 1, min: -1 } },
   clarity: { amount: { default: 0, max: 1, min: -1 } },
   // The Tone Curve's 5 control points (docs/adr/0003-adjustment-layers), one field per axis
-  // (p0x..p4y), all in [0, 1]. The identity defaults come from the curve
-  // module so the registry, the shader's reference, and the widget's reset
-  // target can never drift apart.
   toneCurve: Object.fromEntries(
     Array.from({ length: CURVE_POINT_COUNT }, (_, i) => [
       [`p${i}x`, { default: CURVE_DEFAULT_POINTS[i]!.x, max: 1, min: 0 }],
       [`p${i}y`, { default: CURVE_DEFAULT_POINTS[i]!.y, max: 1, min: 0 }],
     ]).flat(),
   ),
-  // LUT defaults to full strength (1): the draft shows the look immediately.
   lut: { amount: { default: 1, max: 1, min: 0 } },
 } as const satisfies Record<string, Record<string, FieldMeta>>
 
@@ -182,9 +172,6 @@ export function makeRegistry(bodies: RegistryInput): LayerRegistry {
       label: 'LUT',
       pinned: false,
       fields: FIELD_META.lut,
-      // The engine cannot know which LUTs exist (the catalog is a frontend
-      // asset); the frontend overrides this with the first catalog entry
-      // when creating a layer. An empty id renders as "Unknown LUT".
       stringFields: { lutId: '' },
     },
     saturation: {

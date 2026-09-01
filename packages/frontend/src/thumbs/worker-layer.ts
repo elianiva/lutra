@@ -96,16 +96,9 @@ const thumbImageData = (bitmap: ImageBitmap): Effect.Effect<ImageData, Thumbnail
 export const LutThumbnailerLive = Layer.effect(
   LutThumbnailer,
   Effect.gen(function* () {
-    // The pool: 4 workers, or the machine's core count, whichever is lower
-    // (a single-core machine degrades to the pre-pool one-worker behavior).
-    // Each worker lazily instantiates its own jSquash wasm on first use;
-    // the browser caches it after the first group.
     const poolSize = Math.min(4, Math.max(1, navigator.hardwareConcurrency ?? 2))
     const workers: Worker[] = []
 
-    // id -> the Deferred awaiting it plus the worker serving it, so a
-    // worker crash fails only its own requests. Cleared by each request's
-    // completion path; a crash clears its worker's entries wholesale.
     const pendingRef = yield* Ref.make<
       ReadonlyMap<
         number,
@@ -113,16 +106,10 @@ export const LutThumbnailerLive = Layer.effect(
       >
     >(new Map())
     const nextIdRef = yield* Ref.make(0)
-    // lutId -> the photo its in-flight render belongs to (the ImageBitmap
-    // reference). Cleared by each request's completion path; a worker crash
-    // clears it via the failing requests' cleanup, never wholesale.
     const inFlightRef = yield* Ref.make(new Map<LutId, ImageBitmap>())
-    // The downscaled preview, cached per photo: one canvas-2D op per photo,
-    // shared by every request of the group.
     const downscaleRef = yield* Ref.make<
       Option.Option<{ readonly bitmap: ImageBitmap; readonly image: ImageData }>
     >(Option.none())
-    // Round-robin cursor across the pool.
     const roundRobinRef = yield* Ref.make(0)
 
     const spawn = (index: number): Worker => {
@@ -132,8 +119,6 @@ export const LutThumbnailerLive = Layer.effect(
       return worker
     }
 
-    // Worker events fire outside the Effect runtime's stack — route through
-    // the default runtime's background fork, like the encode worker's
     // onmessage handler.
     const onMessage = (event: MessageEvent<LutThumbResponse>) => {
       const { id, bytes, error } = event.data
@@ -157,10 +142,6 @@ export const LutThumbnailerLive = Layer.effect(
       )
     }
 
-    // Fail every request this worker is serving — its event loop is gone,
-    // so those Deferreds would never resolve (the awaiting render fibers
-    // release their inFlight slots on the failure path) — then respawn the
-    // worker so the pool stays at full size. Requests on other workers are
     // untouched.
     const onError = (index: number) => (event: ErrorEvent) => {
       const message = event.message || 'Thumb worker crashed'
@@ -206,10 +187,6 @@ export const LutThumbnailerLive = Layer.effect(
     return LutThumbnailer.of({
       render: (lutId, bitmap, cube) =>
         Effect.gen(function* () {
-          // Downscale once per photo: the slot is keyed by bitmap identity,
-          // so a group's concurrent commands share one canvas-2D op. The
-          // ImageData is then structured-cloned into each request — one
-          // buffer serves the whole pool, so it cannot be transferred.
           const cached = yield* Ref.get(downscaleRef)
           let image: ImageData
           if (Option.isSome(cached) && cached.value.bitmap === bitmap) {
@@ -223,11 +200,6 @@ export const LutThumbnailerLive = Layer.effect(
             yield* Ref.set(downscaleRef, Option.some({ bitmap, image }))
           }
 
-          // Dedupe: register first, so a duplicate dispatch for the same
-          // lutId + photo (a mid-batch tab switch-away-and-back) is skipped
-          // instead of rendering twice. A NEW photo's request for the same
-          // lutId is not deduped — the stale batch may still be running, but
-          // its results are bitmap-guarded away by update.
           const before = yield* Ref.getAndUpdate(inFlightRef, (m) => {
             if (m.get(lutId) === bitmap) {
               return m
@@ -250,11 +222,6 @@ export const LutThumbnailerLive = Layer.effect(
           workers[index]!.postMessage(request)
 
           const result = yield* Deferred.await(deferred).pipe(Effect.option)
-          // The slot is released on every completion path — success,
-          // failure, or the worker crashing (the crash path already removed
-          // its worker's entries; the conditional remove is then a no-op).
-          // The remove is conditional so a newer batch's registration for
-          // the same lutId (a different photo) is never clobbered.
           yield* Ref.update(inFlightRef, (m) => {
             if (m.get(lutId) !== bitmap) {
               return m

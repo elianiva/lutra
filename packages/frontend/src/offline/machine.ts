@@ -4,17 +4,7 @@ import { to, when } from 'foldkit/experimental/machine'
 import { taggedStruct } from 'foldkit/schema'
 import { OfflineMessage } from './messages'
 
-// The offline library's fill state machine (CONTEXT.md "Offline fill"). One
-// state union owning the fill's lifecycle — the main menu's progress card
-// and the "Offline ready" toast read it. The machine is not a runtime:
-// `phase` lives in the root Model's offline slice, and root update steps it
-// with every landed message. Messages with no edge from the current state
-// are ignored — that absence of an edge IS the behavior (a completed fill
-// ignores every event; a paused fill ignores a second pause).
 //
-// The machine steps on the full AppMessage union (like the editor's
-// machine steps on EditorMessage): root update steps it with whatever
-// message lands; only the offline messages below have edges.
 
 /** Nothing has been downloaded this session (or the library is already
  *  complete from a previous session — the fill no-ops then). */
@@ -39,9 +29,6 @@ export const offlineMachine = Machine.define({
   states: {
     Filling: {
       on: {
-        // The network dropped (or the loop noticed mid-run): paused. The
-        // loop resumes itself and announces it with OfflineFillResumed —
-        // the machine never races the loop.
         ConnectivityChanged: [
           when(
             (_state, message) => (message.online ? Option.none() : Option.some(true)),
@@ -50,19 +37,12 @@ export const offlineMachine = Machine.define({
           ),
         ],
         OfflineFillPaused: to('Paused', () => Paused()),
-        // Storage filled up mid-run: stop and retry once with a fresh grant.
         OfflineQuotaError: to('QuotaError', () => QuotaError()),
-        // Every missing file is cached: the app is ready to work offline.
         OfflineFillComplete: to('Ready', () => Ready()),
       },
     },
     Idle: {
       on: {
-        // A run began: the loop diffed the catalog and is fetching. Also the
-        // edge that leaves QuotaError — the persist-retry restarts the run.
-        // (The manual start button's OfflineFillRequested does NOT
-        // transition: the run announces itself with Started, and the machine
-        // never races the loop.)
         OfflineFillStarted: to('Filling', () => Filling()),
       },
     },

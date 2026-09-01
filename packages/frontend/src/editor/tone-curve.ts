@@ -9,12 +9,6 @@ import type { Layer } from '@lutra/engine'
 import { EditorMessage } from './message'
 
 // The Tone Curve widget (docs/adr/0003-adjustment-layers): the drawer's curve editor for a
-// toneCurve draft or focused chain layer. A square-ish SVG plot in unit
-// space (0..1 both axes, y up) draws the identity diagonal as a dashed
-// reference, the piecewise-linear curve through the layer's 5 control
-// points (the exact polyline the shader evaluates — WYSIWYG), and one
-// draggable handle per point. A reset button appears next to the label
-// while the curve diverges from identity (the slider-reset convention,
 // docs/adr/0010-editor-ui, applied to the curve as a whole).
 
 /** Content margin in viewBox units — the corner handles (anchors at the
@@ -49,14 +43,10 @@ export const CurveWidget = Mount.defineStream('CurveWidget', {
   execute: ({ element }) =>
     Stream.callback<typeof EditorMessage.CurvePointDragged.Type>((queue) =>
       Effect.gen(function* () {
-        // Narrow to the SVG element (the mount target is always the widget's
-        // svg) so the listeners get typed PointerEvents, like the canvas
-        // stage's HTMLElement narrowing.
         if (!(element instanceof SVGSVGElement)) {
           return yield* Effect.never
         }
         const svg: SVGSVGElement = element
-        // The handle index being dragged; -1 while no drag is active.
         let dragging = -1
 
         const emit = (index: number, x: number, y: number) =>
@@ -104,8 +94,6 @@ export const CurveWidget = Mount.defineStream('CurveWidget', {
           }
           dragging = index
           svg.setPointerCapture(e.pointerId)
-          // Grab-and-jump: the point follows the pointer from the moment the
-          // grab lands (the same feel as dragging an already-selected handle).
           const { x, y } = unitCoords(e)
           emit(index, x, y)
         }
@@ -171,8 +159,6 @@ export const toneCurveWidget = (h: HtmlBuilder<EditorMessage>, layer: Layer) => 
   }
   const points = curvePointsOf(layer)
   const neutral = isCurveNeutral(layer)
-  // The curve polyline: the exact piecewise-linear function the shader
-  // evaluates, in viewBox space (y flipped).
   const polyline = points
     .map((p) => `${toView(p.x).toFixed(2)},${yToView(p.y).toFixed(2)}`)
     .join(' ')
@@ -184,7 +170,6 @@ export const toneCurveWidget = (h: HtmlBuilder<EditorMessage>, layer: Layer) => 
         [
           h.span([h.Class('text-[10px] uppercase tracking-[0.14em] text-muted')], ['Tone curve']),
           // The reset affordance (docs/adr/0010-editor-ui): visible only while the curve
-          // diverges from identity — its presence is the discoverability.
           ...(neutral
             ? []
             : [
@@ -204,14 +189,8 @@ export const toneCurveWidget = (h: HtmlBuilder<EditorMessage>, layer: Layer) => 
       ),
       h.svg(
         [
-          // touch-none: a touch drag must start the curve drag, not scroll
-          // the drawer (the same rule as the canvas stage's pan/zoom).
           h.Class('block h-40 w-full cursor-crosshair touch-none'),
           h.ViewBox(`0 0 ${CURVE_VIEW} ${CURVE_VIEW}`),
-          // The plot is wider than tall in the drawer; stretching the unit
-          // square keeps the grid and curve aligned with the pointer mapping
-          // (both use the same per-axis scale). Handles become slightly
-          // elliptical — invisible at their size.
           h.PreserveAspectRatio('none'),
           h.AriaLabel('Tone curve'),
           h.Role('img'),
@@ -219,8 +198,6 @@ export const toneCurveWidget = (h: HtmlBuilder<EditorMessage>, layer: Layer) => 
         ],
         [
           ...gridLines(h),
-          // The identity diagonal (dashed): a neutral curve sits exactly on
-          // it, so any divergence reads at a glance.
           h.line(
             [
               h.X1(String(toView(0))),
@@ -251,8 +228,6 @@ export const toneCurveWidget = (h: HtmlBuilder<EditorMessage>, layer: Layer) => 
                 h.Cx(fmt(toView(p.x))),
                 h.Cy(fmt(yToView(p.y))),
                 h.R('4.5'),
-                // The mount reads these positions for hit-testing; the index
-                // keeps the drag target stable across re-renders.
                 h.DataAttribute('curve-handle', String(index)),
                 h.Class('cursor-grab fill-panel stroke-accent'),
                 h.StrokeWidth('2'),

@@ -68,10 +68,6 @@ export const SaturationLayer = Schema.Struct({
 export type SaturationLayer = typeof SaturationLayer.Type
 
 // The Color Mixer (Lightroom-style HSL panel, docs/adr/0003-adjustment-layers): eight hue
-// ranges (red, orange, yellow, green, aqua, blue, purple, magenta), each
-// with hue / saturation / luminance adjustments — 24 numeric fields, one
-// uniform slot each. Field naming is `{color}{Channel}`: redHue,
-// redSaturation, redLuminance, ...
 
 const MixerChannelFields = {
   aquaHue: Schema.Number,
@@ -110,14 +106,6 @@ export type ColorMixerLayer = typeof ColorMixerLayer.Type
 export const GrainLayer = Schema.Struct({
   ...LayerCommon.fields,
   type: Schema.Literal('grain'),
-  // amount: grain strength (0 = off, 1 = heavy)
-  // profile: film stock character preset (0–4, integer steps)
-  //   0 = Subtle (fine 35mm, low intensity)
-  //   1 = Medium (balanced 35mm, peak midtones)
-  //   2 = Heavy (pushed film, visible in shadows)
-  //   3 = Vintage (soft, warm chroma, coarse grain)
-  //   4 = Cinematic (coarse 16mm, high chroma)
-  // size: manual grain size override (0 = use profile default)
   // chroma: color grain strength (0 = monochrome, 1 = full RGB)
   amount: Schema.Number,
   profile: Schema.Number,
@@ -149,11 +137,6 @@ export const ClarityLayer = Schema.Struct({
 export type ClarityLayer = typeof ClarityLayer.Type
 
 // The Tone Curve (docs/adr/0003-adjustment-layers): 5 fixed control points — the black and
-// white anchors plus three interior points — each with an x (input tone)
-// and y (output tone) in [0, 1], stored as one numeric field per axis
-// (`p0x`, `p0y`, …, `p4x`, `p4y`) so the layer rides the registry's plain
-// per-field f32 uniform packing. The shader evaluates the piecewise-linear
-// curve through the x-ordered points; the drawer's curve widget drags them.
 const CurvePointFields = {
   p0x: Schema.Number,
   p0y: Schema.Number,
@@ -177,9 +160,6 @@ export type ToneCurveLayer = typeof ToneCurveLayer.Type
 export const LutLayer = Schema.Struct({
   ...LayerCommon.fields,
   type: Schema.Literal('lut'),
-  // Reference into the LUT library (the vendored file path, e.g.
-  // "luts/colorslide/fuji_velvia_50.cube"). A branded `LutId`, not a
-  // uniform — the engine resolves it to a cube via the render request's
   // LUT map.
   lutId: LutIdSchema,
   amount: Schema.Number,

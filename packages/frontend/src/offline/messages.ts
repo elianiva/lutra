@@ -3,37 +3,21 @@ import { defineMessageUnion } from 'foldkit/message'
 import { LutIdSchema } from '@lutra/engine'
 import type { LutId } from '@lutra/engine'
 
-// The offline fill's event and message universe (CONTEXT.md "Offline
-// library", "Offline fill"). The fill loop publishes FillEvents into its
-// PubSub; a root subscription bridges them into the root's message loop as
-// the Offline* Messages below. Root update steps the offline machine
-// (./machine.ts) and forwards per-file facts into the editor Submodel (its
-// LUT bar rows render per-LUT download state).
 
-// One library file to mirror: the catalog itself, a `.cube`, or a generic
-// thumbnail. `lutId` is set for cube files — the LUT bar rows key on it —
-// and null for catalog/thumbnail files.
 export interface FillFile {
   readonly path: string
   readonly lutId: LutId | null
 }
 
 export type FillEvent =
-  // A run began; `total` is the full library size, `done` the count already
-  // cached from previous runs (the diff's cached side).
   | { readonly _tag: 'FillStarted'; readonly total: number; readonly done: number }
   | { readonly _tag: 'FillFileStarted'; readonly file: FillFile }
   | { readonly _tag: 'FillFileCompleted'; readonly file: FillFile }
   | { readonly _tag: 'FillFileFailed'; readonly file: FillFile }
-  // The device went offline mid-run: the loop waits and resumes on its own.
   | { readonly _tag: 'FillPaused' }
   | { readonly _tag: 'FillResumed' }
-  // The run finished every missing file (failures are retried on the next
-  // run's diff; a run that ends here means "everything downloadable is
   // cached").
   | { readonly _tag: 'FillComplete' }
-  // Storage is full: the run stops, the machine shows QuotaError, and the
-  // app retries once with a fresh persist() grant.
   | { readonly _tag: 'FillQuotaError'; readonly message: string }
 
 export const OfflineMessage = defineMessageUnion({
@@ -56,14 +40,10 @@ export const OfflineMessage = defineMessageUnion({
   OfflineQuotaError: {
     message: S.String,
   },
-  // The browser's online/offline state.
   ConnectivityChanged: {
     online: S.Boolean,
   },
-  // The saveData gate's manual start button (the auto-start is skipped on
-  // metered connections).
   OfflineFillRequested: {},
-  // The result of the persist() request the fill makes on start (and again on
   // a quota retry).
   StoragePersisted: {
     persisted: S.Boolean,

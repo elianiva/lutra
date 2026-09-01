@@ -2,11 +2,6 @@ import { Schema as S } from 'effect'
 import { Idle, OfflinePhase } from './machine'
 import type { LutId } from '@lutra/engine'
 
-// The root's offline slice (CONTEXT.md "Offline library"): the fill
-// machine's state plus the counters the main menu's progress card and the
-// "Offline ready" toast read. Owned by the root because it spans both
-// Submodels — the card floats bottom-right on the main menu, the per-LUT
-// download states reach the editor's LUT bar through the root's delegation.
 
 /** A cube file's mirroring state: being fetched, or in the cache. Absence
  *  means "not downloaded" — the offline LUT bar dims those entries. */
@@ -23,27 +18,13 @@ export const stateFor = (downloads: LutDownloads, lutId: LutId): LutDownloadStat
   downloads[lutId] ?? 'not-downloaded'
 
 export const Offline = S.Struct({
-  // The fill's lifecycle (./machine.ts): Idle | Filling | Paused | Ready |
-  // QuotaError. Idle also covers a library already complete from a previous
-  // session — a run with nothing missing emits no events and never leaves
-  // Idle, so a full cache boots silently.
   phase: OfflinePhase,
-  // The browser's online state — drives the machine's Paused transition and
-  // is forwarded to the editor (the LUT bar dims undownloaded entries while
   // offline).
   online: S.Boolean,
-  // The device asked for reduced data usage (navigator.connection.saveData):
-  // the fill does not auto-start, the strip shows a manual start button.
   saveData: S.Boolean,
-  // Files mirrored so far this run (done from the run's start + completions).
   downloaded: S.Number,
-  // The full library size (catalog + cubes + thumbnails) of the current run.
   total: S.Number,
-  // The last navigator.storage.persist() result (null before the first
-  // request) — future Options-screen fuel, and the quota retry's gate.
   persisted: S.NullOr(S.Boolean),
-  // True while the "Offline ready" toast is showing (set on the Filling →
-  // Ready transition; cleared by click or the auto-dismiss timer).
   readyToast: S.Boolean,
 })
 export type Offline = typeof Offline.Type
@@ -51,8 +32,6 @@ export type Offline = typeof Offline.Type
 /** The offline slice at boot. Reads the browser's connectivity/saveData
  *  signals; both degrade to the non-offline posture when absent. */
 export const initialOffline = (): Offline => {
-  // SAFETY: navigator.connection/saveData are non-standard; read them structurally and degrade to the non-offline posture when absent.
-  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
   const { connection } = navigator as Navigator & { connection?: { readonly saveData?: boolean } }
   return {
     downloaded: 0,

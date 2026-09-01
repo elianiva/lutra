@@ -5,14 +5,7 @@ import { LutCache, LutCacheLive } from './cache'
 import type { LutCacheContract } from './cache'
 import type { FillEvent, FillFile } from './messages'
 
-// The offline fill (CONTEXT.md "Offline fill"): the background process that
-// mirrors the vendored LUT library into Cache Storage so the app works
 // without a connection. Page-driven by design (docs/adr/0007-offline): the fill
-// runs as a fiber in a service layer, publishing per-file events into a
-// PubSub; a root subscription bridges those events into the message loop
-// (per-LUT rows, the progress card, the "Offline ready" toast all read the
-// same channel). The service worker never drives this — it only serves the
-// cache the fill writes.
 
 /** Every file of the offline library: the catalog itself, then per entry
  *  the `.cube` and the generic thumbnail. The path is the URL the app
@@ -23,7 +16,6 @@ import type { FillEvent, FillFile } from './messages'
 export const libraryFiles = (catalog: readonly LutCatalogEntry[]): readonly FillFile[] => [
   { lutId: null, path: '/luts/film_luts.json' },
   ...catalog.flatMap((entry) => [
-    // oxlint-disable-next-line consistent-type-assertions
     { lutId: entry.lut_file, path: `/luts/${entry.lut_file}` },
     { lutId: null, path: `/luts/${entry.thumbnail}` },
   ]),
@@ -89,7 +81,6 @@ const fetchAndPut = (file: FillFile, opts: FillOptions): Effect.Effect<boolean, 
             error.kind === 'quota'
               ? { _tag: 'quota', message: error.message }
               : // Storage unavailable mid-run (has/keys worked at the start
-                // gate, so this is exotic): retry like a transient failure.
                 { _tag: 'transient', cause: error },
           ),
         )
@@ -146,10 +137,6 @@ export const fillFiles = (
 ): Effect.Effect<void> =>
   Effect.gen(function* () {
     const files = libraryFiles(catalog)
-    // The start gate: an unavailable cache (the Cache API threw) means the
-    // offline library cannot work at all — the fill stays silent and the
-    // machine never leaves Idle. The app keeps working online. (An empty
-    // cache is a Success with no keys — that is the normal first run.)
     const cached = yield* opts.cache.keys().pipe(
       Effect.result,
       Effect.map((result) => (result._tag === 'Success' ? result.success : null)),
@@ -171,8 +158,6 @@ export const fillFiles = (
         yield* emit({ _tag: 'FillFileStarted', file })
         const outcome = yield* fetchAndPut(file, opts).pipe(Effect.result)
         if (outcome._tag === 'Failure') {
-          // Quota — terminal: announce and stop the run (the machine shows
-          // QuotaError; the app retries once with a fresh persist() grant).
           yield* emit({ _tag: 'FillQuotaError', message: outcome.failure })
           return
         }
@@ -185,8 +170,6 @@ export const fillFiles = (
       }
       yield* emit({ _tag: 'FillComplete' })
     }
-    // Every run — full or silent — sweeps orphans left by earlier runs or
-    // catalog shrinks (a deploy removed a LUT).
     yield* pruneOrphans(files, opts)
   })
 
@@ -208,8 +191,6 @@ export const OfflineFillLive = Layer.effect(
   OfflineFill,
   Effect.gen(function* () {
     const events = yield* PubSub.unbounded<FillEvent>()
-    // Start signals: `start()` publishes; a supervisor fiber owned by the
-    // layer's scope (killed with the app) runs one fill loop per signal.
     const startSignal = yield* PubSub.unbounded<void>()
     const startedRef = yield* Ref.make(false)
     const cache = yield* LutCache
@@ -227,8 +208,6 @@ export const OfflineFillLive = Layer.effect(
 
     const publish = (event: FillEvent): Effect.Effect<void> =>
       Effect.gen(function* () {
-        // A quota stop re-arms the fill so the persist-retry can start a
-        // fresh run (the machine's QuotaError → OfflineFillStarted edge).
         if (event._tag === 'FillQuotaError') {
           yield* Ref.set(startedRef, false)
         }
@@ -236,19 +215,12 @@ export const OfflineFillLive = Layer.effect(
       })
 
     const run = Effect.gen(function* () {
-      // The catalog must land before the diff. Served by the SW from the
-      // first visit on; a first-visit failure is a network-less session,
-      // where a fill is pointless anyway. After the retries the run gives
-      // up and re-arms (a later manual start can retry).
       const catalog = yield* store
         .getCatalog()
         .pipe(Effect.retry({ schedule: Schedule.exponential(Duration.millis(500), 2), times: 5 }))
       yield* fillFiles(catalog, opts, publish)
     })
 
-    // The supervisor: one fill loop per start signal, forever. The fiber is
-    // scoped to the layer — it lives for the app's lifetime and dies with
-    // it, never with the command that triggered a start.
     yield* Effect.forkScoped(
       Stream.fromPubSub(startSignal).pipe(
         Stream.runForEach(() => run.pipe(Effect.option, Effect.asVoid)),
@@ -268,10 +240,5 @@ export const OfflineFillLive = Layer.effect(
     })
   }),
 ).pipe(
-  // Self-contained (Layer.merge does not subtract requirements at the type
-  // level in this effect version): the fill brings its own LutCache and
-  // LutStore instances. The cache wraps the same browser Cache Storage the
-  // SW reads — instance identity is irrelevant there; the extra catalog
-  // fetch is served cache-first by the SW after the first.
   Layer.provide(Layer.merge(LutCacheLive, LutStoreLive)),
 )

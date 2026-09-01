@@ -131,7 +131,6 @@ describe('collage submodel: load', () => {
       }),
     )
     expect(measured.sizes).toEqual([{ editId: tileEditId(1), width: 300, height: 200 }])
-    // A re-measure replaces, not duplicates.
     const { model: again } = update(
       measured,
       CollageMessage.ThumbsMeasured({
@@ -206,14 +205,11 @@ describe('collage submodel: layout auto-saves', () => {
     scene(
       config,
       given(loaded),
-      // The Rows control sits beside Columns.
       sceneExpect(selector('[data-control="rows"]')).toExist(),
       sceneExpect(role('button', { name: 'One more row' })).toExist(),
-      // A 2×2 grid holding one photo leaves three background cells.
       sceneExpect(selector('[data-collage-grid="2x2"]')).toExist(),
       sceneExpect(selector('[data-collage-empty-cell="0"]')).toExist(),
       sceneExpect(selector('[data-collage-empty-cell="2"]')).toExist(),
-      // Dropping to one row re-flows the same tile into a 2×1 grid.
       click(role('button', { name: 'One fewer row' })),
       Command.resolve(SaveCollage, CollageMessage.CollageSaved()),
       sceneExpect(selector('[data-collage-grid="2x1"]')).toExist(),
@@ -378,7 +374,6 @@ describe('collage submodel: arrange mode', () => {
     const { model: dragging } = update(pending, move)
     expect(dragging.drag.dragState._tag).toBe('Dragging')
     const { model: done, commands = [] } = update(dragging, release)
-    // Dropped before tile 2 → the first photo lands between photos 2 and 3.
     expect(collageOf(done).tiles.map((t) => t.editId)).toEqual([
       tileEditId(2),
       tileEditId(1),
@@ -425,7 +420,6 @@ describe('collage submodel: arrange mode', () => {
 
 describe('collage submodel: frame mode', () => {
   it('ModeChanged to arrange commits an in-flight framing draft', () => {
-    // A wide photo in a square cell has horizontal overflow to pan through.
     const loaded: Model = {
       ...loadedWith([1, 2]),
       mode: 'frame',
@@ -454,7 +448,6 @@ describe('collage submodel: frame mode', () => {
       mode: 'frame' as const,
       cellPx: { width: 100, height: 100 },
     }
-    // A wide photo overflows horizontally, so panning has room.
     const sized = {
       ...base,
       sizes: [{ editId: tileEditId(1), width: 400, height: 100 }],
@@ -466,7 +459,6 @@ describe('collage submodel: frame mode', () => {
     expect(started.framingDraft?.index).toBe(0)
     expect(started.framingDraft?.framing).toEqual(defaultTileFraming())
     const { model: moved } = update(started, CollageMessage.PanMoved({ screenX: 50, screenY: 0 }))
-    // Dragging right moves the visible window left in image space.
     expect(moved.framingDraft?.framing.focusX).toBeLessThan(0.5)
     const { model: ended, commands = [] } = update(moved, CollageMessage.PanEnded())
     expect(ended.framingDraft).toBe(null)
@@ -497,7 +489,6 @@ describe('collage submodel: frame mode', () => {
     const { model: settled, commands = [] } = update(zoomed, CollageMessage.ZoomSettled({ seq }))
     expect(collageOf(settled).tiles[0]!.framing.zoom).toBeGreaterThan(1)
     expect(commands.map((c) => c.name)).toEqual(['SaveCollage', 'ScheduleUndoExpiry'])
-    // A stale settle (a newer gesture re-armed the timer) does nothing.
     const { model: again } = update(base, CollageMessage.WheelZoomed({ index: 0, deltaY: -100 }))
     const { model: stale } = update(again, CollageMessage.ZoomSettled({ seq: again.zoomSeq + 1 }))
     expect(stale.framingDraft).not.toBe(null)
@@ -549,7 +540,6 @@ describe('collage submodel: frame mode', () => {
   })
 })
 
-// Resolve the dialog's internal ShowDialog command.
 const openDialog = [
   Command.expectHas(Dialog.ShowDialog),
   Command.resolve(Dialog.ShowDialog, Dialog.Message.SucceededShowDialog()),
@@ -562,12 +552,10 @@ describe('collage submodel: export', () => {
       given(loadedWith([1, 2])),
       click(selector('[aria-label^="Export"]')),
       ...openDialog,
-      // The dialog shows the shared sections and the collage filename.
       sceneExpect(text('EXPORT')).toExist(),
       sceneExpect(text('lutra-collage.png')).toExist(),
       sceneExpect(text('PNG')).toExist(),
       sceneExpect(text('100%')).toExist(),
-      // Composition starts immediately and lands in the frame slot.
       Command.expectHas(SnapshotCollageExport),
       Command.resolve(
         SnapshotCollageExport,
@@ -575,7 +563,6 @@ describe('collage submodel: export', () => {
       ),
       Command.expectNone(),
 
-      // Pressing Export encodes and downloads — the size appears.
       click(text('Export')),
       sceneExpect(text('Encoding…')).toExist(),
       Command.expectHas(ExportDialog.PrepareExport),
@@ -590,7 +577,6 @@ describe('collage submodel: export', () => {
       ),
       sceneExpect(text('Downloaded', { exact: false })).toExist(),
       sceneExpect(text('4.0 KB', { exact: false })).toExist(),
-      // The dialog stays open after a download.
       sceneExpect(text('EXPORT')).toExist(),
       Command.expectNone(),
     )
@@ -615,7 +601,6 @@ describe('collage submodel: export', () => {
         ExportDialog.ExportDownload,
         ExportDialog.Message.Downloaded({ url: 'blob:collage-1' }),
       ),
-      // Cancel closes: the composed frame drops and the url is revoked.
       click(text('Cancel')),
       Command.resolve(Dialog.CloseDialog, Dialog.Message.CompletedCloseDialog()),
       Command.resolve(ExportDialog.RevokeExportUrl, ExportDialog.Message.UrlRevoked()),
@@ -642,7 +627,6 @@ describe('collage submodel: export', () => {
 
 describe('collage export: update-level guards', () => {
   it('a compose that lands while the dialog is closed is dropped', () => {
-    // No ExportRequested has opened the dialog.
     const { model, commands = [] } = update(
       initialModel(),
       CollageMessage.CollageExportSnapshotted({ failedTiles: 0 }),

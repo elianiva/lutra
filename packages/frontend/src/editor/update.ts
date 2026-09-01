@@ -46,7 +46,7 @@ const presentState = (model: Model) => ({
   splitAt: model.compareSplitAt,
 })
 
-/** P6 present coalescing — like renderNow's renderPending guard but for the
+/** Present coalescing — like renderNow's renderPending guard but for the
  *  blit-only PresentFrame (divider drag at 60 Hz vs one GPU submit at a
  *  time). While a present is in flight, overwrites pendingPresent with the
  *  latest value; FramePresented flushes it. */
@@ -78,8 +78,6 @@ const renderNow = (model: Model): UpdateReturn => {
   if (!model.source.bitmap) {
     return { model }
   }
-  // The draft lives in the phase machine (Drafting); the render pipeline
-  // still receives it as a plain layer appended after the chain.
   const draft = model.phase._tag === 'Drafting' ? model.phase.layer : null
   let layers = model.chain
   let draftLayer = draft
@@ -165,7 +163,6 @@ const bumpRecents = (model: Model, lutId: LutId): Model => ({
 const generateThumbCommands = (
   model: Model,
 ): readonly Command.Command<EditorMessage, never, LutStore | LutThumbnailer>[] => {
-  // The strip is only visible (and only browsable) while the bar is open.
   const { bitmap } = model.source
   if (!model.lutBarOpen || !bitmap || !model.catalog) {
     return []
@@ -205,10 +202,6 @@ const dismissPreviewOr = (model: Model, proceed: () => UpdateReturn): UpdateRetu
  * Most arms emit `Option.none()`.
  */
 export const update = (model: Model, message: EditorMessage): UpdateReturn => {
-  // Data-level gate the machine can't see: the LUT tool needs the catalog
-  // (a LUT draft must reference a real lutId, and the first catalog entry is
-  // the default selection). Everything else the editor blocks — no image,
-  // loading, error, draft active — is a missing edge in the machine.
   if (
     message._tag === 'SelectedTool' &&
     message.type === 'lut' &&
@@ -217,8 +210,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
     return { model }
   }
 
-  // Step the phase machine. `from` is the pre-step state: the branches that
-  // commit or discard a draft read the draft layer from it.
   const from = model.phase
   const result = editorMachine.step(model.phase, message)
   const phase = result.state
@@ -228,33 +219,20 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
   return Match.value(message).pipe(
     Match.withReturnType<UpdateReturn>(),
     Match.tagsExhaustive({
-      // mobile bottom sheets (docs/adr/0010-editor-ui.md)
-      // Toggle the tapped sheet: tapping the active tab closes it, tapping
-      // the other switches. Desktop never reads this — the panels render
-      // side-by-side there regardless (the sheet classes are `lg:`-scoped).
       ToggledMobileSheet: ({ sheet }) => ({
         model: { ...model, mobileSheet: model.mobileSheet === sheet ? null : sheet, phase },
       }),
 
-      // The mount already wrote the element into the CanvasRef service; the
-      // acknowledgment exists for observability (DevTools, Scene, replay).
       CanvasRegistered: () => ({ model }),
 
       FilePickRequested: () => ({ model, commands: [PickImageFile()] }),
       FilePickCancelled: () => ({ model }),
 
-      // The load result drives the LUT card's status slot (plan 06): a
-      // failure records the error (the card shows "LUTs unavailable" with
-      // the message as its title); a success clears it.
       CatalogLoaded: ({ catalog }) => ({
         model: { ...model, catalog, catalogError: null, phase },
       }),
       CatalogFailed: ({ error }) => ({ model: { ...model, catalogError: error, phase } }),
 
-      // offline library (the LUT bar's per-row states, docs/adr/0007-offline)
-      // Root-delegated facts; the editor machine has no edges for them, so
-      // the phase passes through untouched. A cube file's fetch began: the
-      // bar row shows its spinner.
       OfflineFileFetching: ({ lutId }) => ({
         model: {
           ...model,
@@ -262,8 +240,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           phase,
         },
       }),
-      // A cube landed in the offline library: the row is downloadable — and
-      // any "not downloaded yet" notice is moot.
       OfflineFileDownloaded: ({ lutId }) => ({
         model: {
           ...model,
@@ -272,11 +248,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           phase,
         },
       }),
-      // The browser's online state flipped (dimming flag for the bar).
       OfflineConnectivityChanged: ({ online }) => ({ model: { ...model, online, phase } }),
-      // An undownloaded row was clicked while offline: the bar's name line
-      // shows the distinct connect-once notice (the commit is blocked — the
-      // click never reaches the chain).
       OfflineLutUnavailable: ({ lutId }) => {
         const name = model.catalog?.find((entry) => entry.lut_file === lutId)?.name ?? lutId
         return {
@@ -288,9 +260,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         }
       },
 
-      // The machine's edge already dispatched DecodeImage (its args come from
-      // the message); the branch only carries the new phase forward. A file
-      // selection anywhere but Empty/Error/Loading is ignored.
       SelectedImageFile: () => {
         if (!transitioned) {
           return { model }
@@ -300,17 +269,11 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           commands: machineCommands,
         }
       },
-      // A decode can only land while Loading (or re-land in Idle/Error for
-      // the double-pick race). A completion that lands in Empty — after a
-      // ClearedImage — has no edge and is dropped: a stale decode cannot
-      // resurrect a cleared image. The picked file's bytes become the
-      // unattached source record (id null) that Save creates an Edit from.
       ImageDecoded: ({ bitmap, width, height, source }) => {
         if (!transitioned) {
           return { model }
         }
-        // P5 hygiene: close the previous decoded bitmap (CPU-side 24Mpx)
-        // before replacing it — otherwise a 6k photo leaks decoded pixels
+        // Close the previous decoded bitmap before replacing it — otherwise a large photo leaks decoded pixels
         // until the tab is closed.
         if (model.source.bitmap && model.source.bitmap !== bitmap) {
           try {
@@ -319,8 +282,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             void 0
           }
         }
-        // A new photo invalidates the previous one's per-photo LUT previews
-        // (docs/adr/0002-lut-library): clear the map and revoke the old blob URLs.
         const urls = Object.values(model.lutThumbs)
         const { model: next, commands = [] } = renderNow({
           ...model,
@@ -330,8 +291,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           layerCreationError: null,
           saveStatus: { _tag: 'idle' },
           lutThumbs: {},
-          // A new photo is a new context: close the mobile sheets so the
-          // canvas is the first thing on screen (docs/adr/0010-editor-ui.md).
           mobileSheet: null,
           presentPending: false,
           pendingPresent: null,
@@ -347,12 +306,8 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         }
         return { model: { ...model, phase, source: { ...model.source, error } } }
       },
-      // The machine moves the phase (draft/selection discarded); the branch
-      // resets the model data that only makes sense with an image. In Empty
-      // the machine ignores the clear and the resets are no-ops.
       ClearedImage: () => {
-        // P5 hygiene: free the decoded bitmap when the image is cleared —
-        // 6k bitmaps are ~70 MiB of CPU memory each.
+        // Free the decoded bitmap when the image is cleared.
         if (model.source.bitmap) {
           try {
             model.source.bitmap.close()
@@ -360,8 +315,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             void 0
           }
         }
-        // The image is gone: its per-photo LUT previews are dead too —
-        // clear the map and revoke the blob URLs (docs/adr/0002-lut-library).
         const urls = Object.values(model.lutThumbs)
         return {
           model: {
@@ -378,13 +331,8 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             renderedStamp: 0,
             lastRender: null,
             bins: null,
-            // A new image starts the split position over at 50% (the compare
-            // mode itself persists across images).
             compareSplitAt: 0.5,
-            // A cleared image has no LUT target — a stale hover preview must
-            // not leak into a future render.
             previewLut: null,
-            // The mobile sheets close with the image (docs/adr/0010-editor-ui.md).
             mobileSheet: null,
             attachedEdit: null,
             saveStatus: { _tag: 'idle' },
@@ -394,12 +342,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         }
       },
 
-      // attached edit (gallery → /edit/:id)
-      // The machine moved to Idle (or ignored the message); the branch seeds
-      // the loaded chain + source bitmap and renders it — the same shape a
-      // fresh `ImageDecoded` produces, so the editor cannot tell whether it
-      // was seeded from a pick or a load. The stored id + source bytes
-      // become the attached record that Save writes back through.
       EditLoaded: ({ id, chain, bitmap, width, height, source }) => {
         if (!transitioned) {
           return { model }
@@ -411,8 +353,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             void 0
           }
         }
-        // A new photo invalidates the previous one's per-photo LUT previews
-        // (docs/adr/0002-lut-library): clear the map and revoke the old blob URLs.
         const urls = Object.values(model.lutThumbs)
         const { model: next, commands = [] } = renderNow({
           ...model,
@@ -422,14 +362,9 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           layerCreationError: null,
           activeFieldIndex: {},
           activeMixerColor: {},
-          // A new attached edit closes the bar and its hover preview.
           lutBarOpen: false,
           previewLut: null,
-          // A new image starts the split position over at 50% (the compare
-          // mode itself persists across images).
           compareSplitAt: 0.5,
-          // And closes the mobile sheets — the canvas is the first thing
-          // on screen (docs/adr/0010-editor-ui.md).
           mobileSheet: null,
           attachedEdit: { id, source },
           saveStatus: { _tag: 'idle' },
@@ -458,18 +393,9 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         }
       },
 
-      // Save/export while a bar preview is active dismisses the preview
-      // instead of acting (docs/adr/0002-lut-library D7) — the thumbnail and the export
-      // frame snapshot `model.lastRender`, which would otherwise capture the
-      // hovered look. The next click proceeds.
       SaveRequested: () => dismissPreviewOr({ ...model, phase }, () => startSave(model, false)),
       SaveAsRequested: () => dismissPreviewOr({ ...model, phase }, () => startSave(model, true)),
       EditSaved: ({ id, savedAt }) => {
-        // Attach the model to the persisted Edit: a fresh-pick Save created
-        // the attachment, Save as re-points it. When the id is NEW (no
-        // attachment, or a different id), surface EditCreated so the root
-        // pushes the /edit/:id URL — a reload then re-attaches to the saved
-        // Edit. An in-place save keeps the URL it already addresses.
         const attached = model.attachedEdit
         if (!attached) {
           return { model: { ...model, phase } }
@@ -497,9 +423,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       }),
 
       SelectedTool: () => {
-        // The machine moved into Creating and attached CreateLayer as its
-        // command. Keep the old visual context until that Effect reports;
-        // the command is the only caller that consumes createLayerFor.
         if (!transitioned || phase._tag !== 'Creating') {
           return { model }
         }
@@ -516,8 +439,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         }
       },
       LayerCreated: () => {
-        // The machine accepts a result only while the matching creation is
-        // pending, then installs the validated layer as the draft.
         if (!transitioned || from._tag !== 'Creating' || phase._tag !== 'Drafting') {
           return { model }
         }
@@ -531,9 +452,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         }
         if (layer.type === 'lut') {
           const { catalog } = model
-          // SelectedTool is gated above, so a successful LUT creation always
-          // has a catalog. Keep the check at this boundary for stale startup
-          // messages rather than indexing an absent entry.
           if (!catalog || catalog.length === 0) {
             return { model }
           }
@@ -543,8 +461,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             phase: { ...phase, layer: { ...layer, lutId: catalog[0]!.lut_file } },
           }
         }
-        // The bar just auto-opened: the visible group's per-photo thumbs
-        // start generating (docs/adr/0002-lut-library) — one command per missing LUT.
         const rendered = {
           ...next,
           activeFieldIndex: ensureFieldIndex(model.activeFieldIndex, layer.id),
@@ -562,8 +478,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         if (!transitioned || from._tag !== 'Drafting') {
           return { model }
         }
-        // The machine moved the phase to Selected (focused on the draft); the
-        // branch commits the draft layer into the chain.
         return renderNow({
           ...model,
           chain: [...model.chain, from.layer],
@@ -588,16 +502,11 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         })
       },
       UpdatedDraftParam: () => {
-        // The machine already applied the param to the draft layer in the
-        // new phase; the branch only re-renders.
         if (!transitioned || phase._tag !== 'Drafting') {
           return { model }
         }
         return renderNow({ ...model, phase })
       },
-      // The bar's click commits the real value: clear any hover preview (a
-      // stale one would otherwise double-apply) and bump recents — real
-      // picks only, the `catalog[0]` auto-default never bumps (D6).
       ChangedDraftLut: ({ lutId }) => {
         if (!transitioned || phase._tag !== 'Drafting') {
           return { model }
@@ -614,9 +523,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           return { model }
         }
         const open = !model.lutBarOpen
-        // Closing also clears the hover preview; opening has nothing to
-        // clear (a closed bar cannot be hovered). Opening starts the
-        // visible group's per-photo thumbs (docs/adr/0002-lut-library).
         const next = {
           ...model,
           lutBarOpen: open,
@@ -626,11 +532,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         return { model: next, commands: open ? generateThumbCommands(next) : [] }
       },
 
-      // LUT bar (bottom filmstrip picker, docs/adr/0002-lut-library)
-      // Hover enter/leave on a bar thumb. Presentation-only: sets the
-      // previewed lutId and re-renders; the committed chain/draft is
-      // untouched. null restores the committed look. The same-value guard
-      // skips redundant renders while scrubbing across the strip.
       PreviewedLut: ({ lutId }) => {
         if (!model.source.bitmap) {
           return { model }
@@ -643,43 +544,26 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         }
         return renderNow({ ...model, offlineLutNotice: null, phase, previewLut: lutId })
       },
-      // Tab click: presentation-only (no render), but the newly visible
-      // group's per-photo thumbs start generating (docs/adr/0002-lut-library) — a
-      // revisit after a failure retries the missing LUTs.
       SelectedLutTab: ({ tab }) => {
         const next = { ...model, lutTab: tab, offlineLutNotice: null, phase }
         return { model: next, commands: generateThumbCommands(next) }
       },
-      // Recents restored from localStorage at boot.
       LutRecentsLoaded: ({ recents }) => ({ model: { ...model, lutRecents: recents, phase } }),
       LutRecentsSaved: () => ({ model }),
 
-      // per-photo LUT thumbnails (filmstrip previews, docs/adr/0002-lut-library)
-      // A thumb landed. One that belongs to a previous photo (the bitmap
-      // changed while the worker was rendering) is revoked and dropped —
-      // the map only ever holds the current photo's previews.
       LutThumbGenerated: ({ lutId, url, bitmap }) => {
         if (model.source.bitmap !== bitmap) {
           return { model, commands: [RevokeLutThumbs({ urls: [url] })] }
         }
         return { model: { ...model, lutThumbs: { ...model.lutThumbs, [lutId]: url }, phase } }
       },
-      // A thumb failed (cube fetch, downscale, worker, encode): the
-      // vendored generic jpg stays — previews are presentation-only, so
-      // failures are not user-visible.
       LutThumbFailed: () => ({ model }),
       LutThumbsRevoked: () => ({ model }),
 
       SelectedLayer: () => {
-        // The machine moved to Selected; the branch closes the bar (a
-        // selection is a new context — D9, and the bar's target may be
-        // gone). A selection without an image (or while a draft is active)
-        // has no edge and is ignored.
         if (!transitioned) {
           return { model }
         }
-        // Selecting a layer opens its sliders: on mobile the sheet follows
-        // to the layer drawer (docs/adr/0010-editor-ui.md).
         return {
           model: { ...model, lutBarOpen: false, mobileSheet: 'layers', phase, previewLut: null },
         }
@@ -687,10 +571,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       RemovedLayer: ({ id }) => {
         const { [id]: _r, ...restIndex } = model.activeFieldIndex
         const { [id]: _rc, ...restMixer } = model.activeMixerColor
-        // Removing the focused layer also deselects it — the machine's
-        // Selected → Idle edge handles that; any other removal leaves the
-        // phase alone. The removal always drops a hover preview (the target
-        // may be the removed layer).
         return renderNow({
           ...model,
           activeFieldIndex: restIndex,
@@ -778,9 +658,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           },
         }
       },
-      // The mixer swatch row's selection: which of the 8 hue ranges the
-      // drawer shows. Presentation-only (like CycledToggledField) — the
-      // sliders are already bound to their fields; no render needed.
       SelectedMixerColor: ({ id, color }) => ({
         model: {
           ...model,
@@ -792,13 +669,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         },
       }),
 
-      // tone curve widget (docs/adr/0003-adjustment-layers)
-      // A chain-layer drag is a plain data op (the machine has no edge from
-      // Selected — the chain lives in the model, not the phase); a draft
-      // drag goes through the machine's Drafting edge and only re-renders
-      // here. Any other phase has no edge and is ignored — the widget only
-      // renders while a toneCurve draft or selection exists, so the target
-      // is unambiguous. The engine clamps the move.
       CurvePointDragged: ({ index, x, y }) => {
         if (model.phase._tag === 'Selected') {
           const id = model.phase.layerId
@@ -817,10 +687,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         }
         return renderNow({ ...model, phase })
       },
-      // The reset button restores the identity curve: the same draft/chain
-      // split as the drag (machine edge for the draft, data op for the
-      // chain). The button only renders on a non-neutral curve, so a reset
-      // on a neutral curve is a stray message that changes nothing.
       CurveReset: () => {
         if (model.phase._tag === 'Selected') {
           const id = model.phase.layerId

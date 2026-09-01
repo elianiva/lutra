@@ -61,15 +61,9 @@ export const PanZoom = Mount.defineStream('PanZoom', {
           dragging: false,
           lastX: 0,
           lastY: 0,
-          // Set on the first wheel/drag; while false the view is still the
-          // auto-fit, so a stage resize can safely re-fit.
           touched: false,
         }
-        // Active pointers, for touch pan/pinch tracking.
         const pointers = new Map<number, { x: number; y: number }>()
-        // The pinch anchor: offsets and stage-relative midpoint at pinch
-        // start, so the content under the start midpoint stays under the
-        // live midpoint as the scale changes.
         let pinch: {
           startDist: number
           startScale: number
@@ -78,7 +72,6 @@ export const PanZoom = Mount.defineStream('PanZoom', {
           startMidX: number
           startMidY: number
         } | null = null
-        // Last single tap (time + position), for double-tap detection.
         let lastTap = { at: 0, x: 0, y: 0 }
         const emit = (scale: number, offsetX: number, offsetY: number) =>
           Queue.offerUnsafe(queue, EditorMessage.ScaledCanvas({ offsetX, offsetY, scale }))
@@ -146,11 +139,6 @@ export const PanZoom = Mount.defineStream('PanZoom', {
           const rect = stage.getBoundingClientRect()
           const cx = e.clientX - rect.left
           const cy = e.clientY - rect.top
-          // Normalize the delta to pixels: trackpads report pixels, mice report
-          // lines (and some devices pages). Then scale the zoom factor by the
-          // delta so trackpads (many small deltas) and mice (few large deltas)
-          // zoom at a comparable, controlled rate. A fixed per-event factor made
-          // trackpads zoom far too aggressively.
           const delta =
             e.deltaMode === WheelEvent.DOM_DELTA_LINE
               ? e.deltaY * 16
@@ -198,9 +186,6 @@ export const PanZoom = Mount.defineStream('PanZoom', {
           state.touched = true
           pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
           if (pointers.size === 1) {
-            // A double-tap toggles the zoom instead of starting a drag
-            // (two taps, 300ms, within a finger-width — the browser does
-            // not fire dblclick for touch).
             const now = performance.now()
             if (
               e.pointerType === 'touch' &&
@@ -218,8 +203,6 @@ export const PanZoom = Mount.defineStream('PanZoom', {
             state.lastY = e.clientY
             stage.setPointerCapture(e.pointerId)
           } else if (pointers.size === 2) {
-            // The second finger lands: switch from pan to pinch, anchored
-            // at the current midpoint.
             state.dragging = false
             const [a, b] = [...pointers.values()]
             const rect = stage.getBoundingClientRect()
@@ -239,8 +222,6 @@ export const PanZoom = Mount.defineStream('PanZoom', {
           }
           pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
           if (pinch && pointers.size === 2) {
-            // Pinch: the content under the start midpoint stays under the
-            // live midpoint while the scale follows the finger distance.
             const [a, b] = [...pointers.values()]
             const rect = stage.getBoundingClientRect()
             const d = Math.hypot(a!.x - b!.x, a!.y - b!.y)
@@ -270,8 +251,6 @@ export const PanZoom = Mount.defineStream('PanZoom', {
             pinch = null
             stage.releasePointerCapture(e.pointerId)
           } else if (pointers.size === 1) {
-            // One finger lifted: the remaining one takes over the pan,
-            // anchored where it is so the image doesn't jump.
             pinch = null
             state.dragging = true
             const [rest] = [...pointers.values()]
@@ -280,15 +259,8 @@ export const PanZoom = Mount.defineStream('PanZoom', {
           }
         }
 
-        // Re-fit when the stage resizes, as long as the user hasn't panned or
-        // zoomed since the last fit.
         const resizeObserver = new ResizeObserver(refit)
         resizeObserver.observe(stage)
-        // The canvas itself resizes when the compare mode changes (Side by
-        // side doubles the canvas width) — the stage does not. Observe the
-        // content container so the wider strip is re-fitted into view. The
-        // observer's initial callback re-emits the mount-time fit, which is
-        // a no-op (same values).
         const container = stage.firstElementChild
         const contentObserver = container ? new ResizeObserver(refit) : null
         if (contentObserver && container) {
@@ -302,8 +274,6 @@ export const PanZoom = Mount.defineStream('PanZoom', {
             stage.addEventListener('pointermove', onMove)
             stage.addEventListener('pointerup', onUp)
             stage.addEventListener('pointercancel', onUp)
-            // Mouse double-click zooms too (touch double-tap is handled in
-            // onDown — browsers don't fire dblclick for touch reliably).
             stage.addEventListener('dblclick', toggleZoom)
             return { contentObserver, onDown, onMove, onUp, onWheel, resizeObserver }
           }),
@@ -348,7 +318,6 @@ export const RegisterCanvas = Mount.define('RegisterCanvas', {
     }),
 })
 
-// compare (before/after viewing)
 
 /**
  * Pointer mount for the Split-mode divider: dragging moves the split
@@ -369,10 +338,7 @@ export const CompareDivider = Mount.defineStream('CompareDivider', {
           Queue.offerUnsafe(queue, EditorMessage.ChangedSplitPosition({ position }))
 
         let dragging = false
-        // P6 rAF coalescing: pointermove fires at device rate (often
         // >60 Hz) while PresentFrame is a GPU blit submit; keep only the
-        // latest position per frame so divider drag emits ≤60 Hz even on
-        // 240 Hz mice. The pending value survives until the frame fires.
         let pendingPosition: number | null = null
         let rafId: number | null = null
         const flushPending = () => {
@@ -388,8 +354,6 @@ export const CompareDivider = Mount.defineStream('CompareDivider', {
           if (e.button !== 0) {
             return
           }
-          // The stage's pan/zoom mount listens on the stage element; stopping
-          // the event here keeps a divider grab from becoming a pan.
           e.stopPropagation()
           dragging = true
           divider.setPointerCapture(e.pointerId)
@@ -410,8 +374,6 @@ export const CompareDivider = Mount.defineStream('CompareDivider', {
         }
         const onUp = (e: PointerEvent) => {
           dragging = false
-          // Flush any pending drag position on release so the final
-          // position lands without waiting for the next frame.
           if (rafId !== null) {
             cancelAnimationFrame(rafId)
             rafId = null
@@ -624,8 +586,6 @@ const histogramView = (bins: Uint32Array | null, h: HtmlBuilder<EditorMessage>):
     }
   }
 
-  // Area polygon: the bin curve left→right, then the bottom edge back to
-  // the origin. The stroke reuses the same curve (without the corners).
   const curve: string[] = []
   for (let i = 0; i < 256; i++) {
     const x = (i / 255) * HISTOGRAM_WIDTH
@@ -639,8 +599,6 @@ const histogramView = (bins: Uint32Array | null, h: HtmlBuilder<EditorMessage>):
       h.Class(
         'pointer-events-none absolute bottom-3 right-3 h-[70px] w-[140px] rounded border border-border bg-panel/80 text-ink sm:h-[110px] sm:w-[220px]',
       ),
-      // The SVG's viewBox scales with the box, so the same points render at
-      // any size — the responsive box shrinks the overlay on phones
       // (docs/adr/0010-editor-ui.md), where 220px would collide with the Compare control.
     ],
     [
@@ -678,21 +636,9 @@ const histogramOverlay = (h: HtmlBuilder<EditorMessage>, bins: Uint32Array | nul
 
 const loadedStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel) => {
   const src = model.source
-  // Side by side shows both halves at preview resolution: the canvas is 2×
-  // the preview width (source left, graded right), so neither side is
-  // stretched. The backend follows the size change in place via
-  // `resizeCanvas` (swapchain re-configures, `u_canvas` rewritten, no
-  // image textures rebuilt) and the blit maps each half 1:1; PanZoom
-  // re-fits to the wider content. P2 clamps the drawing buffer to
-  // `device.limits.maxTextureDimension2D` so a compat 4096 cap does not
-  // throw on the 2× width.
   const contentWidth = model.compareMode === 'side-by-side' ? src.width * 2 : src.width
   return h.div(
     [
-      // inset-0: the stage div fills the center column, so the transform div
-      // below is anchored to the stage origin and pan/zoom offsets are plain
-      // stage coordinates (no flex centering to compensate for).
-      // touch-none: the browser must not hijack touch gestures into
       // scroll/zoom — pointer pan and pinch own the stage (docs/adr/0010-editor-ui.md).
       h.Class('absolute inset-0 touch-none'),
       h.OnMount(PanZoom({ imageHeight: src.height, imageWidth: contentWidth })),
@@ -700,11 +646,6 @@ const loadedStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel) => 
     [
       h.div(
         [
-          // relative: the containing block for image-space children (the
-          // compare divider's `left: N%` resolves against the image width,
-          // not the stage — CONTEXT.md "Split position"). w-fit: the
-          // container wraps the image-sized canvas instead of stretching
-          // to the stage, so percentages mean image pixels.
           h.Class('relative w-fit origin-top-left'),
           h.Attribute(
             'style',
@@ -715,23 +656,14 @@ const loadedStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel) => 
           h.canvas(
             [
               h.Id('lutra-canvas'),
-              // Register this element in the CanvasRef service on mount, so
-              // render commands resolve it from the app context (no global
-              // getElementById lookup).
               h.OnMount(RegisterCanvas()),
-              // width/height attributes size both the CSS layout and (via
               // configure) the WebGPU swapchain; the GPU backend blits every
-              // rendered frame straight onto this canvas. Side by side
-              // doubles the width, so the swapchain is 2× the image width
-              // and each half shows at native resolution.
               h.Attribute('width', String(contentWidth)),
               h.Attribute('height', String(src.height)),
               h.Class('block'),
             ],
             [],
           ),
-          // The divider sits in image space, so it moves with the image
-          // under pan/zoom; the blit draws the before/after boundary right
           // under it.
           model.compareMode === 'split' ? splitDivider(h, model) : null,
         ],

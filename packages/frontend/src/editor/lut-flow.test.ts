@@ -50,7 +50,6 @@ const catalog: Catalog = [
 
 // SAFETY: fabricated GPU handle stub — tests never execute GPU work, so only its type flows through the model; the buffer has no backing storage and is never read.
 const stubHandle = () =>
-  // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
   new RenderHandle({} as GPUTexture, 200, 150, { buffer: {} as GPUBuffer, map: null })
 
 const editId = () => EditId('11111111-1111-4111-8111-111111111111')
@@ -136,16 +135,13 @@ describe('LUT layer flow', () => {
   })
 
   it('only toggles the bar for a LUT draft or selected LUT layer', () => {
-    // No draft, nothing selected: toggle is a no-op
     const { model: m1 } = update(loaded(), EditorMessage.ToggledLutPicker())
     expect(m1.lutBarOpen).toBe(false)
 
-    // With a LUT draft: toggles
     const { model: withDraft } = selectTool(loaded(), 'lut')
     const { model: m2 } = update(withDraft, EditorMessage.ToggledLutPicker())
     expect(m2.lutBarOpen).toBe(false)
 
-    // A non-LUT draft: no-op
     const { model: withExposure } = selectTool(loaded(), 'exposure')
     const { model: m3 } = update(withExposure, EditorMessage.ToggledLutPicker())
     expect(m3.lutBarOpen).toBe(false)
@@ -159,8 +155,6 @@ describe('LUT bar preview (hover)', () => {
       EditorMessage.PreviewedLut({ lutId: lutBw }),
     )
     expect(model.previewLut).toBe(lutBw)
-    // The machine-owned draft keeps its committed lutId — the preview is
-    // applied at render time only.
     expect(draftLutId(model)).toBe(lutPrint)
     const render = commands.find((c) => c.name === 'RenderChain')
     expect(render?.args?.draft).toMatchObject({ lutId: lutBw })
@@ -243,7 +237,6 @@ describe('LUT bar commit + recents', () => {
 
   it('recents dedupe-prepend and cap at 12', () => {
     let model = lutDraft()
-    // Seed 12 distinct recents (newest first) through draft commits.
     for (let i = 0; i < 12; i++) {
       model = update(
         model,
@@ -254,7 +247,6 @@ describe('LUT bar commit + recents', () => {
     expect(model.lutRecents[0]).toBe('luts/print/seed_11.cube')
     expect(model.lutRecents[11]).toBe('luts/print/seed_0.cube')
 
-    // A 13th pick pushes the oldest out.
     model = update(
       model,
       EditorMessage.ChangedDraftLut({ lutId: LutId('luts/print/new.cube') }),
@@ -263,7 +255,6 @@ describe('LUT bar commit + recents', () => {
     expect(model.lutRecents[0]).toBe('luts/print/new.cube')
     expect(model.lutRecents).not.toContain('luts/print/seed_0.cube')
 
-    // Re-picking an existing id moves it to the front without duplicating.
     model = update(
       model,
       EditorMessage.ChangedDraftLut({ lutId: LutId('luts/print/seed_5.cube') }),
@@ -290,7 +281,6 @@ describe('per-photo LUT thumbnails (lazy generation)', () => {
     commands.filter((c) => c.name === 'GenerateLutThumb').map((c) => c.args?.lutId)
 
   it('a LUT draft auto-open generates the visible group', () => {
-    // Effective tab: recents-empty falls back to the first category (Print).
     const { commands = [] } = selectTool(loaded(), 'lut')
     expect(genIds(commands)).toEqual([lutPrint])
   })
@@ -309,7 +299,6 @@ describe('per-photo LUT thumbnails (lazy generation)', () => {
     const model = { ...lutDraft(), lutThumbs: { [lutBw]: 'blob:done' } }
     const { commands = [] } = update(model, EditorMessage.SelectedLutTab({ tab: 'Bw' }))
     expect(genIds(commands)).toEqual([])
-    // The other group is still missing and generates on its visit.
     const { commands: back = [] } = update(model, EditorMessage.SelectedLutTab({ tab: 'Print' }))
     expect(genIds(back)).toEqual([lutPrint])
   })
@@ -486,7 +475,6 @@ describe('persistence-during-preview dismissal', () => {
     expect(model.previewLut).toBeNull()
     expect(model.saveStatus).toEqual({ _tag: 'idle' })
     expect(commands.some((c) => c.name === 'SaveEdit')).toBe(false)
-    // The next Save proceeds normally.
     const { model: next, commands: nextCommands = [] } = update(
       model,
       EditorMessage.SaveRequested(),
@@ -508,7 +496,6 @@ describe('persistence-during-preview dismissal', () => {
     expect(model.previewLut).toBeNull()
     expect(model.exportDialog.dialog.isOpen).toBe(false)
     expect(commands.some((c) => c.name === 'SnapshotForExport')).toBe(false)
-    // The next Export opens the dialog.
     const { model: next, commands: nextCommands = [] } = update(
       model,
       EditorMessage.ExportRequested(),
@@ -520,8 +507,6 @@ describe('persistence-during-preview dismissal', () => {
 
 describe('catalog load state (LUT card status slot)', () => {
   it('CatalogFailed records the error for the LUT card caption', () => {
-    // A catalog-less model: the startup fetch is still in flight (or the
-    // LUT library is broken) — the tool panel shows the status caption.
     const { model } = update(
       { ...initialModel(), phase: Idle() },
       EditorMessage.CatalogFailed({
@@ -529,7 +514,6 @@ describe('catalog load state (LUT card status slot)', () => {
       }),
     )
     expect(model.catalogError?.message).toBe('Failed to load luts/film_luts.json: HTTP 500')
-    // The catalog itself stays missing — the LUT tool remains inert.
     expect(model.catalog).toBeNull()
   })
 
@@ -542,7 +526,6 @@ describe('catalog load state (LUT card status slot)', () => {
     )
     const { model } = update(failed, EditorMessage.CatalogLoaded({ catalog }))
     expect(model.catalogError).toBeNull()
-    // The message boundary re-validates the payload — structural equality,
     // not identity.
     expect(model.catalog).toEqual(catalog)
   })
@@ -575,27 +558,18 @@ describe('LUT bar view', () => {
       sceneConfig,
       given(lutDraft()),
       ...stageMounts,
-      // Tab column: the catalog categories with counts (Recents hidden
-      // while empty). Print is the active tab (first-category fallback).
       sceneExpect(role('button', { name: 'Print' })).toExist(),
       sceneExpect(role('button', { name: 'Bw' })).toExist(),
       sceneExpect(role('button', { name: 'Recents' })).toBeAbsent(),
       sceneExpect(role('button', { name: 'Print' })).toHaveClass('bg-panel-alt'),
-      // Filmstrip: the active tab's 64px thumbs (lazy img, title tooltip).
       sceneExpect(role('button', { name: 'Apply Kodak 2393 Cuspclip' })).toExist(),
       sceneExpect(role('button', { name: 'Apply Agfa APX 100' })).toBeAbsent(),
-      // Switch to the Bw tab.
       click(role('button', { name: 'Bw' })),
       resolveThumbFailure(lutBw),
       sceneExpect(role('button', { name: 'Apply Agfa APX 100' })).toExist(),
-      // Hover previews on the canvas (the render carries the previewed
-      // draft lutId); the name line shows the hovered entry live.
       hover(role('button', { name: 'Apply Agfa APX 100' })),
       ...resolveRender(),
       sceneExpect(text('Agfa APX 100 · Bw')).toExist(),
-      // Click commits: the accent border moves to the clicked thumb, its
-      // centered check badge appears (the active LUT must read at a
-      // glance), and the name line keeps it (now the committed LUT).
       click(role('button', { name: 'Apply Agfa APX 100' })),
       sceneExpect(role('button', { name: 'Apply Agfa APX 100' })).toHaveClass('border-accent'),
       inside(
@@ -614,8 +588,6 @@ describe('LUT bar view', () => {
       sceneConfig,
       given({ ...selectedLut(), lutBarOpen: true }),
       ...stageMounts,
-      // The committed LUT (Kodak) carries the accent border and the check
-      // badge; the uncommitted Bw thumb has neither.
       sceneExpect(role('button', { name: 'Apply Kodak 2393 Cuspclip' })).toHaveClass(
         'border-accent',
       ),
@@ -630,10 +602,7 @@ describe('LUT bar view', () => {
       sceneExpect(text('Agfa APX 100 · Bw')).toExist(),
       click(role('button', { name: 'Apply Agfa APX 100' })),
       sceneExpect(role('button', { name: 'Apply Agfa APX 100' })).toHaveClass('border-accent'),
-      // The Bw tab only renders the Bw group — the Kodak thumb (Print) is
-      // gone, so the accent border can only be on the clicked thumb.
       sceneExpect(role('button', { name: 'Apply Kodak 2393 Cuspclip' })).toBeAbsent(),
-      // The check badge moved with the border: only the clicked thumb
       // carries it now.
       inside(
         role('button', { name: 'Apply Agfa APX 100' }),
@@ -654,8 +623,6 @@ describe('LUT bar view', () => {
       sceneConfig,
       given({ ...selectedLut(), lutBarOpen: true, lutTab: 'recents' }),
       ...stageMounts,
-      // Recents is empty: the tab is hidden and the first category is the
-      // effective tab (content + highlight).
       sceneExpect(role('button', { name: 'Recents' })).toBeAbsent(),
       sceneExpect(role('button', { name: 'Print' })).toHaveClass('bg-panel-alt'),
       sceneExpect(role('button', { name: 'Apply Kodak 2393 Cuspclip' })).toExist(),
@@ -674,13 +641,10 @@ describe('LUT bar view', () => {
       sceneConfig,
       given(model),
       ...stageMounts,
-      // No per-photo thumb yet: the vendored generic jpg shows.
       sceneExpect(role('img', { name: 'Kodak 2393 Cuspclip' })).toHaveAttr(
         'src',
         '/luts/thumbnails/print/kodak_2393_cuspclip.jpg',
       ),
-      // Switch to Bw: generation fires, and the worker result swaps the
-      // thumb to the per-photo URL.
       click(role('button', { name: 'Bw' })),
       Command.resolve(
         GenerateLutThumb,
@@ -696,7 +660,6 @@ describe('LUT bar view', () => {
       sceneConfig,
       given(lutDraft()),
       ...stageMounts,
-      // The bar auto-opens with a LUT draft; the chevron on the drawer row
       // closes it…
       sceneExpect(label('LUT thumbnails')).toExist(),
       click(role('button', { name: 'Toggle LUT bar' })),
