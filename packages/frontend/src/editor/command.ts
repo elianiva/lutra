@@ -4,7 +4,7 @@ import * as Persistence from 'effect/unstable/persistence/KeyValueStore'
 import type { StoreError } from '@lutra/store'
 import { Edit, EditStore, EditIdSchema, newEditId } from '@lutra/store'
 import {
-  type GpuError,
+  GpuError,
   createLayer,
   createRenderRequest,
   Layer,
@@ -27,6 +27,7 @@ import {
 } from '../errors'
 import { EditorMessage, PresentState } from './message'
 import { ENGINE_REGISTRY } from '../editor/layer-meta'
+import { toPreviewBitmap } from '../gpu/preview'
 
 // The frontend consumes the engine's registry directly — no duplicate layer
 // definitions. Layer creation stays an Effect until the CreateLayer command
@@ -106,13 +107,21 @@ export const DecodeImage = Command.define('DecodeImage', {
           }),
         try: async () => await file.arrayBuffer(),
       })
-      const bitmap = yield* Effect.tryPromise({
+      const nativeBitmap = yield* Effect.tryPromise({
         catch: (cause) =>
           new ImageDecodeError({
             message: `Failed to decode image: ${String(cause)}`,
             cause,
           }),
         try: async () => await createImageBitmap(file),
+      })
+      const bitmap = yield* Effect.tryPromise({
+        catch: (cause) =>
+          new ImageDecodeError({
+            message: `Failed to decode image: ${String(cause)}`,
+            cause,
+          }),
+        try: async () => await toPreviewBitmap(nativeBitmap),
       })
       return EditorMessage.ImageDecoded({
         bitmap,
@@ -147,7 +156,7 @@ export const LoadEdit = Command.define('LoadEdit', {
         })
       }
       const edit = maybeEdit.value
-      const bitmap = yield* Effect.tryPromise({
+      const nativeBitmap = yield* Effect.tryPromise({
         // SAFETY: the edit's bytes are backed by a transferred ArrayBuffer from the store; TS cannot express that, so the BlobPart cast is the documented boundary.
         // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
         try: async () => await createImageBitmap(new Blob([edit.source as BlobPart])),
@@ -156,6 +165,14 @@ export const LoadEdit = Command.define('LoadEdit', {
             cause,
             message: `Failed to decode saved image: ${String(cause)}`,
           }),
+      })
+      const bitmap = yield* Effect.tryPromise({
+        catch: (cause) =>
+          new ImageDecodeError({
+            cause,
+            message: `Failed to decode saved image: ${String(cause)}`,
+          }),
+        try: async () => await toPreviewBitmap(nativeBitmap),
       })
       return EditorMessage.EditLoaded({
         id: edit.id,
@@ -400,24 +417,98 @@ export const ReadHistogram = Command.define('ReadHistogram', {
 /** Settings persistence is shared with the collage's export dialog (docs/adr/0004-export). */
 import { setFrame } from '../export-dialog'
 
+const OFF_PRESENT = { mode: 'off', splitAt: 0, showBefore: false } as const
+
 /**
- * Read the frame identified by `handle` back from the GPU once, when the
- * export dialog opens. The ImageData lands in the shared export-dialog
- * frame slot for the dialog's lifetime so pressing Export again re-encodes
- * without another readback — it never rides through the model (docs/adr/0004-export).
+ * Read the frame back from the GPU once, when the export dialog opens.
+ * The ImageData lands in the shared export-dialog frame slot for the
+ * dialog's lifetime so pressing Export again re-encodes without another
+ * readback — it never rides through the model (docs/adr/0004-export).
+ *
+ * P0 preview: the editor grades at preview resolution (FHD-class) so the
+ * display `handle` is preview sized. Export must be native. When native
+ * `source` + `layers` are provided the command decodes the full-res bytes,
+ * re-executes the chain at native size on a detached canvas, and snapshots
+ * that frame. When they are absent (tests, or no attached edit) it falls
+ * back to snapshotting the preview handle — the old path — so existing
+ * scenes keep passing.
  */
 export const SnapshotForExport = Command.define('SnapshotForExport', {
-  args: { handle: Schema.instanceOf(RenderHandle) },
-  execute: ({ handle }) =>
+  args: {
+    handle: Schema.instanceOf(RenderHandle),
+    draft: Schema.optional(Schema.NullOr(Layer)),
+    layers: Schema.optional(Schema.Array(Layer)),
+    source: Schema.optional(Schema.Uint8Array),
+  },
+  execute: ({ handle, draft, layers, source }) =>
     Effect.gen(function* () {
+      // Native path: source + layers present -> re-render at native size
+      // on a detached canvas so export is full resolution even though the
+      // editor session is preview sized.
+      if (source && layers) {
+        const chain: Layer[] = [...layers]
+        if (draft) {
+          chain.push(draft)
+        }
+        const luts = yield* resolveLuts(chain)
+        const nativeBitmap = yield* Effect.tryPromise({
+          catch: (cause) =>
+            new GpuError({
+              cause,
+              message: `Failed to decode source for export: ${String(cause)}`,
+            }),
+          try: async () => {
+            // SAFETY: the stored source is a transferred ArrayBuffer; TS cannot
+            // express that, so the BlobPart cast is the documented boundary.
+            // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, anti-slop/require-safety-comment-for-type-assertion, anti-slop/no-chained-type-assertions
+            const blob = new Blob([source as BlobPart])
+            return await createImageBitmap(blob)
+          },
+        })
+        try {
+          const request = yield* createRenderRequest(
+            chain,
+            ENGINE_REGISTRY,
+            nativeBitmap,
+            0,
+            luts,
+          )
+          const canvas = document.createElement('canvas')
+          canvas.width = nativeBitmap.width
+          canvas.height = nativeBitmap.height
+          const backend = yield* GpuBackend
+          const nativeHandle = yield* backend.execute(request, canvas, OFF_PRESENT)
+          const image = yield* backend.snapshot(nativeHandle)
+          setFrame(image)
+          nativeBitmap.close()
+          return EditorMessage.ExportSnapshotted()
+        } catch (cause) {
+          // Best-effort close; the bitmap is discarded on either path.
+          nativeBitmap.close()
+          throw cause
+        }
+      }
       const backend = yield* GpuBackend
       const image = yield* backend.snapshot(handle)
       setFrame(image)
       return EditorMessage.ExportSnapshotted()
     }).pipe(
-      Effect.catchTag('GpuError', (err: GpuError) =>
-        Effect.succeed(EditorMessage.ExportSnapshotFailed({ error: err })),
-      ),
+      Effect.catchTags({
+        GpuError: (err: GpuError) =>
+          Effect.succeed(EditorMessage.ExportSnapshotFailed({ error: err })),
+        LutLoadError: (err) =>
+          Effect.succeed(
+            EditorMessage.ExportSnapshotFailed({
+              error: new GpuError({ cause: err, message: String(err) }),
+            }),
+          ),
+        LutParseError: (err) =>
+          Effect.succeed(
+            EditorMessage.ExportSnapshotFailed({
+              error: new GpuError({ cause: err, message: String(err) }),
+            }),
+          ),
+      }),
     ),
   messages: [EditorMessage.ExportSnapshotted, EditorMessage.ExportSnapshotFailed],
 })
