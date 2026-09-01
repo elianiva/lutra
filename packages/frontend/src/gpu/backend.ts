@@ -5,6 +5,7 @@ import { HISTOGRAM_BINS, HistogramRing, makeSlot } from './histogram-ring'
 import type { HistogramSlot } from './histogram-ring'
 import { presentModeToWgsl } from './present-mode'
 import type { ComparePresent } from './present-mode'
+import { descriptorCacheKey, pipelineCacheKey, toPassDescriptor } from './pass-descriptor'
 
 export type { ComparePresent } from './present-mode'
 
@@ -689,18 +690,18 @@ export const GpuBackendLive = Layer.effect(
     ): Effect.Effect<ComputeEntry, GpuError> =>
       Effect.gen(function* () {
         const { device, sampler } = gpu
-        const cacheKey =
-          pass.lutId === undefined ? pass.source : `${pass.source}::lut:${pass.lutId}`
+        const descriptor = toPassDescriptor(pass)
+        const cacheKey = descriptorCacheKey(descriptor)
         const cached = s.compute[cacheKey]
         if (cached) {
           return cached
         }
 
         const pipelines = yield* Ref.get(pipelineCacheRef)
-        const cachedPipeline = pipelines[pass.source]
+        const cachedPipeline = pipelines[pipelineCacheKey(descriptor)]
         let compiled = cachedPipeline
         if (!compiled) {
-          const module = device.createShaderModule({ code: pass.source })
+          const module = device.createShaderModule({ code: descriptor.source })
           const pipeline = device.createComputePipeline({
             compute: { entryPoint: 'main', module },
             layout: 'auto',
@@ -709,42 +710,42 @@ export const GpuBackendLive = Layer.effect(
             layout: pipeline.getBindGroupLayout(0),
             pipeline,
           }
-          yield* Ref.update(pipelineCacheRef, (cache) => ({ ...cache, [pass.source]: built }))
+          yield* Ref.update(pipelineCacheRef, (cache) => ({
+            ...cache,
+            [pipelineCacheKey(descriptor)]: built,
+          }))
           compiled = built
         }
 
-        const hasParams = pass.uniforms.length > 0
-        const paramsBuffer = hasParams
+        const paramsBuffer = descriptor.hasParams
           ? device.createBuffer({
               size: roundUp(pass.uniforms.length * 4, 16),
               usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
             })
           : null
 
-        // mirror that.
         const entries: GPUBindGroupEntry[] = [
           { binding: 0, resource: src.createView() },
           { binding: 1, resource: dst.createView() },
           { binding: 2, resource: { buffer: s.resolutionBuffer } },
         ]
-        if (pass.usesFrame) {
+        if (descriptor.usesFrame) {
           entries.push({ binding: 3, resource: { buffer: s.frameBuffer } })
         }
         if (paramsBuffer) {
           entries.push({ binding: 4, resource: { buffer: paramsBuffer } })
         }
-        if (pass.usesSampler) {
+        if (descriptor.usesSampler) {
           entries.push({ binding: 5, resource: sampler })
         }
-        if (pass.lutId !== undefined) {
-          const cube = luts.get(pass.lutId)
+        if (descriptor.lutId !== undefined) {
+          const cube = luts.get(descriptor.lutId)
           if (!cube) {
             return yield* Effect.fail(
-              new GpuError({ message: `LUT cube missing for ${pass.lutId}` }),
+              new GpuError({ message: `LUT cube missing for ${descriptor.lutId}` }),
             )
           }
-          // texture defaults to e2DArray in Chrome, which fails bind-group
-          const lutTex = yield* ensureLutTexture(device, pass.lutId, cube)
+          const lutTex = yield* ensureLutTexture(device, descriptor.lutId, cube)
           entries.push({
             binding: 6,
             resource: lutTex.createView({ dimension: '3d' }),
