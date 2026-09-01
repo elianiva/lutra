@@ -16,6 +16,7 @@ export class RenderHandle {
     readonly width: number,
     readonly height: number,
     readonly readback: HistogramSlot,
+    readonly generation: number = 0,
   ) {}
 }
 
@@ -874,7 +875,7 @@ export const GpuBackendLive = Layer.effect(
 
           s.histogramRing.occupy(slot, slot.buffer.mapAsync(GPUMapMode.READ))
 
-          return new RenderHandle(s.dstTex, s.width, s.height, slot)
+          return new RenderHandle(s.dstTex, s.width, s.height, slot, slot.generation)
         }).pipe(
           // specific WGSL rejection) must surface as a GpuError. Without
           Effect.catchDefect((cause: unknown) =>
@@ -960,7 +961,7 @@ export const GpuBackendLive = Layer.effect(
           if (Option.isNone(live) || !live.value.histogramRing.owns(slot)) {
             return new Uint32Array(HISTOGRAM_BINS)
           }
-          return yield* live.value.histogramRing.consume(slot)
+          return yield* live.value.histogramRing.consume(slot, handle.generation)
         }),
     })
   }),

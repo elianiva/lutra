@@ -222,7 +222,7 @@ describe('Image decode flow', () => {
           handle: new RenderHandle({} as GPUTexture, 200, 150, {
             // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
             buffer: {} as GPUBuffer,
-            state: { _tag: 'Idle' },
+            state: { _tag: 'Idle' }, generation: 0,
           }),
         }),
       ),

@@ -13,10 +13,11 @@ export type HistogramSlot = {
   readonly [slotBrand]?: true
   readonly buffer: GPUBuffer
   state: SlotState
+  generation: number
 }
 
 export const makeSlot = (buffer: GPUBuffer): HistogramSlot =>
-  ({ [slotBrand]: true as const, buffer, state: { _tag: 'Idle' } }) as HistogramSlot
+  ({ buffer, generation: 0, state: { _tag: 'Idle' } }) as HistogramSlot
 
 export const isIdle = (slot: HistogramSlot): boolean => slot.state._tag === 'Idle'
 
@@ -46,6 +47,9 @@ export class HistogramRing {
   acquire(): Effect.Effect<HistogramSlot> {
     const next = this.slots[this.cursor % HISTOGRAM_SLOTS]!
     this.cursor += 1
+    const bump = () => {
+      next.generation += 1
+    }
     if (next.state._tag === 'Pending') {
       const pending = next.state.promise
       return Effect.gen(function* () {
@@ -56,9 +60,11 @@ export class HistogramRing {
           void cause
         }
         next.state = { _tag: 'Idle' }
+        bump()
         return next
       })
     }
+    bump()
     return Effect.succeed(next)
   }
 
@@ -79,8 +85,8 @@ export class HistogramRing {
     return (this.slots as readonly HistogramSlot[]).includes(slot)
   }
 
-  consume(slot: HistogramSlot): Effect.Effect<Uint32Array<ArrayBuffer>, GpuError> {
-    if (slot.state._tag === 'Idle' || !this.owns(slot)) {
+  consume(slot: HistogramSlot, expectedGeneration: number): Effect.Effect<Uint32Array<ArrayBuffer>, GpuError> {
+    if (slot.state._tag === 'Idle' || !this.owns(slot) || slot.generation !== expectedGeneration) {
       return Effect.succeed(new Uint32Array(HISTOGRAM_BINS))
     }
     const pending = slot.state.promise
