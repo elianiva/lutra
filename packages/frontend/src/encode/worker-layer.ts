@@ -70,7 +70,22 @@ export const ImageEncoderWorkerLive = Layer.effect(
           const deferred = yield* Deferred.make<Uint8Array, EncodeError>()
           yield* Ref.update(pendingRef, (pending) => new Map(pending).set(id, deferred))
           const request: EncodeRequest = { id, image, settings }
-          worker.postMessage(request)
+          // Transfer the pixel buffer — 24 Mpx of RGBA (~96 MiB) would
+          // otherwise be structured-cloned (memcpy) to the worker. The
+          // ImageData on the main thread is not reused after the encode
+          // (the frame slot keeps the detached buffer, and the encode
+          // promise resolves before the slot is re-read), so neutering it
+          // is safe. Guard SharedArrayBuffer (not transferable).
+          const buffer = image.data.buffer
+          if (buffer instanceof ArrayBuffer && buffer.byteLength > 0) {
+            try {
+              worker.postMessage(request, [buffer])
+            } catch {
+              worker.postMessage(request)
+            }
+          } else {
+            worker.postMessage(request)
+          }
           return yield* Deferred.await(deferred)
         }),
     })

@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import { RenderHandle } from '../gpu/backend'
-import { SourceImage, CompareMode, Catalog, SaveError } from './message'
+import { SourceImage, CompareMode, Catalog, SaveError, PresentState } from './message'
 import { LayerIdSchema, LutIdSchema, Layer, LAYER_TYPES } from '@lutra/engine'
 import { EditIdSchema } from '@lutra/store'
 import * as ExportDialog from '../export-dialog'
@@ -132,6 +132,14 @@ export const Model = Schema.Struct({
   // while pending so the GPU queue never backs up (the in-flight render
   // re-triggers with the newest state when it completes).
   renderPending: Schema.Boolean,
+  // P6 present coalescing: one PresentFrame at a time (a blit), so 60 Hz
+  // divider drags don't queue 60 submits. While presentPending is true,
+  // only the latest position/mode is kept in pendingPresent and flushed
+  // when FramePresented lands — mirrors the renderPending/revision guard
+  // but with an explicit slot (not a revision) because the blit is cheap
+  // and the value is just three scalars.
+  presentPending: Schema.Boolean,
+  pendingPresent: Schema.NullOr(PresentState),
   // Stamp of the chain+draft the currently displayed frame was rendered for;
   // lets update ignore renders that arrived after a newer mutation.
   renderedStamp: Schema.Number,
@@ -182,6 +190,8 @@ export const initialModel = (): Model => ({
   phase: editorMachine.initial,
   previewLut: null,
   renderPending: false,
+  presentPending: false,
+  pendingPresent: null,
   renderedStamp: 0,
   revision: 0,
   saveStatus: { _tag: 'idle' },
