@@ -10,7 +10,7 @@ import {
 import * as DragAndDrop from '@/components/ui/drag-and-drop'
 import { dragGhostClass } from '@/components/ui/drag-and-drop'
 import { cn } from '@/lib/utils'
-import { Download, RotateCcw, X } from 'lucide'
+import { Download, GripVertical, Plus, RotateCcw, X } from 'lucide'
 import { button } from '@/components/ui/button'
 import { CollageMessage } from './message'
 import type { Model } from './model'
@@ -22,18 +22,6 @@ import { cellSize, effectiveRowCount } from './compose'
 import { placement } from './framing'
 import * as ExportDialog from '../export-dialog'
 
-/**
- * The Collage Submodel's view (docs/adr/0006-frontend-architecture, docs/adr/0009-collage): the
- * fixed-grid preview — each tile drawn from its referenced Edit's
- * full-resolution source through its tile framing, with frame-ratio /
- * columns / rows / gutter / background controls (an explicit M×N grid whose
- * spare capacity renders as background), an Arrange/Frame mode toggle (drag-and-drop reorder
- * vs pan/zoom framing), per-tile remove (Arrange) and reset-framing (Frame),
- * an undo toast, and back navigation. Stepper controls emit raw intents;
- * clamping happens once, in update.
- */
-
-/** The share-target presets (docs/adr/0009-collage); custom W:H covers the rest. */
 const FRAME_PRESETS: readonly { label: string; value: number }[] = [
   { label: '1:1', value: 1 },
   { label: '4:5', value: 4 / 5 },
@@ -43,7 +31,6 @@ const FRAME_PRESETS: readonly { label: string; value: number }[] = [
 
 const matchesPreset = (ratio: number, value: number) => Math.abs(ratio - value) < 1e-9
 
-// lazy islands (ADR 0006)
 const lazyControls = createLazy()
 const lazyGrid = createLazy()
 const lazyCell = createKeyedLazy()
@@ -157,7 +144,12 @@ const ghostView = (
       return h.div(
         [
           h.Style(style),
-          h.Class(cn('-translate-x-1/2 -translate-y-1/2 overflow-hidden border border-accent', dragGhostClass)),
+          h.Class(
+            cn(
+              '-translate-x-1/2 -translate-y-1/2 overflow-hidden border border-accent',
+              dragGhostClass,
+            ),
+          ),
         ],
         [
           h.div(
@@ -170,11 +162,14 @@ const ghostView = (
   })
 }
 
-const controlsWrapper = (
-  mode: Model['mode'],
-  collage: Collage,
-  h: HtmlBuilder<CollageMessage>,
-): Html => controls(h, mode, collage)
+const controlsWrapper = (collage: Collage, h: HtmlBuilder<CollageMessage>): Html =>
+  controls(h, collage)
+
+const exportBarWrapper = (dialog: Model['exportDialog'], h: HtmlBuilder<CollageMessage>): Html =>
+  ExportDialog.exportBarView(h, dialog, (message: ExportDialog.Message) =>
+    CollageMessage.GotCollageExportDialogMessage({ message }),
+  )
+const lazyExportBar = createLazy()
 
 const body = (h: HtmlBuilder<CollageMessage>, model: Model) =>
   AsyncData.match(model.collage, {
@@ -187,8 +182,17 @@ const body = (h: HtmlBuilder<CollageMessage>, model: Model) =>
       collage.tiles.length === 0
         ? emptyState(h, model.userEmptied)
         : h.div(
-            [h.Class('flex min-h-0 flex-1 flex-col gap-4 p-4')],
-            [lazyControls(controlsWrapper, [model.mode, collage, h])!, grid(h, model, collage)],
+            [h.Class('flex min-h-0 flex-1 flex-col gap-4 p-4 lg:flex-row')],
+            [
+              h.div(
+                [h.Class('flex min-w-0 flex-1 flex-col gap-4')],
+                [lazyControls(controlsWrapper, [collage, h])!, grid(h, model, collage)],
+              ),
+              h.div(
+                [h.Class('w-full shrink-0 lg:w-[320px]')],
+                [lazyExportBar(exportBarWrapper, [model.exportDialog, h])!],
+              ),
+            ],
           ),
   })
 
@@ -228,7 +232,8 @@ const stepperButton = (
       onClick,
       variant: 'outline',
       size: 'icon-sm',
-      className: 'grid place-items-center border-border text-xs text-muted hover:border-muted hover:text-ink',
+      className:
+        'grid place-items-center border-border text-xs text-muted hover:border-muted hover:text-ink',
       attributes: [h.AriaLabel(ariaLabel), h.DataAttribute('layout-control', label)],
     },
     label,
@@ -238,7 +243,6 @@ const stepperButton = (
 const controlLabel = (h: HtmlBuilder<CollageMessage>, text: string) =>
   h.span([h.Class('text-[10px] uppercase tracking-[0.14em]')], [text])
 
-/** The ratio's normalized W:H pair — the shorter side is 1. */
 const ratioPair = (ratio: number): [number, number] =>
   ratio >= 1 ? [Math.round(ratio * 100) / 100, 1] : [1, Math.round((1 / ratio) * 100) / 100]
 
@@ -309,33 +313,7 @@ const ratioInput = (
     }),
   ])
 
-const modeToggle = (h: HtmlBuilder<CollageMessage>, mode: Model['mode']) =>
-  h.div(
-    [h.Class('flex border border-border'), h.DataAttribute('control', 'mode')],
-    (['arrange', 'frame'] as const).map((option, i) =>
-      button(
-        {
-          onClick: CollageMessage.ModeChanged({ mode: option }),
-          size: 'xs',
-          variant: mode === option ? 'default' : 'ghost',
-          className: cn(
-            'px-2 py-0.5 text-xs capitalize',
-            i === 0 ? 'border-r border-border' : '',
-            mode === option ? 'bg-accent text-ink' : 'text-muted hover:text-ink',
-          ),
-          attributes: [
-            h.AriaLabel(option === 'arrange' ? 'Arrange photos' : 'Frame photos'),
-            h.DataAttribute('mode-button', option),
-            h.AriaPressed(String(mode === option)),
-          ],
-        },
-        option,
-        h,
-      ),
-    ),
-  )
-
-const controls = (h: HtmlBuilder<CollageMessage>, mode: Model['mode'], collage: Collage) =>
+const controls = (h: HtmlBuilder<CollageMessage>, collage: Collage) =>
   h.div(
     [h.Class('flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted')],
     [
@@ -418,7 +396,6 @@ const controls = (h: HtmlBuilder<CollageMessage>, mode: Model['mode'], collage: 
         `Background: ${collage.layout.background}`,
         h,
       ),
-      modeToggle(h, mode),
     ],
   )
 
@@ -430,18 +407,14 @@ const gridView = (
   background: string,
   tiles: Collage['tiles'],
   framingDraft: Model['framingDraft'],
-  mode: Model['mode'],
+  selectedTile: Model['selectedTile'],
   drag: Model['drag'],
   photos: Model['photos'],
   sizes: Model['sizes'],
   h: HtmlBuilder<CollageMessage>,
 ): Html => {
-  // Maps for O(1) lookups during per-tile render — avoids linear find per tile
-  // on every rAF-throttled PanMoved. Created once per grid render, not per cell.
   const photoById = new Map(photos.map((p) => [p.id, p]))
   const sizeById = new Map(sizes.map((s) => [s.editId, s]))
-  // An explicit M×N grid renders its spare capacity as background cells
-  // (docs/adr/0009-collage) — non-interactive placeholders past the last tile.
   const capacity = columns * rows
   const empties = Array.from({ length: Math.max(0, capacity - tiles.length) }, (_, i) =>
     h.div(
@@ -471,12 +444,25 @@ const gridView = (
           index,
           framingDraft?.index === index ? framingDraft.framing : tile.framing,
           cellAspect,
-          mode,
+          selectedTile === index,
           drag,
           photoById,
           sizeById,
           h,
         ])!,
+      ),
+      h.div(
+        [
+          h.Key('add-photos'),
+          h.DataAttribute('add-photos', 'true'),
+          h.Style({ aspectRatio: String(cellAspect) }),
+          h.Class(
+            'flex cursor-pointer flex-col items-center justify-center gap-1 border border-dashed border-border bg-transparent text-muted hover:border-accent hover:text-accent',
+          ),
+          h.OnClick(CollageMessage.AddPhotosRequested()),
+          h.AriaLabel('Add photos to collage'),
+        ],
+        [icon(h, Plus, 'Add photos', 20), h.span([h.Class('text-xs')], ['Add photos'])],
       ),
       ...empties,
     ],
@@ -488,7 +474,7 @@ const tileCellView = (
   index: number,
   framing: TileFraming,
   cellAspect: number,
-  mode: Model['mode'],
+  selected: boolean,
   drag: Model['drag'],
   photoById: Map<EditId, Model['photos'][number]>,
   sizeById: Map<EditId, Model['sizes'][number]>,
@@ -496,7 +482,6 @@ const tileCellView = (
 ): Html => {
   const photo = photoById.get(editId)
   const url = photo === undefined ? null : photoUrl(photo.id, photo.source)
-  const arrange = mode === 'arrange'
   const dropTarget = Option.match(DragAndDrop.maybeDropTarget(drag), {
     onNone: () => null,
     onSome: (t) => (t.containerId === `tile-${index}` ? t : null),
@@ -509,56 +494,32 @@ const tileCellView = (
     })
   const cellClass = [
     'relative overflow-hidden',
+    selected ? 'ring-2 ring-accent' : '',
     ...(dropTarget !== null ? ['ring-2 ring-accent'] : []),
     ...(draggedHere ? ['opacity-40'] : []),
-    ...(!arrange ? ['cursor-grab select-none touch-none'] : []),
+    selected ? 'cursor-grab select-none touch-none' : 'cursor-pointer',
   ].join(' ')
   const cellAttrs: Attribute<CollageMessage>[] = [
     h.Key(editId),
     h.DataAttribute('collage-cell', `${index}`),
     h.DataAttribute('collage-tile', `${index}`),
-    h.Style(
-      arrange
-        ? { aspectRatio: String(cellAspect) }
-        : { aspectRatio: String(cellAspect), touchAction: 'none' },
-    ),
+    h.Style({ aspectRatio: String(cellAspect), ...(selected ? { touchAction: 'none' } : {}) }),
     ...DragAndDrop.droppable(`tile-${index}`, `Photo slot ${index + 1}`),
     h.Class(cellClass),
+    h.OnClick(CollageMessage.TileSelected({ index })),
   ]
-  if (!arrange) {
+  if (selected) {
     cellAttrs.push(
-      h.OnPointerDown((_pointerType, button, screenX, screenY) =>
-        button === 0
+      h.OnPointerDown((_pointerType, btn, screenX, screenY) =>
+        btn === 0
           ? Option.some(CollageMessage.PanStarted({ index, screenX, screenY }))
           : Option.none(),
       ),
-      // No OnDoubleClick(ResetFraming) here: browsers synthesize click/dblclick
-      // from down+up on the same element even after a long drag, so ending one
-      // pan and quickly re-grabbing fired a spurious reset — the photo appeared
-      // to snap back to center (docs/adr/0010-editor-ui chose button-only reset for the
-      // same reason). The tile's reset button covers the affordance.
     )
   }
   return h.div(cellAttrs, [
     h.div(
-      [
-        ...(arrange
-          ? [
-              ...DragAndDrop.draggable(
-                {
-                  model: drag,
-                  toParentMessage: (message) => CollageMessage.GotDragMessage({ message }),
-                  itemId: editId,
-                  containerId: `tile-${index}`,
-                  index,
-                },
-                h,
-              ),
-              ...DragAndDrop.sortable(editId),
-            ]
-          : []),
-        h.Class('relative h-full w-full'),
-      ],
+      [h.Class('relative h-full w-full')],
       [
         url === null || photo === undefined
           ? h.div(
@@ -566,29 +527,50 @@ const tileCellView = (
               ['No photo'],
             )
           : framedPhotoCached(h, url, editId, framing, cellAspect, sizeById),
-        arrange
-          ? button(
+        h.div(
+          [
+            ...DragAndDrop.draggable(
               {
-                onClick: CollageMessage.RemovedTile({ index }),
-                variant: 'ghost',
-                size: 'icon-sm',
-                className:
-                  'absolute right-0 top-0 z-10 grid place-items-center bg-black/50 p-0 text-[10px] text-white/80 hover:text-white',
-                attributes: [
-                  h.AriaLabel(`Remove photo ${index + 1}`),
-                  h.DataAttribute('remove-tile', `${index}`),
-                ],
+                model: drag,
+                toParentMessage: (message) => CollageMessage.GotDragMessage({ message }),
+                itemId: editId,
+                containerId: `tile-${index}`,
+                index,
               },
-              [icon(h, X, `Remove photo ${index + 1}`, 12)],
               h,
-            )
-          : button(
+            ),
+            ...DragAndDrop.sortable(editId),
+            h.Class(
+              'absolute left-0 top-0 z-10 grid place-items-center bg-black/50 p-1 text-white/80 hover:text-white',
+            ),
+            h.AriaLabel(`Drag to reorder photo ${index + 1}`),
+            h.DataAttribute('drag-handle', `${index}`),
+          ],
+          [icon(h, GripVertical, `Drag to reorder photo ${index + 1}`, 12)],
+        ),
+        button(
+          {
+            onClick: CollageMessage.RemovedTile({ index }),
+            variant: 'ghost',
+            size: 'icon-sm',
+            className:
+              'absolute right-0 top-0 z-10 grid place-items-center bg-black/50 p-0 text-[10px] text-white/80 hover:text-white',
+            attributes: [
+              h.AriaLabel(`Remove photo ${index + 1}`),
+              h.DataAttribute('remove-tile', `${index}`),
+            ],
+          },
+          [icon(h, X, `Remove photo ${index + 1}`, 12)],
+          h,
+        ),
+        selected
+          ? button(
               {
                 onClick: CollageMessage.ResetFraming({ index }),
                 variant: 'ghost',
                 size: 'icon-sm',
                 className:
-                  'absolute right-0 top-0 z-10 grid place-items-center bg-black/50 p-0 text-white/80 hover:text-white',
+                  'absolute bottom-0 right-0 z-10 grid place-items-center bg-black/50 p-0 text-white/80 hover:text-white',
                 attributes: [
                   h.AriaLabel(`Reset framing of photo ${index + 1}`),
                   h.DataAttribute('reset-framing', `${index}`),
@@ -596,7 +578,8 @@ const tileCellView = (
               },
               [icon(h, RotateCcw, `Reset framing of photo ${index + 1}`, 12)],
               h,
-            ),
+            )
+          : null,
         dropTarget !== null
           ? h.div(
               [
@@ -643,9 +626,6 @@ const framedPhotoCached = (
       height: `${p.height * 100}%`,
       left: `${p.left * 100}%`,
       top: `${p.top * 100}%`,
-      // Promote to compositor layer; hint the browser that these properties
-      // animate on every rAF during a pan drag. `contain: strict` isolates
-      // layout so a single tile's transform doesn't invalidate siblings.
       willChange: 'left, top, width, height',
       transform: 'translateZ(0)',
       contain: 'strict',
@@ -669,7 +649,7 @@ const grid = (h: HtmlBuilder<CollageMessage>, model: Model, collage: Collage) =>
     background,
     collage.tiles,
     model.framingDraft,
-    model.mode,
+    model.selectedTile,
     model.drag,
     model.photos,
     model.sizes,

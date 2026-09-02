@@ -1,6 +1,6 @@
-import { Effect, Option, Schema as S } from 'effect'
+import { DateTime, Effect, Option, Schema as S } from 'effect'
 import { Duration } from 'effect'
-import { Command } from 'foldkit'
+import { Command, File as FoldkitFile } from 'foldkit'
 import { pushUrl } from 'foldkit/navigation'
 import {
   Collage,
@@ -8,8 +8,10 @@ import {
   CollageLayout,
   CollageStore as CollageStoreTag,
   CollageTile,
+  Edit,
   EditIdSchema,
   EditStore,
+  newEditId,
 } from '@lutra/store'
 import type { EditId, StoreError } from '@lutra/store'
 import { CollageMessage } from './message'
@@ -162,6 +164,82 @@ export const ReportCellSize = Command.define('ReportCellSize', {
 export const NavigateMenu = Command.define('NavigateMenu', {
   execute: pushUrl('/').pipe(Effect.as(CollageMessage.NavigatedBack())),
   messages: [CollageMessage.NavigatedBack],
+})
+
+const IMAGE_TYPES = ['image/*', '.jpg', '.jpeg', '.png', '.webp', '.avif']
+
+const readSource = (file: File): Effect.Effect<Uint8Array | null, never, never> =>
+  Effect.tryPromise(() => file.arrayBuffer()).pipe(
+    Effect.map((buffer) => new Uint8Array(buffer)),
+    Effect.orElseSucceed(() => null),
+  )
+
+const makeThumbnail = (file: File, source: Uint8Array): Effect.Effect<Uint8Array, never, never> =>
+  Effect.tryPromise(() => createImageBitmap(file)).pipe(
+    Effect.option,
+    Effect.flatMap((maybeBitmap) => {
+      if (Option.isNone(maybeBitmap)) return Effect.succeed(source)
+      const bmp = maybeBitmap.value
+      return Effect.gen(function* () {
+        const maxDim = 320
+        const scale = Math.min(1, maxDim / Math.max(bmp.width, bmp.height))
+        const width = Math.max(1, Math.round(bmp.width * scale))
+        const height = Math.max(1, Math.round(bmp.height * scale))
+        const canvas = new OffscreenCanvas(width, height)
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return source
+        ctx.drawImage(bmp, 0, 0, width, height)
+        const blob = yield* Effect.tryPromise(() =>
+          canvas.convertToBlob({ quality: 0.85, type: 'image/jpeg' }),
+        ).pipe(Effect.option)
+        if (Option.isNone(blob)) return source
+        const buffer = yield* Effect.tryPromise(() => blob.value.arrayBuffer()).pipe(Effect.option)
+        if (Option.isNone(buffer)) return source
+        return new Uint8Array(buffer.value)
+      }).pipe(Effect.ensuring(Effect.sync(() => bmp.close())))
+    }),
+  )
+
+export const PickAndAppendPhotos = Command.define('PickAndAppendPhotos', {
+  execute: Effect.gen(function* PickAndAppendPhotos() {
+    const files = yield* FoldkitFile.selectMultiple(IMAGE_TYPES)
+    if (files.length === 0) {
+      return CollageMessage.AddPhotosFailed({ message: 'no photos selected' })
+    }
+    const edits = yield* EditStore
+    const addedIds: EditId[] = []
+    const photos: { id: EditId; source: Uint8Array }[] = []
+    for (const file of files) {
+      const source = yield* readSource(file)
+      if (!source) continue
+      const thumbnail = yield* makeThumbnail(file, source)
+      const id = newEditId()
+      const edit = Edit.make({
+        chain: [],
+        id,
+        savedAt: DateTime.nowUnsafe().epochMilliseconds,
+        source,
+        thumbnail,
+      })
+      const saved = yield* edits.save(edit).pipe(
+        Effect.as(true),
+        Effect.catchTag('StoreError', () => Effect.succeed(false)),
+      )
+      if (saved) {
+        addedIds.push(id)
+        photos.push({ id, source })
+      }
+    }
+    if (addedIds.length === 0) {
+      return CollageMessage.AddPhotosFailed({ message: 'could not add photos' })
+    }
+    return CollageMessage.PhotosAddedToCollage({ editIds: addedIds, photos })
+  }).pipe(
+    Effect.catch(() =>
+      Effect.succeed(CollageMessage.AddPhotosFailed({ message: 'could not add photos' })),
+    ),
+  ),
+  messages: [CollageMessage.PhotosAddedToCollage, CollageMessage.AddPhotosFailed],
 })
 
 /**

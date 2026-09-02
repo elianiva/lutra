@@ -272,17 +272,16 @@ describe('collage submodel: layout auto-saves', () => {
 })
 
 describe('collage submodel: arrange mode', () => {
-  it('starts in Arrange mode; the toggle switches and renders the mode buttons', () => {
+  it('starts with no tile selected; tapping selects and shows reset for that tile', () => {
     const loaded = loadedWith([1, 2])
-    expect(loaded.mode).toBe('arrange')
+    expect(loaded.selectedTile).toBe(null)
     scene(
       config,
       given(loaded),
-      sceneExpect(role('button', { name: 'Arrange photos' })).toExist(),
-      sceneExpect(role('button', { name: 'Frame photos' })).toExist(),
-      click(role('button', { name: 'Frame photos' })),
+      sceneExpect(role('button', { name: 'Remove photo 1' })).toExist(),
+      sceneExpect(role('button', { name: 'Reset framing of photo 1' })).toBeAbsent(),
+      click(selector('[data-collage-tile="0"]')),
       sceneExpect(role('button', { name: 'Reset framing of photo 1' })).toExist(),
-      sceneExpect(role('button', { name: 'Remove photo 1' })).toBeAbsent(),
     )
   })
 
@@ -419,10 +418,10 @@ describe('collage submodel: arrange mode', () => {
 })
 
 describe('collage submodel: frame mode', () => {
-  it('ModeChanged to arrange commits an in-flight framing draft', () => {
+  it('deselecting commits an in-flight framing draft', () => {
     const loaded: Model = {
       ...loadedWith([1, 2]),
-      mode: 'frame',
+      selectedTile: 0,
       cellPx: { width: 200, height: 200 },
       sizes: [{ editId: tileEditId(1), width: 400, height: 100 }],
     }
@@ -434,9 +433,9 @@ describe('collage submodel: frame mode', () => {
     expect(moved.framingDraft).not.toBe(null)
     const { model: committed, commands = [] } = update(
       moved,
-      CollageMessage.ModeChanged({ mode: 'arrange' }),
+      CollageMessage.TileSelected({ index: null }),
     )
-    expect(committed.mode).toBe('arrange')
+    expect(committed.selectedTile).toBe(null)
     expect(committed.framingDraft).toBe(null)
     expect(collageOf(committed).tiles[0]!.framing).not.toEqual(defaultTileFraming())
     expect(commands.map((c) => c.name)).toEqual(['SaveCollage', 'ScheduleUndoExpiry'])
@@ -445,7 +444,7 @@ describe('collage submodel: frame mode', () => {
   it('PanStarted seeds a draft; PanMoved pans within bounds; PanEnded commits', () => {
     const base = {
       ...loadedWith([1, 2]),
-      mode: 'frame' as const,
+      selectedTile: 0 as const,
       cellPx: { width: 100, height: 100 },
     }
     const sized = {
@@ -468,7 +467,7 @@ describe('collage submodel: frame mode', () => {
   })
 
   it('pan with an unmeasured cell size is a no-op', () => {
-    const base = { ...loadedWith([1, 2]), mode: 'frame' as const }
+    const base = { ...loadedWith([1, 2]), selectedTile: 0 as const }
     const { model: started } = update(
       base,
       CollageMessage.PanStarted({ index: 0, screenX: 0, screenY: 0 }),
@@ -480,7 +479,7 @@ describe('collage submodel: frame mode', () => {
   it('WheelZoomed drafts the zoom and commits once the wheel goes quiet', () => {
     const base = {
       ...loadedWith([1, 2]),
-      mode: 'frame' as const,
+      selectedTile: 0 as const,
       cellPx: { width: 100, height: 100 },
     }
     const { model: zoomed } = update(base, CollageMessage.WheelZoomed({ index: 0, deltaY: -100 }))
@@ -495,7 +494,7 @@ describe('collage submodel: frame mode', () => {
   })
 
   it('ResetFraming restores cover-centered and takes an undo snapshot', () => {
-    const base = { ...loadedWith([1, 2]), mode: 'frame' as const }
+    const base = { ...loadedWith([1, 2]), selectedTile: 0 as const }
     const framedCollage = {
       ...collageWith([1, 2]),
       tiles: [
@@ -520,13 +519,13 @@ describe('collage submodel: frame mode', () => {
   })
 
   it('ResetFraming on an untouched tile is a no-op', () => {
-    const base = { ...loadedWith([1, 2]), mode: 'frame' as const }
+    const base = { ...loadedWith([1, 2]), selectedTile: 0 as const }
     const { model, commands = [] } = update(base, CollageMessage.ResetFraming({ index: 0 }))
     expect(model).toBe(base)
     expect(commands).toEqual([])
   })
 
-  it('framing messages outside Frame mode are ignored', () => {
+  it('framing messages without a selected tile are ignored', () => {
     const loaded = loadedWith([1, 2])
     for (const message of [
       CollageMessage.PanStarted({ index: 0, screenX: 0, screenY: 0 }),

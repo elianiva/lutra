@@ -15,5 +15,5 @@ export {
   type Resource,
 } from './command'
 export { filenameFor, open, update, type UpdateReturn } from './update'
-export { exportDialogView } from './view'
+export { exportBarView, exportDialogView } from './view'
 export { clearFrame, peekFrame, setFrame } from './frame'

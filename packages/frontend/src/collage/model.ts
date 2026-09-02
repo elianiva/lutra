@@ -53,12 +53,6 @@ export const ThumbSize = S.Struct({
   height: S.Number,
 })
 
-/**
- * The Arrange/Frame mode toggle (docs/adr/0009-collage): one gesture surface, two
- * meanings — dragging reorders photos in Arrange and pans them in Frame.
- */
-export const ScreenMode = S.Literals(['arrange', 'frame'])
-
 export const Model = S.Struct({
   collage: LoadedCollage.schema,
   /** Full-resolution source bytes per referenced Edit (HD preview). */
@@ -68,7 +62,7 @@ export const Model = S.Struct({
   // A transient banner (dangling references dropped on load, a failed save,
   // a failed export), null when clean.
   notice: S.NullOr(S.String),
-  mode: ScreenMode,
+  selectedTile: S.NullOr(S.Number),
   // The shared drag-and-drop machine (@foldkit/ui/dragAndDrop).
   drag: DragAndDrop.Model,
   /** A framing gesture in flight: which tile, and its next framing. */
@@ -98,7 +92,7 @@ export const initialModel = (): Model => ({
   photos: [],
   sizes: [],
   notice: null,
-  mode: 'arrange',
+  selectedTile: null,
   drag: DragAndDrop.init({ id: 'collage-grid', orientation: 'Horizontal' }),
   framingDraft: null,
   pan: null,
