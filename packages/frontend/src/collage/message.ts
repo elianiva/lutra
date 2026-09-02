@@ -42,10 +42,7 @@ export const CollageMessage = defineMessageUnion({
   },
   ToggledBackground: {},
 
-  /** The Arrange/Frame toggle moved (docs/adr/0009-collage). Leaving Frame commits any in-flight framing gesture. */
-  ModeChanged: {
-    mode: S.Literals(['arrange', 'frame']),
-  },
+  TileSelected: { index: S.NullOr(S.Number) },
 
   // arrangement (auto-saves on every mutation, docs/adr/0009-collage)
   RemovedTile: { index: S.Number },
@@ -104,5 +101,12 @@ export const CollageMessage = defineMessageUnion({
   GotCollageExportDialogMessage: {
     message: ExportDialog.Message,
   },
+
+  AddPhotosRequested: {},
+  PhotosAddedToCollage: {
+    editIds: S.Array(EditIdSchema),
+    photos: S.Array(CollagePhoto),
+  },
+  AddPhotosFailed: { message: S.String },
 })
 export type CollageMessage = typeof CollageMessage.Type

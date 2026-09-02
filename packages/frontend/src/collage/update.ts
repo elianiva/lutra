@@ -12,6 +12,7 @@ import { CollageMessage } from './message'
 import {
   NavigateMenu,
   MeasureThumbs,
+  PickAndAppendPhotos,
   SaveCollage,
   ScheduleUndoExpiry,
   ScheduleZoomCommit,
@@ -246,12 +247,22 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
           },
         })),
 
-      ModeChanged: ({ mode }) =>
-        mode === model.mode
-          ? { model }
-          : mode === 'frame'
-            ? { model: { ...model, mode } }
-            : commitDraft({ ...model, mode }),
+      TileSelected: ({ index }) => {
+        const target = index === model.selectedTile ? null : index
+        if (target === model.selectedTile) return { model }
+        const committed = model.framingDraft ? commitDraft(model) : { model }
+        const base = committed.model
+        if (target !== null) {
+          const collage = collageOf(base)
+          if (!collage || target < 0 || target >= collage.tiles.length) {
+            return committed.commands
+              ? { model: base, commands: committed.commands }
+              : { model: base }
+          }
+        }
+        const next: Model = { ...base, selectedTile: target }
+        return committed.commands ? { model: next, commands: committed.commands } : { model: next }
+      },
 
       RemovedTile: ({ index }) => {
         const collage = collageOf(model)
@@ -263,7 +274,14 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
           ...c,
           tiles: removeTile(c.tiles, index),
         }))
-        return { model: emptied ? { ...nextModel, userEmptied: true } : nextModel, commands }
+        let selectedTile = nextModel.selectedTile
+        if (selectedTile !== null) {
+          if (selectedTile === index) selectedTile = null
+          else if (selectedTile > index) selectedTile -= 1
+        }
+        const patched =
+          selectedTile === nextModel.selectedTile ? nextModel : { ...nextModel, selectedTile }
+        return { model: emptied ? { ...patched, userEmptied: true } : patched, commands }
       },
 
       // drag-and-drop reorder (docs/adr/0009-collage)
@@ -301,7 +319,7 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
       // tile framing (docs/adr/0009-collage)
       PanStarted: ({ index, screenX, screenY }) => {
         const collage = collageOf(model)
-        if (!collage || model.mode !== 'frame') {
+        if (!collage || model.selectedTile !== index) {
           return { model }
         }
         const tile = collage.tiles[index]
@@ -356,7 +374,7 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
       PanEnded: () => commitDraft(model),
       WheelZoomed: ({ index, deltaY }) => {
         const collage = collageOf(model)
-        if (!collage || model.mode !== 'frame') {
+        if (!collage || model.selectedTile === null) {
           return { model }
         }
         const tile = collage.tiles[index]
@@ -377,7 +395,7 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
       ZoomSettled: (settled) => (settled.seq === model.zoomSeq ? commitDraft(model) : { model }),
       ResetFraming: ({ index }) => {
         const collage = collageOf(model)
-        if (!collage || model.mode !== 'frame') {
+        if (!collage || model.selectedTile === null) {
           return { model }
         }
         const tile = collage.tiles[index]
@@ -453,6 +471,23 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         ),
       CollageExportSnapshotFailed: ({ message }) =>
         delegate(model, ExportDialog.Message.FrameFailed({ message }), model.notice),
+
+      AddPhotosRequested: () => ({ model, commands: [PickAndAppendPhotos()] }),
+      PhotosAddedToCollage: ({ editIds, photos }) => {
+        const collage = collageOf(model)
+        if (!collage) return { model }
+        const newTiles = editIds.map((editId) => ({ editId, framing: defaultTileFraming() }))
+        const { model: nextModel, commands = [] } = mutateWithUndo(model, 'Added photos', (c) => ({
+          ...c,
+          tiles: [...c.tiles, ...newTiles],
+        }))
+        const mergedPhotos = [...nextModel.photos, ...photos]
+        return {
+          model: { ...nextModel, photos: mergedPhotos },
+          commands: [...commands, MeasureThumbs({ photos })],
+        }
+      },
+      AddPhotosFailed: ({ message }) => ({ model: { ...model, notice: message } }),
 
       BackRequested: () => ({ model, commands: [NavigateMenu()] }),
       NavigatedBack: () => ({ model }),

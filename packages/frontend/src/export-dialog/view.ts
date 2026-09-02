@@ -35,8 +35,7 @@ export const exportDialogView = <P>(
         content: ({ title, closeButton }, dialogH) => [
           Dialog.header(
             {
-              className:
-                'flex items-baseline justify-between border-b border-border px-4 py-3',
+              className: 'flex items-baseline justify-between border-b border-border px-4 py-3',
             },
             [
               Dialog.title(
@@ -97,6 +96,58 @@ export const exportDialogView = <P>(
       h,
     ),
   })
+
+export const exportBarView = <P>(
+  h: HtmlBuilder<P>,
+  model: Model,
+  toParent: (message: Message) => P,
+) =>
+  h.div(
+    [
+      h.Class('flex flex-col gap-3 border border-border bg-panel px-3 py-3'),
+      h.DataAttribute('export-bar', 'true'),
+    ],
+    [
+      h.div(
+        [h.Class('flex items-baseline justify-between')],
+        [
+          h.span([h.Class('text-[10px] uppercase tracking-[0.14em] text-muted')], ['Inline']),
+          h.span([h.Class('text-[10px] tnum text-muted')], [filenameFor(model)]),
+        ],
+      ),
+      formatSection(h, model.settings, (format) => toParent(Message.ChangedFormat({ format }))),
+      qualitySection(h, model.settings, (quality) => toParent(Message.ChangedQuality({ quality }))),
+      resolutionSection(h, model.settings, peekFrame(), (scale) =>
+        toParent(Message.ChangedScale({ scale })),
+      ),
+      h.div(
+        [h.Class('flex items-baseline justify-between border-t border-border pt-2')],
+        [
+          h.span([h.Class('text-[10px] uppercase tracking-[0.14em] text-muted')], ['Size']),
+          h.span(
+            [h.Class('tnum text-xs text-ink'), h.DataAttribute('export-size', 'true')],
+            [statusText(model)],
+          ),
+        ],
+      ),
+      h.div(
+        [h.Class('flex justify-end')],
+        [
+          button(
+            {
+              onClick: toParent(Message.EncodeRequested()),
+              isDisabled: !model.ready || model.encoding,
+              size: 'xs',
+              className: 'px-4 disabled:opacity-30',
+              attributes: [h.DataAttribute('export-encode', 'true')],
+            },
+            model.encoding ? 'Encoding…' : model.downloaded ? 'Download again' : 'Download',
+            h,
+          ),
+        ],
+      ),
+    ],
+  )
 
 const statusSection = <P>(h: HtmlBuilder<P>, model: Model) =>
   h.div(

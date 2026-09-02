@@ -3,7 +3,6 @@ import { Subscription } from 'foldkit'
 import * as DragAndDrop from '@/components/ui/drag-and-drop'
 import { CollageMessage } from './message'
 import type { Model } from './model'
-import { ScreenMode } from './model'
 
 type CoalescedLike = {
   screenX: number
@@ -105,16 +104,14 @@ const own = Subscription.make<Model, CollageMessage>()((entry) => ({
     },
   ),
   wheelZoom: entry(
-    { mode: ScreenMode },
+    { selected: S.NullOr(S.Number) },
     {
-      modelToDependencies: (model: Model) => ({ mode: model.mode }),
-      dependenciesToStream: ({ mode }: { mode: 'arrange' | 'frame' }) =>
+      modelToDependencies: (model: Model) => ({ selected: model.selectedTile }),
+      dependenciesToStream: ({ selected }: { selected: number | null }) =>
         Stream.when(
           Subscription.fromEventFilterMap({
             target: (): EventTarget => document,
             type: 'wheel',
-            // Wheel listeners are passive by default; preventDefault needs an
-            // explicitly non-passive one.
             options: { passive: false },
             toMessage: (event: WheelEvent): Option.Option<CollageMessage> => {
               const tile =
@@ -127,54 +124,51 @@ const own = Subscription.make<Model, CollageMessage>()((entry) => ({
               return Option.some(CollageMessage.WheelZoomed({ index, deltaY: event.deltaY }))
             },
           }),
-          Effect.sync(() => mode === 'frame'),
+          Effect.sync(() => selected !== null),
         ),
     },
   ),
   cellSize: entry(
-    { mode: ScreenMode },
+    {},
     {
-      modelToDependencies: (model: Model) => ({ mode: model.mode }),
-      dependenciesToStream: ({ mode }: { mode: 'arrange' | 'frame' }) =>
-        Stream.when(
-          Stream.callback<CollageMessage>((queue) =>
-            Effect.gen(function* watchCell() {
-              let observer: ResizeObserver | null = null
-              let raf = 0
-              let observedEl: Element | null = null
-              const resync = () => {
-                const el = document.querySelector('[data-collage-cell]')
-                if (el !== observedEl) {
-                  if (observedEl && observer) observer.unobserve(observedEl)
-                  observedEl = el
-                  if (el && observer) observer.observe(el)
-                }
-                raf = requestAnimationFrame(resync)
+      modelToDependencies: () => ({}),
+      dependenciesToStream: () =>
+        Stream.callback<CollageMessage>((queue) =>
+          Effect.gen(function* watchCell() {
+            let observer: ResizeObserver | null = null
+            let raf = 0
+            let observedEl: Element | null = null
+            const resync = () => {
+              const el = document.querySelector('[data-collage-cell]')
+              if (el !== observedEl) {
+                if (observedEl && observer) observer.unobserve(observedEl)
+                observedEl = el
+                if (el && observer) observer.observe(el)
               }
-              yield* Effect.acquireRelease(
+              raf = requestAnimationFrame(resync)
+            }
+            yield* Effect.acquireRelease(
+              Effect.sync(() => {
+                observer = new ResizeObserver((entries) => {
+                  const rect = entries[0]?.contentRect
+                  if (rect && rect.width > 0 && rect.height > 0) {
+                    Queue.offerUnsafe(
+                      queue,
+                      CollageMessage.CellMeasured({ width: rect.width, height: rect.height }),
+                    )
+                  }
+                })
+                raf = requestAnimationFrame(resync)
+                return { observer }
+              }),
+              ({ observer }) =>
                 Effect.sync(() => {
-                  observer = new ResizeObserver((entries) => {
-                    const rect = entries[0]?.contentRect
-                    if (rect && rect.width > 0 && rect.height > 0) {
-                      Queue.offerUnsafe(
-                        queue,
-                        CollageMessage.CellMeasured({ width: rect.width, height: rect.height }),
-                      )
-                    }
-                  })
-                  raf = requestAnimationFrame(resync)
-                  return { observer }
+                  cancelAnimationFrame(raf)
+                  observer.disconnect()
                 }),
-                ({ observer }) =>
-                  Effect.sync(() => {
-                    cancelAnimationFrame(raf)
-                    observer.disconnect()
-                  }),
-              )
-              return yield* Effect.never
-            }),
-          ),
-          Effect.sync(() => mode === 'frame'),
+            )
+            return yield* Effect.never
+          }),
         ),
     },
   ),
