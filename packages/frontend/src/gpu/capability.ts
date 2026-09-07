@@ -34,8 +34,10 @@ type ProbeResult = {
  */
 export const detectWebGpu = Effect.gen(function* () {
   const result = yield* Effect.tryPromise({
-    catch: (): ProbeResult =>
-      ({ capability: unsupportedWebGpu('WebGPU probe threw an unexpected error.'), maxTextureDimension2D: null }),
+    catch: (): ProbeResult => ({
+      capability: unsupportedWebGpu('WebGPU probe threw an unexpected error.'),
+      maxTextureDimension2D: null,
+    }),
     try: async (): Promise<ProbeResult> => {
       if (navigator.gpu === undefined) {
         return {
@@ -48,7 +50,9 @@ export const detectWebGpu = Effect.gen(function* () {
       const adapter = await navigator.gpu.requestAdapter()
       if (adapter === null) {
         return {
-          capability: unsupportedWebGpu('WebGPU is present but requestAdapter() returned no GPU adapter.'),
+          capability: unsupportedWebGpu(
+            'WebGPU is present but requestAdapter() returned no GPU adapter.',
+          ),
           maxTextureDimension2D: null,
         }
       }
@@ -61,9 +65,7 @@ export const detectWebGpu = Effect.gen(function* () {
   if (result.maxTextureDimension2D !== null) {
     // Diagnostic: probe uses default adapter, acquireGpu uses high-performance — they may differ.
     // Logged here so the requiredLimits change is observable without changing gating.
-    yield* Effect.logDebug(
-      `[WebGPU] probe maxTextureDimension2D=${result.maxTextureDimension2D}`,
-    )
+    yield* Effect.logDebug(`[WebGPU] probe maxTextureDimension2D=${result.maxTextureDimension2D}`)
   }
   return result.capability
 })

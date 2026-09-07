@@ -1,6 +1,7 @@
 packages:
   - 'packages/*'
 allowBuilds:
+  lefthook: true
   msgpackr-extract: true
   workerd: true
 minimumReleaseAgeExclude:

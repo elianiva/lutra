@@ -9,7 +9,6 @@ import { DownloadState } from '../offline/model'
 import { LutLoadError } from '../luts/store'
 import { LayerCreationError } from '../errors'
 
-
 const ActiveFieldIndex = Schema.Record(LayerIdSchema, Schema.Number)
 
 const ActiveMixerColor = Schema.Record(LayerIdSchema, Schema.Number)

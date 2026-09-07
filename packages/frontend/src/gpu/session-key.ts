@@ -26,7 +26,10 @@ export const toSessionKey = (
 })
 
 export const sessionKeyEquals = (a: SessionKey, b: SessionKey): boolean =>
-  a.canvas === b.canvas && a.image.width === b.image.width && a.image.height === b.image.height && a.srcBitmap === b.srcBitmap
+  a.canvas === b.canvas &&
+  a.image.width === b.image.width &&
+  a.image.height === b.image.height &&
+  a.srcBitmap === b.srcBitmap
 
 export const canvasDimensionsOf = (canvas: HTMLCanvasElement): CanvasDimensions => ({
   height: canvas.height,

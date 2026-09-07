@@ -825,7 +825,10 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             : SnapshotForExport({ handle: model.lastRender })
         return {
           model: { ...model, exportDialog: dialogModel, phase },
-          commands: [...Command.mapMessages(dialogCommands, toExportDialogMessage), snapshotCommand],
+          commands: [
+            ...Command.mapMessages(dialogCommands, toExportDialogMessage),
+            snapshotCommand,
+          ],
         }
       },
       GotExportDialogMessage: ({ message }) => delegateToExportDialog(model, phase, message),

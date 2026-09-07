@@ -6,7 +6,12 @@ import type { HistogramSlot } from './histogram-ring'
 import { presentModeToWgsl } from './present-mode'
 import type { ComparePresent } from './present-mode'
 import { descriptorCacheKey, pipelineCacheKey, toPassDescriptor } from './pass-descriptor'
-import { canvasDimensionsEqual, canvasDimensionsOf, sessionKeyEquals, toSessionKey } from './session-key'
+import {
+  canvasDimensionsEqual,
+  canvasDimensionsOf,
+  sessionKeyEquals,
+  toSessionKey,
+} from './session-key'
 
 export type { ComparePresent } from './present-mode'
 
@@ -456,7 +461,9 @@ export const GpuBackendLive = Layer.effect(
           try {
             obj.destroy()
           } catch (cause) {
-            void Effect.runFork(Effect.logDebug(`[WebGPU] cleanup destroy skipped: ${String(cause)}`))
+            void Effect.runFork(
+              Effect.logDebug(`[WebGPU] cleanup destroy skipped: ${String(cause)}`),
+            )
           }
         }
       }
@@ -509,7 +516,11 @@ export const GpuBackendLive = Layer.effect(
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
           }),
         )
-        device.queue.writeBuffer(canvasSizeBuffer, 0, new Float32Array([canvas.width, canvas.height]))
+        device.queue.writeBuffer(
+          canvasSizeBuffer,
+          0,
+          new Float32Array([canvas.width, canvas.height]),
+        )
         const frameBuffer = track(
           device.createBuffer({
             size: 16,
@@ -647,9 +658,17 @@ export const GpuBackendLive = Layer.effect(
         const current = yield* Ref.get(sessionRef)
         const key = toSessionKey(canvas, width, height, srcBitmap)
         if (Option.isSome(current)) {
-          const currentKey = toSessionKey(current.value.canvas, current.value.width, current.value.height, current.value.srcBitmap)
+          const currentKey = toSessionKey(
+            current.value.canvas,
+            current.value.width,
+            current.value.height,
+            current.value.srcBitmap,
+          )
           if (sessionKeyEquals(currentKey, key)) {
-            const storedCanvas = { height: current.value.canvasHeight, width: current.value.canvasWidth }
+            const storedCanvas = {
+              height: current.value.canvasHeight,
+              width: current.value.canvasWidth,
+            }
             const nextCanvas = canvasDimensionsOf(canvas)
             if (!canvasDimensionsEqual(storedCanvas, nextCanvas)) {
               resizeCanvas(gpu, current.value)

@@ -499,11 +499,16 @@ const tileCellView = (
     ...(draggedHere ? ['opacity-40'] : []),
     selected ? 'cursor-grab select-none touch-none' : 'cursor-pointer',
   ].join(' ')
+  const cellStyle: Record<string, string> = {}
+  cellStyle.aspectRatio = String(cellAspect)
+  if (selected) {
+    cellStyle.touchAction = 'none'
+  }
   const cellAttrs: Attribute<CollageMessage>[] = [
     h.Key(editId),
     h.DataAttribute('collage-cell', `${index}`),
     h.DataAttribute('collage-tile', `${index}`),
-    h.Style({ aspectRatio: String(cellAspect), ...(selected ? { touchAction: 'none' } : {}) }),
+    h.Style(cellStyle),
     ...DragAndDrop.droppable(`tile-${index}`, `Photo slot ${index + 1}`),
     h.Class(cellClass),
     h.OnClick(CollageMessage.TileSelected({ index })),

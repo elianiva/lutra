@@ -3,7 +3,6 @@ import { defineMessageUnion } from 'foldkit/message'
 import { LutIdSchema } from '@lutra/engine'
 import type { LutId } from '@lutra/engine'
 
-
 export interface FillFile {
   readonly path: string
   readonly lutId: LutId | null

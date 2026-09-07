@@ -21,10 +21,7 @@ type CanvasWithQuality = CanvasRenderingContext2D & {
   imageSmoothingQuality: string
 }
 
-export const previewDimensions = (
-  nativeWidth: number,
-  nativeHeight: number,
-): PreviewSize => {
+export const previewDimensions = (nativeWidth: number, nativeHeight: number): PreviewSize => {
   const longEdge = Math.max(nativeWidth, nativeHeight)
   if (longEdge <= PREVIEW_LONG_EDGE || longEdge === 0) {
     return { height: nativeHeight, width: nativeWidth }
@@ -79,5 +76,4 @@ export const toPreviewBitmap = async (bitmap: ImageBitmap): Promise<ImageBitmap>
  * Sampling helper for the collage path's framing canvas — re-exported so
  * tests can assert the cap without duplicating the arithmetic.
  */
-export const isPreviewNeeded = (w: number, h: number): boolean =>
-  Math.max(w, h) > PREVIEW_LONG_EDGE
+export const isPreviewNeeded = (w: number, h: number): boolean => Math.max(w, h) > PREVIEW_LONG_EDGE

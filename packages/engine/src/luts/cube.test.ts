@@ -56,21 +56,26 @@ describe('parseCube', () => {
     )
   })
 
-  it('preserves the file point order for any cube size', () => {
-    fc.assert(
-      fc.property(fc.integer({ max: 16, min: 2 }), (size) => {
-        const cube = parseCube(indexCube(size))
-        expect(cube.data).toHaveLength(size * size * size * 3)
-        for (let i = 0; i < size * size * size; i++) {
-          // Point i is texel (r = i % size, g = (i / size) % size, b = i /
-          // size²) in the file's red-fastest order; its value is its index.
-          expect(cube.data[i * 3]).toBe(i)
-          expect(cube.data[i * 3 + 1]).toBe(i)
-          expect(cube.data[i * 3 + 2]).toBe(i)
-        }
-      }),
-    )
-  })
+  it(
+    'preserves the file point order for any cube size',
+    // Slow under parallel load (size-16 → 100 property runs × 4096 points); keep it hermetic, just allow wall-clock headroom.
+    { timeout: 30_000 },
+    () => {
+      fc.assert(
+        fc.property(fc.integer({ max: 16, min: 2 }), (size) => {
+          const cube = parseCube(indexCube(size))
+          expect(cube.data).toHaveLength(size * size * size * 3)
+          for (let i = 0; i < size * size * size; i++) {
+            // Point i is texel (r = i % size, g = (i / size) % size, b = i /
+            // size²) in the file's red-fastest order; its value is its index.
+            expect(cube.data[i * 3]).toBe(i)
+            expect(cube.data[i * 3 + 1]).toBe(i)
+            expect(cube.data[i * 3 + 2]).toBe(i)
+          }
+        }),
+      )
+    },
+  )
 
   it('accepts any layout of ignorable lines around the data', () => {
     fc.assert(

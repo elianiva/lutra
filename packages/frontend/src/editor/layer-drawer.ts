@@ -489,8 +489,6 @@ export const sliderControl = (
     onInput: onChange,
   }
   const finalConfig =
-    toggledLabel && onToggleLabel
-      ? { ...rangeConfig, labelOnClick: onToggleLabel }
-      : rangeConfig
+    toggledLabel && onToggleLabel ? { ...rangeConfig, labelOnClick: onToggleLabel } : rangeConfig
   return h.div([h.Class('flex flex-col gap-1')], [lutraRangeRow(h, finalConfig)])
 }

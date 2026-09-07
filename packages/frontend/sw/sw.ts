@@ -48,7 +48,10 @@ self.addEventListener('fetch', (event: FetchEvent) => {
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request).catch(
-        async () => await caches.match('/index.html').then((hit: Response | undefined) => hit ?? Response.error()),
+        async () =>
+          await caches
+            .match('/index.html')
+            .then((hit: Response | undefined) => hit ?? Response.error()),
       ),
     )
     return

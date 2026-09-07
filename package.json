@@ -8,10 +8,11 @@
     "check": "vp check",
     "dev": "turbo dev",
     "fmt": "vp fmt",
-    "lint": "NODE_OPTIONS='--experimental-strip-types' vp lint",
+    "lint": "vp lint",
     "typecheck": "turbo typecheck",
     "test": "turbo test",
     "infra:deploy": "alchemy deploy --stage prod --yes",
+    "prepare": "lefthook install",
     "vendor:luts": "bun scripts/vendor-luts.ts"
   },
   "dependencies": {
@@ -24,6 +25,7 @@
     "@oxlint/plugins": "1.80.0",
     "@resvg/resvg-js": "^2.6.2",
     "@types/bun": "^1.4.0",
+    "lefthook": "^2.1.12",
     "oxlint": "1.80.0",
     "turbo": "^2.10.12",
     "typescript": "^7.0.2",

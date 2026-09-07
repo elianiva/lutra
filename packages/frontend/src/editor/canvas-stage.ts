@@ -318,7 +318,6 @@ export const RegisterCanvas = Mount.define('RegisterCanvas', {
     }),
 })
 
-
 /**
  * Pointer mount for the Split-mode divider: dragging moves the split
  * position, double-clicking resets it to 50%. The divider element lives

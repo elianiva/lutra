@@ -21,7 +21,11 @@ export const RANGES = [
 
 const CHANNELS = ['Hue', 'Saturation', 'Luminance'] as const
 
-export const wrapHueForRange = (h: number, left: number, right: number): [number, number, number] => {
+export const wrapHueForRange = (
+  h: number,
+  left: number,
+  right: number,
+): [number, number, number] => {
   let hh = h
   let ll = left
   let rr = right

@@ -1,0 +1,63 @@
+name: Feature request
+description: Request a new adjustment layer or feature
+title: '[Request]: '
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Want something Lutra doesn't have yet? Tell us what and why. Note the v1 palette is intentionally limited (LUT, Exposure, Contrast, Shadows, Highlights, Tone Curve, White Balance, Saturation, Color Mixer, Grain, Vignette, Chromatic Aberration, Clarity) — limitation is the feature.
+
+  - type: input
+    id: feature
+    attributes:
+      label: Feature name
+      description: Which layer or feature are you requesting?
+      placeholder: 'Dehaze layer'
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Use case / motivation
+      description: What are you trying to achieve? Why is this needed?
+      placeholder: 'I want to cut through haze in landscape shots…'
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Proposed behavior / additional details
+      description: Any ideas on parameters, ranges, or interaction with layer order? Leave blank if not sure
+      placeholder: |
+        - Single strength slider, 0–100
+        - Should run in linear light like other layers
+        - Prior art: …
+      render: text
+    validations:
+      required: false
+
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: Would you like to contribute this?
+      description: Are you willing to open a PR for it?
+      multiple: false
+      options:
+        - No, just requesting
+        - Yes, I'd like to work on it
+        - Yes, I already have a draft / WIP
+      default: 0
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Links, screenshots, or anything else
+      render: text
+    validations:
+      required: false

@@ -441,13 +441,7 @@ export const SnapshotForExport = Command.define('SnapshotForExport', {
           },
         })
         try {
-          const request = yield* createRenderRequest(
-            chain,
-            ENGINE_REGISTRY,
-            nativeBitmap,
-            0,
-            luts,
-          )
+          const request = yield* createRenderRequest(chain, ENGINE_REGISTRY, nativeBitmap, 0, luts)
           const canvas = document.createElement('canvas')
           canvas.width = nativeBitmap.width
           canvas.height = nativeBitmap.height

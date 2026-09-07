@@ -1,32 +1,33 @@
 import { defineConfig } from 'vite-plus'
 
+const agentIgnorePatterns = [
+  '.agent/**',
+  '.agents/**',
+  '.claude/**',
+  '.codex/**',
+  '.continue/**',
+  '.cursor/**',
+  '.gemini/**',
+  '.opencode/**',
+  '.pi/**',
+  '.roo/**',
+  '.windsurf/**',
+  'tools/oxlint/anti-slop/**',
+]
+
 export default defineConfig({
   fmt: {
-    ignorePatterns: [
-      '.claude/**',
-      'dist/**',
-      'repos/**',
-      '**/*.d.ts',
-      '.turbo/**',
-      'tools/oxlint/anti-slop/**',
-    ],
+    ignorePatterns: ['.turbo/**', 'dist/**', 'repos/**', '**/*.d.ts', ...agentIgnorePatterns],
     semi: false,
     singleQuote: true,
     trailingComma: 'all',
   },
   lint: {
-    ignorePatterns: [
-      '.claude/**',
-      'dist/**',
-      'repos/**',
-      '**/*.d.ts',
-      '.turbo/**',
-      'tools/oxlint/anti-slop/**',
-    ],
+    ignorePatterns: ['.turbo/**', 'dist/**', 'repos/**', '**/*.d.ts', ...agentIgnorePatterns],
     jsPlugins: [
       {
         name: 'anti-slop',
-        specifier: './tools/oxlint/anti-slop/index.js',
+        specifier: './tools/oxlint/anti-slop/index.ts',
       },
       {
         name: 'foldkit',

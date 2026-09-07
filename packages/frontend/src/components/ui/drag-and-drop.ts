@@ -56,4 +56,3 @@ export const dragContainerClass =
 
 export const dragGhostClass =
   'flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm text-card-foreground shadow-lg ring-1 ring-foreground/10 select-none'
-
