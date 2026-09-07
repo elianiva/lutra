@@ -70,10 +70,7 @@ export const lutraRangeRow = <M>(
         ],
         [
           h.div(
-            [
-              h.Class(cn(sliderTrackClass, 'relative')),
-              h.DataAttribute('slot', 'slider-track'),
-            ],
+            [h.Class(cn(sliderTrackClass, 'relative')), h.DataAttribute('slot', 'slider-track')],
             [
               h.div([
                 h.Class(cn(sliderFilledTrackClass, 'absolute left-0 top-0')),

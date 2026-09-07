@@ -41,7 +41,8 @@ export const sliderRootClass =
 export const sliderTrackClass =
   'bg-border-strong rounded-none data-horizontal:h-0.5 data-horizontal:w-full data-vertical:h-full data-vertical:w-0.5 relative grow overflow-hidden select-none'
 
-export const sliderFilledTrackClass = 'bg-accent select-none data-horizontal:h-full data-vertical:w-full'
+export const sliderFilledTrackClass =
+  'bg-accent select-none data-horizontal:h-full data-vertical:w-full'
 
 export const sliderThumbClass =
   'border-accent ring-ring/50 relative size-4 rounded-none border bg-accent transition-[color,box-shadow] after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-disabled:pointer-events-none data-disabled:opacity-50 block shrink-0 select-none disabled:pointer-events-none disabled:opacity-50'
@@ -510,4 +511,3 @@ export const styledViewInputs = <M>(
   )
   return viewInputsWithOptional
 }
-

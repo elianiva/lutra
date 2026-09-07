@@ -239,6 +239,4 @@ export const OfflineFillLive = Layer.effect(
         }),
     })
   }),
-).pipe(
-  Layer.provide(Layer.merge(LutCacheLive, LutStoreLive)),
-)
+).pipe(Layer.provide(Layer.merge(LutCacheLive, LutStoreLive)))

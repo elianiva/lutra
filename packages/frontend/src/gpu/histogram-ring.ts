@@ -100,7 +100,10 @@ export class HistogramRing {
     return this.slots.includes(slot)
   }
 
-  consume(slot: HistogramSlot, expectedGeneration: number): Effect.Effect<Uint32Array<ArrayBuffer>, GpuError> {
+  consume(
+    slot: HistogramSlot,
+    expectedGeneration: number,
+  ): Effect.Effect<Uint32Array<ArrayBuffer>, GpuError> {
     if (slot.state._tag === 'Idle' || !this.owns(slot) || slot.generation !== expectedGeneration) {
       return Effect.succeed(new Uint32Array(HISTOGRAM_BINS))
     }

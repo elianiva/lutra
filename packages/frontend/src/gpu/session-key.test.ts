@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { canvasDimensionsEqual, canvasDimensionsOf, sessionKeyEquals, toSessionKey } from './session-key'
+import {
+  canvasDimensionsEqual,
+  canvasDimensionsOf,
+  sessionKeyEquals,
+  toSessionKey,
+} from './session-key'
 
 describe('session-key', () => {
   it('equals when canvas identity, image size and bitmap match', () => {
@@ -57,7 +62,11 @@ describe('session-key', () => {
     // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, typescript/consistent-type-assertions -- SAFETY: test stub dimensions only
     const canvas = { width: 200, height: 150 } as HTMLCanvasElement
     expect(canvasDimensionsOf(canvas)).toEqual({ width: 200, height: 150 })
-    expect(canvasDimensionsEqual({ width: 200, height: 150 }, { width: 200, height: 150 })).toBe(true)
-    expect(canvasDimensionsEqual({ width: 200, height: 150 }, { width: 400, height: 150 })).toBe(false)
+    expect(canvasDimensionsEqual({ width: 200, height: 150 }, { width: 200, height: 150 })).toBe(
+      true,
+    )
+    expect(canvasDimensionsEqual({ width: 200, height: 150 }, { width: 400, height: 150 })).toBe(
+      false,
+    )
   })
 })

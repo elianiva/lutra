@@ -144,10 +144,7 @@ const header = (h: HtmlBuilder<GalleryMessage>, selectedCount: number) =>
               onClick: GalleryMessage.SettingsRequested(),
               variant: 'ghost',
               size: 'xs',
-              attributes: [
-                h.AriaLabel('Open settings'),
-                h.DataAttribute('open-settings', 'true'),
-              ],
+              attributes: [h.AriaLabel('Open settings'), h.DataAttribute('open-settings', 'true')],
             },
             'Settings',
             h,
@@ -308,9 +305,7 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary, selected: bo
               : `border-white/60 bg-black/40 text-white/80 hover:text-white ${hoverReveal}`
           }`,
           attributes: [
-            h.AriaLabel(
-              selected ? 'Remove from collage selection' : 'Add to collage selection',
-            ),
+            h.AriaLabel(selected ? 'Remove from collage selection' : 'Add to collage selection'),
             h.DataAttribute('select-edit-id', summary.id),
           ],
         },

@@ -21,11 +21,7 @@ export const tab = (
         'flex shrink-0 items-center justify-between gap-2 px-3 py-1.5 text-left text-[10px] uppercase tracking-[0.14em] rounded-none',
         active ? 'bg-panel-alt text-ink' : 'text-muted hover:bg-panel-alt hover:text-ink',
       ),
-      attributes: [
-        h.AriaPressed(String(active)),
-        h.AriaLabel(label),
-        h.Key(tab),
-      ],
+      attributes: [h.AriaPressed(String(active)), h.AriaLabel(label), h.Key(tab)],
     },
     [
       h.span([h.Class('truncate')], [label]),

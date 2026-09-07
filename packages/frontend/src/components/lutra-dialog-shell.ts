@@ -16,8 +16,7 @@ export const lutraNarrowPanelClass =
 
 export const lutraDialogTitleClass = 'text-sm font-semibold tracking-[0.14em]'
 
-export const lutraDialogFooterClass =
-  'flex justify-end gap-2 border-t border-border px-4 py-3'
+export const lutraDialogFooterClass = 'flex justify-end gap-2 border-t border-border px-4 py-3'
 
 export const lutraDialogSectionClass = 'flex flex-col gap-4 px-4 py-4'
 

@@ -2,7 +2,6 @@ import { Schema as S } from 'effect'
 import { Idle, OfflinePhase } from './machine'
 import type { LutId } from '@lutra/engine'
 
-
 /** A cube file's mirroring state: being fetched, or in the cache. Absence
  *  means "not downloaded" — the offline LUT bar dims those entries. */
 export const DownloadState = S.Union([S.Literal('fetching'), S.Literal('downloaded')])

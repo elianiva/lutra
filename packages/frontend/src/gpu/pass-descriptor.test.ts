@@ -27,7 +27,12 @@ describe('pass-descriptor', () => {
     const d = toPassDescriptor(
       // SAFETY: test stubs a uniform field; FieldKey is branded string.
       // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, typescript/consistent-type-assertions -- SAFETY: branded FieldKey test value
-      basePass({ uniforms: [{ field: 'x' as never, layerIndex: 0, offset: 0 }], usesFrame: true, usesSampler: true }),
+      basePass({
+        // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, typescript/consistent-type-assertions -- SAFETY: branded FieldKey test value
+        uniforms: [{ field: 'x' as never, layerIndex: 0, offset: 0 }],
+        usesFrame: true,
+        usesSampler: true,
+      }),
     )
     expect(d.hasParams).toBe(true)
     expect(d.usesFrame).toBe(true)
