@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import * as fc from 'fast-check'
-import { moveTile, removeTile } from './tiles'
+import { moveTile } from './tiles'
 
 describe('collage tiles: array operations', () => {
   it('moveTile preserves the multiset of elements for any indices', () => {
@@ -58,26 +58,5 @@ describe('collage tiles: array operations', () => {
     expect(moveTile(tiles, 0, -1)).toEqual(tiles)
     expect(moveTile(tiles, 3, 0)).toEqual(tiles)
     expect(moveTile(tiles, 0, 3)).toEqual(tiles)
-  })
-
-  it('removeTile drops exactly the indexed element', () => {
-    fc.assert(
-      fc.property(
-        fc.array(fc.string(), { maxLength: 12, minLength: 1 }),
-        fc.nat(),
-        (tiles, raw) => {
-          const index = raw % tiles.length
-          const removed = removeTile(tiles, index)
-          expect(removed).toHaveLength(tiles.length - 1)
-          expect(removed).toEqual([...tiles.slice(0, index), ...tiles.slice(index + 1)])
-        },
-      ),
-    )
-  })
-
-  it('removeTile out of range returns the array unchanged', () => {
-    const tiles = ['a', 'b']
-    expect(removeTile(tiles, 2)).toEqual(tiles)
-    expect(removeTile(tiles, -1)).toEqual(tiles)
   })
 })

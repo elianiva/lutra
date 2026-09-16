@@ -1,8 +1,21 @@
 import { describe, it, expect as vitestExpect } from 'vitest'
-import { Command, Mount, click, expect, given, scene, selector, text } from 'foldkit/scene'
+import { defaultExportSettings } from '@lutra/engine'
+import {
+  Command,
+  Mount,
+  change,
+  click,
+  expect,
+  given,
+  role,
+  scene,
+  selector,
+  text,
+} from 'foldkit/scene'
 import { Dialog } from '@foldkit/ui'
 import { MockImageBitmap } from '../vitest-setup'
 import * as ExportDialog from '../export-dialog'
+import type { Model as ExportDialogModel } from '../export-dialog/model'
 import { initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
@@ -152,9 +165,11 @@ describe('Export dialog', () => {
       Command.resolve(ExportDialog.SaveExportSettings, ExportDialog.Message.SettingsSaved()),
       Command.expectNone(),
 
-      // Scale down to 50% — dims shown; again no encode.
+      // Scale down to 50% — the output fields show the target pixels; again no encode.
       click(text('50%')),
-      expect(text('200 × 150 → 100 × 75')).toExist(),
+      expect(selector('[data-export-width="true"]')).toHaveValue('100'),
+      expect(selector('[data-export-height="true"]')).toHaveValue('75'),
+      expect(text('of 200 × 150')).toExist(),
       Command.resolve(ExportDialog.SaveExportSettings, ExportDialog.Message.SettingsSaved()),
       Command.expectNone(),
 
@@ -169,6 +184,79 @@ describe('Export dialog', () => {
         ExportDialog.Message.Downloaded({ url: 'blob:export-1' }),
       ),
       expect(text('1.0 KB', { exact: false })).toExist(),
+      Command.expectNone(),
+    )
+  })
+
+  it('typing an exact output size writes the scale and derives the other dimension', () => {
+    scene(
+      config,
+      given(loadedModel()),
+      ...mountLoadedStage,
+      click(selector('[aria-label^="Export"]')),
+      ...openDialog,
+      Command.resolve(SnapshotForExport, EditorMessage.ExportSnapshotted()),
+      change(selector('[data-export-width="true"]'), '50'),
+      expect(selector('[data-export-width="true"]')).toHaveValue('50'),
+      expect(selector('[data-export-height="true"]')).toHaveValue('38'),
+      Command.resolve(ExportDialog.SaveExportSettings, ExportDialog.Message.SettingsSaved()),
+      Command.expectNone(),
+    )
+  })
+
+  it('changing the resampler persists the choice', () => {
+    scene(
+      config,
+      given(loadedModel()),
+      ...mountLoadedStage,
+      click(selector('[aria-label^="Export"]')),
+      ...openDialog,
+      Command.resolve(SnapshotForExport, EditorMessage.ExportSnapshotted()),
+      expect(text('LANCZOS')).toHaveClass('bg-accent'),
+      click(text('MITCHELL')),
+      expect(text('MITCHELL')).toHaveClass('bg-accent'),
+      Command.resolve(ExportDialog.SaveExportSettings, ExportDialog.Message.SettingsSaved()),
+      Command.expectNone(),
+    )
+  })
+
+  it('hides the codec options until opened, then persists a toggle', () => {
+    scene(
+      config,
+      given(loadedModel()),
+      ...mountLoadedStage,
+      click(selector('[aria-label^="Export"]')),
+      ...openDialog,
+      Command.resolve(SnapshotForExport, EditorMessage.ExportSnapshotted()),
+      click(text('JPEG')),
+      Command.resolve(ExportDialog.SaveExportSettings, ExportDialog.Message.SettingsSaved()),
+      // Collapsed by default — the dialog stays compact.
+      expect(text('Progressive')).not.toExist(),
+      click(selector('[data-export-advanced="true"]')),
+      expect(text('Progressive')).toExist(),
+      expect(role('button', { name: 'Progressive: on' })).toHaveAttr('aria-pressed', 'true'),
+      click(role('button', { name: 'Progressive: off' })),
+      Command.resolve(ExportDialog.SaveExportSettings, ExportDialog.Message.SettingsSaved()),
+      expect(role('button', { name: 'Progressive: off' })).toHaveAttr('aria-pressed', 'true'),
+      Command.expectNone(),
+    )
+  })
+
+  it('a lossless WebP encode hides the quality knob', () => {
+    scene(
+      config,
+      given(loadedModel()),
+      ...mountLoadedStage,
+      click(selector('[aria-label^="Export"]')),
+      ...openDialog,
+      Command.resolve(SnapshotForExport, EditorMessage.ExportSnapshotted()),
+      click(text('WEBP')),
+      Command.resolve(ExportDialog.SaveExportSettings, ExportDialog.Message.SettingsSaved()),
+      expect(text('Quality')).toExist(),
+      click(selector('[data-export-advanced="true"]')),
+      click(role('button', { name: 'Lossless: on' })),
+      Command.resolve(ExportDialog.SaveExportSettings, ExportDialog.Message.SettingsSaved()),
+      expect(text('Quality')).not.toExist(),
       Command.expectNone(),
     )
   })
@@ -284,5 +372,43 @@ describe('Export dialog', () => {
     vitestExpect(after.exportDialog.encoding).toBe(false)
     vitestExpect(commands.map((c) => c.name)).toEqual(['RevokeExportUrl'])
     vitestExpect(after.exportDialog.url).toBeNull()
+  })
+})
+
+describe('Export settings: quality coupling', () => {
+  const step = (model: ExportDialogModel, message: ExportDialog.Message) =>
+    ExportDialog.update(model, message).model
+  const fresh = () => ExportDialog.init({ fileStem: 'x', id: 'quality-test' })
+
+  it('nulls quality only for PNG and keeps it across a lossless toggle', () => {
+    let model = step(fresh(), ExportDialog.Message.ChangedFormat({ format: 'webp' }))
+    model = step(model, ExportDialog.Message.ChangedQuality({ quality: 90 }))
+    vitestExpect(model.settings.quality).toBe(90)
+
+    model = step(
+      model,
+      ExportDialog.Message.ChangedWebpOptions({ options: { effort: 4, lossless: true } }),
+    )
+    vitestExpect(model.settings.quality).toBe(90)
+    model = step(
+      model,
+      ExportDialog.Message.ChangedWebpOptions({ options: { effort: 4, lossless: false } }),
+    )
+    vitestExpect(model.settings.quality).toBe(90)
+
+    model = step(model, ExportDialog.Message.ChangedFormat({ format: 'png' }))
+    vitestExpect(model.settings.quality).toBeNull()
+    model = step(model, ExportDialog.Message.ChangedFormat({ format: 'jpeg' }))
+    vitestExpect(model.settings.quality).toBe(75)
+  })
+
+  it('fills a lossy format that was persisted with a null quality', () => {
+    const model = step(
+      fresh(),
+      ExportDialog.Message.SettingsLoaded({
+        settings: { ...defaultExportSettings(), format: 'jpeg', quality: null },
+      }),
+    )
+    vitestExpect(model.settings.quality).toBe(75)
   })
 })

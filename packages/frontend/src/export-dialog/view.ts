@@ -1,5 +1,5 @@
 import { Option, pipe } from 'effect'
-import type { HtmlBuilder } from 'foldkit/html'
+import type { Html, HtmlBuilder } from 'foldkit/html'
 import * as Dialog from '@/components/ui/dialog'
 import {
   lutraDialogFooterClass,
@@ -11,12 +11,66 @@ import { button } from '@/components/ui/button'
 import { ExportDialogMessage as Message } from './message'
 import { filenameFor } from './update'
 import type { Model } from './model'
-import { fmtBytes, formatSection, qualitySection, resolutionSection } from './sections'
+import {
+  encoderOptionsSection,
+  fmtBytes,
+  formatSection,
+  qualitySection,
+  sizeSection,
+} from './sections'
 import { peekFrame } from './frame'
+
+const settingsSections = <P>(
+  h: HtmlBuilder<P>,
+  model: Model,
+  toParent: (message: Message) => P,
+): Html[] => [
+  formatSection(h, model.settings, (format) => toParent(Message.ChangedFormat({ format }))),
+  qualitySection(h, model.settings, (quality) => toParent(Message.ChangedQuality({ quality }))),
+  sizeSection(
+    h,
+    model.settings,
+    peekFrame(),
+    (scale) => toParent(Message.ChangedScale({ scale })),
+    (method) => toParent(Message.ChangedResizeMethod({ method })),
+  ),
+  advancedSection(h, model, toParent),
+]
+
+const advancedSection = <P>(
+  h: HtmlBuilder<P>,
+  model: Model,
+  toParent: (message: Message) => P,
+): Html =>
+  h.div(
+    [h.Class('flex flex-col gap-2')],
+    [
+      button(
+        {
+          onClick: toParent(Message.ToggledAdvanced()),
+          variant: 'ghost',
+          size: 'xs',
+          className:
+            'flex items-center justify-between px-0 text-[10px] uppercase tracking-[0.14em] text-muted hover:text-ink',
+          attributes: [h.AriaExpanded(model.advanced), h.DataAttribute('export-advanced', 'true')],
+        },
+        [`Codec options ${model.advanced ? '−' : '+'}`],
+        h,
+      ),
+      model.advanced
+        ? encoderOptionsSection(h, model.settings, {
+            onChangedAvif: (options) => toParent(Message.ChangedAvifOptions({ options })),
+            onChangedJpeg: (options) => toParent(Message.ChangedJpegOptions({ options })),
+            onChangedWebp: (options) => toParent(Message.ChangedWebpOptions({ options })),
+          })
+        : null,
+    ],
+  )
 
 /**
  * The shared export dialog view (docs/adr/0004-export): the format / quality /
- * resolution sections with the status line and `<stem>.<format>` filename.
+ * size / codec-options sections with the status line and `<stem>.<format>`
+ * filename.
  */
 export const exportDialogView = <P>(
   h: HtmlBuilder<P>,
@@ -52,18 +106,7 @@ export const exportDialogView = <P>(
           ),
           dialogH.div(
             [dialogH.Class(lutraDialogSectionClass)],
-            [
-              formatSection(dialogH, model.settings, (format) =>
-                toParent(Message.ChangedFormat({ format })),
-              ),
-              qualitySection(dialogH, model.settings, (quality) =>
-                toParent(Message.ChangedQuality({ quality })),
-              ),
-              resolutionSection(dialogH, model.settings, peekFrame(), (scale) =>
-                toParent(Message.ChangedScale({ scale })),
-              ),
-              statusSection(dialogH, model),
-            ],
+            [...settingsSections(dialogH, model, toParent), statusSection(dialogH, model)],
           ),
           Dialog.footer(
             { className: lutraDialogFooterClass },
@@ -97,9 +140,15 @@ export const exportDialogView = <P>(
     ),
   })
 
+/**
+ * The owner's always-visible export panel. `frame` is the owner's composed
+ * frame size — the inline bar is usable before any snapshot lands, so it
+ * cannot read the pixel slot the way the modal does.
+ */
 export const exportBarView = <P>(
   h: HtmlBuilder<P>,
   model: Model,
+  frame: { readonly width: number; readonly height: number },
   toParent: (message: Message) => P,
 ) =>
   h.div(
@@ -117,9 +166,14 @@ export const exportBarView = <P>(
       ),
       formatSection(h, model.settings, (format) => toParent(Message.ChangedFormat({ format }))),
       qualitySection(h, model.settings, (quality) => toParent(Message.ChangedQuality({ quality }))),
-      resolutionSection(h, model.settings, peekFrame(), (scale) =>
-        toParent(Message.ChangedScale({ scale })),
+      sizeSection(
+        h,
+        model.settings,
+        frame,
+        (scale) => toParent(Message.ChangedScale({ scale })),
+        (method) => toParent(Message.ChangedResizeMethod({ method })),
       ),
+      advancedSection(h, model, toParent),
       h.div(
         [h.Class('flex items-baseline justify-between border-t border-border pt-2')],
         [

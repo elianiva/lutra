@@ -135,6 +135,14 @@ export const zoomed = (
   cellAspect: number,
 ): TileFraming => clampFraming({ ...framing, zoom: framing.zoom * factor }, imageAspect, cellAspect)
 
+/** Set an absolute zoom (the slider's write), keeping the current focus point. */
+export const withZoom = (
+  framing: TileFraming,
+  zoom: number,
+  imageAspect: number,
+  cellAspect: number,
+): TileFraming => clampFraming({ ...framing, zoom }, imageAspect, cellAspect)
+
 /** True when a framing is indistinguishable from the untouched default. */
 export const isDefaultFraming = (framing: TileFraming): boolean =>
   sameFraming(framing, defaultTileFraming())

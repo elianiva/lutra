@@ -200,15 +200,23 @@ const makeThumbnail = (file: File, source: Uint8Array): Effect.Effect<Uint8Array
     }),
   )
 
-export const PickAndAppendPhotos = Command.define('PickAndAppendPhotos', {
-  execute: Effect.gen(function* PickAndAppendPhotos() {
-    const files = yield* FoldkitFile.selectMultiple(IMAGE_TYPES)
-    if (files.length === 0) {
-      return CollageMessage.AddPhotosFailed({ message: 'no photos selected' })
-    }
+/** A freshly saved Edit and the source bytes it owns. */
+interface CreatedEdit {
+  readonly id: EditId
+  readonly source: Uint8Array
+}
+
+/**
+ * Save one Edit per picked file (fresh id, empty chain, source + thumbnail).
+ * A file that cannot be read or saved is skipped; the caller reports when
+ * nothing landed. Shared by the add and replace pickers.
+ */
+const createEdits = (
+  files: ReadonlyArray<File>,
+): Effect.Effect<ReadonlyArray<CreatedEdit>, never, EditStore> =>
+  Effect.gen(function* createEdits() {
     const edits = yield* EditStore
-    const addedIds: EditId[] = []
-    const photos: { id: EditId; source: Uint8Array }[] = []
+    const created: CreatedEdit[] = []
     for (const file of files) {
       const source = yield* readSource(file)
       if (!source) continue
@@ -226,20 +234,71 @@ export const PickAndAppendPhotos = Command.define('PickAndAppendPhotos', {
         Effect.catchTag('StoreError', () => Effect.succeed(false)),
       )
       if (saved) {
-        addedIds.push(id)
-        photos.push({ id, source })
+        created.push({ id, source })
       }
     }
-    if (addedIds.length === 0) {
+    return created
+  })
+
+export const PickAndAppendPhotos = Command.define('PickAndAppendPhotos', {
+  execute: Effect.gen(function* PickAndAppendPhotos() {
+    const files = yield* FoldkitFile.selectMultiple(IMAGE_TYPES)
+    if (files.length === 0) {
+      return CollageMessage.PhotoPickCancelled()
+    }
+    const created = yield* createEdits(files)
+    if (created.length === 0) {
       return CollageMessage.AddPhotosFailed({ message: 'could not add photos' })
     }
-    return CollageMessage.PhotosAddedToCollage({ editIds: addedIds, photos })
+    return CollageMessage.PhotosAddedToCollage({
+      editIds: created.map((edit) => edit.id),
+      photos: created.map((edit) => ({ id: edit.id, source: edit.source })),
+    })
   }).pipe(
     Effect.catch(() =>
       Effect.succeed(CollageMessage.AddPhotosFailed({ message: 'could not add photos' })),
     ),
   ),
-  messages: [CollageMessage.PhotosAddedToCollage, CollageMessage.AddPhotosFailed],
+  messages: [
+    CollageMessage.PhotosAddedToCollage,
+    CollageMessage.AddPhotosFailed,
+    CollageMessage.PhotoPickCancelled,
+  ],
+})
+
+/**
+ * Swap the tile's photo: pick one file, save it as a fresh Edit, and hand
+ * the tile its new reference (docs/adr/0009-collage). There is no remove — replacing is
+ * how a collage's photos change once it exists.
+ */
+export const PickReplacementPhoto = Command.define('PickReplacementPhoto', {
+  args: { index: S.Number },
+  execute: ({ index }) =>
+    Effect.gen(function* PickReplacementPhoto() {
+      const picked = yield* FoldkitFile.select(IMAGE_TYPES)
+      if (Option.isNone(picked)) {
+        return CollageMessage.PhotoPickCancelled()
+      }
+      const created = yield* createEdits([picked.value])
+      const replacement = created[0]
+      if (!replacement) {
+        return CollageMessage.AddPhotosFailed({ message: 'could not replace the photo' })
+      }
+      return CollageMessage.TileReplaced({
+        editId: replacement.id,
+        index,
+        photo: { id: replacement.id, source: replacement.source },
+      })
+    }).pipe(
+      Effect.catch(() =>
+        Effect.succeed(CollageMessage.AddPhotosFailed({ message: 'could not replace the photo' })),
+      ),
+    ),
+  messages: [
+    CollageMessage.TileReplaced,
+    CollageMessage.AddPhotosFailed,
+    CollageMessage.PhotoPickCancelled,
+  ],
 })
 
 /**

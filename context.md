@@ -120,7 +120,7 @@ A gallery-side record arranging several **Edits** into one shareable image: a st
 _Avoid_: "moodboard" (implies freeform placement; the layout is a fixed grid), "Contact sheet" (names the grid layout style, not the record), "collage layer" (a collage contains no adjustment layers).
 
 **Collage tile**:
-One placed **Edit** within a **Collage**: the referenced **Edit id**, plus that tile's **tile framing** — position is the tile's array index in reading order. Tiles support remove, reorder, and reframing only; there is no add-after-creation in v1. An Edit deleted after being placed is dropped from the Collage on load, with a notice; saving persists the cleaned set.
+One placed **Edit** within a **Collage**: the referenced **Edit id**, plus that tile's **tile framing** — position is the tile's array index in reading order. Changing a collage's photos means **replacing** a tile (a fresh Edit behind the same cell — the replaced Edit stays in the gallery) or making a new collage; there is no per-tile delete. An Edit deleted after being placed is dropped from the Collage on load, with a notice; saving persists the cleaned set.
 _Avoid_: "cell" (the cell is the layout slot; the tile is the placed Edit).
 
 **Frame ratio**:
@@ -219,11 +219,11 @@ _Avoid_: "preset picker" (presets are built-in looks, distinct from LUTs), "film
 The empty-state placeholder in the canvas area before an image is loaded. Shows a dashed-border drop target with an icon and the prompt "Drop an image or click to browse." Accepts drag-and-drop and click-to-browse file input. Disappears once an image is loaded.
 
 **Export dialog**:
-The modal opened by the top-bar export button. Offers a format (PNG/JPEG/WebP/AVIF), a quality slider (lossy formats only), a resolution preset (100/75/50/25% of the displayed frame), and the download button. Encoding runs only when Export is pressed (a live size preview was too slow) — the button shows a loading state while the frame encodes, and the file size appears after the download. The dialog stays open after a download — tweak and re-export until it looks right. Settings persist across sessions.
+The modal opened by the top-bar export button. Offers a format (PNG/JPEG/WebP/AVIF), a quality slider (lossy formats only), a **size** (percentage presets plus exact output width × height typed against the frame, capped at 100%), a **resample** filter, a collapsible **codec options** section for the active format, and the download button. Encoding runs only when Export is pressed (a live size preview was too slow) — the button shows a loading state while the frame encodes, and the file size appears after the download. The dialog stays open after a download — tweak and re-export until it looks right. Settings persist across sessions.
 _Avoid_: "Save dialog" (there is no file location choice; the browser owns the download)
 
 **Export settings**:
-The persisted format / quality / scale choice shown in the **export dialog**. `quality` is null only for PNG (lossless); switching to a lossy format fills the default 75.
+The persisted format / quality / size / resampler / codec-options choice shown in the **export dialog**. `quality` is null only for PNG (the one format with no quality knob); a lossless WebP/AVIF keeps its value so switching the toggle back off restores it, and the codec call omits quality while lossless. The codec options are one struct per lossy format (MozJPEG progressive / optimize-coding / smoothing, WebP lossless / method effort, AVIF lossless / speed). The one size value is a `scale` in `[0.01, 1]` — a preset or a typed pixel size read against the frame — because export never upscales.
 
 ### Adjustments
 
@@ -258,7 +258,7 @@ The gallery screen at `/` (the app's entry point). Shows saved **edits** as a gr
 _Avoid_: "Gallery" (ambiguous with the image-processing sense of the word), "landing page".
 
 **Collage screen**:
-The screen at `/collage/<collage id>`, reached from **Create collage** or a **Collages**-section tile. Renders the fixed-grid preview — each **Collage tile** drawn from its referenced **Edit**'s stored thumbnail through its **tile framing**, fitted to the viewport — with an Arrange/Frame mode toggle (Arrange: drag-and-drop reorder with an insertion gap; Frame: drag pans and wheel zooms the tile's framing), layout controls (frame ratio, columns, gutter, background), per-tile remove with an undo toast, an export button reusing the export dialog, and back navigation to the **main menu**. Layout changes auto-save; references whose Edit was deleted are dropped on load with a notice.
+The screen at `/collage/<collage id>`, reached from **Create collage** or a **Collages**-section tile. Renders the fixed-grid preview — each **Collage tile** drawn from its referenced **Edit**'s stored thumbnail through its **tile framing**, fitted to the viewport — with an **Arrange / Frame** mode toggle: **Arrange** drags tiles to reorder and replaces a tile's photo, **Frame** pans the selected tile and zooms it with a slider or the wheel (so a touch device can zoom). Layout controls (frame ratio, columns, rows, gutter, background) take a typed number or a stepper, per-tile replace with an undo toast, an export button reusing the export dialog, and back navigation to the **main menu**. Layout changes auto-save; references whose Edit was deleted are dropped on load with a notice.
 _Avoid_: "collage editor" (nothing is edited but the arrangement).
 
 **Attached edit**:

@@ -1,11 +1,11 @@
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import * as fc from 'fast-check'
 import { createRequire } from 'node:module'
 import { readFile } from 'node:fs/promises'
 import * as Webp from '@jsquash/webp/encode.js'
 import * as Avif from '@jsquash/avif/encode.js'
 import { encodeImage } from './jsquash'
-import { EXPORT_SCALES } from './settings'
+import { EXPORT_SCALE_PRESETS, defaultExportOptions, defaultExportSettings } from './settings'
 import type { ExportSettings } from './settings'
 
 const require = createRequire(import.meta.url)
@@ -47,11 +47,7 @@ const makeImage = (width = 64, height = 48): ImageData => {
 const settings = (
   format: ExportSettings['format'],
   overrides: Partial<ExportSettings> = {},
-): ExportSettings =>
-  // The spread of Partial overrides widens the literal; the cast is the
-  // deliberate escape hatch for the test's convenience.
-  // oxlint-disable-next-line consistent-type-assertions
-  ({ format, quality: 75, scale: 1, ...overrides })
+): ExportSettings => ({ ...defaultExportSettings(), format, quality: 75, ...overrides })
 
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
 
@@ -74,10 +70,37 @@ describe('encodeImage', () => {
     expect([...bytes.subarray(8, 12)]).toEqual([0x57, 0x45, 0x42, 0x50]) // WEBP
   })
 
+  it('honours the WebP lossless option — the bitstream switches to VP8L', async () => {
+    const asText = (bytes: Uint8Array) => String.fromCharCode(...bytes)
+    const lossy = await encodeImage(makeImage(), settings('webp'))
+    const lossless = await encodeImage(
+      makeImage(),
+      settings('webp', {
+        options: { ...defaultExportOptions(), webp: { effort: 4, lossless: true } },
+      }),
+    )
+    expect(asText(lossy)).not.toContain('VP8L')
+    expect(asText(lossless)).toContain('VP8L')
+  })
+
   it('encodes AVIF', async () => {
     const bytes = await encodeImage(makeImage(), settings('avif'))
     // ISO-BMFF: size + 'ftyp' box.
     expect([...bytes.subarray(4, 8)]).toEqual([0x66, 0x74, 0x79, 0x70])
+  })
+
+  it('omits quality for a lossless AVIF, so the codec does not warn', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await encodeImage(
+      makeImage(),
+      settings('avif', {
+        options: { ...defaultExportOptions(), avif: { lossless: true, speed: 6 } },
+        quality: null,
+      }),
+    )
+    const warnings = warn.mock.calls.map((args) => String(args[0]))
+    expect(warnings.filter((line) => line.includes('AVIF lossless'))).toEqual([])
+    warn.mockRestore()
   })
 
   it('downscales before encoding: the output dimensions are the rounded scale', async () => {
@@ -88,7 +111,7 @@ describe('encodeImage', () => {
       fc.asyncProperty(
         fc.integer({ max: 192, min: 1 }),
         fc.integer({ max: 192, min: 1 }),
-        fc.constantFrom(...EXPORT_SCALES),
+        fc.constantFrom(...EXPORT_SCALE_PRESETS),
         async (width, height, scale) => {
           const bytes = await encodeImage(
             makeImage(width, height),

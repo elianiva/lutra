@@ -16,6 +16,10 @@ class Website extends Cloudflare.Website.Vite<Website>()('lutra', {
   domain: 'lutra.elianiva.com',
   assets: {
     runWorkerFirst: false,
+    // Deep links (`/edit/<id>`, `/collage/<id>`) have no asset on disk; the
+    // asset layer must serve index.html so the client router boots instead of
+    // 404ing. Without this every non-root URL breaks on a reload or a share.
+    notFoundHandling: 'single-page-application',
   },
 }) {}
 

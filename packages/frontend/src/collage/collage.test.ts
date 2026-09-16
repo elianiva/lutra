@@ -4,6 +4,7 @@ import { AsyncData } from 'foldkit'
 import { DragAndDrop } from '@foldkit/ui'
 import {
   Command,
+  change,
   click,
   expect as sceneExpect,
   given,
@@ -72,6 +73,15 @@ const loadedWith = (...args: Parameters<typeof collageWith>): Model => {
   return model
 }
 
+/** A loaded collage in Frame mode with tile 0 selected and a measured cell. */
+const framingWith = (...args: Parameters<typeof collageWith>): Model => ({
+  ...loadedWith(...args),
+  mode: 'Frame',
+  selectedTile: 0,
+  cellPx: { width: 100, height: 100 },
+  sizes: [{ editId: tileEditId(1), width: 400, height: 100 }],
+})
+
 /** The loaded collage record behind a model's AsyncData (test precondition). */
 const collageOf = (model: Model): CollageRecord => {
   const maybe = AsyncData.getData(model.collage)
@@ -81,14 +91,20 @@ const collageOf = (model: Model): CollageRecord => {
   throw new Error('expected a loaded collage')
 }
 
+const firstTileFraming = (model: Model) => collageOf(model).tiles[0]!.framing
+
 describe('collage submodel: load', () => {
-  it('a loaded collage renders its tiles with remove controls', () => {
+  it('a loaded collage renders replace controls and no delete', () => {
     const loaded = loadedWith([1, 2, 3])
     scene(
       config,
       given(loaded),
-      sceneExpect(role('button', { name: 'Remove photo 1' })).toExist(),
-      sceneExpect(role('button', { name: 'Remove photo 3' })).toExist(),
+      sceneExpect(role('button', { name: 'Replace photo 1' })).toExist(),
+      sceneExpect(role('button', { name: 'Replace photo 3' })).toExist(),
+      sceneExpect(role('button', { name: 'Remove photo 1' })).toBeAbsent(),
+      // The inline export bar knows the composed frame before any snapshot lands.
+      sceneExpect(selector('[data-export-width="true"]')).toHaveValue('2048'),
+      sceneExpect(text('of 2048 × 2048')).toExist(),
     )
   })
 
@@ -103,6 +119,7 @@ describe('collage submodel: load', () => {
     )
     expect(model.collage._tag).toBe('Success')
     expect(model.notice).toBe(null)
+    expect(model.mode).toBe('Arrange')
     expect(commands.map((c) => c.name)).toEqual(['MeasureThumbs'])
     expect(out).toBeUndefined()
   })
@@ -206,11 +223,11 @@ describe('collage submodel: layout auto-saves', () => {
       config,
       given(loaded),
       sceneExpect(selector('[data-control="rows"]')).toExist(),
-      sceneExpect(role('button', { name: 'One more row' })).toExist(),
+      sceneExpect(role('button', { name: 'Increase Rows' })).toExist(),
       sceneExpect(selector('[data-collage-grid="2x2"]')).toExist(),
       sceneExpect(selector('[data-collage-empty-cell="0"]')).toExist(),
       sceneExpect(selector('[data-collage-empty-cell="2"]')).toExist(),
-      click(role('button', { name: 'One fewer row' })),
+      click(role('button', { name: 'Decrease Rows' })),
       Command.resolve(SaveCollage, CollageMessage.CollageSaved()),
       sceneExpect(selector('[data-collage-grid="2x1"]')).toExist(),
       sceneExpect(selector('[data-collage-empty-cell="0"]')).toExist(),
@@ -224,6 +241,17 @@ describe('collage submodel: layout auto-saves', () => {
     const { model: low } = update(loaded, CollageMessage.ChangedGutter({ gutter: -5 }))
     expect(collageOf(high).layout.gutter).toBe(32)
     expect(collageOf(low).layout.gutter).toBe(0)
+  })
+
+  it('the gutter can be typed, not only stepped', () => {
+    const loaded = loadedWith([1, 2, 3])
+    scene(
+      config,
+      given(loaded),
+      change(selector('[data-gutter-input="true"]'), '20'),
+      Command.resolve(SaveCollage, CollageMessage.CollageSaved()),
+      sceneExpect(selector('[data-gutter-input="true"]')).toHaveValue('20'),
+    )
   })
 
   it('ChangedFrameRatio clamps to 0.5–3 and queues a save', () => {
@@ -271,59 +299,122 @@ describe('collage submodel: layout auto-saves', () => {
   })
 })
 
-describe('collage submodel: arrange mode', () => {
-  it('starts with no tile selected; tapping selects and shows reset for that tile', () => {
+describe('collage submodel: modes', () => {
+  it('starts in Arrange; Frame is one tap away', () => {
     const loaded = loadedWith([1, 2])
-    expect(loaded.selectedTile).toBe(null)
-    scene(
-      config,
-      given(loaded),
-      sceneExpect(role('button', { name: 'Remove photo 1' })).toExist(),
-      sceneExpect(role('button', { name: 'Reset framing of photo 1' })).toBeAbsent(),
-      click(selector('[data-collage-tile="0"]')),
-      sceneExpect(role('button', { name: 'Reset framing of photo 1' })).toExist(),
-    )
+    expect(loaded.mode).toBe('Arrange')
+    const { model: frame } = update(loaded, CollageMessage.ChangedMode({ mode: 'Frame' }))
+    expect(frame.mode).toBe('Frame')
+    const { model: arrange } = update(frame, CollageMessage.ChangedMode({ mode: 'Arrange' }))
+    expect(arrange.mode).toBe('Arrange')
   })
 
-  it('RemovedTile drops by index, queues a save, and shows the undo toast', () => {
-    const loaded = loadedWith([7, 8, 9])
-    const { model, commands = [] } = update(loaded, CollageMessage.RemovedTile({ index: 1 }))
-    expect(collageOf(model).tiles.map((t) => t.editId)).toEqual([tileEditId(7), tileEditId(9)])
+  it('a tile tap does nothing in Arrange mode', () => {
+    const loaded = loadedWith([1, 2])
+    const { model, commands = [] } = update(loaded, CollageMessage.TileSelected({ index: 0 }))
+    expect(model).toBe(loaded)
+    expect(commands).toEqual([])
+  })
+
+  it('leaving Frame commits the in-flight framing and clears the selection', () => {
+    const loaded = framingWith([1, 2])
+    const { model: panning } = update(
+      loaded,
+      CollageMessage.PanStarted({ index: 0, screenX: 0, screenY: 0 }),
+    )
+    const { model: moved } = update(panning, CollageMessage.PanMoved({ screenX: 50, screenY: 0 }))
+    expect(moved.framingDraft).not.toBe(null)
+    const { model: arranged, commands = [] } = update(
+      moved,
+      CollageMessage.ChangedMode({ mode: 'Arrange' }),
+    )
+    expect(arranged.mode).toBe('Arrange')
+    expect(arranged.selectedTile).toBe(null)
+    expect(arranged.framingDraft).toBe(null)
+    expect(firstTileFraming(arranged)).not.toEqual(defaultTileFraming())
     expect(commands.map((c) => c.name)).toEqual(['SaveCollage', 'ScheduleUndoExpiry'])
-    expect(model.undo?.tiles.map((t) => t.editId)).toEqual([
-      tileEditId(7),
-      tileEditId(8),
-      tileEditId(9),
+  })
+
+  it('the mode toggle is on screen and reports the pressed mode', () => {
+    scene(
+      config,
+      given(loadedWith([1, 2])),
+      sceneExpect(selector('[data-mode-option="Arrange"]')).toHaveAttr('aria-pressed', 'true'),
+      click(selector('[data-mode-option="Frame"]')),
+      sceneExpect(selector('[data-mode-option="Frame"]')).toHaveAttr('aria-pressed', 'true'),
+      sceneExpect(selector('[data-framing-panel="true"]')).toBeAbsent(),
+      sceneExpect(text('Tap a photo to frame it')).toExist(),
+    )
+  })
+})
+
+describe('collage submodel: replace', () => {
+  it('ReplaceTileRequested opens the file picker for that tile', () => {
+    const loaded = loadedWith([1, 2])
+    const { commands = [] } = update(loaded, CollageMessage.ReplaceTileRequested({ index: 1 }))
+    expect(commands.map((c) => c.name)).toEqual(['PickReplacementPhoto'])
+  })
+
+  it('TileReplaced swaps the edit, resets framing, saves, and keeps undo', () => {
+    const framed = Collage.make({
+      id,
+      savedAt: 1,
+      layout: defaultCollageLayout(),
+      tiles: [
+        { editId: tileEditId(1), framing: { zoom: 2, focusX: 0.5, focusY: 0.5 } },
+        { editId: tileEditId(2), framing: defaultTileFraming() },
+      ],
+    })
+    const loaded: Model = { ...loadedWith([1, 2]), collage: AsyncData.Success({ data: framed }) }
+    const photo = { id: tileEditId(9), source: new Uint8Array([1, 2, 3]) }
+    const { model, commands = [] } = update(
+      loaded,
+      CollageMessage.TileReplaced({ index: 0, editId: tileEditId(9), photo }),
+    )
+    expect(collageOf(model).tiles.map((t) => t.editId)).toEqual([tileEditId(9), tileEditId(2)])
+    expect(collageOf(model).tiles[0]!.framing).toEqual(defaultTileFraming())
+    expect(model.photos).toEqual([photo])
+    expect(model.undo?.tiles.map((t) => t.editId)).toEqual([tileEditId(1), tileEditId(2)])
+    expect(model.undoLabel).toBe('Replaced photo')
+    expect(commands.map((c) => c.name)).toEqual([
+      'SaveCollage',
+      'ScheduleUndoExpiry',
+      'MeasureThumbs',
     ])
-    expect(model.undoLabel).toBe('Removed photo')
   })
 
-  it('removing the last photo flags the user-emptied state', () => {
-    const loaded = loadedWith([7])
-    const { model } = update(loaded, CollageMessage.RemovedTile({ index: 0 }))
-    expect(model.userEmptied).toBe(true)
-    scene(
-      config,
-      given(model),
-      sceneExpect(text('All photos removed.')).toExist(),
-      sceneExpect(
-        text('Bring them back with Undo, or delete the collage from the menu.'),
-      ).toExist(),
+  it('an out-of-range replacement is ignored', () => {
+    const loaded = loadedWith([1])
+    const { model, commands = [] } = update(
+      loaded,
+      CollageMessage.TileReplaced({
+        index: 5,
+        editId: tileEditId(9),
+        photo: { id: tileEditId(9), source: new Uint8Array() },
+      }),
     )
+    expect(model).toBe(loaded)
+    expect(commands).toEqual([])
   })
 
-  it('a dangling-drop empty state reads differently from a user-emptied one', () => {
-    scene(
-      config,
-      given(loadedWith([])),
-      sceneExpect(text('Every photo in this collage is gone.')).toExist(),
-    )
+  it('a cancelled pick is a no-op with no notice', () => {
+    const loaded = loadedWith([1])
+    const { model, commands = [] } = update(loaded, CollageMessage.PhotoPickCancelled())
+    expect(model).toBe(loaded)
+    expect(commands).toEqual([])
   })
 
-  it('UndoPressed restores the snapshotted tiles and saves', () => {
+  it('UndoPressed restores the tiles the replace overwrote and saves', () => {
     const loaded = loadedWith([7, 8, 9])
-    const { model: removed } = update(loaded, CollageMessage.RemovedTile({ index: 1 }))
-    const { model: restored, commands = [] } = update(removed, CollageMessage.UndoPressed())
+    const { model: replaced } = update(
+      loaded,
+      CollageMessage.TileReplaced({
+        index: 1,
+        editId: tileEditId(20),
+        photo: { id: tileEditId(20), source: new Uint8Array() },
+      }),
+    )
+    const { model: restored, commands = [] } = update(replaced, CollageMessage.UndoPressed())
     expect(collageOf(restored).tiles.map((t) => t.editId)).toEqual([
       tileEditId(7),
       tileEditId(8),
@@ -335,11 +426,18 @@ describe('collage submodel: arrange mode', () => {
 
   it('UndoExpired clears the slot only for the matching sequence', () => {
     const loaded = loadedWith([7, 8])
-    const { model: removed } = update(loaded, CollageMessage.RemovedTile({ index: 0 }))
-    const seq = removed.undo?.seq ?? -1
-    const { model: stale } = update(removed, CollageMessage.UndoExpired({ seq: seq + 1 }))
+    const { model: replaced } = update(
+      loaded,
+      CollageMessage.TileReplaced({
+        index: 0,
+        editId: tileEditId(20),
+        photo: { id: tileEditId(20), source: new Uint8Array() },
+      }),
+    )
+    const seq = replaced.undo?.seq ?? -1
+    const { model: stale } = update(replaced, CollageMessage.UndoExpired({ seq: seq + 1 }))
     expect(stale.undo).not.toBe(null)
-    const { model: expired } = update(removed, CollageMessage.UndoExpired({ seq }))
+    const { model: expired } = update(replaced, CollageMessage.UndoExpired({ seq }))
     expect(expired.undo).toBe(null)
     expect(expired.undoLabel).toBe(null)
   })
@@ -418,13 +516,20 @@ describe('collage submodel: arrange mode', () => {
 })
 
 describe('collage submodel: frame mode', () => {
+  it('shows a zoom slider, the zoom value, and Done for the selected tile', () => {
+    scene(
+      config,
+      given(framingWith([1, 2])),
+      sceneExpect(selector('[data-framing-panel="true"]')).toExist(),
+      sceneExpect(selector('[data-zoom-slider="true"]')).toExist(),
+      sceneExpect(selector('[data-zoom-value="true"]')).toHaveText('100%'),
+      sceneExpect(role('button', { name: 'Reset framing of photo 1' })).toExist(),
+      sceneExpect(role('button', { name: 'Finish framing' })).toExist(),
+    )
+  })
+
   it('deselecting commits an in-flight framing draft', () => {
-    const loaded: Model = {
-      ...loadedWith([1, 2]),
-      selectedTile: 0,
-      cellPx: { width: 200, height: 200 },
-      sizes: [{ editId: tileEditId(1), width: 400, height: 100 }],
-    }
+    const loaded = framingWith([1, 2])
     const { model: panning } = update(
       loaded,
       CollageMessage.PanStarted({ index: 0, screenX: 0, screenY: 0 }),
@@ -437,20 +542,12 @@ describe('collage submodel: frame mode', () => {
     )
     expect(committed.selectedTile).toBe(null)
     expect(committed.framingDraft).toBe(null)
-    expect(collageOf(committed).tiles[0]!.framing).not.toEqual(defaultTileFraming())
+    expect(firstTileFraming(committed)).not.toEqual(defaultTileFraming())
     expect(commands.map((c) => c.name)).toEqual(['SaveCollage', 'ScheduleUndoExpiry'])
   })
 
   it('PanStarted seeds a draft; PanMoved pans within bounds; PanEnded commits', () => {
-    const base = {
-      ...loadedWith([1, 2]),
-      selectedTile: 0 as const,
-      cellPx: { width: 100, height: 100 },
-    }
-    const sized = {
-      ...base,
-      sizes: [{ editId: tileEditId(1), width: 400, height: 100 }],
-    }
+    const sized = framingWith([1, 2])
     const { model: started } = update(
       sized,
       CollageMessage.PanStarted({ index: 0, screenX: 0, screenY: 0 }),
@@ -462,12 +559,12 @@ describe('collage submodel: frame mode', () => {
     const { model: ended, commands = [] } = update(moved, CollageMessage.PanEnded())
     expect(ended.framingDraft).toBe(null)
     expect(ended.pan).toBe(null)
-    expect(collageOf(ended).tiles[0]!.framing.focusX).toBeLessThan(0.5)
+    expect(firstTileFraming(ended).focusX).toBeLessThan(0.5)
     expect(commands.map((c) => c.name)).toEqual(['SaveCollage', 'ScheduleUndoExpiry'])
   })
 
   it('pan with an unmeasured cell size is a no-op', () => {
-    const base = { ...loadedWith([1, 2]), selectedTile: 0 as const }
+    const base = { ...framingWith([1, 2]), cellPx: null }
     const { model: started } = update(
       base,
       CollageMessage.PanStarted({ index: 0, screenX: 0, screenY: 0 }),
@@ -477,24 +574,31 @@ describe('collage submodel: frame mode', () => {
   })
 
   it('WheelZoomed drafts the zoom and commits once the wheel goes quiet', () => {
-    const base = {
-      ...loadedWith([1, 2]),
-      selectedTile: 0 as const,
-      cellPx: { width: 100, height: 100 },
-    }
+    const base = framingWith([1, 2])
     const { model: zoomed } = update(base, CollageMessage.WheelZoomed({ index: 0, deltaY: -100 }))
     expect(zoomed.framingDraft?.framing.zoom).toBeGreaterThan(1)
     const seq = zoomed.zoomSeq
     const { model: settled, commands = [] } = update(zoomed, CollageMessage.ZoomSettled({ seq }))
-    expect(collageOf(settled).tiles[0]!.framing.zoom).toBeGreaterThan(1)
+    expect(firstTileFraming(settled).zoom).toBeGreaterThan(1)
     expect(commands.map((c) => c.name)).toEqual(['SaveCollage', 'ScheduleUndoExpiry'])
     const { model: again } = update(base, CollageMessage.WheelZoomed({ index: 0, deltaY: -100 }))
     const { model: stale } = update(again, CollageMessage.ZoomSettled({ seq: again.zoomSeq + 1 }))
     expect(stale.framingDraft).not.toBe(null)
   })
 
+  it('ZoomSet drafts an absolute zoom and commits once the slider goes quiet', () => {
+    const base = framingWith([1, 2])
+    const { model: set, commands = [] } = update(
+      base,
+      CollageMessage.ZoomSet({ index: 0, zoom: 3 }),
+    )
+    expect(set.framingDraft?.framing.zoom).toBeCloseTo(3)
+    expect(commands.map((c) => c.name)).toEqual(['ScheduleZoomCommit'])
+    const { model: settled } = update(set, CollageMessage.ZoomSettled({ seq: set.zoomSeq }))
+    expect(firstTileFraming(settled).zoom).toBeCloseTo(3)
+  })
+
   it('ResetFraming restores cover-centered and takes an undo snapshot', () => {
-    const base = { ...loadedWith([1, 2]), selectedTile: 0 as const }
     const framedCollage = {
       ...collageWith([1, 2]),
       tiles: [
@@ -506,20 +610,20 @@ describe('collage submodel: frame mode', () => {
       ],
     }
     const framed: Model = {
-      ...base,
+      ...framingWith([1, 2]),
       collage: AsyncData.Success({ data: framedCollage }),
     }
     const { model: reset, commands = [] } = update(
       framed,
       CollageMessage.ResetFraming({ index: 0 }),
     )
-    expect(collageOf(reset).tiles[0]!.framing).toEqual(defaultTileFraming())
+    expect(firstTileFraming(reset)).toEqual(defaultTileFraming())
     expect(reset.undoLabel).toBe('Framing reset')
     expect(commands.map((c) => c.name)).toEqual(['SaveCollage', 'ScheduleUndoExpiry'])
   })
 
   it('ResetFraming on an untouched tile is a no-op', () => {
-    const base = { ...loadedWith([1, 2]), selectedTile: 0 as const }
+    const base = framingWith([1, 2])
     const { model, commands = [] } = update(base, CollageMessage.ResetFraming({ index: 0 }))
     expect(model).toBe(base)
     expect(commands).toEqual([])
@@ -531,6 +635,7 @@ describe('collage submodel: frame mode', () => {
       CollageMessage.PanStarted({ index: 0, screenX: 0, screenY: 0 }),
       CollageMessage.ResetFraming({ index: 0 }),
       CollageMessage.WheelZoomed({ index: 0, deltaY: -100 }),
+      CollageMessage.ZoomSet({ index: 0, zoom: 3 }),
     ]) {
       const { model, commands = [] } = update(loaded, message)
       expect(model).toBe(loaded)
