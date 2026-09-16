@@ -1,7 +1,16 @@
 import { Schema as S } from 'effect'
 import { defineMessageUnion } from 'foldkit/message'
 import * as Dialog from '@/components/ui/dialog'
-import { ExportFormat, ExportQuality, ExportScale, ExportSettings } from '@lutra/engine'
+import {
+  AvifOptions,
+  ExportFormat,
+  ExportQuality,
+  ExportScale,
+  ExportSettings,
+  JpegOptions,
+  ResizeMethod,
+  WebpOptions,
+} from '@lutra/engine'
 
 /**
  * The shared export dialog machine's messages (docs/adr/0004-export). The owning
@@ -27,6 +36,12 @@ export const ExportDialogMessage = defineMessageUnion({
   ChangedFormat: { format: ExportFormat },
   ChangedQuality: { quality: ExportQuality },
   ChangedScale: { scale: ExportScale },
+  ChangedResizeMethod: { method: ResizeMethod },
+  ChangedJpegOptions: { options: JpegOptions },
+  ChangedWebpOptions: { options: WebpOptions },
+  ChangedAvifOptions: { options: AvifOptions },
+  /** Expand/collapse the per-format codec options. */
+  ToggledAdvanced: {},
   SettingsLoaded: { settings: ExportSettings },
   SettingsSaved: {},
 

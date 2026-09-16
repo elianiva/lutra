@@ -1,4 +1,4 @@
-import { applyLutCpu, encodeImage } from '@lutra/engine'
+import { applyLutCpu, defaultExportSettings, encodeImage } from '@lutra/engine'
 import type { LutCube } from '@lutra/engine'
 
 // The LUT-thumbnail worker. The main thread posts `{ id, image, cube }`; the
@@ -45,7 +45,7 @@ self.onmessage = (event: MessageEvent<LutThumbRequest>) => {
     })
     return
   }
-  encodeImage(graded, { format: 'jpeg', quality: 85, scale: 1 })
+  encodeImage(graded, { ...defaultExportSettings(), format: 'jpeg', quality: 85 })
     .then((bytes) => {
       ctx.postMessage({ bytes, id }, [bytes.buffer])
     })

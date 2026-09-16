@@ -13,6 +13,7 @@ import {
   NavigateMenu,
   MeasureThumbs,
   PickAndAppendPhotos,
+  PickReplacementPhoto,
   SaveCollage,
   ScheduleUndoExpiry,
   ScheduleZoomCommit,
@@ -20,8 +21,8 @@ import {
 } from './command'
 import type { Model } from './model'
 import { LAYOUT_BOUNDS, clamp, loadedCollage } from './model'
-import { moveTile, removeTile } from './tiles'
-import { isDefaultFraming, panned, sameFraming, zoomed } from './framing'
+import { moveTile } from './tiles'
+import { isDefaultFraming, panned, sameFraming, withZoom, zoomed } from './framing'
 
 type Resource = GpuBackend | LutStore | ImageEncoder | KeyValueStore | CollageStore | EditStore
 
@@ -72,7 +73,6 @@ const mutateWithUndo = (
       undo: { seq, tiles: previous },
       undoLabel: label,
       undoSeq: seq,
-      userEmptied: false,
     },
     commands: [SaveCollage({ collage: next }), ScheduleUndoExpiry({ seq })],
   }
@@ -175,7 +175,8 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
             pan: null,
             undo: null,
             undoLabel: null,
-            userEmptied: false,
+            mode: 'Arrange',
+            selectedTile: null,
           },
           // Aspect measurement rides the load (docs/adr/0009-collage).
           commands: [MeasureThumbs({ photos })],
@@ -247,7 +248,26 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
           },
         })),
 
+      /**
+       * Switch interaction mode (docs/adr/0009-collage). Leaving Frame commits any
+       * in-flight framing gesture and clears the selection, so a pan cannot
+       * stay half-applied while the grid becomes draggable again.
+       */
+      ChangedMode: ({ mode }) => {
+        const committed = model.framingDraft ? commitDraft(model) : { model }
+        const base = committed.model
+        const next: Model = {
+          ...base,
+          mode,
+          selectedTile: mode === 'Frame' ? base.selectedTile : null,
+        }
+        return committed.commands ? { model: next, commands: committed.commands } : { model: next }
+      },
+
       TileSelected: ({ index }) => {
+        if (model.mode !== 'Frame') {
+          return { model }
+        }
         const target = index === model.selectedTile ? null : index
         if (target === model.selectedTile) return { model }
         const committed = model.framingDraft ? commitDraft(model) : { model }
@@ -264,24 +284,33 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         return committed.commands ? { model: next, commands: committed.commands } : { model: next }
       },
 
-      RemovedTile: ({ index }) => {
+      ReplaceTileRequested: ({ index }) => ({
+        model,
+        commands: [PickReplacementPhoto({ index })],
+      }),
+      TileReplaced: ({ index, editId, photo }) => {
         const collage = collageOf(model)
-        if (!collage) {
+        const tile = collage?.tiles[index]
+        if (!collage || !tile || tile.editId === editId) {
           return { model }
         }
-        const emptied = collage.tiles.length === 1
-        const { model: nextModel, commands = [] } = mutateWithUndo(model, 'Removed photo', (c) => ({
-          ...c,
-          tiles: removeTile(c.tiles, index),
-        }))
-        let selectedTile = nextModel.selectedTile
-        if (selectedTile !== null) {
-          if (selectedTile === index) selectedTile = null
-          else if (selectedTile > index) selectedTile -= 1
+        const { model: nextModel, commands = [] } = mutateWithUndo(
+          model,
+          'Replaced photo',
+          (c) => ({
+            ...c,
+            tiles: c.tiles.map((t, i) =>
+              i === index ? { editId, framing: defaultTileFraming() } : t,
+            ),
+          }),
+        )
+        return {
+          model: {
+            ...nextModel,
+            photos: [...nextModel.photos.filter((p) => p.id !== editId), photo],
+          },
+          commands: [...commands, MeasureThumbs({ photos: [photo] })],
         }
-        const patched =
-          selectedTile === nextModel.selectedTile ? nextModel : { ...nextModel, selectedTile }
-        return { model: emptied ? { ...patched, userEmptied: true } : patched, commands }
       },
 
       // drag-and-drop reorder (docs/adr/0009-collage)
@@ -319,7 +348,7 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
       // tile framing (docs/adr/0009-collage)
       PanStarted: ({ index, screenX, screenY }) => {
         const collage = collageOf(model)
-        if (!collage || model.selectedTile !== index) {
+        if (!collage || model.mode !== 'Frame' || model.selectedTile !== index) {
           return { model }
         }
         const tile = collage.tiles[index]
@@ -393,6 +422,29 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         }
       },
       ZoomSettled: (settled) => (settled.seq === model.zoomSeq ? commitDraft(model) : { model }),
+      ZoomSet: ({ index, zoom }) => {
+        const collage = collageOf(model)
+        if (!collage || model.mode !== 'Frame' || model.selectedTile !== index) {
+          return { model }
+        }
+        const tile = collage.tiles[index]
+        if (!tile) {
+          return { model }
+        }
+        const imageAspect = aspectOf(model, tile.editId)
+        const cellAspect = model.cellPx ? model.cellPx.width / Math.max(1, model.cellPx.height) : 1
+        const start =
+          model.framingDraft?.index === index ? model.framingDraft.framing : tile.framing
+        const framing = withZoom(start, zoom, imageAspect, cellAspect)
+        if (sameFraming(framing, start)) {
+          return { model }
+        }
+        const seq = model.zoomSeq + 1
+        return {
+          model: { ...model, framingDraft: { index, framing }, zoomSeq: seq },
+          commands: [ScheduleZoomCommit({ seq })],
+        }
+      },
       ResetFraming: ({ index }) => {
         const collage = collageOf(model)
         if (!collage || model.selectedTile === null) {
@@ -428,7 +480,6 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
             collage: loadedCollage.Success({ data: restored }),
             undo: null,
             undoLabel: null,
-            userEmptied: false,
           },
           commands: [SaveCollage({ collage: restored })],
         }
@@ -488,6 +539,7 @@ export const update = (model: Model, message: CollageMessage): UpdateReturn =>
         }
       },
       AddPhotosFailed: ({ message }) => ({ model: { ...model, notice: message } }),
+      PhotoPickCancelled: () => ({ model }),
 
       BackRequested: () => ({ model, commands: [NavigateMenu()] }),
       NavigatedBack: () => ({ model }),

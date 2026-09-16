@@ -46,6 +46,14 @@ export const CollagePhoto = S.Struct({
 })
 export type CollagePhoto = typeof CollagePhoto.Type
 
+/**
+ * The collage screen's interaction mode (docs/adr/0009-collage): **Arrange** reorders
+ * and replaces photos; **Frame** pans and zooms one selected photo. One mode
+ * at a time keeps drag-to-reorder and drag-to-pan unambiguous on one surface.
+ */
+export const CollageMode = S.Literals(['Arrange', 'Frame'])
+export type CollageMode = typeof CollageMode.Type
+
 /** The measured pixel size of one source photo (for aspect math). */
 export const ThumbSize = S.Struct({
   editId: EditIdSchema,
@@ -62,6 +70,8 @@ export const Model = S.Struct({
   // A transient banner (dangling references dropped on load, a failed save,
   // a failed export), null when clean.
   notice: S.NullOr(S.String),
+  /** The interaction mode; Arrange by default. */
+  mode: CollageMode,
   selectedTile: S.NullOr(S.Number),
   // The shared drag-and-drop machine (@foldkit/ui/dragAndDrop).
   drag: DragAndDrop.Model,
@@ -78,8 +88,6 @@ export const Model = S.Struct({
   undoLabel: S.NullOr(S.String),
   undoSeq: S.Number,
   zoomSeq: S.Number,
-  /** True only when the user themselves removed every photo (vs dangling refs). */
-  userEmptied: S.Boolean,
   /** Measured CSS-pixel size of one preview cell (ResizeObserver-fed). */
   cellPx: S.NullOr(S.Struct({ width: S.Number, height: S.Number })),
   // The shared export-dialog machine (docs/adr/0009-collage).
@@ -92,6 +100,7 @@ export const initialModel = (): Model => ({
   photos: [],
   sizes: [],
   notice: null,
+  mode: 'Arrange',
   selectedTile: null,
   drag: DragAndDrop.init({ id: 'collage-grid', orientation: 'Horizontal' }),
   framingDraft: null,
@@ -100,7 +109,6 @@ export const initialModel = (): Model => ({
   undoLabel: null,
   undoSeq: 0,
   zoomSeq: 0,
-  userEmptied: false,
   cellPx: null,
   exportDialog: ExportDialog.init({
     id: 'collage-export-dialog',

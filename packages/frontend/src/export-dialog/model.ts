@@ -36,6 +36,9 @@ export const Model = S.Struct({
   error: S.NullOr(S.String),
   // True after a successful download, until the next settings change.
   downloaded: S.Boolean,
+  // True while the per-format codec options are expanded (collapsed keeps
+  // the inline export bar compact).
+  advanced: S.Boolean,
 })
 export type Model = typeof Model.Type
 
@@ -49,4 +52,5 @@ export const init = (config: { readonly id: string; readonly fileStem: string })
   url: null,
   error: null,
   downloaded: false,
+  advanced: false,
 })

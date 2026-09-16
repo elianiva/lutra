@@ -50,14 +50,30 @@ export const update = (model: Model, message: Message): UpdateReturn =>
 
       // settings: persist; the encode waits for the Export press
       ChangedFormat: ({ format }) =>
-        settingsChanged(model, {
-          ...model.settings,
-          format,
-          quality: format === 'png' ? null : (model.settings.quality ?? 75),
-        }),
+        settingsChanged(model, withQualityForFormat({ ...model.settings, format })),
       ChangedQuality: ({ quality }) => settingsChanged(model, { ...model.settings, quality }),
       ChangedScale: ({ scale }) => settingsChanged(model, { ...model.settings, scale }),
-      SettingsLoaded: ({ settings }) => ({ model: { ...model, settings } }),
+      ChangedResizeMethod: ({ method }) =>
+        settingsChanged(model, { ...model.settings, resizeMethod: method }),
+      ChangedJpegOptions: ({ options }) =>
+        settingsChanged(model, {
+          ...model.settings,
+          options: { ...model.settings.options, jpeg: options },
+        }),
+      ChangedWebpOptions: ({ options }) =>
+        settingsChanged(model, {
+          ...model.settings,
+          options: { ...model.settings.options, webp: options },
+        }),
+      ChangedAvifOptions: ({ options }) =>
+        settingsChanged(model, {
+          ...model.settings,
+          options: { ...model.settings.options, avif: options },
+        }),
+      ToggledAdvanced: () => ({ model: { ...model, advanced: !model.advanced } }),
+      SettingsLoaded: ({ settings }) => ({
+        model: { ...model, settings: withQualityForFormat(settings) },
+      }),
 
       EncodeRequested: () => {
         // The encode runs here, on Export press — not on settings change.
@@ -108,6 +124,16 @@ const settingsChanged = (model: Model, settings: Model['settings']): UpdateRetur
   model: { ...model, downloaded: false, settings },
   commands: [SaveExportSettings({ settings })],
 })
+
+/**
+ * Keep `quality` consistent with the format: null only for PNG, the one
+ * format with no quality knob. A lossless WebP/AVIF keeps its value, so
+ * switching the lossless toggle back off restores the user's quality.
+ */
+const withQualityForFormat = (settings: Model['settings']): Model['settings'] =>
+  settings.format === 'png'
+    ? { ...settings, quality: null }
+    : { ...settings, quality: settings.quality ?? 75 }
 
 /**
  * Run the @foldkit/ui Dialog submodel and lift its results. On close: drop

@@ -1,8 +1,11 @@
 /**
  * Tile-array operations for the collage (docs/adr/0009-collage). Position IS the
- * array index in reading order, so remove and reorder are plain array ops —
- * the same splice semantics as the editor chain's `ReorderedLayer`, pinned
- * by property tests in `tiles.test.ts`.
+ * array index in reading order, so reorder is a plain array move — the same
+ * splice semantics as the editor chain's `ReorderedLayer`, pinned by property
+ * tests in `tiles.test.ts`.
+ *
+ * There is no remove: a collage's photos change by replacement, not deletion
+ * (docs/adr/0009-collage).
  */
 
 /** Move one element from index `from` to index `to`. Out-of-range or no-op moves return the array unchanged. */
@@ -20,12 +23,4 @@ export const moveTile = <T>(tiles: readonly T[], from: number, to: number): read
   }
   next.splice(to, 0, moved)
   return next
-}
-
-/** Remove the element at `index`. An out-of-range index returns the array unchanged. */
-export const removeTile = <T>(tiles: readonly T[], index: number): readonly T[] => {
-  if (index < 0 || index >= tiles.length) {
-    return tiles
-  }
-  return [...tiles.slice(0, index), ...tiles.slice(index + 1)]
 }

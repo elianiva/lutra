@@ -3,7 +3,7 @@ import { defineMessageUnion } from 'foldkit/message'
 import * as DragAndDrop from '@/components/ui/drag-and-drop'
 import * as ExportDialog from '../export-dialog'
 import { Collage, EditIdSchema, StoreError } from '@lutra/store'
-import { CollagePhoto } from './model'
+import { CollageMode, CollagePhoto } from './model'
 
 /**
  * The Collage Submodel's message union (docs/adr/0006-frontend-architecture, docs/adr/0009-collage). Internal to the
@@ -42,10 +42,24 @@ export const CollageMessage = defineMessageUnion({
   },
   ToggledBackground: {},
 
+  /** Switch between Arrange (reorder/replace) and Frame (pan/zoom) — docs/adr/0009-collage. */
+  ChangedMode: { mode: CollageMode },
+
   TileSelected: { index: S.NullOr(S.Number) },
 
   // arrangement (auto-saves on every mutation, docs/adr/0009-collage)
-  RemovedTile: { index: S.Number },
+  /** Open the file picker to swap the photo in this tile (there is no remove). */
+  ReplaceTileRequested: { index: S.Number },
+  /**
+   * The picked replacement landed: a fresh Edit was saved and now fills the
+   * tile. The previous Edit stays in the gallery — a collage never owns its
+   * tiles' Edits.
+   */
+  TileReplaced: {
+    index: S.Number,
+    editId: EditIdSchema,
+    photo: CollagePhoto,
+  },
   GotDragMessage: {
     message: DragAndDrop.Message,
   },
@@ -65,6 +79,11 @@ export const CollageMessage = defineMessageUnion({
   WheelZoomed: {
     index: S.Number,
     deltaY: S.Number,
+  },
+  /** An absolute zoom from the framing slider, drafted and committed like the wheel. */
+  ZoomSet: {
+    index: S.Number,
+    zoom: S.Number,
   },
   /** The wheel went quiet — the drafted zoom commits and auto-saves. */
   ZoomSettled: { seq: S.Number },
@@ -108,5 +127,7 @@ export const CollageMessage = defineMessageUnion({
     photos: S.Array(CollagePhoto),
   },
   AddPhotosFailed: { message: S.String },
+  /** The file picker was dismissed — a no-op, never a notice. */
+  PhotoPickCancelled: {},
 })
 export type CollageMessage = typeof CollageMessage.Type
