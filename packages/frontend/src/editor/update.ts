@@ -223,7 +223,14 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         model: { ...model, mobileSheet: model.mobileSheet === sheet ? null : sheet, phase },
       }),
 
-      CanvasRegistered: () => ({ model }),
+      CanvasRegistered: () =>
+        // The canvas is registered from a forked mount fiber, so the render a
+        // decode dispatched is in flight before the element exists and fails
+        // with "Canvas not ready" — registration is the signal that the frame
+        // is now drawable. Re-render when nothing has been presented for the
+        // current revision yet (the same staleness test the RenderedFrame
+        // handler uses); an up-to-date frame means this canvas already shows it.
+        model.renderedStamp >= model.revision ? { model } : renderNow({ ...model, phase }),
 
       FilePickRequested: () => ({ model, commands: [PickImageFile()] }),
       FilePickCancelled: () => ({ model }),
