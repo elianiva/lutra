@@ -393,7 +393,7 @@ export const ReadHistogram = Command.define('ReadHistogram', {
   messages: [EditorMessage.HistogramComputed, EditorMessage.HistogramFailed],
 })
 
-/** Settings persistence is shared with the collage's export dialog (docs/adr/0004-export). */
+/** Settings persistence is shared with the export dialog (docs/adr/0004-export). */
 import { setFrame } from '../export-dialog'
 
 const OFF_PRESENT = { mode: 'off', splitAt: 0, showBefore: false } as const

@@ -2,9 +2,9 @@ import type { EditId } from '@lutra/store'
 
 /**
  * Memoize bytes→object URL per summary id, shared by every surface that
- * renders stored thumbnails (the main menu grid and the collage preview).
- * Dormant while the store is empty; entries live for the session (the same
- * lifecycle as the gallery's original per-view cache).
+ * renders stored thumbnails (the main menu grid). Dormant while the store is
+ * empty; entries live for the session (the same lifecycle as the gallery's
+ * original per-view cache).
  */
 const cache = new Map<EditId, string>()
 

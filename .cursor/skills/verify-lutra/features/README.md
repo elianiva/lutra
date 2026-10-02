@@ -43,5 +43,4 @@ These are real user features with no dedicated scenario yet; add `--scenario` br
 - Save an edit / gallery persistence (`Save`, `Save as`) → tile appears in the Gallery.
 - Export an image (export dialog → download). Note: export does a GPU readback; verify whether it succeeds under software WebGPU before relying on it.
 - Compare (`Toggle` / `Split` / `Side by side`) in the editor bottom bar.
-- Create / edit a Collage (`/collage/:id`).
 - Reorder / delete adjustment layers.

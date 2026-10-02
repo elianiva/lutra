@@ -1,7 +1,7 @@
 import { Schema as S } from 'effect'
 import { defineMessageUnion } from 'foldkit/message'
 import * as Dialog from '@/components/ui/dialog'
-import { EditSummary, EditIdSchema, StoreError, CollageIdSchema, Collage } from '@lutra/store'
+import { EditSummary, EditIdSchema, StoreError } from '@lutra/store'
 import { ImageDecodeError, ThumbnailEncodeError } from '../errors'
 
 /**
@@ -25,10 +25,6 @@ export const GalleryMessage = defineMessageUnion({
   EditDeleted: {},
   DeleteFailed: { error: StoreError },
 
-  // collage selection (docs/adr/0009-collage)
-  ToggledSelection: { id: EditIdSchema },
-  CreateCollageRequested: {},
-
   OpenPhotoRequested: {},
   PhotoPickCancelled: {},
   PhotoCreated: { id: EditIdSchema },
@@ -47,25 +43,6 @@ export const GalleryMessage = defineMessageUnion({
     error: S.Option(PhotoCreateError),
     summaries: S.Option(S.Array(EditSummary)),
   },
-
-  // collage section (docs/adr/0009-collage): list + open + delete
-  CollagesListed: { collages: S.Array(Collage) },
-  CollageListFailed: { error: StoreError },
-  CollageThumbsMeasured: {
-    sizes: S.Array(S.Struct({ editId: EditIdSchema, width: S.Number, height: S.Number })),
-  },
-  CollageOpenRequested: { id: CollageIdSchema },
-  ToggledCollageDeleteConfirm: {
-    id: CollageIdSchema,
-  },
-  CollageDeleteConfirmCancelled: {},
-  CollageDeleteRequested: { id: CollageIdSchema },
-  CollageDeleted: {},
-  CollageDeleteFailed: { error: StoreError },
-
-  // create a collage (persist-first, docs/adr/0009-collage)
-  CollageCreated: { id: CollageIdSchema },
-  CollageCreateFailed: { error: StoreError },
 
   // drag & drop / paste (gallery drop zone + clipboard)
   DragEntered: {},
@@ -91,13 +68,10 @@ export type GalleryMessage = typeof GalleryMessage.Type
 
 /**
  * The facts the gallery surfaces to the root (docs/adr/0006-frontend-architecture). Narrow and
- * semantic: the root owns navigation, so "open this edit" and "open this
- * collage" are the only facts the gallery emits. The root reacts by pushing
- * the corresponding URL.
+ * semantic: the root owns navigation, so "open this edit" is the only fact the
+ * gallery emits. The root reacts by pushing the corresponding URL.
  */
 export const GalleryOutMessage = defineMessageUnion({
   OpenedEdit: { id: EditIdSchema },
-  CreatedCollage: { id: CollageIdSchema },
-  OpenedCollage: { id: CollageIdSchema },
 })
 export type GalleryOutMessage = typeof GalleryOutMessage.Type

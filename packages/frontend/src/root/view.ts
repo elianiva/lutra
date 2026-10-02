@@ -3,10 +3,9 @@ import { Match, Schema as S } from 'effect'
 import type { Model } from './model'
 import { AppMessage, RootMessage } from './message'
 import { OfflineMessage } from '../offline/messages'
-import { GalleryRoute, EditorRoute, CollageRoute, CollageHomeRoute } from '../route'
+import { GalleryRoute, EditorRoute } from '../route'
 import * as Gallery from '../gallery'
 import * as Editor from '../editor'
-import * as Collage from '../collage'
 import { button } from '@/components/ui/button'
 
 /**
@@ -34,9 +33,6 @@ const toGalleryParent = (
 const toEditorParent = (
   message: Parameters<typeof RootMessage.GotEditorMessage>[0]['message'],
 ): RootMessage => RootMessage.GotEditorMessage({ message })
-const toCollageParent = (
-  message: Parameters<typeof RootMessage.GotCollageMessage>[0]['message'],
-): RootMessage => RootMessage.GotCollageMessage({ message })
 
 // Module-scope helpers for lazy — stable fn references (lazy compares fn === prevFn)
 const unsupportedScreenView = (webgpu: Model['webgpu'], h: HtmlBuilder<AppMessage>): Html =>
@@ -100,7 +96,6 @@ const activeRouteView = (
   route: Model['route'],
   gallery: Model['gallery'],
   editor: Model['editor'],
-  collage: Model['collage'],
   h: HtmlBuilder<AppMessage>,
 ): Html =>
   Match.value(route).pipe(
@@ -119,15 +114,6 @@ const activeRouteView = (
         slotId: 'editor',
         toParentMessage: toEditorParent,
         view: Editor.view,
-      }),
-    ),
-    Match.when(S.is(CollageHomeRoute), () => h.div([], [])),
-    Match.when(S.is(CollageRoute), () =>
-      h.submodel({
-        model: collage,
-        slotId: 'collage',
-        toParentMessage: toCollageParent,
-        view: Collage.view,
       }),
     ),
     Match.orElse(() => notFound(h)),
@@ -153,13 +139,7 @@ export const view = (model: Model, h: HtmlBuilder<AppMessage>): Document => {
           }),
           Match.orElse(() => []),
         ),
-        lazyActiveRoute(activeRouteView, [
-          model.route,
-          model.gallery,
-          model.editor,
-          model.collage,
-          h,
-        ])!,
+        lazyActiveRoute(activeRouteView, [model.route, model.gallery, model.editor, h])!,
       ],
     ),
     title: 'Lutra',

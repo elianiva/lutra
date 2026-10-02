@@ -1,13 +1,15 @@
 import { DateTime } from 'effect'
 import { Submodel, AsyncData } from 'foldkit'
 import { type Html, type HtmlBuilder, createLazy, createKeyedLazy } from 'foldkit/html'
-import { Check, Undo2, Upload, X } from 'lucide'
+import { Upload, X } from 'lucide'
 import { button } from '@/components/ui/button'
 import { GalleryMessage } from './message'
 import type { Model } from './model'
-import type { Collage as CollageRecord, EditSummary, EditId, StoreError } from '@lutra/store'
+import type { EditSummary, StoreError } from '@lutra/store'
 import { settingsDialogView } from './settings-dialog'
 import { deleteDialogView } from './delete-dialog'
+import { thumbnailUrl } from '../thumbnail-url'
+import { icon } from '../components/icon'
 
 /**
  * The Gallery Submodel's view (docs/adr/0006-frontend-architecture). Branded via `defineView` so it
@@ -23,18 +25,8 @@ import { deleteDialogView } from './delete-dialog'
 const lazyHeader = createLazy()
 const lazyNotice = createLazy()
 const lazyTile = createKeyedLazy()
-const lazyCollageCard = createKeyedLazy()
-const lazyCollageSection = createLazy()
 
-type CollagesSectionSlice = Pick<
-  Model,
-  'collages' | 'grid' | 'collageThumbSizes' | 'confirmingCollageDelete'
->
-
-type CollageCardSlice = Pick<Model, 'grid' | 'collageThumbSizes' | 'confirmingCollageDelete'>
-
-const headerView = (selectedCount: number, h: HtmlBuilder<GalleryMessage>): Html =>
-  header(h, selectedCount)
+const headerView = (h: HtmlBuilder<GalleryMessage>): Html => header(h)
 const noticeView = (message: string | null, h: HtmlBuilder<GalleryMessage>): Html =>
   notice(message, h)
 
@@ -51,21 +43,9 @@ export const view = Submodel.defineView<Model, GalleryMessage>((model, h) => {
       h.OnDropFiles((files) => GalleryMessage.FilesDropped({ files: [...files] })),
     ],
     [
-      lazyHeader(headerView, [model.selection.length, h])!,
+      lazyHeader(headerView, [h])!,
       lazyNotice(noticeView, [model.notice, h]) ?? notice(model.notice, h),
-      h.main(
-        [h.Class('flex min-h-0 flex-1 flex-col overflow-auto')],
-        [
-          gridBody(h, grid, model.selection),
-          lazyCollageSection(collagesSectionView, [
-            model.collages,
-            model.grid,
-            model.collageThumbSizes,
-            model.confirmingCollageDelete,
-            h,
-          ]) ?? collagesSection(h, model),
-        ],
-      ),
+      h.main([h.Class('flex min-h-0 flex-1 flex-col overflow-auto')], [gridBody(h, grid)]),
       settingsDialogView(h, model),
       deleteDialogView(h, model),
       dropOverlay(h, model.dragOver),
@@ -73,26 +53,12 @@ export const view = Submodel.defineView<Model, GalleryMessage>((model, h) => {
   )
 })
 
-const collagesSectionView = (
-  collages: Model['collages'],
-  grid: Model['grid'],
-  thumbSizes: Model['collageThumbSizes'],
-  confirming: Model['confirmingCollageDelete'],
-  h: HtmlBuilder<GalleryMessage>,
-): Html =>
-  collagesSection(h, {
-    collages,
-    grid,
-    collageThumbSizes: thumbSizes,
-    confirmingCollageDelete: confirming,
-  })
-
 const notice = (message: string | null, h: HtmlBuilder<GalleryMessage>) =>
   message === null
     ? null
     : h.div([h.Class('border-b border-border bg-panel px-4 py-1 text-xs text-accent')], [message])
 
-const header = (h: HtmlBuilder<GalleryMessage>, selectedCount: number) =>
+const header = (h: HtmlBuilder<GalleryMessage>) =>
   h.header(
     [h.Class('flex items-center justify-between border-b border-border bg-panel px-4 py-2')],
     [
@@ -100,24 +66,6 @@ const header = (h: HtmlBuilder<GalleryMessage>, selectedCount: number) =>
       h.div(
         [h.Class('flex items-center gap-2')],
         [
-          // "Create collage" appears once two or more edits are selected
-          // (docs/adr/0009-collage): below that there is nothing to arrange.
-          ...(selectedCount >= 2
-            ? [
-                button(
-                  {
-                    onClick: GalleryMessage.CreateCollageRequested(),
-                    size: 'xs',
-                    attributes: [
-                      h.AriaLabel(`Create a collage from ${selectedCount} selected edits`),
-                      h.DataAttribute('create-collage', 'true'),
-                    ],
-                  },
-                  `Create collage (${selectedCount})`,
-                  h,
-                ),
-              ]
-            : []),
           button(
             {
               onClick: GalleryMessage.OpenPhotoRequested(),
@@ -157,7 +105,6 @@ const header = (h: HtmlBuilder<GalleryMessage>, selectedCount: number) =>
 const gridBody = (
   h: HtmlBuilder<GalleryMessage>,
   grid: AsyncData.AsyncData<readonly EditSummary[], StoreError>,
-  selection: readonly EditId[],
 ) =>
   AsyncData.match(grid, {
     onFailure: (error) => errorState(h, error.message),
@@ -165,8 +112,7 @@ const gridBody = (
     onLoading: () => spinner(h),
     onRefreshing: () => spinner(h),
     onStale: () => spinner(h),
-    onSuccess: (summaries) =>
-      summaries.length === 0 ? emptyState(h) : gridTiles(h, summaries, selection),
+    onSuccess: (summaries) => (summaries.length === 0 ? emptyState(h) : gridTiles(h, summaries)),
   })
 
 const spinner = (h: HtmlBuilder<GalleryMessage>) =>
@@ -250,35 +196,26 @@ const errorState = (h: HtmlBuilder<GalleryMessage>, error: string) =>
  *  pointer leaves; tabbing in still reveals them for keyboard users. */
 const hoverReveal = 'opacity-0 group-hover:opacity-100 group-has-focus-visible:opacity-100'
 
-const gridTiles = (
-  h: HtmlBuilder<GalleryMessage>,
-  summaries: readonly EditSummary[],
-  selection: readonly EditId[],
-) =>
+const gridTiles = (h: HtmlBuilder<GalleryMessage>, summaries: readonly EditSummary[]) =>
   h.div(
     [h.Class('grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4 p-4')],
-    summaries.map((summary) =>
-      lazyTile(summary.id, tileView, [summary, selection.includes(summary.id), h])!,
-    ),
+    summaries.map((summary) => lazyTile(summary.id, tileView, [summary, h])!),
   )
 
-const tileView = (summary: EditSummary, selected: boolean, h: HtmlBuilder<GalleryMessage>): Html =>
-  tile(h, summary, selected)
+const tileView = (summary: EditSummary, h: HtmlBuilder<GalleryMessage>): Html => tile(h, summary)
 
-const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary, selected: boolean) =>
+const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) =>
   h.div(
     [
       h.Key(summary.id),
       h.DataAttribute('edit-id', summary.id),
       h.Class(
-        `group relative aspect-square overflow-hidden rounded border bg-panel hover:border-muted ${
-          selected ? 'border-accent' : 'border-border'
-        }`,
+        'group relative aspect-square overflow-hidden rounded border border-border bg-panel hover:border-muted',
       ),
     ],
     [
-      // Click target for opening the edit — must not include the select or
-      // delete buttons so those clicks don't bubble up into ClickedEdit.
+      // Click target for opening the edit — must not include the delete button
+      // so those clicks don't bubble up into ClickedEdit.
       button(
         {
           onClick: GalleryMessage.ClickedEdit({ id: summary.id }),
@@ -287,29 +224,6 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary, selected: bo
           attributes: [h.AriaLabel('Open saved edit')],
         },
         [tileThumb(h, summary)],
-        h,
-      ),
-      // The collage-select control (docs/adr/0009-collage): an overlay like the
-      // delete control — no separate "select mode" to enter or leave; the
-      // header CTA appears at two or more. Hidden until hover/focus like
-      // the rest of the tile's overlays — except once selected, where it
-      // stays put so the picked state remains visible without hover.
-      button(
-        {
-          onClick: GalleryMessage.ToggledSelection({ id: summary.id }),
-          variant: 'ghost',
-          size: 'icon-sm',
-          className: `absolute left-1 top-1 z-10 grid place-items-center rounded-full border p-0 ${
-            selected
-              ? 'border-accent bg-accent text-ink'
-              : `border-white/60 bg-black/40 text-white/80 hover:text-white ${hoverReveal}`
-          }`,
-          attributes: [
-            h.AriaLabel(selected ? 'Remove from collage selection' : 'Add to collage selection'),
-            h.DataAttribute('select-edit-id', summary.id),
-          ],
-        },
-        selected ? [icon(h, Check, 'Selected')] : [],
         h,
       ),
       // Caption + delete ✕: hidden until hover/focus (the ✕ opens the
@@ -354,272 +268,9 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary, selected: bo
     ],
   )
 
-/** Memoize bytes→object URL per summary id via the shared cache. */
-import { thumbnailUrl } from '../thumbnail-url'
-import { icon } from '../components/icon'
-import { cellSize, effectiveRowCount } from '../collage/compose'
-import { isDefaultFraming, placement } from '../collage/framing'
 const tileThumb = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) => {
   const url = thumbnailUrl(summary.id, summary.thumbnail)
   return url
     ? h.img([h.Src(url), h.Alt(''), h.Class('h-full w-full object-cover')])
     : h.div([h.Class('flex h-full w-full items-center justify-center text-muted')], ['No thumb'])
-}
-
-// Collages section (docs/adr/0009-collage)
-
-/**
- * The saved-collages strip beneath the edits grid. Each card composes a live
- * mini-preview client-side: a CSS grid mirroring the collage's layout
- * (columns, rows, gutter, background) filled with the referenced Edits' cached
- * thumbnails — no pixels are copied; the record is the summary. Hidden
- * entirely while the store holds no collages.
- */
-const collagesSection = (h: HtmlBuilder<GalleryMessage>, slice: CollagesSectionSlice) =>
-  AsyncData.match(slice.collages, {
-    onFailure: () => null,
-    onIdle: () => null,
-    onLoading: () => null,
-    onRefreshing: () => null,
-    onStale: () => null,
-    onSuccess: (collages) => (collages.length === 0 ? null : collageCards(h, collages, slice)),
-  })
-
-const collageCards = (
-  h: HtmlBuilder<GalleryMessage>,
-  collages: readonly CollageRecord[],
-  slice: CollagesSectionSlice,
-) =>
-  h.section(
-    [h.DataAttribute('collages-section', 'true'), h.Class('border-t border-border p-4')],
-    [
-      h.h2(
-        [h.Class('mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted')],
-        ['Collages'],
-      ),
-      h.div(
-        [h.Class('grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4')],
-        collages.map((collage) =>
-          lazyCollageCard(collage.id, collageCardView, [
-            collage,
-            slice.grid,
-            slice.collageThumbSizes,
-            slice.confirmingCollageDelete,
-            h,
-          ])!,
-        ),
-      ),
-    ],
-  )
-
-const collageCardView = (
-  collage: CollageRecord,
-  grid: Model['grid'],
-  thumbSizes: Model['collageThumbSizes'],
-  confirmingId: Model['confirmingCollageDelete'],
-  h: HtmlBuilder<GalleryMessage>,
-): Html =>
-  collageCard(h, collage, {
-    grid,
-    collageThumbSizes: thumbSizes,
-    confirmingCollageDelete: confirmingId,
-  })
-
-const collageCard = (
-  h: HtmlBuilder<GalleryMessage>,
-  collage: CollageRecord,
-  slice: CollageCardSlice,
-) => {
-  const byId = new Map(slice.grid._tag === 'Success' ? slice.grid.data.map((s) => [s.id, s]) : [])
-  const confirming = slice.confirmingCollageDelete === collage.id
-  return h.div(
-    [
-      h.Key(collage.id),
-      h.DataAttribute('collage-id', collage.id),
-      h.Class(
-        `group relative aspect-square overflow-hidden rounded border bg-panel hover:border-muted ${
-          confirming ? 'border-accent' : 'border-border'
-        }`,
-      ),
-    ],
-    [
-      // The mini-preview doubles as the open click target; the confirm and
-      // delete controls sit above it so their clicks don't bubble.
-      button(
-        {
-          onClick: GalleryMessage.CollageOpenRequested({ id: collage.id }),
-          variant: 'ghost',
-          className: 'absolute inset-0 h-auto p-0',
-          attributes: [
-            h.AriaLabel(`Open collage with ${collage.tiles.length} photos`),
-            h.DataAttribute('open-collage-id', collage.id),
-          ],
-        },
-        [miniPreview(h, collage, byId, slice.collageThumbSizes)],
-        h,
-      ),
-      h.div(
-        [
-          h.Class(
-            `absolute bottom-0 left-0 right-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent px-2 py-1 ${
-              // The armed confirm must stay reachable without hover.
-              confirming ? 'opacity-100' : hoverReveal
-            }`,
-          ),
-        ],
-        [
-          h.span(
-            [h.Class('text-[10px] text-white/80 tnum')],
-            [
-              `${collage.tiles.length} ${collage.tiles.length === 1 ? 'photo' : 'photos'} · ${
-                collage.savedAt > 0
-                  ? DateTime.formatLocal({ dateStyle: 'short' })(
-                      DateTime.makeUnsafe(collage.savedAt),
-                    )
-                  : ''
-              }`,
-            ],
-          ),
-          h.div(
-            [h.Class('relative z-10 flex items-center gap-1')],
-            confirming
-              ? [
-                  // ADR-0010's two-step inline confirm: red confirm + undo.
-                  button(
-                    {
-                      onClick: GalleryMessage.CollageDeleteRequested({ id: collage.id }),
-                      variant: 'ghost',
-                      size: 'icon-sm',
-                      className: 'grid place-items-center p-0 text-red-400 hover:text-red-300',
-                      attributes: [
-                        h.AriaLabel('Confirm deleting this collage'),
-                        h.DataAttribute('confirm-delete-collage-id', collage.id),
-                      ],
-                    },
-                    [icon(h, X, 'Confirm deleting this collage')],
-                    h,
-                  ),
-                  button(
-                    {
-                      onClick: GalleryMessage.CollageDeleteConfirmCancelled(),
-                      variant: 'ghost',
-                      size: 'icon-sm',
-                      className: 'grid place-items-center p-0 text-white/80 hover:text-white',
-                      attributes: [
-                        h.AriaLabel('Cancel deleting this collage'),
-                        h.DataAttribute('cancel-delete-collage-id', collage.id),
-                      ],
-                    },
-                    [icon(h, Undo2, 'Cancel deleting this collage')],
-                    h,
-                  ),
-                ]
-              : [
-                  button(
-                    {
-                      onClick: GalleryMessage.ToggledCollageDeleteConfirm({ id: collage.id }),
-                      variant: 'ghost',
-                      size: 'icon-sm',
-                      className: 'grid place-items-center p-0 text-white/80 hover:text-white',
-                      attributes: [
-                        h.AriaLabel('Delete this collage'),
-                        h.DataAttribute('delete-collage-id', collage.id),
-                      ],
-                    },
-                    [icon(h, X, 'Delete this collage')],
-                    h,
-                  ),
-                ],
-          ),
-        ],
-      ),
-    ],
-  )
-}
-
-/**
- * The CSS-grid mini-preview: layout-faithful (frame ratio included), and
- * tiles with custom framing mirror it through the same placement math the
- * collage screen and export use; default-framed tiles stay cover-cropped.
- */
-const miniPreview = (
-  h: HtmlBuilder<GalleryMessage>,
-  collage: CollageRecord,
-  byId: Map<EditId, EditSummary>,
-  sizes: Model['collageThumbSizes'],
-) => {
-  const cell = cellSize(collage.layout, Math.max(1, collage.tiles.length), 1000)
-  const cellAspect = cell.width / cell.height
-  // Mirror the screen's explicit M×N grid: spare capacity renders as
-  // background cells (docs/adr/0009-collage).
-  const columns = Math.max(1, Math.round(collage.layout.columns))
-  const rows = effectiveRowCount(collage.layout, collage.tiles.length)
-  const empties = Array.from(
-    { length: Math.max(0, columns * rows - collage.tiles.length) },
-    (_, i) => h.div([h.Key(`empty-${i}`), h.Class('h-full w-full')], []),
-  )
-  return h.div(
-    [
-      h.Class('flex h-full w-full items-center justify-center p-1'),
-      h.Style({
-        backgroundColor: collage.layout.background === 'dark' ? '#000000' : '#ffffff',
-      }),
-    ],
-    [
-      h.div(
-        [
-          h.Class('grid h-full w-full'),
-          h.Style({
-            display: 'grid',
-            gridTemplateColumns: `repeat(${columns}, 1fr)`,
-            gap: `${Math.max(1, Math.round(collage.layout.gutter / 4))}px`,
-          }),
-        ],
-        [
-          ...collage.tiles.map((tileRef) => {
-            const summary = byId.get(tileRef.editId)
-            const url = summary ? thumbnailUrl(summary.id, summary.thumbnail) : null
-            if (!url) {
-              return h.div([h.Key(tileRef.editId), h.Class('h-full w-full bg-neutral-700')], [])
-            }
-            if (isDefaultFraming(tileRef.framing)) {
-              return h.img([
-                h.Key(tileRef.editId),
-                h.Src(url),
-                h.Alt(''),
-                h.Class('h-full w-full object-cover'),
-              ])
-            }
-            const size = sizes.find((s) => s.editId === tileRef.editId)
-            if (!size || size.width <= 0 || size.height <= 0) {
-              return h.img([
-                h.Key(tileRef.editId),
-                h.Src(url),
-                h.Alt(''),
-                h.Class('h-full w-full object-cover'),
-              ])
-            }
-            const p = placement(tileRef.framing, size.width / size.height, cellAspect)
-            return h.div(
-              [h.Key(tileRef.editId), h.Class('relative h-full w-full overflow-hidden')],
-              [
-                h.img([
-                  h.Src(url),
-                  h.Alt(''),
-                  h.Class('absolute max-w-none'),
-                  h.Style({
-                    width: `${p.width * 100}%`,
-                    height: `${p.height * 100}%`,
-                    left: `${p.left * 100}%`,
-                    top: `${p.top * 100}%`,
-                  }),
-                ]),
-              ],
-            )
-          }),
-          ...empties,
-        ],
-      ),
-    ],
-  )
 }

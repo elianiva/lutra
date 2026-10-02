@@ -37,7 +37,7 @@ export const tableCrud = <Table extends IndexedDbTable.AnyWithProps, Summary>({
   table,
   toSummary,
 }: {
-  /** Human-readable store name used in error messages (`'edit'`, `'collage'`). */
+  /** Human-readable store name used in error messages (`'edit'`). */
   readonly label: string
   /** The resolved query entry point (`(yield* LutraDbSchema).from(Table.tableName)`). */
   readonly table: IndexedDbQueryBuilder.IndexedDbQuery.From<Table>

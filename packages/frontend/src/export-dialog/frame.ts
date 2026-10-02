@@ -8,9 +8,8 @@
  * this slot owns the pixels for the dialog's lifetime — exactly the seam
  * `thumbnail-url.ts` uses for thumbnail blobs.
  *
- * The editor and the collage never hold frames at the same time (one route
- * is active), and every dialog open snapshots afresh, so one shared slot is
- * equivalent to the per-screen slots it replaces.
+ * The owning screen slots a frame when it opens its dialog and clears it on
+ * close, so one shared slot is all the ownership this needs.
  */
 let frame: ImageData | null = null
 

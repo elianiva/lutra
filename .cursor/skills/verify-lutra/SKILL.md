@@ -5,7 +5,7 @@ description: Drive the real Lutra web app (WebGPU film-simulation photo editor) 
 
 # Verify Lutra
 
-Lutra is a client-side, WebGPU photo color-grading app (see the repo `README.md`). The user surface is the **web UI** at `http://localhost:5173` with three screens: the Gallery (`/`), the Editor (`/edit/:id`), and Collage (`/collage/:id`). This skill launches that app and drives it over the Chrome DevTools Protocol using stable ARIA/`data-` handles, then captures evidence.
+Lutra is a client-side, WebGPU photo color-grading app (see the repo `README.md`). The user surface is the **web UI** at `http://localhost:5173` with two screens: the Gallery (`/`) and the Editor (`/edit/:id`). This skill launches that app and drives it over the Chrome DevTools Protocol using stable ARIA/`data-` handles, then captures evidence.
 
 The harness launches its **own isolated Chrome** (private profile, private debug port, software-WebGPU flags) and tears down only that Chrome. It never touches the computer-use browser, so it is safe to run alongside an interactive session.
 
