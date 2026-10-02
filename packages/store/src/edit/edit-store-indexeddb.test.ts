@@ -136,6 +136,55 @@ class ListCommand implements fc.AsyncCommand<Model, void> {
 }
 
 describe('EditStoreIndexedDb (IndexedDB local backend)', () => {
+  it('upgrades a v1 database to v2 without touching its Edits (docs/adr/0005-storage)', async () => {
+    // Build a v1-shaped "lutra" database by hand — the `edits` store, its
+    // `saved_at` index, and one encoded row — then open it through the real
+    // backend, which must run the v1→v2 migration and leave the row readable.
+    //
+    // This must stay the FIRST case in the file: fake-indexeddb caches the open
+    // connection per database name, so once anything has opened `lutra` the
+    // upgrade can no longer be observed.
+    const row = {
+      id: '11111111-1111-4111-8111-111111111111',
+      savedAt: 5,
+      chain: [],
+      source: new Uint8Array([1, 2, 3]),
+      thumbnail: new Uint8Array([9, 9]),
+    }
+    await new Promise<void>((resolve, reject) => {
+      const open = indexedDB.open('lutra', 1)
+      open.onupgradeneeded = () => {
+        const store = open.result.createObjectStore('edits', { keyPath: 'id' })
+        store.createIndex('saved_at', 'savedAt')
+        store.put(row)
+      }
+      open.onsuccess = () => {
+        open.result.close()
+        resolve()
+      }
+      open.onerror = () => reject(open.error)
+    })
+
+    // The pre-existing row survives, and the store still writes on top of it.
+    expect(await run(load(EditId(row.id)))).not.toEqual(Option.none())
+    const added = edit('22222222-2222-4222-8222-222222222222', 7)
+    await run(save(added))
+    expect(await run(list())).toHaveLength(2)
+
+    // v2 is retained as a no-op so databases already at v2 keep opening —
+    // IndexedDB refuses to open a database at a lower version than on disk.
+    const version = await new Promise<number | null>((resolve) => {
+      const open = indexedDB.open('lutra')
+      open.onsuccess = () => {
+        const { version: v } = open.result
+        open.result.close()
+        resolve(v)
+      }
+      open.onerror = () => resolve(null)
+    })
+    expect(version).toBe(2)
+  })
+
   it('load finds an Edit by id even when it is not the first row', async () => {
     // Rows come back in key order, so the second id is not the scan's
     // first row — a load-by-id must still find it (the old

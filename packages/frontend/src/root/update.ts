@@ -2,8 +2,8 @@ import { Effect, Match, Schema as S } from 'effect'
 import { Command, Update } from 'foldkit'
 import { pushUrl } from 'foldkit/navigation'
 import { evo } from 'foldkit/struct'
-import type { EditStore, CollageStore } from '@lutra/store'
-import { EditIdSchema, CollageIdSchema } from '@lutra/store'
+import type { EditStore } from '@lutra/store'
+import { EditIdSchema } from '@lutra/store'
 import type { GpuBackend } from '../gpu/backend'
 import type { CanvasRef } from '../gpu/canvas-ref'
 import type { LutStore } from '../luts/store'
@@ -12,11 +12,10 @@ import type { ImageEncoder } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
 import { AppMessage, RootMessage } from './message'
 import type { Model } from './model'
-import { GalleryRoute, EditorRoute, CollageRoute, CollageHomeRoute } from '../route'
+import { GalleryRoute, EditorRoute } from '../route'
 import type { AppRoute } from '../route'
 import * as Gallery from '../gallery'
 import * as Editor from '../editor'
-import * as Collage from '../collage'
 import { OfflineMessage } from '../offline/messages'
 import { offlineMachine } from '../offline/machine'
 import type { Offline } from '../offline/model'
@@ -31,7 +30,6 @@ type Resource =
   | ImageEncoder
   | KeyValueStore
   | EditStore
-  | CollageStore
   | LutThumbnailer
   | OfflineFill
 
@@ -43,23 +41,6 @@ export type UpdateReturn = Update.Return<Model, AppMessage, Resource>
 const NavigateToEdit = Command.define('NavigateToEdit', {
   args: { id: EditIdSchema },
   execute: ({ id }) => pushUrl(`/edit/${id}`).pipe(Effect.as(RootMessage.NavigatedTo())),
-  messages: [RootMessage.NavigatedTo],
-})
-
-/** Push the menu URL for a bare `/collage` (no id): collages are created
- *  persist-first from the gallery, so there is no "new collage" screen to
- *  show — the bare form is a redirect, not a destination. */
-const NavigateHome = Command.define('NavigateHome', {
-  execute: pushUrl('/').pipe(Effect.as(RootMessage.NavigatedTo())),
-  messages: [RootMessage.NavigatedTo],
-})
-
-/** Push the collage URL for a Collage the user created from the gallery. The
- *  URL change triggers a `ChangedRoute`, which moves the collage screen into
- *  place — this Command is just the side effect that starts it. */
-const NavigateToCollage = Command.define('NavigateToCollage', {
-  args: { id: CollageIdSchema },
-  execute: ({ id }) => pushUrl(`/collage/${id}`).pipe(Effect.as(RootMessage.NavigatedTo())),
   messages: [RootMessage.NavigatedTo],
 })
 
@@ -90,21 +71,6 @@ const applyRoute = (model: Model, route: AppRoute) =>
       const mapped = Command.mapMessages(cmds, (m) => RootMessage.GotEditorMessage({ message: m }))
       return {
         model: withRoute(evo(model, { editor: (_) => nextEditor }), route),
-        commands: mapped,
-      }
-    }),
-    Match.when(S.is(CollageHomeRoute), (route) => {
-      // Bare `/collage` is a redirect home, not a screen.
-      return { model: withRoute(model, route), commands: [NavigateHome()] }
-    }),
-    Match.when(S.is(CollageRoute), (route) => {
-      const { model: nextCollage, commands: cmds = [] } = Collage.informRouteChanged(
-        model.collage,
-        route,
-      )
-      const mapped = Command.mapMessages(cmds, (m) => RootMessage.GotCollageMessage({ message: m }))
-      return {
-        model: withRoute(evo(model, { collage: (_) => nextCollage }), route),
         commands: mapped,
       }
     }),
@@ -171,12 +137,7 @@ export const update = (model: Model, message: AppMessage): UpdateReturn => {
         }
         return {
           model: evo(model, { gallery: (_) => nextGallery }),
-          commands: [
-            ...mapped,
-            out._tag === 'OpenedEdit'
-              ? NavigateToEdit({ id: out.id })
-              : NavigateToCollage({ id: out.id }),
-          ],
+          commands: [...mapped, NavigateToEdit({ id: out.id })],
         }
       },
       GotEditorMessage: ({ message: editorMessage }) => {
@@ -199,16 +160,6 @@ export const update = (model: Model, message: AppMessage): UpdateReturn => {
           model: evo(model, { editor: (_) => nextEditor }),
           commands: [...mapped, NavigateToEdit({ id: out.id })],
         }
-      },
-      GotCollageMessage: ({ message: collageMessage }) => {
-        const { model: nextCollage, commands: cmds = [] } = Collage.update(
-          model.collage,
-          collageMessage,
-        )
-        const mapped = Command.mapMessages(cmds, (m) =>
-          RootMessage.GotCollageMessage({ message: m }),
-        )
-        return { model: evo(model, { collage: (_) => nextCollage }), commands: mapped }
       },
       NavigatedTo: () => ({ model }),
 

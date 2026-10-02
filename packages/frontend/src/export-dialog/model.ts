@@ -3,12 +3,11 @@ import * as Dialog from '@/components/ui/dialog'
 import { ExportSettings, defaultExportSettings } from '@lutra/engine'
 
 /**
- * The export dialog machine shared by the editor and the collage screens
- * (docs/adr/0004-export): format/quality/scale settings (persisted across
- * sessions), the encode-on-press flow with its blob-URL lifecycle, and the
- * composed/readback frame slot. The owning screen supplies only its
- * snapshot — GPU readback for the editor, grid composition for the collage
- * — and reports it through `FrameReady`.
+ * The export dialog machine (docs/adr/0004-export): format/quality/scale
+ * settings (persisted across sessions), the encode-on-press flow with its
+ * blob-URL lifecycle, and the composed/readback frame slot. The owning screen
+ * supplies only its snapshot — GPU readback, for the editor — and reports it
+ * through `FrameReady`.
  *
  * The pixels bypass the TEA model entirely (docs/adr/0004-export): a
  * full-resolution ImageData is megabytes, and routing it through

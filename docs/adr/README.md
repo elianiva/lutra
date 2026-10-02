@@ -12,6 +12,5 @@ Durable architectural context only — what we decided, why, and what it constra
 | 0006                                     | [Frontend architecture](0006-frontend-architecture.md)        | Root submodel + route arms, error taxonomy, component pattern, view memoization discipline |
 | 0007                                     | [Offline support](0007-offline.md)                            | Page-driven fill, dumb service worker, cache lifetimes                                     |
 | 0008                                     | [RAW decode](0008-raw-decode.md)                              | Owned LibRaw wasm build, decode settings, licensing posture                                |
-| 0009                                     | [Collage](0009-collage.md)                                    | Composition by reference, previews/export, layout model                                    |
 | 0010                                     | [Editor & gallery UI conventions](0010-editor-ui.md)          | Compare presentation rule, tool panel, destructive actions, multi-select, responsive/touch |
 | [Depth of field](0011-depth-of-field.md) | Focal-plane depth blur layer — focal-plane model, layer shape |

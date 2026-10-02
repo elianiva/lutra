@@ -21,7 +21,7 @@ A codec knob whose units are ambiguous stays internal rather than mislabeled in 
 
 ## Shared export dialog submodel
 
-The whole export dialog is **one TEA submodel** consumed by every exporting surface (editor, collage): settings persistence, encode → download → revoke lifecycle, close-time cleanup, and error surfacing live in one machine. Adding a surface is additive: define a snapshot command that fills the frame slot, embed `ExportDialog.Model`, delegate with a thin `Got*Message` arm.
+The whole export dialog is **one TEA submodel** consumed by every exporting surface: settings persistence, encode → download → revoke lifecycle, close-time cleanup, and error surfacing live in one machine. Adding a surface is additive: define a snapshot command that fills the frame slot, embed `ExportDialog.Model`, delegate with a thin `Got*Message` arm.
 
 - Commands are schema-carried data — never functions or pixels in command args.
 - **Composed frames bypass the TEA model**: megabyte `ImageData`s never enter Messages or Model (every model log, diff, or devtools snapshot would enumerate millions of cells — observed as a hard crash). A module-level one-slot frame cache owned by the machine holds pixels for the dialog's lifetime; owners snapshot before reporting success, and every dialog open re-snapshots.

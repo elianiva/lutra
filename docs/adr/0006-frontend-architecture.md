@@ -2,7 +2,7 @@
 
 ## Root Submodel, one Submodel per route arm
 
-A root Submodel owns the top-level route; each route arm (Gallery, Editor, Collage) is its own Submodel embedded via `h.submodel`. Route-driven state initializes via `init(route)` (cold load) and refreshes via `informRouteChanged(route)` (navigation), both firing the same route-driven Commands — so reload and in-app navigation behave identically. Child messages wrap as `Got<Arm>Message`, keeping each screen's state machine behind its own boundary.
+A root Submodel owns the top-level route; each route arm (Gallery, Editor) is its own Submodel embedded via `h.submodel`. Route-driven state initializes via `init(route)` (cold load) and refreshes via `informRouteChanged(route)` (navigation), both firing the same route-driven Commands — so reload and in-app navigation behave identically. Child messages wrap as `Got<Arm>Message`, keeping each screen's state machine behind its own boundary.
 
 ## Error taxonomy
 

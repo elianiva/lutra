@@ -1,19 +1,7 @@
-import { Array, DateTime, Effect, Option, Schema as S } from 'effect'
+import { Array, DateTime, Effect, Schema as S } from 'effect'
 import { Command, File as FoldkitFile } from 'foldkit'
 import type { StoreError } from '@lutra/store'
-import {
-  Collage,
-  CollageStore,
-  CollageIdSchema,
-  EditStore,
-  EditIdSchema,
-  Edit,
-  EditId,
-  newCollageId,
-  newEditId,
-  defaultCollageLayout,
-  defaultTileFraming,
-} from '@lutra/store'
+import { EditStore, EditIdSchema, Edit, EditId, newEditId } from '@lutra/store'
 import { ImageDecodeError, ThumbnailEncodeError } from '../errors'
 import { GalleryMessage } from './message'
 
@@ -40,77 +28,6 @@ export const ListEdits = Command.define('ListEdits', {
  * the smaller grid. An unknown id is a no-op. A backend failure surfaces as
  * `DeleteFailed`.
  */
-/**
- * Fetch the saved collages for the main menu's Collages section
- * (docs/adr/0009-collage): full records — the layout drives the mini-previews. The
- * store orders newest-first.
- */
-export const ListCollages = Command.define('ListCollages', {
-  execute: Effect.gen(function* () {
-    const store = yield* CollageStore
-    const collages = yield* store.list()
-    return GalleryMessage.CollagesListed({ collages })
-  }).pipe(
-    Effect.catchTag('StoreError', (err: StoreError) =>
-      Effect.succeed(GalleryMessage.CollageListFailed({ error: err })),
-    ),
-  ),
-  messages: [GalleryMessage.CollagesListed, GalleryMessage.CollageListFailed],
-})
-
-/**
- * Decode the custom-framed collage tiles' thumbnails to learn their pixel
- * sizes (docs/adr/0009-collage) — the mini-previews mirror each tile's framing,
- * which needs its aspect. Default-framed tiles never reach here (they render
- * as cover); a failed decode just leaves that tile covered.
- */
-export const MeasureCollageThumbs = Command.define('MeasureCollageThumbs', {
-  args: {
-    thumbs: S.Array(S.Struct({ id: EditIdSchema, thumbnail: S.Uint8Array })),
-  },
-  execute: ({ thumbs }) =>
-    Effect.gen(function* MeasureCollageThumbs() {
-      const sizes: { readonly editId: EditId; readonly width: number; readonly height: number }[] =
-        []
-      for (const { id, thumbnail } of thumbs) {
-        // SAFETY: the store hands back image bytes over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
-        // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
-        const bytes = thumbnail as BlobPart
-        const decoded = yield* Effect.option(
-          Effect.tryPromise(() => createImageBitmap(new Blob([bytes]))),
-        )
-        if (Option.isNone(decoded)) {
-          continue
-        }
-        sizes.push({ editId: id, width: decoded.value.width, height: decoded.value.height })
-        yield* Effect.sync(() => decoded.value.close())
-      }
-      return GalleryMessage.CollageThumbsMeasured({ sizes })
-    }),
-  messages: [GalleryMessage.CollageThumbsMeasured],
-})
-
-/**
- * Delete one collage by id (`CollageStore.delete`); the caller re-lists to
- * reflect the smaller section. Deleting a collage never touches its
- * referenced Edits (docs/adr/0009-collage: composition by reference). A backend
- * failure surfaces as `CollageDeleteFailed`.
- */
-export const DeleteCollage = Command.define('DeleteCollage', {
-  args: { id: CollageIdSchema },
-  execute: ({ id }) =>
-    Effect.gen(function* () {
-      const store = yield* CollageStore
-      yield* store.delete(id)
-      return GalleryMessage.CollageDeleted()
-    }).pipe(
-      Effect.catchTag('StoreError', (err: StoreError) =>
-        Effect.succeed(GalleryMessage.CollageDeleteFailed({ error: err })),
-      ),
-    ),
-  messages: [GalleryMessage.CollageDeleted, GalleryMessage.CollageDeleteFailed],
-})
-
 export const DeleteEdit = Command.define('DeleteEdit', {
   args: { id: EditIdSchema },
   execute: ({ id }) =>
@@ -340,35 +257,4 @@ export const AddFiles = Command.define('AddFiles', {
     GalleryMessage.PhotoCreateFailed,
     GalleryMessage.PhotosAdded,
   ],
-})
-
-/**
- * The gallery's "create collage" flow (docs/adr/0009-collage): persist a new Collage
- * (fresh uuid, default layout, one tile per selected Edit in pick order) and
- * surface the id as `CollageCreated`. Persist-first, like opening a photo —
- * the record exists before the screen opens, and the root navigates onto it.
- * A backend failure surfaces as `CollageCreateFailed` so the gallery can show
- * it instead of silently dropping the selection.
- */
-export const CreateCollage = Command.define('CreateCollage', {
-  args: { editIds: S.Array(EditIdSchema) },
-  execute: ({ editIds }) =>
-    Effect.gen(function* CreateCollage() {
-      const store = yield* CollageStore
-      const id = newCollageId()
-      yield* store.save(
-        Collage.make({
-          id,
-          savedAt: DateTime.nowUnsafe().epochMilliseconds,
-          layout: defaultCollageLayout(),
-          tiles: editIds.map((editId) => ({ editId, framing: defaultTileFraming() })),
-        }),
-      )
-      return GalleryMessage.CollageCreated({ id })
-    }).pipe(
-      Effect.catchTag('StoreError', (err: StoreError) =>
-        Effect.succeed(GalleryMessage.CollageCreateFailed({ error: err })),
-      ),
-    ),
-  messages: [GalleryMessage.CollageCreated, GalleryMessage.CollageCreateFailed],
 })

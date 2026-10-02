@@ -1,7 +1,7 @@
 import { Schema as S } from 'effect'
 import { AsyncData } from 'foldkit'
 import * as Dialog from '@/components/ui/dialog'
-import { EditSummary, StoreError, EditIdSchema, Collage, CollageIdSchema } from '@lutra/store'
+import { EditSummary, StoreError, EditIdSchema } from '@lutra/store'
 
 /**
  * The Gallery Submodel's model (docs/adr/0006-frontend-architecture): the list of saved Edits
@@ -17,26 +17,11 @@ export const GalleryRoute = S.Struct({})
 export const EditList = AsyncData.Schema(S.Array(EditSummary), StoreError)
 /** The schema's typed constructors (`EditList.Success` etc.). */
 export const editList = EditList
-/** The saved collages beneath the edits grid (newest first), as AsyncData. */
-export const CollageList = AsyncData.Schema(S.Array(Collage), StoreError)
-/** The schema's typed constructors (`CollageList.Success` etc.). */
-export const collageList = CollageList
 
 export const Model = S.Struct({
   grid: EditList.schema,
   // A transient banner message (e.g. a failed photo create), null when clean.
   notice: S.NullOr(S.String),
-  // The current collage selection: Edit ids picked via the per-tile select
-  // controls. Empty means nothing is selected; "Create collage" enables at two.
-  selection: S.Array(EditIdSchema),
-  // The saved-collages section under the edits grid (docs/adr/0009-collage).
-  collages: CollageList.schema,
-  // Measured thumbnail pixel sizes for collage tiles whose framing is
-  // custom (docs/adr/0009-collage) — the mini-previews mirror the framing, which
-  // needs each photo's aspect. Default-framed tiles stay object-cover.
-  collageThumbSizes: S.Array(S.Struct({ editId: EditIdSchema, width: S.Number, height: S.Number })),
-  // ADR-0010's inline two-step delete confirm, per collage card.
-  confirmingCollageDelete: S.NullOr(CollageIdSchema),
   // The Edit id awaiting delete confirmation in the modal dialog (ADR-0010,
   // superseded to a dialog): null when no deletion is pending.
   pendingDelete: S.NullOr(EditIdSchema),
@@ -62,10 +47,6 @@ export type Model = typeof Model.Type
 export const initialModel = (): Model => ({
   grid: EditList.Idle(),
   notice: null,
-  selection: [],
-  collages: CollageList.Idle(),
-  collageThumbSizes: [],
-  confirmingCollageDelete: null,
   pendingDelete: null,
   settingsDialog: Dialog.init({ id: 'gallery-settings-dialog' }),
   deleteDialog: Dialog.init({ id: 'gallery-delete-dialog' }),

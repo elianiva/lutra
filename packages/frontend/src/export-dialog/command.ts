@@ -8,9 +8,8 @@ import { loadExportSettings, saveExportSettings } from '../export-settings'
 
 /**
  * The shared export dialog machine's commands (docs/adr/0004-export): encode,
- * download, revoke, and settings persistence — one implementation for the
- * editor and the collage screens. The owning screen supplies only its own
- * snapshot command.
+ * download, revoke, and settings persistence. The owning screen supplies only
+ * its own snapshot command.
  */
 export type Resource = ImageEncoder | KeyValueStore
 

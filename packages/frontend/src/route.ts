@@ -1,28 +1,20 @@
 import { Schema, pipe } from 'effect'
 import { Route } from 'foldkit'
-import { CollageIdSchema, EditIdSchema } from '@lutra/store'
+import { EditIdSchema } from '@lutra/store'
 
-// The app is three screens behind three route arms, each owned by a Submodel
-// (docs/adr/0006-frontend-architecture): the Gallery (the main menu, `/`), the Editor
-// (`/edit/:editId`, opened from a gallery tile), and the Collage screen
-// (`/collage/:collageId`, opened from "Create collage" or a Collages tile).
+// The app is two screens behind two route arms, each owned by a Submodel
+// (docs/adr/0006-frontend-architecture): the Gallery (the main menu, `/`) and
+// the Editor (`/edit/:editId`, opened from a gallery tile).
 //
-//   Gallery = "/"                       → Gallery submodel
-//   Editor  = "/edit/:editId"           → Editor submodel (editId decoded
-//                                         through EditIdSchema so a malformed
-//                                         id swallows the whole route → NotFound)
-//   Collage = "/collage" | "/collage/:id" → Collage submodel; the bare form
-//                                         carries a null id and the root
-//                                         redirects home (collages are always
-//                                         created persist-first from the menu,
-//                                         so there is no "new collage" screen)
-//   NotFound = anything else            → NotFound fallback
+//   Gallery = "/"           → Gallery submodel
+//   Editor  = "/edit/:editId" → Editor submodel (editId decoded through
+//                              EditIdSchema so a malformed id swallows the
+//                              whole route → NotFound)
+//   NotFound = anything else → NotFound fallback
 
 export const AppRoute = Route.defineRouteUnion({
   Gallery: {},
   Editor: { editId: EditIdSchema },
-  Collage: { collageId: CollageIdSchema },
-  CollageHome: {},
   NotFound: { path: Schema.String },
 })
 export type AppRoute = typeof AppRoute.Type
@@ -31,21 +23,10 @@ export type AppRoute = typeof AppRoute.Type
 export const GalleryRoute = AppRoute.Gallery
 /** The editor, attached to one Edit by id. */
 export const EditorRoute = AppRoute.Editor
-/**
- * The collage screen, attached to one Collage by id. foldkit's router has no
- * optional-segment combinator and its biparsers must typecheck in both
- * directions, so `/collage/:id` and the bare `/collage` are two route tags:
- * the bare form is a redirect home (collages are always created
- * persist-first from the menu — there is no "new collage" screen).
- */
-export const CollageRoute = AppRoute.Collage
-export const CollageHomeRoute = AppRoute.CollageHome
 export const NotFoundRoute = AppRoute.NotFound
 
 export type GalleryRoute = typeof GalleryRoute.Type
 export type EditorRoute = typeof EditorRoute.Type
-export type CollageRoute = typeof CollageRoute.Type
-export type CollageHomeRoute = typeof CollageHomeRoute.Type
 export type NotFoundRoute = typeof NotFoundRoute.Type
 
 const galleryRouter = pipe(Route.root, Route.mapTo(GalleryRoute))
@@ -54,13 +35,7 @@ const editorRouter = pipe(
   Route.slash(Route.schemaSegment('editId', EditIdSchema)),
   Route.mapTo(EditorRoute),
 )
-const collageRouter = pipe(
-  Route.literal('collage'),
-  Route.slash(Route.schemaSegment('collageId', CollageIdSchema)),
-  Route.mapTo(CollageRoute),
-)
-const bareCollageRouter = pipe(Route.literal('collage'), Route.mapTo(CollageHomeRoute))
-const router = Route.oneOf(editorRouter, collageRouter, bareCollageRouter, galleryRouter)
+const router = Route.oneOf(editorRouter, galleryRouter)
 
 /** Parse a URL into an AppRoute; anything unmatched falls back to NotFound. */
 export const parseRoute = Route.parseUrlWithFallback(router, NotFoundRoute)

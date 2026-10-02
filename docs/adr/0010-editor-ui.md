@@ -14,7 +14,7 @@ Desktop shows an icon rail; each tool's label + two-line description (what it do
 
 ## Destructive actions
 
-No native `confirm()`. Friction is proportional to recoverability: Edit deletion (destructive, irreversible) uses a modal dialog; collage deletion (recoverable by recreation) uses an inline two-step confirm on the card.
+No native `confirm()`. Friction is proportional to recoverability: Edit deletion (destructive, irreversible) uses a modal dialog.
 
 ## Gallery behaviors
 

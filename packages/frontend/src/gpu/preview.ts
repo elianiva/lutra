@@ -1,8 +1,7 @@
 /**
  * Preview sizing: editor grades at preview resolution, export at native.
  * The preview long edge is capped to FHD-class (~2-3Mpx)
- * so a 6000×4000 photo dispatches ~2.8Mpx not 24Mpx — the same win the
- * collage path already gets by downsampling to cell size.
+ * so a 6000×4000 photo dispatches ~2.8Mpx not 24Mpx.
  *
  * Single source of truth for both the canvas attributes (view) and the
  * bitmap the session textures are sized to (command). Side-by-side becomes
@@ -39,10 +38,9 @@ export const previewDimensions = (nativeWidth: number, nativeHeight: number): Pr
  * ownership). When a new bitmap is created the source is closed — the
  * caller owns only the returned bitmap.
  *
- * Uses a 2d canvas drawImage (the same path collage uses for its framed
- * crop) then createImageBitmap(canvas). That stays correct even on Safari
- * where createImageBitmap(file, { resizeWidth }) is ignored. The canvas
- * is not inserted in the DOM.
+ * Uses a 2d canvas drawImage then createImageBitmap(canvas). That stays correct
+ * even on Safari where createImageBitmap(file, { resizeWidth }) is ignored. The
+ * canvas is not inserted in the DOM.
  */
 export const toPreviewBitmap = async (bitmap: ImageBitmap): Promise<ImageBitmap> => {
   const { width, height } = previewDimensions(bitmap.width, bitmap.height)
@@ -73,7 +71,7 @@ export const toPreviewBitmap = async (bitmap: ImageBitmap): Promise<ImageBitmap>
 }
 
 /**
- * Sampling helper for the collage path's framing canvas — re-exported so
- * tests can assert the cap without duplicating the arithmetic.
+ * Whether `toPreviewBitmap` will downscale — re-exported so tests can assert
+ * the cap without duplicating the arithmetic.
  */
 export const isPreviewNeeded = (w: number, h: number): boolean => Math.max(w, h) > PREVIEW_LONG_EDGE

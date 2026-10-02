@@ -1,6 +1,6 @@
-// The persistence seam (docs/adr/0005-storage, docs/adr/0009-collage). Owns the Edit / Collage
-// schemas, the swappable EditStore / CollageStore contracts, and backend
-// implementations. A future server/account-side store lands here too.
+// The persistence seam (docs/adr/0005-storage). Owns the Edit schema, the
+// swappable EditStore contract, and backend implementations. A future
+// server/account-side store lands here too.
 
 export { EditId, EditIdSchema, newEditId } from './edit/edit-id'
 export type { EditId as EditIdType } from './edit/edit-id'
@@ -11,33 +11,10 @@ export type { EditSummary as EditSummaryType } from './edit/edit-summary'
 export { StoreError } from './edit/store-error'
 export type { StoreError as StoreErrorType } from './edit/store-error'
 
-export { CollageId, CollageIdSchema, newCollageId } from './collage/collage-id'
-export type { CollageId as CollageIdType } from './collage/collage-id'
-export {
-  Collage,
-  CollageBackground,
-  CollageLayout,
-  CollageTile,
-  TileFraming,
-  defaultCollageLayout,
-  defaultTileFraming,
-} from './collage/collage'
-export type {
-  Collage as CollageType,
-  CollageBackground as CollageBackgroundType,
-  CollageLayout as CollageLayoutType,
-  CollageTile as CollageTileType,
-  TileFraming as TileFramingType,
-} from './collage/collage'
-
 export { EditStore } from './edit/edit-store'
 export type { EditStore as EditStoreContract } from './edit/edit-store'
 export { EditTable } from './edit/edit-table'
 export { EditStoreIndexedDb, EditStoreLive } from './edit/edit-store-indexeddb'
-export { CollageStore } from './collage/collage-store'
-export type { CollageStore as CollageStoreContract } from './collage/collage-store'
-export { CollageTable } from './collage/collage-table'
-export { CollageStoreIndexedDb, CollageStoreLive } from './collage/collage-store-indexeddb'
 
-// The shared database schema ("lutra": v1 edits, v2 collages)
+// The shared database schema ("lutra": v1 edits, v2 a retained no-op)
 export { LutraDbSchema } from './db'

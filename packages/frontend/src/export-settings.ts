@@ -3,9 +3,9 @@ import * as Persistence from 'effect/unstable/persistence/KeyValueStore'
 import { ExportSettings, defaultExportSettings } from '@lutra/engine'
 
 /**
- * Export-settings persistence, shared by the editor's and the collage's
- * export dialogs (docs/adr/0004-export): one KeyValueStore key, one schema — both
- * surfaces offer the same format/quality/scale choice and remember it.
+ * Export-settings persistence, shared by every surface that offers the
+ * format/quality/scale choice (docs/adr/0004-export): one KeyValueStore key,
+ * one schema — so both offer the same choice and remember it.
  */
 
 export const EXPORT_SETTINGS_KEY = 'exportSettings'

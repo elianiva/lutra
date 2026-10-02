@@ -3,7 +3,7 @@ import type { Url } from 'foldkit'
 import { Runtime } from 'foldkit'
 import { BrowserKeyValueStore } from '@effect/platform-browser'
 import type { UrlRequest } from 'foldkit/navigation'
-import { CollageStoreIndexedDb, EditStoreIndexedDb } from '@lutra/store'
+import { EditStoreIndexedDb } from '@lutra/store'
 import { AppMessage, RootMessage } from './root/message'
 import { Model } from './root/model'
 import { init } from './root/init'
@@ -81,8 +81,8 @@ export const application = Runtime.makeApplication({
               LutThumbnailerLive,
               Layer.merge(
                 BrowserKeyValueStore.layerLocalStorage,
-                // The local IndexedDB backends (docs/adr/0005-storage, docs/adr/0009-collage).
-                Layer.merge(EditStoreIndexedDb, CollageStoreIndexedDb),
+                // The local IndexedDB backends (docs/adr/0005-storage).
+                EditStoreIndexedDb,
               ),
             ),
           ),
