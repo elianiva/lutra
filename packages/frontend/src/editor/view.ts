@@ -225,7 +225,7 @@ const mobileTabBarImpl = (
   return h.nav(
     [
       h.Class(
-        'flex flex-none items-center gap-1 rounded-full bg-s1 p-1 pb-[max(4px,env(safe-area-inset-bottom))] shadow-[0_-12px_28px_-18px_var(--mat-shadow-a)] lg:hidden',
+        'absolute inset-x-3 bottom-3 z-30 flex items-center gap-1 rounded-full bg-s1 p-1 pb-[max(4px,env(safe-area-inset-bottom))] shadow-[0_12px_28px_-12px_var(--mat-shadow-a)] lg:hidden',
       ),
       h.AriaLabel('Editor panels'),
     ],
