@@ -23,10 +23,11 @@ Check `docs/adr/` for architecture decisions — they are the permanent record.
 
 ## Conventions
 
-- **Effect v4 beta + foldkit TEA.** Everything is modeled with Effect idioms and state machines for robustness. Root Submodel owns the route; Gallery and Editor are Submodels per route arm.
+- **Effect v4 + foldkit TEA.** Everything is modeled with Effect idioms and state machines for robustness. Root Submodel owns the route; Gallery and Editor are Submodels per route arm.
 - **Non-destructive ordered layers.** Each adjustment layer consumes the previous layer's output. Order matters; keep it that way.
 - **No `as`, no `any`.** The oxlint `anti-slop` rules enforce this (plus no conditional empty-object spreads, no runtime `typeof`, etc.). Run `pnpm lint` — it must be clean.
 - **Vendored LUTs** live under the frontend assets; `pnpm vendor:luts` refreshes them via `scripts/vendor-luts.ts`.
+- **Property tests generate through Effect `Arbitrary`,** derived from the same Schemas the app decodes with, and register with `it.prop` / `it.effect.prop` from `@effect/vitest` (docs/adr/0012-property-testing). No separate generator library: bounds live in the Schema, not in a hand-written generator.
 
 ## Loop
 
