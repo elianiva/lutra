@@ -34,8 +34,6 @@
   --mat-dim: #988e81;
 
   --mat-accent: #ff7a52;
-  --mat-accent-hi: #ffa385;
-  --mat-accent-shade: #a63c1b;
   --mat-accent-ink: #1b110c;
   --mat-accent-soft: rgba(255, 122, 82, 0.14);
   --mat-halo: rgba(255, 122, 82, 0.18);
@@ -75,8 +73,6 @@
   --mat-dim: #766d5f;
 
   --mat-accent: #c04520;
-  --mat-accent-hi: #d96a41;
-  --mat-accent-shade: #7f2a10;
   --mat-accent-ink: #fff8f2;
   --mat-accent-soft: rgba(192, 69, 32, 0.12);
   --mat-halo: rgba(192, 69, 32, 0.16);
@@ -315,32 +311,40 @@ body {
   }
 }
 
-/* The primary action is a physical key: a lit top face, a shaded bottom
- * edge, a contact shadow, and a press that sinks it. */
+/* The primary action carries a subtle top-down gradient: a slightly lighter
+ * face at the top, the flat accent at the bottom, one soft highlight and one
+ * short shadow. Depth comes from the light, not from a lip or a press. */
 .key {
-  background-image: linear-gradient(180deg, var(--mat-accent-hi), var(--mat-accent));
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--mat-accent) 86%, white),
+    var(--mat-accent) 72%
+  );
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.22),
-    0 2px 0 var(--mat-accent-shade),
-    0 10px 20px -8px var(--mat-halo);
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+    0 1px 2px var(--mat-shadow-b),
+    0 8px 18px -12px var(--mat-halo);
   transition:
-    transform 60ms ease,
-    box-shadow 60ms ease,
-    filter 120ms ease;
+    filter 140ms ease,
+    box-shadow 140ms ease;
 }
 
 .key:hover {
-  filter: brightness(1.06);
+  filter: brightness(1.05);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+    0 2px 4px var(--mat-shadow-b),
+    0 10px 22px -12px var(--mat-halo);
 }
 
 .key:active {
-  transform: translateY(2px);
+  filter: brightness(0.97);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
-    0 0 0 var(--mat-accent-shade),
-    0 4px 10px -6px var(--mat-halo);
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 1px 3px rgba(0, 0, 0, 0.18),
+    0 1px 1px var(--mat-shadow-b);
 }
 
 /* native range input: hidden behind the styled track/knob */
