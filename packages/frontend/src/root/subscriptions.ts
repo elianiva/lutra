@@ -3,6 +3,7 @@ import { Dom, Subscription } from 'foldkit'
 import { OfflineFill } from '../offline/fill'
 import { OfflineMessage, fillEventToMessage } from '../offline/messages'
 import { AppMessage, RootMessage } from './message'
+import { EditorMessage } from '../editor/message'
 import type { Model } from './model'
 import { GalleryMessage } from '../gallery/message' /**
  * The root's subscriptions (docs/adr/0007-offline): the three bridges that feed
@@ -83,6 +84,45 @@ export const subscriptions = Subscription.aggregate<Model, AppMessage, OfflineFi
               },
             }),
             Effect.sync(() => routeTag === 'Gallery'),
+          ),
+      },
+    ),
+    /**
+     * The editor's ⌘K: opens the add-adjustment palette, the one search path
+     * into the thirteen tools (docs/adr/0013-materials). A document listener
+     * rather than a mount, because the palette is only in the DOM while it is
+     * open — the binding has to outlive it.
+     */
+    editorPaletteShortcut: entry(
+      { routeTag: S.String },
+      {
+        modelToDependencies: (model: Model) => ({ routeTag: model.route._tag }),
+        dependenciesToStream: ({ routeTag }: { routeTag: string }) =>
+          Stream.when(
+            Stream.callback<AppMessage>((queue) =>
+              Effect.gen(function* () {
+                const onKeyDown = (event: KeyboardEvent) => {
+                  if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'k') {
+                    return
+                  }
+                  event.preventDefault()
+                  Queue.offerUnsafe(
+                    queue,
+                    RootMessage.GotEditorMessage({ message: EditorMessage.ToggledPalette() }),
+                  )
+                }
+                yield* Effect.acquireRelease(
+                  Effect.sync(() => {
+                    document.addEventListener('keydown', onKeyDown)
+                    return onKeyDown
+                  }),
+                  (listener) =>
+                    Effect.sync(() => document.removeEventListener('keydown', listener)),
+                )
+                return yield* Effect.never
+              }),
+            ),
+            Effect.sync(() => routeTag === 'Editor'),
           ),
       },
     ),

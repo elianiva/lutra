@@ -7,14 +7,12 @@ import type { CompareMode } from './message'
 import type { Model } from './model'
 
 /**
- * The print's own controls (docs/adr/0013-materials). Everything here changes
- * what the frame shows — the zoom level and the compare presentation — so it
- * lives on the frame, not in a detached bar under it.
- *
- * The histogram is the one readout that stays on the workspace: it measures
- * the frame but never changes it.
+ * The print's own bar (docs/adr/0013-materials): the luma readout, the zoom
+ * level and the compare presentation. Everything here belongs to the
+ * frame — it reads or changes what the frame shows — so it is drawn inside
+ * the print card and travels with the print when the stage pans or zooms.
  */
-export type ViewBarSlice = Pick<Model, 'scale' | 'compareMode' | 'phase'>
+export type ViewBarSlice = Pick<Model, 'scale' | 'compareMode' | 'phase' | 'bins'>
 
 const COMPARE_MODES: readonly {
   readonly mode: CompareMode
@@ -38,7 +36,7 @@ const compareButton = (
   h.button(
     [
       h.Class(
-        `grid size-8 place-items-center rounded-full transition-colors ${
+        `grid size-7 place-items-center rounded-full transition-colors ${
           active
             ? 'bg-accent text-accent-ink shadow-[0_4px_12px_var(--mat-halo)]'
             : hasImage
@@ -53,34 +51,16 @@ const compareButton = (
       h.Title(label),
       h.Key(mode),
     ],
-    [icon(h, Icon, label, 13)],
+    [icon(h, Icon, label, 12)],
   )
 
-export const viewBar = (h: HtmlBuilder<EditorMessage>, slice: ViewBarSlice): Html => {
-  const hasImage =
-    slice.phase._tag === 'Idle' ||
-    slice.phase._tag === 'Selected' ||
-    slice.phase._tag === 'Drafting'
-  return h.div(
-    [h.Class('mt-3 flex items-center justify-between gap-3')],
-    [
-      h.span([h.Class('micro tnum font-mono')], [`${String(Math.round(slice.scale * 100))}%`]),
-      h.div(
-        [h.Class('flex items-center gap-0.5'), h.AriaLabel('Compare modes')],
-        COMPARE_MODES.map(({ mode, label, icon: Icon }) =>
-          compareButton(h, mode, label, Icon, slice.compareMode === mode, hasImage),
-        ),
-      ),
-    ],
-  )
-}
+/* ---------- the luma readout: a graph on the frame ---------- */
 
-/* ---------- the histogram: a workspace readout ---------- */
+const LUMA_WIDTH = 132
+const LUMA_HEIGHT = 18
 
-const HISTOGRAM_WIDTH = 208
-const HISTOGRAM_HEIGHT = 26
-
-const histogram = (bins: Uint32Array | null, h: HtmlBuilder<EditorMessage>): Html => {
+/** The graded luma histogram: 256 bins flattened into the readout's width. */
+const lumaCurve = (bins: Uint32Array | null, h: HtmlBuilder<EditorMessage>): Html => {
   let max = 0
   if (bins !== null) {
     for (let i = 0; i < 256; i++) {
@@ -93,21 +73,18 @@ const histogram = (bins: Uint32Array | null, h: HtmlBuilder<EditorMessage>): Htm
   const curve: string[] = []
   if (bins !== null) {
     for (let i = 0; i < 256; i++) {
-      const x = (i / 255) * HISTOGRAM_WIDTH
-      const y =
-        max === 0 ? HISTOGRAM_HEIGHT : HISTOGRAM_HEIGHT - ((bins[i] ?? 0) / max) * HISTOGRAM_HEIGHT
+      const x = (i / 255) * LUMA_WIDTH
+      const y = max === 0 ? LUMA_HEIGHT : LUMA_HEIGHT - ((bins[i] ?? 0) / max) * LUMA_HEIGHT
       curve.push(`${x.toFixed(1)},${y.toFixed(1)}`)
     }
   }
   const area =
-    bins === null
-      ? ''
-      : [...curve, `${HISTOGRAM_WIDTH},${HISTOGRAM_HEIGHT}`, `0,${HISTOGRAM_HEIGHT}`].join(' ')
+    bins === null ? '' : [...curve, `${LUMA_WIDTH},${LUMA_HEIGHT}`, `0,${LUMA_HEIGHT}`].join(' ')
 
   return h.svg(
     [
-      h.Class('block h-[26px] w-full'),
-      h.Attribute('viewBox', `0 0 ${HISTOGRAM_WIDTH} ${HISTOGRAM_HEIGHT}`),
+      h.Class('block h-full w-full'),
+      h.Attribute('viewBox', `0 0 ${LUMA_WIDTH} ${LUMA_HEIGHT}`),
       h.Attribute('preserveAspectRatio', 'none'),
       h.Attribute('aria-hidden', 'true'),
     ],
@@ -137,12 +114,39 @@ const histogram = (bins: Uint32Array | null, h: HtmlBuilder<EditorMessage>): Htm
   )
 }
 
-export const histogramCard = (h: HtmlBuilder<EditorMessage>, bins: Model['bins']): Html =>
+const lumaReadout = (h: HtmlBuilder<EditorMessage>, bins: Model['bins']): Html =>
   h.div(
+    [h.Class('flex min-w-0 flex-1 items-center gap-2.5')],
     [
-      h.Class(
-        'surface pointer-events-none flex h-16 w-[240px] flex-col gap-1 px-4 py-3 max-lg:hidden',
+      h.span([h.Class('micro flex-none')], ['Luma']),
+      h.div(
+        [h.Class('relative h-[18px] min-w-0 flex-1 max-w-[168px]')],
+        [lumaCurve(bins, h), h.div([h.Class('seam absolute inset-x-0 bottom-0')], [])],
       ),
     ],
-    [h.span([h.Class('micro')], ['Luma · graded']), histogram(bins, h)],
   )
+
+export const viewBar = (h: HtmlBuilder<EditorMessage>, slice: ViewBarSlice): Html => {
+  const hasImage =
+    slice.phase._tag === 'Idle' ||
+    slice.phase._tag === 'Selected' ||
+    slice.phase._tag === 'Drafting'
+  return h.div(
+    [h.Class('mt-3 flex items-center justify-between gap-4')],
+    [
+      lumaReadout(h, slice.bins),
+      h.div(
+        [h.Class('flex flex-none items-center gap-2')],
+        [
+          h.span([h.Class('micro tnum font-mono')], [`${String(Math.round(slice.scale * 100))}%`]),
+          h.div(
+            [h.Class('flex items-center gap-0.5'), h.AriaLabel('Compare modes')],
+            COMPARE_MODES.map(({ mode, label, icon: Icon }) =>
+              compareButton(h, mode, label, Icon, slice.compareMode === mode, hasImage),
+            ),
+          ),
+        ],
+      ),
+    ],
+  )
+}

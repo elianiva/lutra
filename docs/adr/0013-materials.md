@@ -32,25 +32,26 @@ The canvas is the window. Nothing reserves a column or a band: the rail, the hea
 │ │  │        ┌──────────────────────┐  ┌────┐  │ inspector  │ │
 │ │ra│        │        print         │  │ 01 │  │ (selected  │ │
 │ │il│        │  (image + captions)  │  │ 02 │  │  layer)    │ │
-│ │  │        └──────────────────────┘  │ 03 │  └────────────┘ │
-│ └──┘        LUMA ────────                 └────┘              │
-└──────────────────────────────────────────────────────────────┘
+│ │  │        │ LUMA ──  100%  ◐ ◫ ▥ │  │ 03 │  └────────────┘ │
+│ └──┘        └──────────────────────┘  │ +Add│                │
+└───────────────────────────────────────┴────┴────────────────┘
 ```
 
 - **Tool rail** (`tool-panel.ts`): thirteen icons floating at the left edge. Hover or focus opens a card with the tool's number, name and copy — labels live in the card so the rail stays narrow enough to float.
-- **Print** (`canvas-stage.ts`): one card holding the image stage, the plate label, the serif caption and the controls that change what the frame shows (zoom and compare). Its size follows the image's aspect ratio.
-- **Chain modules** (`chain-dock.ts`): the edit chain docks to the print's right edge as separate module cards — one per layer, numbered top to bottom, connected to the frame by a short stub. An empty chain has no modules; the frame stays a print.
+- **Print** (`canvas-stage.ts`): one card holding the image stage, the plate label, the serif caption and the frame's own bar — the luma readout, the zoom level and the compare presentation. Its size follows the image's aspect ratio.
+- **Chain rack** (`chain-dock.ts`): the edit chain sits beside the print's right edge as one card, flush in its rows and sized to them — a short chain is a short rack, with a 12px gap to the frame. Rows are numbered top to bottom on a gradient spine; a draft hangs off the end; the last row is `Add`. An empty chain has no rack; the frame stays a print.
 - **Inspector** (`layer-drawer.ts`): the selected layer's parameters, floating at the right edge. A draft uses the same shape with Cancel / Apply in the footer, and a chain layer carries its position row.
-- **Palette** (`palette.ts`): ⌘K or the module column's `+` opens a searchable list of all thirteen tools, grouped Look / Light / Color / Film / Optics.
-- **Histogram** (`status-band.ts`): the graded frame's luminance, floating bottom-left. It reads the frame but never changes it, so it does not live on the frame.
+- **Palette** (`palette.ts`): the rack's `Add` row or ⌘K opens a searchable list of all thirteen tools, grouped Look / Light / Color / Film / Optics. Adding an effect has exactly two entry points in the whole app: the rail (icons, for a known tool) and this palette (search, for an unknown one). The root's `editorPaletteShortcut` subscription owns the key binding, because the palette is only in the DOM while it is open.
+- **Luma readout** (`frame-bar.ts`): the graded frame's luminance drawn inside the print card, left of the zoom and compare controls. It reads the frame, so it belongs to the frame and travels with it when the stage pans or zooms.
 
 Spacing is one 4px scale (4 / 8 / 12 / 16 / 24 / 32 / 48) with 24px gutters, 16px panel padding, 44px rows, and 32 / 36 / 40px controls. Type is one scale: 8 / 9 / 10 / 12 / 16 / 20.
 
 ## Consequences
 
-- **ADR 0010's layout no longer applies.** The tool panel, the layer drawer and the LUT bar are gone; the rail, inspector, dock, palette and status band replace them. The compare presentation rule, the draft transaction and the responsive/touch rules from 0010 still hold.
+- **ADR 0010's layout no longer applies.** The tool panel, the layer drawer and the LUT bar are gone; the rail, inspector, rack, palette and the frame bar replace them. The compare presentation rule, the draft transaction and the responsive/touch rules from 0010 still hold.
 - **The LUT bar is a contact sheet.** Browsing stocks happens inside the inspector's well (`lut-bar/sheet.ts`). Hover still previews (`PreviewedLut`), click still commits (`ChangedDraftLut` / `ChangedLayerLut`), and per-photo thumbnails and the offline gate are unchanged. The `lutBarOpen` flag and `ToggledLutPicker` are retired: the sheet is shown whenever the target is a LUT.
-- **Reordering moved.** It left the drawer rows for the inspector's position row. The dock shows the chain left to right; "move up" means earlier.
+- **Reordering moved.** It left the drawer rows for the inspector's position row. The rack reads the chain top to bottom; "move up" means earlier.
+- **One add path per layout.** The rack's `Add` row replaces the inspector footer's `+`, the empty inspector's button and the phone tab bar's `Add` tab; below `lg` the tab bar carries Adjustments and Inspector only. Fewer buttons, one place to look.
 - **Every mode is a token set.** A new brand colour or a new mode is a change to `styles.css` alone. Components never hardcode a surface colour; they use `bg-s1`, `bg-s2`, `bg-well`, `text-ink`, `text-muted`, `text-dim`, `bg-accent` and the `surface` / `well` / `pill` utilities.
 - **The gallery follows the tokens.** Its structure is unchanged; it inherits the palette, radii and shadows.
 - **Contrast is verified per mode, not per component.** The measured ratios live with the tokens: body text ≥ 14:1, secondary ≥ 5:1, micro labels ≥ 4:1 in both modes.

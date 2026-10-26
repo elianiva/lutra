@@ -1,5 +1,5 @@
 import { type Html, type HtmlBuilder, createLazy } from 'foldkit/html'
-import { Layers as LayersIcon, Plus, SlidersHorizontal } from 'lucide'
+import { Layers as LayersIcon, SlidersHorizontal } from 'lucide'
 import type { IconNode } from 'lucide'
 import { Submodel } from 'foldkit'
 import { hasImage } from './phase'
@@ -9,7 +9,6 @@ import { toolPanel } from './tool-panel'
 import { layerDrawer } from './layer-drawer'
 import { canvasStage } from './canvas-stage'
 import { palette } from './palette'
-import { histogramCard } from './status-band'
 import * as ExportDialog from '../export-dialog'
 import { EditorMessage } from './message'
 import { icon } from '../components/icon'
@@ -22,7 +21,6 @@ const lazyTopBar = createLazy()
 const lazyRail = createLazy()
 const lazyStage = createLazy()
 const lazyInspector = createLazy()
-const lazyHistogram = createLazy()
 const lazyPalette = createLazy()
 const lazyMobileTabBar = createLazy()
 const lazyExportDialog = createLazy()
@@ -55,6 +53,7 @@ const stageView = (
   phase: Model['phase'],
   chain: Model['chain'],
   catalog: Model['catalog'],
+  bins: Model['bins'],
   h: HtmlBuilder<EditorMessage>,
 ): Html =>
   canvasStage(h, {
@@ -67,10 +66,8 @@ const stageView = (
     phase,
     chain,
     catalog,
+    bins,
   })
-
-const histogramView = (bins: Model['bins'], h: HtmlBuilder<EditorMessage>): Html =>
-  histogramCard(h, bins)
 
 const inspectorView = (
   chain: Model['chain'],
@@ -124,8 +121,8 @@ const exportDialogView = (dialog: Model['exportDialog'], h: HtmlBuilder<EditorMe
 
 /**
  * The Editor submodel's view (docs/adr/0013-materials). A shell of three
- * floating regions — the tool rail, the print column (stage, chain dock,
- * status band), and the inspector — plus two overlays: the palette and the
+ * floating regions — the tool rail, the print column (stage, chain rack,
+ * frame bar), and the inspector — plus two overlays: the palette and the
  * export dialog. No region is drawn with a border; tone, rim light and shadow
  * separate them.
  */
@@ -149,6 +146,7 @@ const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
         model.phase,
         model.chain,
         model.catalog,
+        model.bins,
         h,
       ]),
       lazyTopBar(topBarView, [model.saveStatus, model.attachedEdit, model.mode, imageLoaded, h]),
@@ -177,10 +175,6 @@ const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
         model.mobileSheet === 'layers',
         h,
       ]),
-      h.div(
-        [h.Class('pointer-events-none absolute bottom-6 left-6 z-10 max-lg:hidden')],
-        [lazyHistogram(histogramView, [model.bins, h])],
-      ),
       lazyPalette(paletteView, [
         model.paletteOpen,
         model.paletteQuery,
@@ -190,23 +184,16 @@ const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
         model.phase,
         h,
       ]),
-      lazyMobileTabBar(mobileTabBarView, [model.mobileSheet, model.paletteOpen, h]),
+      lazyMobileTabBar(mobileTabBarView, [model.mobileSheet, h]),
       lazyExportDialog(exportDialogView, [model.exportDialog, h]),
     ],
   )
 }
 
-const mobileTabBarView = (
-  mobileSheet: Model['mobileSheet'],
-  paletteOpen: boolean,
-  h: HtmlBuilder<EditorMessage>,
-): Html => mobileTabBarImpl(mobileSheet, paletteOpen, h)
+const mobileTabBarView = (mobileSheet: Model['mobileSheet'], h: HtmlBuilder<EditorMessage>): Html =>
+  mobileTabBarImpl(mobileSheet, h)
 
-const mobileTabBarImpl = (
-  mobileSheet: Model['mobileSheet'],
-  paletteOpen: boolean,
-  h: HtmlBuilder<EditorMessage>,
-) => {
+const mobileTabBarImpl = (mobileSheet: Model['mobileSheet'], h: HtmlBuilder<EditorMessage>) => {
   const panelTab = (label: string, Icon: IconNode, active: boolean, onClick: () => EditorMessage) =>
     h.button(
       [
@@ -236,7 +223,6 @@ const mobileTabBarImpl = (
       panelTab('Inspector', LayersIcon, mobileSheet === 'layers', () =>
         EditorMessage.ToggledMobileSheet({ sheet: 'layers' }),
       ),
-      panelTab('Add', Plus, paletteOpen, () => EditorMessage.ToggledPalette()),
     ],
   )
 }

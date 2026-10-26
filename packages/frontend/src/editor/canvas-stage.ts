@@ -7,7 +7,7 @@ import { ErrorState, hasImage } from './phase'
 import { canvasRef, registerCanvas } from '../gpu/canvas-ref'
 import { LAYER_UI, lutName } from './layer-meta'
 import { chainDock } from './chain-dock'
-import { viewBar } from './status-band'
+import { viewBar } from './frame-bar'
 import { MountElementError } from '../errors'
 import type { Model } from './model'
 
@@ -22,6 +22,7 @@ export type CanvasStageModel = Pick<
   | 'phase'
   | 'chain'
   | 'catalog'
+  | 'bins'
 >
 
 const ZOOM_SPEED = 0.01
@@ -562,7 +563,7 @@ const mount = (
   const { name: lookName, strength, chain: chainLine } = printCaption(model)
   const hasChain = model.chain.length > 0 || model.phase._tag === 'Drafting'
   return h.div(
-    [h.Class('flex flex-col items-stretch gap-5 lg:flex-row lg:items-start lg:gap-2')],
+    [h.Class('flex flex-col items-stretch gap-3 lg:flex-row lg:items-start lg:gap-3')],
     [
       h.figure(
         [
@@ -600,16 +601,12 @@ const mount = (
             scale: model.scale,
             compareMode: model.compareMode,
             phase: model.phase,
+            bins: model.bins,
           }),
         ],
       ),
       ...(hasChain
-        ? [
-            h.div(
-              [h.Class('lg:pt-1')],
-              [chainDock(h, { chain: model.chain, phase: model.phase, catalog: model.catalog })],
-            ),
-          ]
+        ? [chainDock(h, { chain: model.chain, phase: model.phase, catalog: model.catalog })]
         : []),
     ],
   )
@@ -665,8 +662,14 @@ const loadedStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel, rat
 export const canvasStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel) => {
   const ratio = contentRatio(model)
   const loaded = hasImage(model.phase)
+  // On a phone the top bar and the tab bar float over the stage, so the
+  // stage box keeps clear of both: the print and its rack fit between them.
   return h.div(
-    [h.Class('absolute inset-0 flex items-center justify-center overflow-hidden')],
+    [
+      h.Class(
+        'absolute inset-x-0 top-0 bottom-0 flex items-center justify-center overflow-hidden max-lg:top-[64px] max-lg:bottom-[68px]',
+      ),
+    ],
     [
       ...(loaded
         ? [loadedStage(h, model, ratio)]

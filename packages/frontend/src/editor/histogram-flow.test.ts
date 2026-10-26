@@ -104,8 +104,8 @@ const loadedStageMounts = [
   Mount.resolve(RegisterCanvas, EditorMessage.CanvasRegistered()),
 ]
 
-describe('histogram overlay view', () => {
-  it('renders the SVG overlay from the model bins', () => {
+describe('luma readout on the frame', () => {
+  it('renders the curve inside the print card from the model bins', () => {
     const bins = new Uint32Array(256)
     bins.fill(10)
     bins[200] = 100
@@ -118,8 +118,9 @@ describe('histogram overlay view', () => {
         source: { bitmap: new MockImageBitmap(200, 150), error: null, height: 150, width: 200 },
       }),
       ...loadedStageMounts,
-      sceneExpect(selector('svg polygon')).toExist(),
-      sceneExpect(selector('svg polyline')).toExist(),
+      // It is part of the print card, not a card of its own.
+      sceneExpect(selector('[aria-label="Print preview"] svg polygon')).toExist(),
+      sceneExpect(selector('[aria-label="Print preview"] svg polyline')).toExist(),
       Command.expectNone(),
     )
   })

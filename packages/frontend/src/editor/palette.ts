@@ -1,3 +1,4 @@
+import { Option } from 'effect'
 import { type Html, type HtmlBuilder } from 'foldkit/html'
 import { Search } from 'lucide'
 import { icon } from '../components/icon'
@@ -7,12 +8,15 @@ import type { Model } from './model'
 import type { LayerType } from '@lutra/engine'
 
 /**
- * The add-adjustment palette (docs/adr/0013-materials): ⌘K, or the `+` at the
- * end of the dock, opens a searchable list of all thirteen tools. It is the
- * only way in besides the rail, so the rail can stay icons-only.
+ * The add-adjustment palette (docs/adr/0013-materials): ⌘K (bound in the
+ * root's subscriptions), or the one `Add` row at the end of the rack, opens a
+ * searchable list of all thirteen tools.
  *
- * Picking a row dispatches `SelectedTool`, which is the same message the rail
- * sends — one path into the draft transaction, two ways to reach it.
+ * Adding an effect has exactly two entry points in the whole app: the rail,
+ * which lists the tools by icon for a known target, and this palette, which
+ * searches them by name when you do not know which one you want. The palette
+ * dispatches `SelectedTool`, the same message the rail sends — one path into
+ * the draft transaction, two ways to reach it.
  */
 export type PaletteSlice = Pick<
   Model,
@@ -70,6 +74,10 @@ export const palette = (h: HtmlBuilder<EditorMessage>, slice: PaletteSlice): Htm
           ),
           h.AriaLabel('Add an adjustment'),
           h.DataAttribute('testid', 'palette'),
+          // Escape closes from the search field or from a row.
+          h.OnKeyDownPreventDefault((key) =>
+            key === 'Escape' ? Option.some(EditorMessage.ToggledPalette()) : Option.none(),
+          ),
         ],
         [
           h.div(

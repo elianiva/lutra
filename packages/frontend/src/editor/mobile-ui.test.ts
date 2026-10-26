@@ -160,14 +160,15 @@ const resolveRender = () => [
 ]
 
 describe('mobile tab bar view', () => {
-  it('renders the Adjustments, Inspector and Add tabs', () => {
+  it('renders the Adjustments and Inspector tabs', () => {
     scene(
       sceneConfig,
       given(loaded()),
       ...stageMounts,
       sceneExpect(role('button', { name: 'Adjustments' })).toExist(),
       sceneExpect(role('button', { name: 'Inspector' })).toExist(),
-      sceneExpect(role('button', { name: 'Add' })).toExist(),
+      // Adding lives on the rack's own Add row, not in the tab bar.
+      sceneExpect(role('button', { name: 'Add' })).not.toExist(),
       Command.expectNone(),
     )
   })

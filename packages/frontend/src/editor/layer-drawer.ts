@@ -1,17 +1,6 @@
 import { Option, pipe } from 'effect'
 import { type Html, type HtmlBuilder } from 'foldkit/html'
-import {
-  ArrowDown,
-  ArrowUp,
-  Check,
-  ChevronDown,
-  ChevronUp,
-  Eye,
-  EyeOff,
-  Plus,
-  Trash2,
-  X,
-} from 'lucide'
+import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronUp, Eye, EyeOff, Trash2, X } from 'lucide'
 import type { IconNode } from 'lucide'
 import { button } from '@/components/ui/button'
 import { lutraRangeRow } from '@/components/lutra-range-row'
@@ -515,7 +504,6 @@ const panelFooter = (h: HtmlBuilder<EditorMessage>, panel: Panel): Html => {
         false,
         null,
       ),
-      footerButton(h, 'Add adjustment', Plus, EditorMessage.ToggledPalette(), false, null),
     ],
   )
 }
@@ -552,17 +540,7 @@ const emptyPanel = (h: HtmlBuilder<EditorMessage>) =>
       ),
       h.p(
         [h.Class('text-xs leading-relaxed text-muted')],
-        ['Pick an adjustment from the rail, or search all thirteen in the palette.'],
-      ),
-      h.button(
-        [
-          h.Class(
-            'flex h-8 items-center gap-2 rounded-full bg-s2 px-3 text-[10px] uppercase tracking-[0.1em] text-ink hover:bg-s3',
-          ),
-          h.OnClick(EditorMessage.ToggledPalette()),
-          h.AriaLabel('Add adjustment'),
-        ],
-        ['Add adjustment'],
+        ['Pick a tool from the rail, or search all thirteen in the palette.'],
       ),
     ],
   )
