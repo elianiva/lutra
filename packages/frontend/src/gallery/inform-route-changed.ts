@@ -1,6 +1,7 @@
 import { Update } from 'foldkit'
 import type { EditStore } from '@lutra/store'
 import type { AppRoute } from '../route'
+import { readMode } from '../theme'
 import type { Model } from './model'
 import type { GalleryMessage } from './message'
 import { ListEdits } from './command'
@@ -16,6 +17,7 @@ type Resource = EditStore
 
 export type RouteChangedReturn = Update.Return<Model, GalleryMessage, Resource>
 export const informRouteChanged = (model: Model, _route: AppRoute): RouteChangedReturn => ({
-  model,
+  // The editor may have switched the mode while the gallery was away.
+  model: { ...model, mode: readMode() },
   commands: [ListEdits()],
 })

@@ -8,11 +8,11 @@ import {
   expectOutMessage,
   given,
   scene,
-  text,
+  selector,
 } from 'foldkit/scene'
 import { EditId, EditSummary, StoreError } from '@lutra/store'
 import type { EditSummary as EditSummaryRecord } from '@lutra/store'
-import { initialModel } from './model'
+import { editList, initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
 import { OpenPhoto } from './command'
@@ -24,18 +24,22 @@ const config = {
   view,
 } as const
 
+// A loaded (empty) gallery: the grid is what carries the open-photo button.
+const loaded = { ...initialModel(), grid: editList.Success({ data: [] }) }
+const openPhotoButton = selector('[aria-label="Open a photo to start a new edit"]')
+
 const id = EditId('11111111-1111-4111-8111-111111111111')
 
 describe('gallery: open a photo (new edit)', () => {
-  it('shows an Open photo button in the header', () => {
-    scene(config, given(initialModel()), sceneExpect(text('Open photo')).toExist())
+  it('shows an Open photo button once the gallery has loaded', () => {
+    scene(config, given(loaded), sceneExpect(openPhotoButton).toExist())
   })
 
   it('dispatches OpenPhoto when the button is clicked', () => {
     scene(
       config,
-      given(initialModel()),
-      click(text('Open photo')),
+      given(loaded),
+      click(openPhotoButton),
       Command.expectHas(OpenPhoto),
       // The native file picker can't run in the harness — resolve the
       // command as a dismissed picker so the scene ends cleanly.
@@ -58,8 +62,8 @@ describe('gallery: open a photo (new edit)', () => {
   it('a created Edit surfaces as the OpenedEdit OutMessage for the root', () => {
     scene(
       config,
-      given(initialModel()),
-      click(text('Open photo')),
+      given(loaded),
+      click(openPhotoButton),
       Command.resolve(OpenPhoto, GalleryMessage.PhotoCreated({ id })),
       expectOutMessage(GalleryOutMessage.OpenedEdit({ id })),
     )
@@ -118,8 +122,8 @@ describe('gallery: opening several photos at once', () => {
   it('a batch stays on the gallery: nobody navigates', () => {
     scene(
       config,
-      given(initialModel()),
-      click(text('Open photo')),
+      given(loaded),
+      click(openPhotoButton),
       Command.resolve(
         OpenPhoto,
         added({

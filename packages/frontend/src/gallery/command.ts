@@ -3,6 +3,7 @@ import { Command, File as FoldkitFile } from 'foldkit'
 import type { StoreError } from '@lutra/store'
 import { EditStore, EditIdSchema, Edit, EditId, newEditId } from '@lutra/store'
 import { ImageDecodeError, ThumbnailEncodeError } from '../errors'
+import { type Mode, persistMode } from '../theme'
 import { GalleryMessage } from './message'
 
 /**
@@ -257,4 +258,12 @@ export const AddFiles = Command.define('AddFiles', {
     GalleryMessage.PhotoCreateFailed,
     GalleryMessage.PhotosAdded,
   ],
+})
+
+/** Paint the appearance mode on the document root and remember it (docs/adr/0013-materials). */
+export const SetTheme = Command.define('SetTheme', {
+  args: { mode: S.Literals(['dark', 'light']) },
+  execute: ({ mode }: { mode: Mode }) =>
+    persistMode(mode).pipe(Effect.as(GalleryMessage.ThemeApplied())),
+  messages: [GalleryMessage.ThemeApplied],
 })

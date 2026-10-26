@@ -1,12 +1,11 @@
 import { DateTime } from 'effect'
 import { Submodel, AsyncData } from 'foldkit'
 import { type Html, type HtmlBuilder, createLazy, createKeyedLazy } from 'foldkit/html'
-import { Upload, X } from 'lucide'
+import { Eclipse, LayoutGrid, Plus, Sun, Upload, X } from 'lucide'
 import { button } from '@/components/ui/button'
 import { GalleryMessage } from './message'
 import type { Model } from './model'
 import type { EditSummary, StoreError } from '@lutra/store'
-import { settingsDialogView } from './settings-dialog'
 import { deleteDialogView } from './delete-dialog'
 import { thumbnailUrl } from '../thumbnail-url'
 import { icon } from '../components/icon'
@@ -22,11 +21,11 @@ import { icon } from '../components/icon'
  * thumbnail contract (docs/adr/0005-storage).
  */
 // memoization (ADR 0006)
-const lazyHeader = createLazy()
+const lazyPill = createLazy()
 const lazyNotice = createLazy()
 const lazyTile = createKeyedLazy()
 
-const headerView = (h: HtmlBuilder<GalleryMessage>): Html => header(h)
+const pillView = (mode: Model['mode'], h: HtmlBuilder<GalleryMessage>): Html => pill(h, mode)
 const noticeView = (message: string | null, h: HtmlBuilder<GalleryMessage>): Html =>
   notice(message, h)
 
@@ -43,10 +42,12 @@ export const view = Submodel.defineView<Model, GalleryMessage>((model, h) => {
       h.OnDropFiles((files) => GalleryMessage.FilesDropped({ files: [...files] })),
     ],
     [
-      lazyHeader(headerView, [h])!,
       lazyNotice(noticeView, [model.notice, h]) ?? notice(model.notice, h),
-      h.main([h.Class('flex min-h-0 flex-1 flex-col overflow-auto')], [gridBody(h, grid)]),
-      settingsDialogView(h, model),
+      h.main(
+        [h.Class('flex min-h-0 flex-1 flex-col overflow-auto px-8 pb-28 pt-6')],
+        [header(h, grid), gridBody(h, grid)],
+      ),
+      lazyPill(pillView, [model.mode, h])!,
       deleteDialogView(h, model),
       dropOverlay(h, model.dragOver),
     ],
@@ -58,49 +59,81 @@ const notice = (message: string | null, h: HtmlBuilder<GalleryMessage>) =>
     ? null
     : h.div([h.Class('border-b border-border bg-panel px-4 py-1 text-xs text-accent')], [message])
 
-const header = (h: HtmlBuilder<GalleryMessage>) =>
+const header = (
+  h: HtmlBuilder<GalleryMessage>,
+  grid: AsyncData.AsyncData<readonly EditSummary[], StoreError>,
+) =>
   h.header(
-    [h.Class('flex h-16 flex-none items-center gap-6')],
+    [h.Class('mb-4 flex h-8 flex-none items-center gap-3 text-xs')],
     [
-      h.h1([h.Class('text-xs font-semibold tracking-[0.34em] text-signal')], ['LUTRA']),
-      h.div(
-        [h.Class('ml-auto flex items-center gap-2')],
+      h.h1(
+        [h.Class('font-normal')],
         [
-          h.button(
-            [
-              h.Class(
-                'key flex h-10 items-center gap-2 rounded-full bg-accent px-4 text-[10px] uppercase tracking-[0.1em] text-accent-ink',
-              ),
-              h.OnClick(GalleryMessage.OpenPhotoRequested()),
-              h.AriaLabel('Open a photo to start a new edit'),
-            ],
-            ['Open photo'],
-          ),
-          h.button(
-            [
-              h.Class(
-                'flex h-10 items-center rounded-full px-3 text-[10px] uppercase tracking-[0.1em] text-muted hover:bg-s1 hover:text-ink',
-              ),
-              h.OnClick(GalleryMessage.RefreshRequested()),
-              h.AriaLabel('Refresh'),
-            ],
-            ['Refresh'],
-          ),
-          h.button(
-            [
-              h.Class(
-                'flex h-10 items-center rounded-full px-3 text-[10px] uppercase tracking-[0.1em] text-muted hover:bg-s1 hover:text-ink',
-              ),
-              h.OnClick(GalleryMessage.SettingsRequested()),
-              h.AriaLabel('Open settings'),
-              h.DataAttribute('open-settings', 'true'),
-            ],
-            ['Settings'],
+          'Edits',
+          AsyncData.isSuccess(grid) && grid.data.length > 0
+            ? h.span([h.Class('ml-2 text-dim tnum')], [String(grid.data.length)])
+            : null,
+        ],
+      ),
+      h.span([h.Class('ml-auto text-[11px] text-dim')], ['Drop or paste a photo']),
+    ],
+  )
+
+/** The floating navigation: logo, the current page, and the appearance switch
+ *  (docs/adr/0013-materials). Bottom-centre so the grid keeps the full width. */
+const pill = (h: HtmlBuilder<GalleryMessage>, mode: Model['mode']): Html => {
+  const modeSegment = (target: 'dark' | 'light', label: string, Icon: typeof Sun) =>
+    h.button(
+      [
+        h.Class(
+          `grid h-7 w-7 place-items-center rounded-full transition-colors ${
+            mode === target ? 'bg-accent text-accent-ink' : 'text-dim hover:text-ink'
+          }`,
+        ),
+        h.OnClick(GalleryMessage.ToggledMode()),
+        h.AriaLabel(`${label} appearance`),
+        h.AriaPressed(String(mode === target)),
+        h.Title(`${label} appearance`),
+      ],
+      [icon(h, Icon, label, 14)],
+    )
+  return h.nav(
+    [
+      h.Class(
+        'surface-raised absolute bottom-5 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full! p-1.5',
+      ),
+      h.AriaLabel('Navigation'),
+    ],
+    [
+      h.span(
+        [
+          h.Class(
+            'mx-1 grid h-8 w-8 place-items-center rounded-[10px] bg-accent-soft font-bold text-signal',
           ),
         ],
+        ['L'],
+      ),
+      h.span([h.Class('seam-v mx-1.5 h-4')], []),
+      h.span(
+        [
+          h.Class(
+            'flex h-9 items-center gap-2 rounded-full bg-s2 px-4 text-[11px] uppercase tracking-[0.1em] text-ink',
+          ),
+          h.AriaCurrent('page'),
+        ],
+        [icon(h, LayoutGrid, 'Edits', 15), 'Edits'],
+      ),
+      h.span([h.Class('seam-v mx-1.5 h-4')], []),
+      h.div(
+        [
+          h.Class('well flex items-center gap-0.5 rounded-full! p-[3px]'),
+          h.AriaLabel('Appearance'),
+        ],
+        [modeSegment('light', 'Light', Sun), modeSegment('dark', 'Dark', Eclipse)],
       ),
     ],
   )
+}
 
 const gridBody = (
   h: HtmlBuilder<GalleryMessage>,
@@ -195,12 +228,24 @@ const hoverReveal = 'opacity-0 group-hover:opacity-100 group-has-focus-visible:o
 
 const gridTiles = (h: HtmlBuilder<GalleryMessage>, summaries: readonly EditSummary[]) =>
   h.div(
+    [h.Class('grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-4 max-sm:grid-cols-2')],
+    [newEditTile(h), ...summaries.map((summary) => lazyTile(summary.id, tileView, [summary, h])!)],
+  )
+
+const newEditTile = (h: HtmlBuilder<GalleryMessage>) =>
+  h.button(
     [
       h.Class(
-        'grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-5 pb-2 pt-2 max-sm:grid-cols-2',
+        'well flex aspect-square flex-col items-center justify-center gap-1.5 text-dim transition-colors hover:text-accent',
       ),
+      h.OnClick(GalleryMessage.OpenPhotoRequested()),
+      h.AriaLabel('Open a photo to start a new edit'),
     ],
-    summaries.map((summary) => lazyTile(summary.id, tileView, [summary, h])!),
+    [
+      icon(h, Plus, 'New edit', 22),
+      h.span([h.Class('text-xs')], ['New edit']),
+      h.span([h.Class('text-[10px]')], ['Open, drop or paste']),
+    ],
   )
 
 const tileView = (summary: EditSummary, h: HtmlBuilder<GalleryMessage>): Html => tile(h, summary)

@@ -3,7 +3,7 @@ import { Command, Update } from 'foldkit'
 import * as Dialog from '@/components/ui/dialog'
 import type { EditStore, EditSummary } from '@lutra/store'
 import { GalleryMessage, GalleryOutMessage, PhotoCreateError } from './message'
-import { AddFiles, DeleteEdit, ListEdits, OpenPhoto } from './command'
+import { AddFiles, DeleteEdit, ListEdits, OpenPhoto, SetTheme } from './command'
 import type { Model } from './model'
 import { editList } from './model'
 
@@ -101,23 +101,11 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
         },
       }),
 
-      SettingsRequested: () => {
-        const { model: dialog, commands: dialogCommands = [] } = Dialog.open(model.settingsDialog)
-        return {
-          model: { ...model, settingsDialog: dialog },
-          commands: Command.mapMessages(dialogCommands, toSettingsDialogMessage),
-        }
+      ToggledMode: () => {
+        const mode = model.mode === 'dark' ? 'light' : 'dark'
+        return { model: { ...model, mode }, commands: [SetTheme({ mode })] }
       },
-      GotSettingsDialogMessage: ({ message }) => {
-        const { model: dialog, commands: dialogCommands = [] } = Dialog.update(
-          model.settingsDialog,
-          message,
-        )
-        return {
-          model: { ...model, settingsDialog: dialog },
-          commands: Command.mapMessages(dialogCommands, toSettingsDialogMessage),
-        }
-      },
+      ThemeApplied: () => ({ model }),
       GotDeleteDialogMessage: ({ message }) => {
         const { model: dialog, commands: dialogCommands = [] } = Dialog.update(
           model.deleteDialog,
@@ -132,15 +120,9 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
           commands: Command.mapMessages(dialogCommands, toDeleteDialogMessage),
         }
       },
-      ToggledInfiniteCanvas: ({ isEnabled }) => ({
-        model: { ...model, experimental: { ...model.experimental, infiniteCanvas: isEnabled } },
-      }),
     }),
     M.exhaustive,
   )
-
-const toSettingsDialogMessage = (message: Dialog.Message): GalleryMessage =>
-  GalleryMessage.GotSettingsDialogMessage({ message })
 
 const toDeleteDialogMessage = (message: Dialog.Message): GalleryMessage =>
   GalleryMessage.GotDeleteDialogMessage({ message })

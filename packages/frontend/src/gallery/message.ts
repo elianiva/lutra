@@ -50,19 +50,12 @@ export const GalleryMessage = defineMessageUnion({
   FilesDropped: { files: S.Array(S.instanceOf(File)) },
   FilesPasted: { files: S.Array(S.instanceOf(File)) },
 
-  SettingsRequested: {},
-
-  GotSettingsDialogMessage: {
-    message: Dialog.Message,
-  },
+  ToggledMode: {},
+  ThemeApplied: {},
 
   GotDeleteDialogMessage: {
     message: Dialog.Message,
   },
-
-  /** An experimental toggle flipped (the new checked state). UI-only for now —
-   *  nothing consumes the flag yet. */
-  ToggledInfiniteCanvas: { isEnabled: S.Boolean },
 })
 export type GalleryMessage = typeof GalleryMessage.Type
 

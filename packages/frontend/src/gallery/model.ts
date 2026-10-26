@@ -1,6 +1,7 @@
 import { Schema as S } from 'effect'
 import { AsyncData } from 'foldkit'
 import * as Dialog from '@/components/ui/dialog'
+import { Mode, readMode } from '../theme'
 import { EditSummary, StoreError, EditIdSchema } from '@lutra/store'
 
 /**
@@ -25,22 +26,15 @@ export const Model = S.Struct({
   // The Edit id awaiting delete confirmation in the modal dialog (ADR-0010,
   // superseded to a dialog): null when no deletion is pending.
   pendingDelete: S.NullOr(EditIdSchema),
-  // The settings dialog submodel (@foldkit/ui): open/close/animation state.
-  settingsDialog: Dialog.Model,
+  // The appearance mode the pill's switch shows (docs/adr/0013-materials).
+  mode: Mode,
   // The delete-confirmation dialog submodel (@foldkit/ui), opened by a
   // tile's ✕ (ADR-0010, superseded to a dialog).
   deleteDialog: Dialog.Model,
-  // The Experimental section's flags. UI-only for now — nothing reads them
-  // yet; wiring them up changes app behavior and comes later.
   // Visual drag-over state: true while a file drag hovers the gallery
   // root so the view can render a drop overlay. Purely presentation —
   // the drop itself is handled by OnDropFiles.
   dragOver: S.Boolean,
-  experimental: S.Struct({
-    // "Infinite canvas": pan/zoom a Figma-style workspace instead of the
-    // fixed photo canvas. Not wired up — a visual toggle only.
-    infiniteCanvas: S.Boolean,
-  }),
 })
 export type Model = typeof Model.Type
 
@@ -48,10 +42,7 @@ export const initialModel = (): Model => ({
   grid: EditList.Idle(),
   notice: null,
   pendingDelete: null,
-  settingsDialog: Dialog.init({ id: 'gallery-settings-dialog' }),
+  mode: readMode(),
   deleteDialog: Dialog.init({ id: 'gallery-delete-dialog' }),
   dragOver: false,
-  experimental: {
-    infiniteCanvas: false,
-  },
 })
