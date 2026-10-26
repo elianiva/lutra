@@ -33,28 +33,28 @@ export const offlineMachine = Machine.define({
           when(
             (_state, message) => (message.online ? Option.none() : Option.some(true)),
             'Paused',
-            () => Paused(),
+            () => ({ model: Paused() }),
           ),
         ],
-        OfflineFillPaused: to('Paused', () => Paused()),
-        OfflineQuotaError: to('QuotaError', () => QuotaError()),
-        OfflineFillComplete: to('Ready', () => Ready()),
+        OfflineFillPaused: to('Paused', () => ({ model: Paused() })),
+        OfflineQuotaError: to('QuotaError', () => ({ model: QuotaError() })),
+        OfflineFillComplete: to('Ready', () => ({ model: Ready() })),
       },
     },
     Idle: {
       on: {
-        OfflineFillStarted: to('Filling', () => Filling()),
+        OfflineFillStarted: to('Filling', () => ({ model: Filling() })),
       },
     },
     Paused: {
       on: {
-        OfflineFillResumed: to('Filling', () => Filling()),
-        OfflineQuotaError: to('QuotaError', () => QuotaError()),
+        OfflineFillResumed: to('Filling', () => ({ model: Filling() })),
+        OfflineQuotaError: to('QuotaError', () => ({ model: QuotaError() })),
       },
     },
     QuotaError: {
       on: {
-        OfflineFillStarted: to('Filling', () => Filling()),
+        OfflineFillStarted: to('Filling', () => ({ model: Filling() })),
       },
     },
     Ready: {

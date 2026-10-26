@@ -38,130 +38,132 @@ export const editorMachine = Machine.define({
   states: {
     Drafting: {
       on: {
-        ConfirmedDraft: to('Selected', ({ state }) => Selected({ layerId: state.layer.id })),
-        CancelledDraft: to('Idle', () => Idle()),
-        UpdatedDraftParam: to('Drafting', ({ state, message }) =>
-          Drafting({ layer: { ...state.layer, [message.field]: message.value } }),
-        ),
-        CurvePointDragged: to('Drafting', ({ state, message }) =>
-          Drafting({
+        ConfirmedDraft: to('Selected', ({ state }) => ({
+          model: Selected({ layerId: state.layer.id }),
+        })),
+        CancelledDraft: to('Idle', () => ({ model: Idle() })),
+        UpdatedDraftParam: to('Drafting', ({ state, message }) => ({
+          model: Drafting({ layer: { ...state.layer, [message.field]: message.value } }),
+        })),
+        CurvePointDragged: to('Drafting', ({ state, message }) => ({
+          model: Drafting({
             layer: moveCurvePoint(state.layer, message.index, message.x, message.y),
           }),
-        ),
-        CurveReset: to('Drafting', ({ state }) => Drafting({ layer: resetCurve(state.layer) })),
+        })),
+        CurveReset: to('Drafting', ({ state }) => ({
+          model: Drafting({ layer: resetCurve(state.layer) }),
+        })),
         ChangedDraftLut: [
           when(
             (state) => (state.layer.type === 'lut' ? Option.some(state.layer) : Option.none()),
             'Drafting',
-            ({ guardValue, message }) =>
-              Drafting({ layer: { ...guardValue, lutId: message.lutId } }),
+            ({ guardValue, message }) => ({
+              model: Drafting({ layer: { ...guardValue, lutId: message.lutId } }),
+            }),
           ),
         ],
-        ClearedImage: to('Empty', () => Empty()),
-        EditLoaded: to('Idle', () => Idle()),
-        EditLoadFailed: to('Error', () => ErrorState()),
+        ClearedImage: to('Empty', () => ({ model: Empty() })),
+        EditLoaded: to('Idle', () => ({ model: Idle() })),
+        EditLoadFailed: to('Error', () => ({ model: ErrorState() })),
       },
     },
     Empty: {
       on: {
-        SelectedImageFile: to(
-          'Loading',
-          () => Loading(),
-          ({ message }) => [DecodeImage({ file: message.file })],
-        ),
-        EditLoaded: to('Idle', () => Idle()),
-        EditLoadFailed: to('Error', () => ErrorState()),
+        SelectedImageFile: to('Loading', ({ message }) => ({
+          model: Loading(),
+          commands: [DecodeImage({ file: message.file })],
+        })),
+        EditLoaded: to('Idle', () => ({ model: Idle() })),
+        EditLoadFailed: to('Error', () => ({ model: ErrorState() })),
       },
     },
     Error: {
       on: {
-        SelectedImageFile: to(
-          'Loading',
-          () => Loading(),
-          ({ message }) => [DecodeImage({ file: message.file })],
-        ),
-        ImageDecoded: to('Idle', () => Idle()),
-        ClearedImage: to('Empty', () => Empty()),
-        EditLoaded: to('Idle', () => Idle()),
-        EditLoadFailed: to('Error', () => ErrorState()),
+        SelectedImageFile: to('Loading', ({ message }) => ({
+          model: Loading(),
+          commands: [DecodeImage({ file: message.file })],
+        })),
+        ImageDecoded: to('Idle', () => ({ model: Idle() })),
+        ClearedImage: to('Empty', () => ({ model: Empty() })),
+        EditLoaded: to('Idle', () => ({ model: Idle() })),
+        EditLoadFailed: to('Error', () => ({ model: ErrorState() })),
       },
     },
     Idle: {
       on: {
         // cleared image.
-        ImageFailedToDecode: to('Error', () => ErrorState()),
-        ImageDecoded: to('Idle', () => Idle()),
-        SelectedTool: to(
-          'Creating',
-          () => Creating({ selectedLayerId: null }),
-          ({ message }) => [CreateLayer({ type: message.type })],
-        ),
+        ImageFailedToDecode: to('Error', () => ({ model: ErrorState() })),
+        ImageDecoded: to('Idle', () => ({ model: Idle() })),
+        SelectedTool: to('Creating', ({ message }) => ({
+          model: Creating({ selectedLayerId: null }),
+          commands: [CreateLayer({ type: message.type })],
+        })),
         SelectedLayer: [
           when(
             (_state, message) => Option.fromNullOr(message.id),
             'Selected',
-            ({ guardValue }) => Selected({ layerId: guardValue }),
+            ({ guardValue }) => ({ model: Selected({ layerId: guardValue }) }),
           ),
         ],
-        ClearedImage: to('Empty', () => Empty()),
-        EditLoaded: to('Idle', () => Idle()),
-        EditLoadFailed: to('Error', () => ErrorState()),
+        ClearedImage: to('Empty', () => ({ model: Empty() })),
+        EditLoaded: to('Idle', () => ({ model: Idle() })),
+        EditLoadFailed: to('Error', () => ({ model: ErrorState() })),
       },
     },
     Loading: {
       on: {
-        SelectedImageFile: to(
-          'Loading',
-          () => Loading(),
-          ({ message }) => [DecodeImage({ file: message.file })],
-        ),
-        ImageDecoded: to('Idle', () => Idle()),
-        ImageFailedToDecode: to('Error', () => ErrorState()),
-        ClearedImage: to('Empty', () => Empty()),
-        EditLoaded: to('Idle', () => Idle()),
-        EditLoadFailed: to('Error', () => ErrorState()),
+        SelectedImageFile: to('Loading', ({ message }) => ({
+          model: Loading(),
+          commands: [DecodeImage({ file: message.file })],
+        })),
+        ImageDecoded: to('Idle', () => ({ model: Idle() })),
+        ImageFailedToDecode: to('Error', () => ({ model: ErrorState() })),
+        ClearedImage: to('Empty', () => ({ model: Empty() })),
+        EditLoaded: to('Idle', () => ({ model: Idle() })),
+        EditLoadFailed: to('Error', () => ({ model: ErrorState() })),
       },
     },
     Creating: {
       on: {
-        LayerCreated: to('Drafting', ({ message }) => Drafting({ layer: message.layer })),
+        LayerCreated: to('Drafting', ({ message }) => ({
+          model: Drafting({ layer: message.layer }),
+        })),
         LayerCreationFailed: [
           when(
             (state) => Option.fromNullOr(state.selectedLayerId),
             'Selected',
-            ({ guardValue }) => Selected({ layerId: guardValue }),
+            ({ guardValue }) => ({ model: Selected({ layerId: guardValue }) }),
           ),
-          otherwise(to('Idle', () => Idle())),
+          otherwise(to('Idle', () => ({ model: Idle() }))),
         ],
-        ClearedImage: to('Empty', () => Empty()),
-        EditLoaded: to('Idle', () => Idle()),
-        EditLoadFailed: to('Error', () => ErrorState()),
+        ClearedImage: to('Empty', () => ({ model: Empty() })),
+        EditLoaded: to('Idle', () => ({ model: Idle() })),
+        EditLoadFailed: to('Error', () => ({ model: ErrorState() })),
       },
     },
     Selected: {
       on: {
-        SelectedTool: to(
-          'Creating',
-          ({ state }) => Creating({ selectedLayerId: state.layerId }),
-          ({ message }) => [CreateLayer({ type: message.type })],
-        ),
+        SelectedTool: to('Creating', ({ state, message }) => ({
+          model: Creating({ selectedLayerId: state.layerId }),
+          commands: [CreateLayer({ type: message.type })],
+        })),
         SelectedLayer: [
           when(
             (_state, message) => Option.fromNullOr(message.id),
             'Selected',
-            ({ guardValue }) => Selected({ layerId: guardValue }),
+            ({ guardValue }) => ({ model: Selected({ layerId: guardValue }) }),
           ),
         ],
         RemovedLayer: [
           when(
             (state, message) => state.layerId === message.id,
             'Idle',
-            () => Idle(),
+            () => ({ model: Idle() }),
           ),
         ],
-        ClearedImage: to('Empty', () => Empty()),
-        EditLoaded: to('Idle', () => Idle()),
-        EditLoadFailed: to('Error', () => ErrorState()),
+        ClearedImage: to('Empty', () => ({ model: Empty() })),
+        EditLoaded: to('Idle', () => ({ model: Idle() })),
+        EditLoadFailed: to('Error', () => ({ model: ErrorState() })),
       },
     },
   },

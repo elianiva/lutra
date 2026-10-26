@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest'
-import { Effect } from 'effect'
-import * as fc from 'fast-check'
+import { describe, it as vitestIt, expect } from 'vitest'
+import { it } from '@effect/vitest'
+import { Arbitrary, Effect, Schema } from 'effect'
 import { Command, Mount, given, scene, selector, label, expect as sceneExpect } from 'foldkit/scene'
 import { MockImageBitmap } from '../vitest-setup'
 import { initialModel } from './model'
@@ -30,7 +30,7 @@ const presented = (commands: readonly { readonly name: string; readonly args?: P
   commands.find((c) => c.name === 'PresentFrame')?.args?.present
 
 describe('compare flow', () => {
-  it('entering Toggle reveals the source and presents without rendering', () => {
+  vitestIt('entering Toggle reveals the source and presents without rendering', () => {
     const { model, commands = [] } = update(
       loadedModel(),
       EditorMessage.ChangedCompareMode({ mode: 'toggle' }),
@@ -42,7 +42,7 @@ describe('compare flow', () => {
     expect(presented(commands)).toEqual({ mode: 'toggle', showBefore: true, splitAt: 0.5 })
   })
 
-  it('clicking the active Toggle segment flips back to the graded output', () => {
+  vitestIt('clicking the active Toggle segment flips back to the graded output', () => {
     const { model: toggled } = update(
       loadedModel(),
       EditorMessage.ChangedCompareMode({ mode: 'toggle' }),
@@ -59,7 +59,7 @@ describe('compare flow', () => {
     expect(presented(commands)).toEqual({ mode: 'toggle', showBefore: false, splitAt: 0.5 })
   })
 
-  it('coalesces rapid Toggle clicks while a present is in flight', () => {
+  vitestIt('coalesces rapid Toggle clicks while a present is in flight', () => {
     const { model: toggled } = update(
       loadedModel(),
       EditorMessage.ChangedCompareMode({ mode: 'toggle' }),
@@ -77,7 +77,7 @@ describe('compare flow', () => {
     expect(presented(flushed)).toEqual({ mode: 'toggle', showBefore: false, splitAt: 0.5 })
   })
 
-  it('switching modes keeps the split position and shows the graded side', () => {
+  vitestIt('switching modes keeps the split position and shows the graded side', () => {
     const { model: split } = update(
       loadedModel(),
       EditorMessage.ChangedCompareMode({ mode: 'split' }),
@@ -88,25 +88,26 @@ describe('compare flow', () => {
     expect(model.compareSplitAt).toBe(0.3)
   })
 
-  it('clamps any split position into [0, 1]', () => {
-    fc.assert(
-      fc.property(
-        fc.double({ max: 1_000_000, min: -1_000_000, noDefaultInfinity: true, noNaN: true }),
-        (position) => {
-          const { model } = update(loadedModel(), EditorMessage.ChangedSplitPosition({ position }))
-          expect(model.compareSplitAt).toBeGreaterThanOrEqual(0)
-          expect(model.compareSplitAt).toBeLessThanOrEqual(1)
-          // Positions already in range pass through untouched (-0 clamps to +0,
-          // which is the same value).
-          if (position >= 0 && position <= 1) {
-            expect(model.compareSplitAt).toBe(position || 0)
-          }
-        },
+  it.prop(
+    'clamps any split position into [0, 1]',
+    {
+      position: Arbitrary.schema(
+        Schema.Finite.check(Schema.isBetween({ minimum: -1_000_000, maximum: 1_000_000 })),
       ),
-    )
-  })
+    },
+    ({ position }) => {
+      const { model } = update(loadedModel(), EditorMessage.ChangedSplitPosition({ position }))
+      expect(model.compareSplitAt).toBeGreaterThanOrEqual(0)
+      expect(model.compareSplitAt).toBeLessThanOrEqual(1)
+      // Positions already in range pass through untouched (-0 clamps to +0,
+      // which is the same value).
+      if (position >= 0 && position <= 1) {
+        expect(model.compareSplitAt).toBe(position || 0)
+      }
+    },
+  )
 
-  it('does not present without an image', () => {
+  vitestIt('does not present without an image', () => {
     const { model, commands = [] } = update(
       initialModel(),
       EditorMessage.ChangedCompareMode({ mode: 'split' }),
@@ -115,7 +116,7 @@ describe('compare flow', () => {
     expect(commands).toHaveLength(0)
   })
 
-  it('a new image resets the split position but keeps the mode', () => {
+  vitestIt('a new image resets the split position but keeps the mode', () => {
     const { model: split } = update(
       loadedModel(),
       EditorMessage.ChangedCompareMode({ mode: 'split' }),
@@ -126,7 +127,7 @@ describe('compare flow', () => {
     expect(cleared.compareSplitAt).toBe(0.5)
   })
 
-  it('carries the compare state into every chain render', () => {
+  vitestIt('carries the compare state into every chain render', () => {
     const { model: split } = update(
       loadedModel(),
       EditorMessage.ChangedCompareMode({ mode: 'split' }),
@@ -154,7 +155,7 @@ const loadedStageMounts = [
 ]
 
 describe('compare control view', () => {
-  it('renders the four mode segments', () => {
+  vitestIt('renders the four mode segments', () => {
     scene(
       sceneConfig,
       given({
@@ -173,7 +174,7 @@ describe('compare control view', () => {
     )
   })
 
-  it('renders the control dimmed without an image', () => {
+  vitestIt('renders the control dimmed without an image', () => {
     scene(
       sceneConfig,
       given(initialModel()),
@@ -184,7 +185,7 @@ describe('compare control view', () => {
     )
   })
 
-  it('doubles the canvas width in Side by side mode so neither side is stretched', () => {
+  vitestIt('doubles the canvas width in Side by side mode so neither side is stretched', () => {
     scene(
       sceneConfig,
       given({
@@ -203,7 +204,7 @@ describe('compare control view', () => {
     )
   })
 
-  it('keeps the canvas at image size outside Side by side', () => {
+  vitestIt('keeps the canvas at image size outside Side by side', () => {
     scene(
       sceneConfig,
       given({
@@ -221,7 +222,7 @@ describe('compare control view', () => {
     )
   })
 
-  it('renders the divider in Split mode at the split position', () => {
+  vitestIt('renders the divider in Split mode at the split position', () => {
     scene(
       sceneConfig,
       given({
@@ -246,7 +247,7 @@ describe('compare control view', () => {
     )
   })
 
-  it('counter-scales the divider so its screen size is constant under zoom', () => {
+  vitestIt('counter-scales the divider so its screen size is constant under zoom', () => {
     scene(
       sceneConfig,
       given({

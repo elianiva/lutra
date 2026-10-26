@@ -11,30 +11,30 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@effect/platform-browser": "4.0.0-rc.112",
-    "@foldkit/ui": "^0.156.0",
+    "@effect/platform-browser": "4.0.6",
+    "@foldkit/ui": "^0.169.0",
     "@fontsource/electrolize": "^5.3.0",
     "@lutra/engine": "workspace:*",
     "@lutra/store": "workspace:*",
     "@tailwindcss/vite": "^4.3.3",
     "clsx": "^2.1.1",
-    "effect": "4.0.0-rc.112",
-    "foldkit": "^0.156.0",
-    "lucide": "^1.37.0",
-    "tailwind-merge": "^3.6.0",
+    "effect": "4.0.6",
+    "foldkit": "^0.169.0",
+    "lucide": "^1.61.0",
+    "tailwind-merge": "^3.7.0",
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
-    "@foldkit/devtools": "^0.156.0",
-    "@foldkit/devtools-mcp": "^0.19.2",
-    "@foldkit/oxlint-plugin": "^0.11.0",
-    "@foldkit/vite-plugin": "^0.20.0",
-    "@webgpu/types": "^0.1.72",
-    "fast-check": "^4.9.0",
-    "happy-dom": "^20.12.0",
+    "@effect/vitest": "4.0.6",
+    "@foldkit/devtools": "^0.169.0",
+    "@foldkit/devtools-mcp": "^0.25.0",
+    "@foldkit/oxlint-plugin": "^0.15.3",
+    "@foldkit/vite-plugin": "^0.28.0",
+    "@webgpu/types": "^0.1.74",
+    "happy-dom": "^21.0.4",
     "tw-animate-css": "^1.4.0",
     "typescript": "^7.0.2",
-    "vite": "^8.2.2",
-    "vitest": "^4.1.11"
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
   }
 }

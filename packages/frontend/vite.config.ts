@@ -17,7 +17,10 @@ export default defineConfig({
     // cache does not reliably re-optimize when files inside a linked
     // package change).
   },
-  plugins: [foldkit({ devToolsMcpPort: 9988 }), tailwindcss()],
+  // DevTools: the plugin serves its MCP relay at /__foldkit/devtools-mcp and
+  // publishes a token-protected address to a per-user registry, which the
+  // `foldkit-devtools` MCP server discovers. No fixed port to keep in sync.
+  plugins: [foldkit(), tailwindcss()],
   resolve: {
     alias: {
       '@': path.resolve(here, 'src'),

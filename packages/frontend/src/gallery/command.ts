@@ -179,7 +179,7 @@ export const OpenPhoto = Command.define('OpenPhoto', {
     // never loses the batch — and nobody navigates. The listing rides along
     // in the message so the grid refreshes the moment the result lands (a
     // follow-up ListEdits would land after the notice and wipe it).
-    const [failures, createdIds] = yield* Effect.partition(files, createEdit)
+    const [createdIds, failures] = yield* Effect.partition(files, createEdit)
     const store = yield* EditStore
     const summaries = yield* Effect.option(store.list())
     return GalleryMessage.PhotosAdded({
@@ -231,7 +231,7 @@ export const AddFiles = Command.define('AddFiles', {
         const id = yield* createEdit(file)
         return GalleryMessage.PhotoCreated({ id })
       }
-      const [failures, createdIds] = yield* Effect.partition(images, createEdit)
+      const [createdIds, failures] = yield* Effect.partition(images, createEdit)
       const store = yield* EditStore
       const summaries = yield* Effect.option(store.list())
       return GalleryMessage.PhotosAdded({

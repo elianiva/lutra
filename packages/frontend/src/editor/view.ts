@@ -19,7 +19,7 @@ import { icon } from '../components/icon'
 
 // lazy islands (ADR 0006)
 // Editor has ~28 Model fields but only a handful change per message.
-// Each island is memoized by its slice's reference (editor uses `evo`,
+// Each island is memoized by its slice's reference (editor uses `modifyFields`,
 // so unchanged keys keep ===). This keeps a slider drag at ~16ms instead
 // of rebuilding the LUT bar's ~300-thumb catalog grouping on every tick.
 const lazyTopBar = createLazy()

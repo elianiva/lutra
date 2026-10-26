@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Scope } from 'effect'
 import { Effect, Fiber, Option, Ref, Stream } from 'effect'
 import { EditorMessage } from '../editor/message'
+import { liveViewStateChanges } from 'foldkit/mount'
 import { RegisterCanvas } from '../editor/canvas-stage'
 import { canvasRef } from './canvas-ref'
 
@@ -16,7 +17,7 @@ import { canvasRef } from './canvas-ref'
 const mountCanvas = (element: Element): Effect.Effect<Fiber.Fiber<void>, never, Scope.Scope> =>
   Effect.gen(function* mountCanvas() {
     const fiber = yield* Effect.forkScoped(
-      Stream.runForEach(RegisterCanvas().f(element), () => Effect.void),
+      Stream.runForEach(RegisterCanvas().f(element, liveViewStateChanges), () => Effect.void),
     )
     let current: Option.Option<HTMLCanvasElement> = Option.none()
     for (let i = 0; i < 100; i++) {
@@ -54,7 +55,7 @@ describe('RegisterCanvas mount', () => {
 
     const messages = await Effect.runPromise(
       Effect.scoped(
-        Stream.runCollect(Stream.take(RegisterCanvas().f(el), 1)).pipe(
+        Stream.runCollect(Stream.take(RegisterCanvas().f(el, liveViewStateChanges), 1)).pipe(
           Effect.map((chunk) => [...chunk]),
         ),
       ),

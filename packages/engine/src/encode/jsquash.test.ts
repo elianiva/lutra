@@ -1,5 +1,6 @@
-import { beforeAll, describe, expect, it, vi } from 'vitest'
-import * as fc from 'fast-check'
+import { beforeAll, describe, expect, vi } from 'vitest'
+import { it } from '@effect/vitest'
+import { Arbitrary, Effect, Schema } from 'effect'
 import { createRequire } from 'node:module'
 import { readFile } from 'node:fs/promises'
 import * as Webp from '@jsquash/webp/encode.js'
@@ -103,33 +104,35 @@ describe('encodeImage', () => {
     warn.mockRestore()
   })
 
-  it('downscales before encoding: the output dimensions are the rounded scale', async () => {
-    // PNG is lossless, so the IHDR header reports the exact canvas the
-    // codec was handed: the wrapper's resize target
-    // (max(1, round(dim × scale))) must be what the encoder sees.
-    await fc.assert(
-      fc.asyncProperty(
-        fc.integer({ max: 192, min: 1 }),
-        fc.integer({ max: 192, min: 1 }),
-        fc.constantFrom(...EXPORT_SCALE_PRESETS),
-        async (width, height, scale) => {
-          const bytes = await encodeImage(
-            makeImage(width, height),
-            settings('png', { quality: null, scale }),
-          )
-          // PNG IHDR: width at offset 16, height at offset 20 (big-endian).
-          const u32be = (offset: number) =>
-            (bytes[offset]! << 24) |
-            (bytes[offset + 1]! << 16) |
-            (bytes[offset + 2]! << 8) |
-            bytes[offset + 3]!
-          expect([u32be(16), u32be(20)]).toEqual([
-            Math.max(1, Math.round(width * scale)),
-            Math.max(1, Math.round(height * scale)),
-          ])
-        },
-      ),
-      { numRuns: 12 },
-    )
-  })
+  it.effect.prop(
+    'downscales before encoding: the output dimensions are the rounded scale',
+    {
+      dimensions: Arbitrary.all({
+        height: Arbitrary.schema(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 192 }))),
+        width: Arbitrary.schema(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 192 }))),
+      }),
+      scale: Arbitrary.schema(Schema.Literals(EXPORT_SCALE_PRESETS)),
+    },
+    ({ dimensions: { width, height }, scale }) =>
+      Effect.gen(function* () {
+        // PNG is lossless, so the IHDR header reports the exact canvas the
+        // codec was handed: the wrapper's resize target
+        // (max(1, round(dim × scale))) must be what the encoder sees.
+        const bytes = yield* Effect.promise(() =>
+          encodeImage(makeImage(width, height), settings('png', { quality: null, scale })),
+        )
+        // PNG IHDR: width at offset 16, height at offset 20 (big-endian).
+        const u32be = (offset: number) =>
+          (bytes[offset]! << 24) |
+          (bytes[offset + 1]! << 16) |
+          (bytes[offset + 2]! << 8) |
+          bytes[offset + 3]!
+        expect([u32be(16), u32be(20)]).toEqual([
+          Math.max(1, Math.round(width * scale)),
+          Math.max(1, Math.round(height * scale)),
+        ])
+        return true
+      }),
+    { arbitrary: { runs: 12 } },
+  )
 })

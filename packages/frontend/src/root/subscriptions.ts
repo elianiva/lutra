@@ -1,5 +1,5 @@
 import { Effect, Option, Queue, Schema as S, Stream } from 'effect'
-import { Subscription } from 'foldkit'
+import { Dom, Subscription } from 'foldkit'
 import { OfflineFill } from '../offline/fill'
 import { OfflineMessage, fillEventToMessage } from '../offline/messages'
 import { AppMessage, RootMessage } from './message'
@@ -38,11 +38,11 @@ export const subscriptions = Subscription.aggregate<Model, AppMessage, OfflineFi
         modelToDependencies: (model: Model) => ({ routeTag: model.route._tag }),
         dependenciesToStream: ({ routeTag }: { routeTag: string }) =>
           Stream.when(
-            Subscription.fromEventFilterMap({
+            Dom.streamFromEventFilterMap({
               target: pasteTarget,
               type: 'paste',
               options: { passive: false },
-              toMessage: (event: Event): Option.Option<AppMessage> => {
+              filterMapEvent: (event: Event): Option.Option<AppMessage> => {
                 if (!isClipboardEvent(event)) {
                   return Option.none()
                 }
@@ -86,7 +86,7 @@ export const subscriptions = Subscription.aggregate<Model, AppMessage, OfflineFi
           ),
       },
     ),
-    connectivity: Subscription.persistent(
+    connectivity: Subscription.persistentEntry(
       Stream.callback<AppMessage>((queue) =>
         Effect.gen(function* () {
           const emit = (online: boolean) =>
@@ -111,7 +111,7 @@ export const subscriptions = Subscription.aggregate<Model, AppMessage, OfflineFi
         }),
       ),
     ),
-    offlineFill: Subscription.persistent(
+    offlineFill: Subscription.persistentEntry(
       Stream.flatMap(Stream.service(OfflineFill), (service) =>
         Stream.fromPubSub(service.events),
       ).pipe(Stream.map((event): AppMessage => fillEventToMessage(event))),

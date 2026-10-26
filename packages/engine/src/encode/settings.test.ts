@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import * as fc from 'fast-check'
-import { Schema } from 'effect'
+import { describe, expect } from 'vitest'
+import { it } from '@effect/vitest'
+import { Arbitrary, Schema } from 'effect'
 import {
   EXPORT_FORMATS,
   RESIZE_METHODS,
@@ -10,52 +10,48 @@ import {
   isLossy,
   mimeFor,
 } from './settings'
-import type { ExportOptions, ExportSettings as Settings } from './settings'
 
-const formatArb = fc.constantFrom(...EXPORT_FORMATS)
-const qualityArb = fc.oneof(fc.constant(null), fc.integer({ max: 100, min: 0 }))
-const scaleArb = fc.double({ max: 1, min: 0.01, noNaN: true })
+// Property tests derive their inputs from Effect Schemas and generate through
+// Effect's `Arbitrary` (docs/adr/0012-property-testing).
 
-const optionsArb: fc.Arbitrary<ExportOptions> = fc.record({
-  avif: fc.record({
-    lossless: fc.boolean(),
-    speed: fc.integer({ max: 10, min: 0 }),
-  }),
-  jpeg: fc.record({
-    optimizeCoding: fc.boolean(),
-    progressive: fc.boolean(),
-    smoothing: fc.integer({ max: 100, min: 0 }),
-  }),
-  webp: fc.record({
-    effort: fc.integer({ max: 6, min: 0 }),
-    lossless: fc.boolean(),
-  }),
-})
+const Format = Schema.Literals(EXPORT_FORMATS)
+/** The format names as plain strings: the generator excludes them by name. */
+const FORMAT_NAMES: ReadonlyArray<string> = EXPORT_FORMATS
+const ResizeMethodSchema = Schema.Literals(RESIZE_METHODS)
+const Quality = Schema.NullOr(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 100 })))
+const Scale = Schema.Finite.check(Schema.isBetween({ minimum: 0.01, maximum: 1 }))
 
-/** Any payload the schema accepts. */
-const validSettingsArb: fc.Arbitrary<Settings> = fc.record({
-  format: formatArb,
-  options: optionsArb,
-  quality: qualityArb,
-  resizeMethod: fc.constantFrom(...RESIZE_METHODS),
-  scale: scaleArb,
+/** Any settings payload the schema accepts. */
+const ValidSettings = Schema.Struct({
+  format: Format,
+  options: Schema.Struct({
+    avif: Schema.Struct({
+      lossless: Schema.Boolean,
+      speed: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 10 })),
+    }),
+    jpeg: Schema.Struct({
+      optimizeCoding: Schema.Boolean,
+      progressive: Schema.Boolean,
+      smoothing: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 100 })),
+    }),
+    webp: Schema.Struct({
+      effort: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 6 })),
+      lossless: Schema.Boolean,
+    }),
+  }),
+  quality: Quality,
+  resizeMethod: ResizeMethodSchema,
+  scale: Scale,
 })
 
 describe('ExportSettings', () => {
-  it('round-trips any valid settings object', () => {
-    fc.assert(
-      fc.property(validSettingsArb, (settings) => {
-        expect(Schema.decodeSync(ExportSettings)(settings)).toEqual(settings)
-      }),
-    )
+  it.prop('round-trips any valid settings object', { settings: ValidSettings }, ({ settings }) => {
+    expect(Schema.decodeSync(ExportSettings)(settings)).toEqual(settings)
   })
 
   it('decodes the defaults and they are a valid settings object', () => {
-    fc.assert(
-      fc.property(fc.constant(defaultExportSettings()), (defaults) => {
-        expect(Schema.decodeSync(ExportSettings)(defaults)).toEqual(defaults)
-      }),
-    )
+    const defaults = defaultExportSettings()
+    expect(Schema.decodeSync(ExportSettings)(defaults)).toEqual(defaults)
   })
 
   it('fills the defaults for a legacy record written before sizes and codec options existed', () => {
@@ -69,69 +65,69 @@ describe('ExportSettings', () => {
     })
   })
 
-  it('rejects any out-of-range quality', () => {
-    fc.assert(
-      fc.property(
-        fc.record({
-          format: formatArb,
-          options: optionsArb,
-          quality: fc.oneof(
-            fc.integer({ max: -1, min: -1000 }),
-            fc.integer({ max: 1000, min: 101 }),
-            fc.string(),
+  it.prop(
+    'rejects any out-of-range quality',
+    {
+      case: Arbitrary.flatMap(Arbitrary.schema(ValidSettings), (settings) =>
+        Arbitrary.map(
+          Arbitrary.schema(
+            Schema.Union([
+              Schema.Int.check(Schema.isLessThan(-1)),
+              Schema.Int.check(Schema.isGreaterThan(100)),
+              Schema.String,
+            ]),
           ),
-          resizeMethod: fc.constantFrom(...RESIZE_METHODS),
-          scale: scaleArb,
-        }),
-        (settings) => {
-          expect(() => Schema.decodeUnknownSync(ExportSettings)(settings)).toThrow()
-        },
-      ),
-    )
-  })
-
-  it('rejects any unknown format', () => {
-    const formatNames: readonly string[] = EXPORT_FORMATS
-    fc.assert(
-      fc.property(
-        fc.string({ maxLength: 12, minLength: 1 }).filter((s) => !formatNames.includes(s)),
-        (format) => {
-          expect(() =>
-            Schema.decodeUnknownSync(ExportSettings)({
-              format,
-              options: defaultExportOptions(),
-              quality: null,
-              resizeMethod: 'lanczos3',
-              scale: 1,
-            }),
-          ).toThrow()
-        },
-      ),
-    )
-  })
-
-  it('rejects any scale outside [0.01, 1] — no upscaling and a sane floor', () => {
-    fc.assert(
-      fc.property(
-        fc.oneof(
-          fc.double({ max: 0 }),
-          fc.double({ max: 0.009_999, min: 0.000_001 }),
-          fc.double({ min: 1.000_001 }),
+          (quality) => ({ settings, quality }),
         ),
-        (scale) => {
-          expect(() =>
-            Schema.decodeUnknownSync(ExportSettings)({
-              format: 'png',
-              options: defaultExportOptions(),
-              quality: null,
-              resizeMethod: 'lanczos3',
-              scale,
-            }),
-          ).toThrow()
-        },
       ),
-    )
-  })
+    },
+    ({ case: { settings, quality } }) => {
+      expect(() => Schema.decodeUnknownSync(ExportSettings)({ ...settings, quality })).toThrow()
+    },
+  )
+
+  it.prop(
+    'rejects any unknown format',
+    {
+      format: Arbitrary.filter(
+        Arbitrary.schema(Schema.String.check(Schema.isMinLength(1))),
+        (name) => !FORMAT_NAMES.includes(name),
+      ),
+    },
+    ({ format }) => {
+      expect(() =>
+        Schema.decodeUnknownSync(ExportSettings)({
+          format,
+          options: defaultExportOptions(),
+          quality: null,
+          resizeMethod: 'lanczos3',
+          scale: 1,
+        }),
+      ).toThrow()
+    },
+  )
+
+  it.prop(
+    'rejects any scale outside [0.01, 1] — no upscaling and a sane floor',
+    {
+      scale: Schema.Union([
+        Schema.Finite.check(Schema.isLessThanOrEqualTo(0)),
+        Schema.Finite.check(Schema.isBetween({ minimum: 0.000_001, maximum: 0.009_999 })),
+        Schema.Finite.check(Schema.isGreaterThanOrEqualTo(1.000_001)),
+      ]),
+    },
+    ({ scale }) => {
+      expect(() =>
+        Schema.decodeUnknownSync(ExportSettings)({
+          format: 'png',
+          options: defaultExportOptions(),
+          quality: null,
+          resizeMethod: 'lanczos3',
+          scale,
+        }),
+      ).toThrow()
+    },
+  )
 
   it('keeps a quality alongside a lossless WebP/AVIF so a toggle-off restores it', () => {
     const decoded = Schema.decodeSync(ExportSettings)({
@@ -144,22 +140,32 @@ describe('ExportSettings', () => {
     expect(decoded.quality).toBe(90)
   })
 
-  it('rejects payloads missing a required field', () => {
-    fc.assert(
-      fc.property(
-        validSettingsArb.chain((settings) =>
-          fc.constantFrom(
-            { quality: settings.quality, scale: settings.scale },
-            { format: settings.format, scale: settings.scale },
-            { format: settings.format, quality: settings.quality },
-          ),
+  it.prop(
+    'rejects payloads missing a required field',
+    {
+      case: Arbitrary.flatMap(Arbitrary.schema(ValidSettings), (settings) =>
+        Arbitrary.map(
+          Arbitrary.schema(Schema.Literals(['format', 'quality', 'scale'])),
+          (missing) => {
+            switch (missing) {
+              case 'format': {
+                return { quality: settings.quality, scale: settings.scale }
+              }
+              case 'quality': {
+                return { format: settings.format, scale: settings.scale }
+              }
+              case 'scale': {
+                return { format: settings.format, quality: settings.quality }
+              }
+            }
+          },
         ),
-        (settings) => {
-          expect(() => Schema.decodeUnknownSync(ExportSettings)(settings)).toThrow()
-        },
       ),
-    )
-  })
+    },
+    ({ case: payload }) => {
+      expect(() => Schema.decodeUnknownSync(ExportSettings)(payload)).toThrow()
+    },
+  )
 })
 
 describe('format helpers', () => {
@@ -178,11 +184,7 @@ describe('format helpers', () => {
     expect(isLossy({ format: 'avif', options: lossless })).toBe(true)
   })
 
-  it('mimeFor maps each format to its MIME type', () => {
-    fc.assert(
-      fc.property(formatArb, (format) => {
-        expect(mimeFor(format)).toBe(`image/${format}`)
-      }),
-    )
+  it.prop('mimeFor maps each format to its MIME type', { format: Format }, ({ format }) => {
+    expect(mimeFor(format)).toBe(`image/${format}`)
   })
 })

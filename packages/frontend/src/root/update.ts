@@ -1,7 +1,7 @@
 import { Effect, Match, Schema as S } from 'effect'
 import { Command, Update } from 'foldkit'
 import { pushUrl } from 'foldkit/navigation'
-import { evo } from 'foldkit/struct'
+import { modifyFields } from 'foldkit/struct'
 import type { EditStore } from '@lutra/store'
 import { EditIdSchema } from '@lutra/store'
 import type { GpuBackend } from '../gpu/backend'
@@ -9,7 +9,7 @@ import type { CanvasRef } from '../gpu/canvas-ref'
 import type { LutStore } from '../luts/store'
 import type { LutThumbnailer } from '../thumbs/worker-layer'
 import type { ImageEncoder } from '@lutra/engine'
-import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
+import type { KeyValueStore } from 'effect/persistence/KeyValueStore'
 import { AppMessage, RootMessage } from './message'
 import type { Model } from './model'
 import { GalleryRoute, EditorRoute } from '../route'
@@ -44,7 +44,8 @@ const NavigateToEdit = Command.define('NavigateToEdit', {
   messages: [RootMessage.NavigatedTo],
 })
 
-const withRoute = (model: Model, route: Model['route']) => evo(model, { route: (_) => route })
+const withRoute = (model: Model, route: Model['route']) =>
+  modifyFields(model, { route: (_) => route })
 
 /** The route changed (browser back/forward, a pushed URL): set the route and
  *  let the active Submodel derive its state — one arm per Submodel, calling
@@ -59,7 +60,7 @@ const applyRoute = (model: Model, route: AppRoute) =>
       )
       const mapped = Command.mapMessages(cmds, (m) => RootMessage.GotGalleryMessage({ message: m }))
       return {
-        model: withRoute(evo(model, { gallery: (_) => nextGallery }), route),
+        model: withRoute(modifyFields(model, { gallery: (_) => nextGallery }), route),
         commands: mapped,
       }
     }),
@@ -70,7 +71,7 @@ const applyRoute = (model: Model, route: AppRoute) =>
       )
       const mapped = Command.mapMessages(cmds, (m) => RootMessage.GotEditorMessage({ message: m }))
       return {
-        model: withRoute(evo(model, { editor: (_) => nextEditor }), route),
+        model: withRoute(modifyFields(model, { editor: (_) => nextEditor }), route),
         commands: mapped,
       }
     }),
@@ -99,9 +100,9 @@ const delegateToEditor = (model: Model, editorMessage: EditorMessage): UpdateRet
   } = Editor.update(model.editor, editorMessage)
   const mapped = Command.mapMessages(cmds, (m) => RootMessage.GotEditorMessage({ message: m }))
   return out === undefined
-    ? { model: evo(model, { editor: (_) => nextEditor }), commands: mapped }
+    ? { model: modifyFields(model, { editor: (_) => nextEditor }), commands: mapped }
     : {
-        model: evo(model, { editor: (_) => nextEditor }),
+        model: modifyFields(model, { editor: (_) => nextEditor }),
         commands: [...mapped, NavigateToEdit({ id: out.id })],
       }
 }
@@ -133,10 +134,10 @@ export const update = (model: Model, message: AppMessage): UpdateReturn => {
           RootMessage.GotGalleryMessage({ message: m }),
         )
         if (out === undefined) {
-          return { model: evo(model, { gallery: (_) => nextGallery }), commands: mapped }
+          return { model: modifyFields(model, { gallery: (_) => nextGallery }), commands: mapped }
         }
         return {
-          model: evo(model, { gallery: (_) => nextGallery }),
+          model: modifyFields(model, { gallery: (_) => nextGallery }),
           commands: [...mapped, NavigateToEdit({ id: out.id })],
         }
       },
@@ -150,14 +151,14 @@ export const update = (model: Model, message: AppMessage): UpdateReturn => {
           RootMessage.GotEditorMessage({ message: m }),
         )
         if (out === undefined) {
-          return { model: evo(model, { editor: (_) => nextEditor }), commands: mapped }
+          return { model: modifyFields(model, { editor: (_) => nextEditor }), commands: mapped }
         }
         // A save created a new Edit (fresh-pick Save or Save as): push the
         // editor URL for it, exactly as for a gallery tile — reload then
         // re-attaches to the saved Edit (the URL always addresses the
         // editor's attachment).
         return {
-          model: evo(model, { editor: (_) => nextEditor }),
+          model: modifyFields(model, { editor: (_) => nextEditor }),
           commands: [...mapped, NavigateToEdit({ id: out.id })],
         }
       },
@@ -172,7 +173,7 @@ export const update = (model: Model, message: AppMessage): UpdateReturn => {
       // A run began: seed the progress counters (total = full library, done
       // = already-cached files the run's diff found).
       OfflineFillStarted: ({ total, done }) => ({
-        model: evo(model, {
+        model: modifyFields(model, {
           offline: (o) => ({ ...stepOffline(o, message), downloaded: done, total }),
         }),
       }),
@@ -184,7 +185,7 @@ export const update = (model: Model, message: AppMessage): UpdateReturn => {
       // A file landed in the cache: bump the count; cube files mark their
       // LUT row downloaded.
       OfflineFileCompleted: ({ lutId }) => {
-        const withOffline = evo(model, {
+        const withOffline = modifyFields(model, {
           offline: (o) => ({
             ...stepOffline(o, message),
             downloaded: o.downloaded + 1,
@@ -200,14 +201,16 @@ export const update = (model: Model, message: AppMessage): UpdateReturn => {
       OfflineFileFailed: () => ({ model }),
       // The device went offline mid-run / the loop resumed: the machine
       // follows the loop's own announcements.
-      OfflineFillPaused: () => ({ model: evo(model, { offline: (o) => stepOffline(o, message) }) }),
+      OfflineFillPaused: () => ({
+        model: modifyFields(model, { offline: (o) => stepOffline(o, message) }),
+      }),
       OfflineFillResumed: () => ({
-        model: evo(model, { offline: (o) => stepOffline(o, message) }),
+        model: modifyFields(model, { offline: (o) => stepOffline(o, message) }),
       }),
       // The run finished: Ready, the toast shows, and the auto-dismiss
       // timer starts (a click dismisses it earlier).
       OfflineFillComplete: () => ({
-        model: evo(model, {
+        model: modifyFields(model, {
           offline: (o) => ({ ...stepOffline(o, message), readyToast: true }),
         }),
         commands: [DismissOfflineToast()],
@@ -216,13 +219,13 @@ export const update = (model: Model, message: AppMessage): UpdateReturn => {
       // once — gated on a fresh persist() grant (a denied grant stops the
       // loop; the card's retry button is the manual path back in).
       OfflineQuotaError: () => ({
-        model: evo(model, { offline: (o) => stepOffline(o, message) }),
+        model: modifyFields(model, { offline: (o) => stepOffline(o, message) }),
         commands: [StartOfflineFill({ requirePersist: true })],
       }),
       // The browser's online state: the machine's Paused transition (when
       // offline), the slice's flag, and the editor's dimming flag.
       ConnectivityChanged: ({ online }) => {
-        const withOffline = evo(model, {
+        const withOffline = modifyFields(model, {
           offline: (o) => ({ ...stepOffline(o, message), online }),
         })
         return delegateToEditor(withOffline, EditorMessage.OfflineConnectivityChanged({ online }))
@@ -233,10 +236,10 @@ export const update = (model: Model, message: AppMessage): UpdateReturn => {
         commands: [StartOfflineFill({ requirePersist: false })],
       }),
       StoragePersisted: ({ persisted }) => ({
-        model: evo(model, { offline: (o) => ({ ...o, persisted }) }),
+        model: modifyFields(model, { offline: (o) => ({ ...o, persisted }) }),
       }),
       OfflineReadyDismissed: () => ({
-        model: evo(model, { offline: (o) => ({ ...o, readyToast: false }) }),
+        model: modifyFields(model, { offline: (o) => ({ ...o, readyToast: false }) }),
       }),
     }),
   )

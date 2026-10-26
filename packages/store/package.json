@@ -8,14 +8,14 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@effect/platform-browser": "4.0.0-rc.112",
+    "@effect/platform-browser": "4.0.6",
     "@lutra/engine": "workspace:*",
-    "effect": "4.0.0-rc.112"
+    "effect": "4.0.6"
   },
   "devDependencies": {
-    "fake-indexeddb": "^6.2.5",
-    "fast-check": "^4.9.0",
+    "@effect/vitest": "4.0.6",
+    "fake-indexeddb": "^6.2.6",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.5"
   }
 }

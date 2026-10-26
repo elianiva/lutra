@@ -62,10 +62,12 @@ const mountLoadedStage = [
   Mount.resolve(RegisterCanvas, EditorMessage.CanvasRegistered()),
 ]
 
-// Resolve the dialog's internal ShowDialog command.
+// Resolve the dialog's internal ShowDialog command, then its resource-acquiring
+// Mount (both fire as the dialog opens).
 const openDialog = [
   Command.expectHas(Dialog.ShowDialog),
   Command.resolve(Dialog.ShowDialog, Dialog.Message.SucceededShowDialog()),
+  Mount.resolve(Dialog.AcquireResources, Dialog.Message.SucceededAcquireResources()),
 ]
 
 describe('Export dialog', () => {
@@ -317,6 +319,8 @@ describe('Export dialog', () => {
       Command.expectHas(ExportDialog.RevokeExportUrl),
       Command.resolve(ExportDialog.RevokeExportUrl, ExportDialog.Message.UrlRevoked()),
       expect(text('EXPORT')).not.toExist(),
+      // The dialog unmounted, taking its resource-acquiring Mount with it.
+      Mount.expectEnded(Dialog.AcquireResources),
       Command.expectNone(),
     )
   })

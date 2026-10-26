@@ -1,6 +1,6 @@
 import { Effect, Schema as S } from 'effect'
 import { Command } from 'foldkit'
-import type { KeyValueStore } from 'effect/unstable/persistence/KeyValueStore'
+import type { KeyValueStore } from 'effect/persistence/KeyValueStore'
 import { EncodeError, ImageEncoder, ExportSettings, mimeFor } from '@lutra/engine'
 import { ExportDialogMessage } from './message'
 import { peekFrame } from './frame'

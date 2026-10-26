@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest'
-import * as fc from 'fast-check'
-import { Effect, Schema } from 'effect'
+import { describe, expect } from 'vitest'
+import { it } from '@effect/vitest'
+import { Arbitrary, Effect, Schema } from 'effect'
 import { createLayer, makeRegistry, CURVE_POINT_COUNT, CURVE_X_EPS } from '../layers'
 import type { Layer } from '../layers'
 import type { BodySource } from '../shaders'
@@ -58,35 +58,59 @@ describe('tone curve layer defaults', () => {
     ])
   })
 
-  it('every point field sits in [0, 1]', () => {
-    fc.assert(
-      fc.property(
-        fc.array(fc.double({ max: 2, min: -2, noNaN: true }), { maxLength: 32, minLength: 0 }),
-        (values) => {
-          // Move every point to arbitrary (possibly out-of-range) targets;
-          // the invariants must hold no matter the drag path.
-          let layer: Layer = curveLayer()
-          for (let i = 0; i < values.length; i++) {
-            layer = move(
-              layer,
-              i % CURVE_POINT_COUNT,
-              values[i]!,
-              values[(i + 1) % values.length] ?? 0,
-            )
-          }
-          for (const p of curvePointsOf(layer)) {
-            expect(p.x).toBeGreaterThanOrEqual(0)
-            expect(p.x).toBeLessThanOrEqual(1)
-            expect(p.y).toBeGreaterThanOrEqual(0)
-            expect(p.y).toBeLessThanOrEqual(1)
-          }
-        },
+  it.prop(
+    'every point field sits in [0, 1]',
+    {
+      // Out-of-range drag targets: the invariants must hold whatever the path.
+      values: Arbitrary.array(
+        Arbitrary.schema(Schema.Finite.check(Schema.isBetween({ minimum: -2, maximum: 2 }))),
+        { maxLength: 32, minLength: 0 },
       ),
-    )
-  })
+    },
+    ({ values }) => {
+      let layer: Layer = curveLayer()
+      for (let i = 0; i < values.length; i++) {
+        layer = move(layer, i % CURVE_POINT_COUNT, values[i]!, values[(i + 1) % values.length] ?? 0)
+      }
+      for (const p of curvePointsOf(layer)) {
+        expect(p.x).toBeGreaterThanOrEqual(0)
+        expect(p.x).toBeLessThanOrEqual(1)
+        expect(p.y).toBeGreaterThanOrEqual(0)
+        expect(p.y).toBeLessThanOrEqual(1)
+      }
+    },
+  )
 })
 
 describe('moveCurvePoint', () => {
+  it.prop(
+    'keeps the points strictly x-ordered after any drag path',
+    {
+      moves: Arbitrary.array(
+        Arbitrary.schema(
+          Schema.Struct({
+            index: Schema.Int.check(Schema.isBetween({ minimum: -8, maximum: 8 })),
+            x: Schema.Finite.check(Schema.isBetween({ minimum: -2, maximum: 2 })),
+            y: Schema.Finite.check(Schema.isBetween({ minimum: -2, maximum: 2 })),
+          }),
+        ),
+        { maxLength: 32, minLength: 0 },
+      ),
+    },
+    ({ moves }) => {
+      // The spline evaluator walks the points in x order, so every drag — even
+      // one that targets a neighbor's position — must leave them increasing.
+      let layer: Layer = curveLayer()
+      for (const point of moves) {
+        layer = move(layer, point.index, point.x, point.y)
+      }
+      const xs = curvePointsOf(layer).map((point) => point.x)
+      for (let i = 1; i < xs.length; i++) {
+        expect(xs[i]!).toBeGreaterThan(xs[i - 1]!)
+      }
+    },
+  )
+
   it('clamps y into [0, 1]', () => {
     const layer = move(curveLayer(), 2, 0.5, 3)
     expect(curvePointsOf(layer)[2]).toEqual({ x: 0.5, y: 1 })

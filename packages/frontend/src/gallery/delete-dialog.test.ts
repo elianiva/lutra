@@ -1,6 +1,6 @@
 import { describe, it, expect as vitestExpect } from 'vitest'
 import { StoreError } from '@lutra/store'
-import { Command, click, expect, given, scene, selector, text } from 'foldkit/scene'
+import { Command, Mount, click, expect, given, scene, selector, text } from 'foldkit/scene'
 import { Dialog } from '@foldkit/ui'
 import { EditId, EditSummary } from '@lutra/store'
 import type { EditSummary as EditSummaryRecord } from '@lutra/store'
@@ -34,10 +34,12 @@ const loaded = {
   grid: { _tag: 'Success', data: [summary(editId(1)), summary(editId(2))] } as const,
 }
 
-// Resolve the delete dialog's internal ShowDialog command.
+// Resolve the delete dialog's internal ShowDialog command and the Mount that
+// fires when the panel enters the DOM.
 const openDialog = [
   Command.expectHas(Dialog.ShowDialog),
   Command.resolve(Dialog.ShowDialog, Dialog.Message.SucceededShowDialog()),
+  Mount.resolve(Dialog.AcquireResources, Dialog.Message.SucceededAcquireResources()),
 ]
 
 describe('gallery: delete-confirmation dialog', () => {
@@ -75,6 +77,8 @@ describe('gallery: delete-confirmation dialog', () => {
       Command.expectHas(Dialog.CloseDialog),
       Command.resolve(Dialog.CloseDialog, Dialog.Message.CompletedCloseDialog()),
       expect(text('DELETE PHOTO')).not.toExist(),
+      // The dialog unmounted, taking its resource-acquiring Mount with it.
+      Mount.expectEnded(Dialog.AcquireResources),
       Command.expectNone(),
     )
 

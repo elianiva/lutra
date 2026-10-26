@@ -1,5 +1,5 @@
-import { describe, it, expect as vitestExpect } from 'vitest'
-import * as fc from 'fast-check'
+import { describe, it as vitestIt, expect as vitestExpect } from 'vitest'
+import { it } from '@effect/vitest'
 import {
   Command,
   click,
@@ -20,7 +20,7 @@ import { createLayerFor } from './command'
 import { EditorMessage } from './message'
 import type { Model } from './model'
 
-import { Effect, Option } from 'effect'
+import { Arbitrary, Effect, Option, Schema } from 'effect'
 import type { Scene } from 'foldkit/test'
 
 const layer = (type: Parameters<typeof createLayerFor>[0]) => Effect.runSync(createLayerFor(type))
@@ -43,7 +43,7 @@ const renderedOrder = (s: Scene.SceneSimulation<unknown, unknown, unknown>) =>
     .map((o): string => o.pipe(Option.getOrElse(() => '')))
 
 describe('layer reorder buttons', () => {
-  it('shows Move up enabled only on rows below the top of the stack', () => {
+  vitestIt('shows Move up enabled only on rows below the top of the stack', () => {
     const model = modelWith(['exposure', 'contrast', 'saturation'])
     scene(
       config,
@@ -62,7 +62,7 @@ describe('layer reorder buttons', () => {
     )
   })
 
-  it('clicking Move up on the middle row moves it up', () => {
+  vitestIt('clicking Move up on the middle row moves it up', () => {
     const model = modelWith(['exposure', 'contrast', 'saturation'])
     const ids = model.chain.map((l) => l.id)
     scene(
@@ -78,7 +78,7 @@ describe('layer reorder buttons', () => {
     )
   })
 
-  it('clicking Move down on the middle row moves it down', () => {
+  vitestIt('clicking Move down on the middle row moves it down', () => {
     const model = modelWith(['exposure', 'contrast', 'saturation'])
     const ids = model.chain.map((l) => l.id)
     scene(
@@ -94,7 +94,7 @@ describe('layer reorder buttons', () => {
     )
   })
 
-  it('clicking Move down on the top row moves it down', () => {
+  vitestIt('clicking Move down on the top row moves it down', () => {
     const model = modelWith(['exposure', 'contrast', 'saturation'])
     const ids = model.chain.map((l) => l.id)
     scene(
@@ -110,7 +110,7 @@ describe('layer reorder buttons', () => {
     )
   })
 
-  it('clicking Move up on the bottom row moves it up', () => {
+  vitestIt('clicking Move up on the bottom row moves it up', () => {
     const model = modelWith(['exposure', 'contrast', 'saturation'])
     const ids = model.chain.map((l) => l.id)
     scene(
@@ -133,63 +133,64 @@ describe('layer reorder buttons', () => {
 // order each click is an adjacent swap. This pins the splice semantics
 // against a reference model for any chain and any click sequence.
 
-const layerTypeArb = fc.constantFrom(
+// Property tests derive their inputs from Effect Schemas and generate through
+// Effect's `Arbitrary` (docs/adr/0012-property-testing).
+const LayerType = Schema.Literals([
   'exposure',
   'contrast',
   'saturation',
   'vignette',
   'grain',
   'clarity',
-)
-const clickArb = fc.record({
-  dir: fc.constantFrom('up' as const, 'down' as const),
-  row: fc.nat({ max: 7 }),
+])
+const Click = Schema.Struct({
+  dir: Schema.Literals(['up', 'down']),
+  row: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 7 })),
 })
 
 describe('layer reorder semantics (property-based)', () => {
-  it('any click sequence swaps adjacent rows and keeps the chain a permutation', () => {
-    fc.assert(
-      fc.property(
-        fc.array(layerTypeArb, { maxLength: 6, minLength: 1 }),
-        fc.array(clickArb, { maxLength: 12 }),
-        (types, clicks) => {
-          let model: Model = modelWith(types)
-          const original = model.chain.map((l) => l.id)
-          // The rendered order (top→bottom) the drawer shows: chain reversed.
-          const rendered = [...original].reverse()
+  it.prop(
+    'any click sequence swaps adjacent rows and keeps the chain a permutation',
+    {
+      types: Arbitrary.array(Arbitrary.schema(LayerType), { maxLength: 6, minLength: 1 }),
+      clicks: Arbitrary.array(Arbitrary.schema(Click), { maxLength: 12, minLength: 0 }),
+    },
+    ({ types, clicks }) => {
+      let model: Model = modelWith(types)
+      const original = model.chain.map((l) => l.id)
+      // The rendered order (top→bottom) the drawer shows: chain reversed.
+      const rendered = [...original].reverse()
 
-          for (const click of clicks) {
-            const n = rendered.length
-            // A click on a row that does not exist (the drawer has fewer rows
-            // than the generated index) is not a dispatch at all.
-            if (click.row < 0 || click.row >= n) {
-              continue
-            }
-            const chainIndex = n - 1 - click.row
-            // "Move up" needs a row above (rendered row > 0); "Move down" a
-            // row below. The buttons are disabled otherwise, so the click never
-            // dispatches.
-            const legalUp = click.dir === 'up' && click.row > 0
-            const legalDown = click.dir === 'down' && click.row < n - 1
-            if (!legalUp && !legalDown) {
-              continue
-            }
+      for (const click of clicks) {
+        const n = rendered.length
+        // A click on a row that does not exist (the drawer has fewer rows
+        // than the generated index) is not a dispatch at all.
+        if (click.row < 0 || click.row >= n) {
+          continue
+        }
+        const chainIndex = n - 1 - click.row
+        // "Move up" needs a row above (rendered row > 0); "Move down" a
+        // row below. The buttons are disabled otherwise, so the click never
+        // dispatches.
+        const legalUp = click.dir === 'up' && click.row > 0
+        const legalDown = click.dir === 'down' && click.row < n - 1
+        if (!legalUp && !legalDown) {
+          continue
+        }
 
-            // Reference model: the adjacent swap in rendered order.
-            const neighbor = click.dir === 'up' ? click.row - 1 : click.row + 1
-            ;[rendered[click.row], rendered[neighbor]] = [rendered[neighbor]!, rendered[click.row]!]
+        // Reference model: the adjacent swap in rendered order.
+        const neighbor = click.dir === 'up' ? click.row - 1 : click.row + 1
+        ;[rendered[click.row], rendered[neighbor]] = [rendered[neighbor]!, rendered[click.row]!]
 
-            // The real update path.
-            const to = click.dir === 'up' ? chainIndex + 1 : chainIndex - 1
-            model = update(model, EditorMessage.ReorderedLayer({ from: chainIndex, to })).model
+        // The real update path.
+        const to = click.dir === 'up' ? chainIndex + 1 : chainIndex - 1
+        model = update(model, EditorMessage.ReorderedLayer({ from: chainIndex, to })).model
 
-            vitestExpect(model.chain.map((l) => l.id).reverse()).toEqual(rendered)
-            // The chain is always a permutation of the original layers.
-            vitestExpect(model.chain.map((l) => l.id).sort()).toEqual([...original].sort())
-            vitestExpect(new Set(model.chain.map((l) => l.id)).size).toBe(model.chain.length)
-          }
-        },
-      ),
-    )
-  })
+        vitestExpect(model.chain.map((l) => l.id).reverse()).toEqual(rendered)
+        // The chain is always a permutation of the original layers.
+        vitestExpect(model.chain.map((l) => l.id).sort()).toEqual([...original].sort())
+        vitestExpect(new Set(model.chain.map((l) => l.id)).size).toBe(model.chain.length)
+      }
+    },
+  )
 })

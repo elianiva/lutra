@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import { Effect } from 'effect'
-import * as fc from 'fast-check'
+import { describe, expect } from 'vitest'
+import { it } from '@effect/vitest'
+import { Arbitrary, Effect, Schema } from 'effect'
 import { FieldKey } from '../brands'
 import { numField, strField } from './fields'
 import { createLayer } from './defaults'
@@ -98,58 +98,69 @@ const DEFAULTS = {
   lut: { amount: 1 },
 } satisfies Record<LayerType, Record<string, number>>
 
-const typeArb = fc.constantFrom(...LAYER_TYPES)
+// Property tests derive their inputs from Effect Schemas and generate through
+// Effect's `Arbitrary` (docs/adr/0012-property-testing).
+
+const LayerTypeSchema = Schema.Literals(LAYER_TYPES)
+/** The type names as plain strings: the generator excludes them by name. */
+const LAYER_TYPE_NAMES: ReadonlyArray<string> = LAYER_TYPES
 
 describe('createLayer', () => {
-  it('creates every layer type with the documented defaults', () => {
-    fc.assert(
-      fc.property(typeArb, (type) => {
-        const layer = Effect.runSync(createLayer(type, registry))
-        expect(layer.type).toBe(type)
-        expect(layer.visible).toBe(true)
-        for (const [key, expected] of Object.entries(DEFAULTS[type])) {
-          expect(numField(layer, FieldKey(key))).toBe(expected)
-        }
-        // String-typed fields get their registry defaults (LUT id empty).
-        for (const [key, expected] of Object.entries(registry[type].stringFields ?? {})) {
-          expect(strField(layer, FieldKey(key))).toBe(expected)
-        }
-      }),
-    )
-  })
+  it.prop(
+    'creates every layer type with the documented defaults',
+    {
+      type: LayerTypeSchema,
+    },
+    ({ type }) => {
+      const layer = Effect.runSync(createLayer(type, registry))
+      expect(layer.type).toBe(type)
+      expect(layer.visible).toBe(true)
+      for (const [key, expected] of Object.entries(DEFAULTS[type])) {
+        expect(numField(layer, FieldKey(key))).toBe(expected)
+      }
+      // String-typed fields get their registry defaults (LUT id empty).
+      for (const [key, expected] of Object.entries(registry[type].stringFields ?? {})) {
+        expect(strField(layer, FieldKey(key))).toBe(expected)
+      }
+    },
+  )
 
-  it('assigns a unique id to every layer in any sequence of creates', () => {
-    fc.assert(
-      fc.property(fc.array(typeArb, { maxLength: 20, minLength: 2 }), (types) => {
-        const ids = types.map((type) => Effect.runSync(createLayer(type, registry)).id)
-        expect(new Set(ids).size).toBe(ids.length)
-      }),
-    )
-  })
+  it.prop(
+    'assigns a unique id to every layer in any sequence of creates',
+    {
+      types: Arbitrary.array(Arbitrary.schema(LayerTypeSchema), { maxLength: 20, minLength: 2 }),
+    },
+    ({ types }) => {
+      const ids = types.map((type) => Effect.runSync(createLayer(type, registry)).id)
+      expect(new Set(ids).size).toBe(ids.length)
+    },
+  )
 
-  it('fails on the Effect error channel for any unknown type', () => {
-    // The registry is a closed union; the test needs a deliberately-typed
-    // escape hatch to feed a string the registry cannot contain.
-    const layerTypeNames: readonly string[] = LAYER_TYPES
-    fc.assert(
-      fc.property(
-        fc.string({ minLength: 1 }).filter((type) => !layerTypeNames.includes(type)),
-        (type) => {
-          // SAFETY: the fast-check filter proved the string is not a LayerType name, so createLayer must reject it.
-          // oxlint-disable-next-line consistent-type-assertions
-          const type_ = type as LayerType
-          const result = Effect.runSync(
-            Effect.match(createLayer(type_, registry), {
-              onFailure: (error) => ({ _tag: 'failure' as const, error }),
-              onSuccess: () => ({ _tag: 'success' as const }),
-            }),
-          )
-          expect(result._tag).toBe('failure')
-          if (result._tag === 'failure') {
-            expect(result.error).toMatchObject({ _tag: 'UnknownLayerTypeError' })
-          }
-        },
+  it.prop(
+    'fails on the Effect error channel for any unknown type',
+    {
+      // The registry is a closed union; the arbitrary proves the string is not
+      // a LayerType name, so createLayer must reject it.
+      type: Arbitrary.filter(
+        Arbitrary.schema(Schema.String.check(Schema.isMinLength(1))),
+        (name) => !LAYER_TYPE_NAMES.includes(name),
       ),
-    )
-  })
+    },
+    ({ type }) => {
+      // SAFETY: the arbitrary's filter proved the string is not a LayerType
+      // name, which is the only way to reach the error channel.
+      // oxlint-disable-next-line consistent-type-assertions
+      const unknown = type as LayerType
+      const result = Effect.runSync(
+        Effect.match(createLayer(unknown, registry), {
+          onFailure: (error) => ({ _tag: 'failure' as const, error }),
+          onSuccess: () => ({ _tag: 'success' as const }),
+        }),
+      )
+      expect(result._tag).toBe('failure')
+      if (result._tag === 'failure') {
+        expect(result.error).toMatchObject({ _tag: 'UnknownLayerTypeError' })
+      }
+    },
+  )
 })

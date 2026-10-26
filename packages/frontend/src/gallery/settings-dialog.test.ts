@@ -1,5 +1,5 @@
 import { describe, it, expect as vitestExpect } from 'vitest'
-import { Command, click, expect, given, scene, selector, text } from 'foldkit/scene'
+import { Command, Mount, click, expect, given, scene, selector, text } from 'foldkit/scene'
 import { Dialog } from '@foldkit/ui'
 import { initialModel } from './model'
 import { update } from './update'
@@ -11,10 +11,12 @@ const config = {
   view,
 } as const
 
-// Resolve the dialog's internal ShowDialog command.
+// Resolve the dialog's internal ShowDialog command and the Mount that fires
+// when the panel enters the DOM.
 const openDialog = [
   Command.expectHas(Dialog.ShowDialog),
   Command.resolve(Dialog.ShowDialog, Dialog.Message.SucceededShowDialog()),
+  Mount.resolve(Dialog.AcquireResources, Dialog.Message.SucceededAcquireResources()),
 ]
 
 describe('gallery: settings dialog', () => {
@@ -66,6 +68,8 @@ describe('gallery: settings dialog', () => {
       Command.expectHas(Dialog.CloseDialog),
       Command.resolve(Dialog.CloseDialog, Dialog.Message.CompletedCloseDialog()),
       expect(text('SETTINGS')).not.toExist(),
+      // The dialog unmounted, taking its resource-acquiring Mount with it.
+      Mount.expectEnded(Dialog.AcquireResources),
       Command.expectNone(),
     )
   })

@@ -1,6 +1,6 @@
 import { DateTime, Effect, Option, Ref, Schema } from 'effect'
 import { Command, File as FoldkitFile, Render } from 'foldkit'
-import * as Persistence from 'effect/unstable/persistence/KeyValueStore'
+import * as Persistence from 'effect/persistence/KeyValueStore'
 import type { StoreError } from '@lutra/store'
 import { Edit, EditStore, EditIdSchema, newEditId } from '@lutra/store'
 import {

@@ -21,7 +21,7 @@ import { button } from '@/components/ui/button'
  */
 // lazy slots (ADR 0006)
 // Each slot preserves a cached VNode when its slice's reference is unchanged
-// (root uses `evo`, so unchanged keys keep ===). Builder `h` is singleton.
+// (root uses `modifyFields`, so unchanged keys keep ===). Builder `h` is singleton.
 const lazyUnsupported = createLazy()
 const lazyReadyToast = createLazy()
 const lazyOfflineCard = createLazy()

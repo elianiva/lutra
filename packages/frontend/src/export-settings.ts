@@ -1,5 +1,5 @@
 import { Effect, Option } from 'effect'
-import * as Persistence from 'effect/unstable/persistence/KeyValueStore'
+import * as Persistence from 'effect/persistence/KeyValueStore'
 import { ExportSettings, defaultExportSettings } from '@lutra/engine'
 
 /**
