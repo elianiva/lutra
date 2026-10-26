@@ -8,9 +8,8 @@ import { topBar } from './top-bar'
 import { toolPanel } from './tool-panel'
 import { layerDrawer } from './layer-drawer'
 import { canvasStage } from './canvas-stage'
-import { chainDock } from './chain-dock'
 import { palette } from './palette'
-import { statusBand } from './status-band'
+import { histogramCard } from './status-band'
 import * as ExportDialog from '../export-dialog'
 import { EditorMessage } from './message'
 import { icon } from '../components/icon'
@@ -22,9 +21,8 @@ import { icon } from '../components/icon'
 const lazyTopBar = createLazy()
 const lazyRail = createLazy()
 const lazyStage = createLazy()
-const lazyDock = createLazy()
-const lazyStatus = createLazy()
 const lazyInspector = createLazy()
+const lazyHistogram = createLazy()
 const lazyPalette = createLazy()
 const lazyMobileTabBar = createLazy()
 const lazyExportDialog = createLazy()
@@ -71,20 +69,8 @@ const stageView = (
     catalog,
   })
 
-const dockView = (
-  chain: Model['chain'],
-  phase: Model['phase'],
-  catalog: Model['catalog'],
-  h: HtmlBuilder<EditorMessage>,
-): Html => chainDock(h, { chain, phase, catalog })
-
-const statusView = (
-  bins: Model['bins'],
-  scale: number,
-  compareMode: Model['compareMode'],
-  phase: Model['phase'],
-  h: HtmlBuilder<EditorMessage>,
-): Html => statusBand(h, { bins, scale, compareMode, phase })
+const histogramView = (bins: Model['bins'], h: HtmlBuilder<EditorMessage>): Html =>
+  histogramCard(h, bins)
 
 const inspectorView = (
   chain: Model['chain'],
@@ -148,57 +134,52 @@ export const view = Submodel.defineView<Model, EditorMessage>((model, h) => layo
 const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
   const imageLoaded = hasImage(model.phase)
   return h.div(
-    [h.Class('relative flex h-full flex-col bg-bg px-6 pb-6 text-ink max-lg:px-3 max-lg:pb-3')],
+    [h.Class('relative h-full overflow-hidden bg-bg text-ink')],
     [
+      // The canvas is the window. Everything else floats above it: the shell
+      // reserves no columns, so a photo can use the full width
+      // (docs/adr/0013-materials).
+      lazyStage(stageView, [
+        model.source,
+        model.scale,
+        model.offsetX,
+        model.offsetY,
+        model.compareMode,
+        model.compareSplitAt,
+        model.phase,
+        model.chain,
+        model.catalog,
+        h,
+      ]),
       lazyTopBar(topBarView, [model.saveStatus, model.attachedEdit, model.mode, imageLoaded, h]),
+      lazyRail(railView, [
+        model.chain,
+        model.catalog,
+        model.catalogError,
+        model.phase,
+        model.hoveredTool,
+        model.mobileSheet === 'tools',
+        h,
+      ]),
+      lazyInspector(inspectorView, [
+        model.chain,
+        model.phase,
+        model.catalog,
+        model.activeFieldIndex,
+        model.activeMixerColor,
+        model.previewLut,
+        model.lutTab,
+        model.lutRecents,
+        model.lutThumbs,
+        model.lutDownloads,
+        model.online,
+        model.offlineLutNotice,
+        model.mobileSheet === 'layers',
+        h,
+      ]),
       h.div(
-        [h.Class('flex min-h-0 flex-1 gap-6 max-lg:flex-col max-lg:gap-3')],
-        [
-          lazyRail(railView, [
-            model.chain,
-            model.catalog,
-            model.catalogError,
-            model.phase,
-            model.hoveredTool,
-            model.mobileSheet === 'tools',
-            h,
-          ]),
-          h.main(
-            [h.Class('flex min-h-0 min-w-0 flex-1 flex-col gap-6 pt-3 max-lg:gap-3 max-lg:pt-0')],
-            [
-              lazyStage(stageView, [
-                model.source,
-                model.scale,
-                model.offsetX,
-                model.offsetY,
-                model.compareMode,
-                model.compareSplitAt,
-                model.phase,
-                model.chain,
-                model.catalog,
-                h,
-              ]),
-              lazyDock(dockView, [model.chain, model.phase, model.catalog, h]),
-              lazyStatus(statusView, [model.bins, model.scale, model.compareMode, model.phase, h]),
-            ],
-          ),
-          lazyInspector(inspectorView, [
-            model.chain,
-            model.phase,
-            model.catalog,
-            model.activeFieldIndex,
-            model.activeMixerColor,
-            model.previewLut,
-            model.lutTab,
-            model.lutRecents,
-            model.lutThumbs,
-            model.lutDownloads,
-            model.online,
-            model.offlineLutNotice,
-            model.mobileSheet === 'layers',
-            h,
-          ]),
-        ],
+        [h.Class('pointer-events-none absolute bottom-6 left-6 z-10 max-lg:hidden')],
+        [lazyHistogram(histogramView, [model.bins, h])],
       ),
       lazyPalette(paletteView, [
         model.paletteOpen,

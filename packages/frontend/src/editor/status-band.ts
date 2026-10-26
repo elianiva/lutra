@@ -7,15 +7,75 @@ import type { CompareMode } from './message'
 import type { Model } from './model'
 
 /**
- * The status band under the chain dock (docs/adr/0013-materials): the two
- * readouts that used to be canvas overlays. The histogram sits on the left,
- * the zoom and compare controls on the right, both on the same baseline as
- * the dock above them.
+ * The print's own controls (docs/adr/0013-materials). Everything here changes
+ * what the frame shows — the zoom level and the compare presentation — so it
+ * lives on the frame, not in a detached bar under it.
  *
- * The histogram is the graded frame's luminance — the same bins the shader
- * path writes, normalized to the tallest bin.
+ * The histogram is the one readout that stays on the workspace: it measures
+ * the frame but never changes it.
  */
-export type StatusBandSlice = Pick<Model, 'bins' | 'scale' | 'compareMode' | 'phase'>
+export type ViewBarSlice = Pick<Model, 'scale' | 'compareMode' | 'phase'>
+
+const COMPARE_MODES: readonly {
+  readonly mode: CompareMode
+  readonly label: string
+  readonly icon: IconNode
+}[] = [
+  { icon: EyeOff, label: 'Off', mode: 'off' },
+  { icon: Eye, label: 'Toggle', mode: 'toggle' },
+  { icon: Columns2, label: 'Split', mode: 'split' },
+  { icon: SquareSplitHorizontal, label: 'Side by side', mode: 'side-by-side' },
+]
+
+const compareButton = (
+  h: HtmlBuilder<EditorMessage>,
+  mode: CompareMode,
+  label: string,
+  Icon: IconNode,
+  active: boolean,
+  hasImage: boolean,
+): Html =>
+  h.button(
+    [
+      h.Class(
+        `grid size-8 place-items-center rounded-full transition-colors ${
+          active
+            ? 'bg-accent text-accent-ink shadow-[0_4px_12px_var(--mat-halo)]'
+            : hasImage
+              ? 'text-dim hover:bg-s2 hover:text-ink'
+              : 'text-dim opacity-30'
+        }`,
+      ),
+      h.OnClick(EditorMessage.ChangedCompareMode({ mode })),
+      ...(hasImage ? [] : [h.Disabled(true)]),
+      h.AriaLabel(label),
+      h.AriaPressed(String(active)),
+      h.Title(label),
+      h.Key(mode),
+    ],
+    [icon(h, Icon, label, 13)],
+  )
+
+export const viewBar = (h: HtmlBuilder<EditorMessage>, slice: ViewBarSlice): Html => {
+  const hasImage =
+    slice.phase._tag === 'Idle' ||
+    slice.phase._tag === 'Selected' ||
+    slice.phase._tag === 'Drafting'
+  return h.div(
+    [h.Class('mt-3 flex items-center justify-between gap-3')],
+    [
+      h.span([h.Class('micro tnum font-mono')], [`${String(Math.round(slice.scale * 100))}%`]),
+      h.div(
+        [h.Class('flex items-center gap-0.5'), h.AriaLabel('Compare modes')],
+        COMPARE_MODES.map(({ mode, label, icon: Icon }) =>
+          compareButton(h, mode, label, Icon, slice.compareMode === mode, hasImage),
+        ),
+      ),
+    ],
+  )
+}
+
+/* ---------- the histogram: a workspace readout ---------- */
 
 const HISTOGRAM_WIDTH = 208
 const HISTOGRAM_HEIGHT = 26
@@ -77,71 +137,12 @@ const histogram = (bins: Uint32Array | null, h: HtmlBuilder<EditorMessage>): Htm
   )
 }
 
-const COMPARE_MODES: readonly {
-  readonly mode: CompareMode
-  readonly label: string
-  readonly icon: IconNode
-}[] = [
-  { icon: EyeOff, label: 'Off', mode: 'off' },
-  { icon: Eye, label: 'Toggle', mode: 'toggle' },
-  { icon: Columns2, label: 'Split', mode: 'split' },
-  { icon: SquareSplitHorizontal, label: 'Side by side', mode: 'side-by-side' },
-]
-
-const compareButton = (
-  h: HtmlBuilder<EditorMessage>,
-  mode: CompareMode,
-  label: string,
-  Icon: IconNode,
-  active: boolean,
-  hasImage: boolean,
-): Html =>
-  h.button(
+export const histogramCard = (h: HtmlBuilder<EditorMessage>, bins: Model['bins']): Html =>
+  h.div(
     [
       h.Class(
-        `grid size-10 place-items-center rounded-full transition-colors ${
-          active
-            ? 'bg-accent text-accent-ink shadow-[0_4px_12px_var(--mat-halo)]'
-            : hasImage
-              ? 'text-dim hover:bg-s2 hover:text-ink'
-              : 'text-dim opacity-30'
-        }`,
-      ),
-      h.OnClick(EditorMessage.ChangedCompareMode({ mode })),
-      ...(hasImage ? [] : [h.Disabled(true)]),
-      h.AriaLabel(label),
-      h.AriaPressed(String(active)),
-      h.Title(label),
-      h.Key(mode),
-    ],
-    [icon(h, Icon, label, 14)],
-  )
-
-export const statusBand = (h: HtmlBuilder<EditorMessage>, slice: StatusBandSlice): Html => {
-  const hasImage = slice.phase._tag === 'Idle' || slice.phase._tag === 'Selected'
-  return h.div(
-    [h.Class('flex flex-none items-end justify-between gap-6')],
-    [
-      h.div(
-        [h.Class('surface flex h-16 w-[240px] flex-col gap-1 px-4 py-3 max-lg:hidden')],
-        [h.span([h.Class('micro')], ['Luma · graded']), histogram(slice.bins, h)],
-      ),
-      h.div(
-        [
-          h.Class(
-            'surface flex h-12 items-center gap-0.5 p-1 max-lg:w-full max-lg:justify-between',
-          ),
-        ],
-        [
-          h.span(
-            [h.Class('tnum grid h-10 w-16 place-items-center font-mono text-[10px] text-muted')],
-            [`${String(Math.round(slice.scale * 100))}%`],
-          ),
-          ...COMPARE_MODES.map(({ mode, label, icon: Icon }) =>
-            compareButton(h, mode, label, Icon, slice.compareMode === mode, hasImage),
-          ),
-        ],
+        'surface pointer-events-none flex h-16 w-[240px] flex-col gap-1 px-4 py-3 max-lg:hidden',
       ),
     ],
+    [h.span([h.Class('micro')], ['Luma · graded']), histogram(bins, h)],
   )
-}

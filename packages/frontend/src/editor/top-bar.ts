@@ -24,12 +24,16 @@ export const topBar = (
   const saving = saveStatus._tag === 'saving'
   const attachedId = attachedEdit?.id ?? null
   return h.header(
-    [h.Class('flex h-16 flex-none items-center gap-6')],
+    [
+      h.Class(
+        'pointer-events-none absolute inset-x-0 top-0 z-20 flex h-16 items-center gap-6 px-6',
+      ),
+    ],
     [
       h.h1([h.Class('flex-none text-xs font-semibold tracking-[0.34em] text-accent')], ['LUTRA']),
       documentLine(h, attachedEdit),
       h.div(
-        [h.Class('ml-auto flex items-center gap-3')],
+        [h.Class('pointer-events-auto ml-auto flex items-center gap-3')],
         [
           modeToggle(h, mode),
           h.div(

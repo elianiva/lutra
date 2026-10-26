@@ -6,6 +6,8 @@ import { EditorMessage } from './message'
 import { ErrorState, hasImage } from './phase'
 import { canvasRef, registerCanvas } from '../gpu/canvas-ref'
 import { LAYER_UI, lutName } from './layer-meta'
+import { chainDock } from './chain-dock'
+import { viewBar } from './status-band'
 import { MountElementError } from '../errors'
 import type { Model } from './model'
 
@@ -540,7 +542,16 @@ const contentRatio = (model: CanvasStageModel): number => {
   return width > 0 && height > 0 ? width / height : PLACEHOLDER_RATIO
 }
 
-/** The frame: plate label, the print area, the serif caption. */
+/**
+ * The print and the modules attached to it (docs/adr/0013-materials).
+ *
+ * The picture is the centre: one card holding the print area, its caption and
+ * the controls that change what it shows. The edit chain docks to that card's
+ * right edge as separate modules — one per layer, numbered top to bottom, so
+ * the order of the chain and the picture it produces are read in one glance.
+ *
+ * With an empty chain there are no modules: the frame is just the print.
+ */
 const mount = (
   h: HtmlBuilder<EditorMessage>,
   model: CanvasStageModel,
@@ -549,38 +560,57 @@ const mount = (
 ): Html => {
   const [plate, dims] = plateLabel(model)
   const { name: lookName, strength, chain: chainLine } = printCaption(model)
-  return h.figure(
+  const hasChain = model.chain.length > 0 || model.phase._tag === 'Drafting'
+  return h.div(
+    [h.Class('flex flex-col items-stretch gap-5 lg:flex-row lg:items-start lg:gap-2')],
     [
-      h.Class(
-        'surface relative m-0 flex w-fit max-w-full flex-col p-5 pb-3 max-lg:p-3 max-lg:pb-2',
-      ),
-      h.AriaLabel('Print preview'),
-    ],
-    [
-      h.figcaption(
-        [h.Class('micro flex items-baseline justify-between gap-4 pb-3')],
-        [h.span([], [plate]), h.span([h.Class('tnum font-mono')], [dims])],
-      ),
-      h.div(
+      h.figure(
         [
-          h.Class('print-stage relative overflow-hidden rounded-[8px] bg-[var(--mat-stage)]'),
-          h.Style({ '--ar': ratio.toFixed(4) }),
+          h.Class(
+            'surface relative m-0 flex w-fit max-w-full flex-col p-5 pb-3 max-lg:p-3 max-lg:pb-2',
+          ),
+          h.AriaLabel('Print preview'),
         ],
-        [content],
-      ),
-      h.figcaption(
-        [h.Class('mt-3 flex items-baseline justify-between gap-4')],
         [
-          h.span(
-            [h.Class('flex items-baseline gap-2')],
+          h.figcaption(
+            [h.Class('micro flex items-baseline justify-between gap-4 pb-3')],
+            [h.span([], [plate]), h.span([h.Class('tnum font-mono')], [dims])],
+          ),
+          h.div(
             [
-              h.span([h.Class('serif text-[13px] italic text-ink')], [lookName]),
-              ...(strength === null ? [] : [h.span([h.Class('label')], [strength])]),
+              h.Class('print-stage relative overflow-hidden rounded-[8px] bg-[var(--mat-stage)]'),
+              h.Style({ '--ar': ratio.toFixed(4) }),
+            ],
+            [content],
+          ),
+          h.figcaption(
+            [h.Class('mt-3 flex items-baseline justify-between gap-4')],
+            [
+              h.span(
+                [h.Class('flex items-baseline gap-2')],
+                [
+                  h.span([h.Class('serif text-[13px] italic text-ink')], [lookName]),
+                  ...(strength === null ? [] : [h.span([h.Class('label')], [strength])]),
+                ],
+              ),
+              h.span([h.Class('micro tnum font-mono')], [chainLine]),
             ],
           ),
-          h.span([h.Class('micro tnum font-mono')], [chainLine]),
+          viewBar(h, {
+            scale: model.scale,
+            compareMode: model.compareMode,
+            phase: model.phase,
+          }),
         ],
       ),
+      ...(hasChain
+        ? [
+            h.div(
+              [h.Class('lg:pt-1')],
+              [chainDock(h, { chain: model.chain, phase: model.phase, catalog: model.catalog })],
+            ),
+          ]
+        : []),
     ],
   )
 }
@@ -636,7 +666,7 @@ export const canvasStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageMod
   const ratio = contentRatio(model)
   const loaded = hasImage(model.phase)
   return h.div(
-    [h.Class('relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden')],
+    [h.Class('absolute inset-0 flex items-center justify-center overflow-hidden')],
     [
       ...(loaded
         ? [loadedStage(h, model, ratio)]

@@ -23,25 +23,26 @@ Two modes, one structure: `data-mode="dark|light"` on the document root swaps th
 
 ## The shell
 
-The editor is three floating regions and one overlay, spaced on a single grid:
+The canvas is the window. Nothing reserves a column or a band: the rail, the header, the inspector and the readouts float over a full-bleed canvas, and the print is a single object in the middle of it.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ LUTRA   edit …                                   modes  save │ 64
-├────┬──────────────────────────────────────────┬──────────────┤
-│    │              print mount                 │  inspector   │
-│rail│        (framed canvas + captions)        │  (the        │
-│ 52 │                                          │  selected    │
-│    │  chain dock (pills)                      │  layer)      │
-│    │  status band (histogram, zoom, compare)   │  328         │
-└────┴──────────────────────────────────────────┴──────────────┘
+│ LUTRA   edit …                                   modes  save │  floats
+│ ┌──┐                                          ┌────────────┐ │
+│ │  │        ┌──────────────────────┐  ┌────┐  │ inspector  │ │
+│ │ra│        │        print         │  │ 01 │  │ (selected  │ │
+│ │il│        │  (image + captions)  │  │ 02 │  │  layer)    │ │
+│ │  │        └──────────────────────┘  │ 03 │  └────────────┘ │
+│ └──┘        LUMA ────────                 └────┘              │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-- **Tool rail** (`tool-panel.ts`): thirteen icons. Hover or focus opens a card with the tool's number, name and copy — labels live in the card so the rail stays narrow enough to float.
-- **Inspector** (`layer-drawer.ts`): the selected layer's parameters only, never the chain. A draft uses the same shape with Cancel / Apply in the footer. A chain layer also carries its position row (move earlier / later), because reordering must stay reachable.
-- **Chain dock** (`chain-dock.ts`): the chain as separate pills — value on top, name below. Selection is the accent wash; the gaps group, so no separators are drawn.
-- **Palette** (`palette.ts`): ⌘K or the dock's `+` opens a searchable list of all thirteen tools, grouped Look / Light / Color / Film / Optics. It dispatches `SelectedTool`, the same message the rail sends.
-- **Status band** (`status-band.ts`): the histogram and the compare control, moved out of the canvas. They sit under the dock, aligned to the canvas column, so the print never carries chrome over it.
+- **Tool rail** (`tool-panel.ts`): thirteen icons floating at the left edge. Hover or focus opens a card with the tool's number, name and copy — labels live in the card so the rail stays narrow enough to float.
+- **Print** (`canvas-stage.ts`): one card holding the image stage, the plate label, the serif caption and the controls that change what the frame shows (zoom and compare). Its size follows the image's aspect ratio.
+- **Chain modules** (`chain-dock.ts`): the edit chain docks to the print's right edge as separate module cards — one per layer, numbered top to bottom, connected to the frame by a short stub. An empty chain has no modules; the frame stays a print.
+- **Inspector** (`layer-drawer.ts`): the selected layer's parameters, floating at the right edge. A draft uses the same shape with Cancel / Apply in the footer, and a chain layer carries its position row.
+- **Palette** (`palette.ts`): ⌘K or the module column's `+` opens a searchable list of all thirteen tools, grouped Look / Light / Color / Film / Optics.
+- **Histogram** (`status-band.ts`): the graded frame's luminance, floating bottom-left. It reads the frame but never changes it, so it does not live on the frame.
 
 Spacing is one 4px scale (4 / 8 / 12 / 16 / 24 / 32 / 48) with 24px gutters, 16px panel padding, 44px rows, and 32 / 36 / 40px controls. Type is one scale: 8 / 9 / 10 / 12 / 16 / 20.
 

@@ -264,7 +264,7 @@ export const layerDrawer = (
   return h.aside(
     [
       h.Class(
-        `${open ? 'flex' : 'hidden'} absolute inset-x-0 bottom-[64px] z-30 max-h-[70dvh] w-full flex-col overflow-y-auto rounded-t-[18px] bg-s1 shadow-[0_-24px_48px_-20px_var(--mat-shadow-a)] lg:static lg:z-auto lg:max-h-[calc(100dvh-104px)] lg:w-[328px] lg:flex-none lg:overflow-y-auto lg:rounded-none lg:bg-transparent lg:shadow-none`,
+        `${open ? 'flex' : 'hidden'} absolute inset-x-0 bottom-[64px] z-30 max-h-[70dvh] w-full flex-col overflow-y-auto rounded-t-[18px] bg-s1 shadow-[0_-24px_48px_-20px_var(--mat-shadow-a)] lg:bottom-auto lg:left-auto lg:right-6 lg:top-20 lg:z-20 lg:max-h-[calc(100dvh-128px)] lg:w-[328px] lg:flex-none lg:overflow-y-auto lg:rounded-none lg:bg-transparent lg:shadow-none`,
       ),
       h.AriaLabel('Selected adjustment'),
     ],
