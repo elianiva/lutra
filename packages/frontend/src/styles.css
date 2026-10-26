@@ -34,6 +34,8 @@
   --mat-dim: #988e81;
 
   --mat-accent: #ff7a52;
+  --mat-accent-hi: #ffa385;
+  --mat-accent-shade: #a63c1b;
   --mat-accent-ink: #1b110c;
   --mat-accent-soft: rgba(255, 122, 82, 0.14);
   --mat-halo: rgba(255, 122, 82, 0.18);
@@ -73,6 +75,8 @@
   --mat-dim: #766d5f;
 
   --mat-accent: #c04520;
+  --mat-accent-hi: #d96a41;
+  --mat-accent-shade: #7f2a10;
   --mat-accent-ink: #fff8f2;
   --mat-accent-soft: rgba(192, 69, 32, 0.12);
   --mat-halo: rgba(192, 69, 32, 0.16);
@@ -243,7 +247,7 @@ body {
   color: var(--mat-accent);
   box-shadow:
     inset 0 1px 0 var(--mat-rim),
-    0 0 0 4px var(--mat-halo),
+    0 0 0 3px var(--mat-halo),
     var(--mat-elev-1);
 }
 
@@ -290,6 +294,53 @@ body {
 .tnum {
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum';
+}
+
+/*
+ * The print area. The frame follows the image's aspect ratio: the height is
+ * the smaller of the vertical budget and the height the width budget allows,
+ * so a portrait photo is a tall print and a landscape photo is a wide one.
+ * `--ar` is the content aspect (width / height), set inline per image.
+ */
+.print-stage {
+  aspect-ratio: var(--ar, 0.8);
+  height: min(calc(100dvh - 368px), calc((100vw - 548px) / var(--ar, 0.8)));
+  max-width: 100%;
+  margin-inline: auto;
+}
+
+@media (max-width: 1023px) {
+  .print-stage {
+    height: min(calc(100dvh - 340px), calc((100vw - 40px) / var(--ar, 0.8)));
+  }
+}
+
+/* The primary action is a physical key: a lit top face, a shaded bottom
+ * edge, a contact shadow, and a press that sinks it. */
+.key {
+  background-image: linear-gradient(180deg, var(--mat-accent-hi), var(--mat-accent));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.22),
+    0 2px 0 var(--mat-accent-shade),
+    0 10px 20px -8px var(--mat-halo);
+  transition:
+    transform 60ms ease,
+    box-shadow 60ms ease,
+    filter 120ms ease;
+}
+
+.key:hover {
+  filter: brightness(1.06);
+}
+
+.key:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 0 0 var(--mat-accent-shade),
+    0 4px 10px -6px var(--mat-halo);
 }
 
 /* native range input: hidden behind the styled track/knob */

@@ -116,8 +116,8 @@ const textButton = (
       h.Class(
         `${config.hideOnSmall ? 'hidden sm:flex' : 'flex'} ${
           config.primary
-            ? `h-8 items-center gap-2 rounded-full bg-accent px-4 text-[10px] uppercase tracking-[0.1em] text-accent-ink shadow-[0_4px_14px_var(--mat-halo)] ${
-                config.isDisabled ? 'opacity-40' : 'hover:brightness-110'
+            ? `key h-8 items-center gap-2 rounded-full bg-accent px-4 text-[10px] uppercase tracking-[0.1em] text-accent-ink ${
+                config.isDisabled ? 'pointer-events-none opacity-40' : ''
               }`
             : `${baseActionClass(config.isDisabled)} ${config.isDisabled ? '' : 'text-muted'}`
         }`,

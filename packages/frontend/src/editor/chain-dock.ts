@@ -35,7 +35,7 @@ const pillView = (
     [
       h.Key(layer.id),
       h.Class(
-        `pill flex h-14 min-w-[104px] items-center gap-2 px-4 text-left transition-[box-shadow,background-color] ${
+        `pill flex h-14 min-w-[112px] items-center gap-2 px-4 text-left transition-[box-shadow,background-color] ${
           active ? 'pill-active' : selected ? 'text-ink' : 'text-muted hover:bg-s2 hover:text-ink'
         }`,
       ),
@@ -53,7 +53,10 @@ const pillView = (
       h.span(
         [h.Class('flex min-w-0 flex-col')],
         [
-          h.span([h.Class('tnum truncate font-mono text-xs leading-tight')], [dockValue(layer)]),
+          h.span(
+            [h.Class('tnum font-mono text-xs leading-tight whitespace-nowrap')],
+            [dockValue(layer)],
+          ),
           h.span([h.Class('micro truncate leading-tight')], [LAYER_UI[layer.type].label]),
         ],
       ),
@@ -89,7 +92,7 @@ export const chainDock = (h: HtmlBuilder<EditorMessage>, slice: ChainDockSlice):
   return h.div(
     [
       h.Class(
-        'flex flex-none items-center gap-2 overflow-x-auto pb-1 max-lg:justify-start lg:self-center lg:justify-center',
+        'flex flex-none items-center gap-2 overflow-x-auto p-1 max-lg:justify-start lg:self-center lg:justify-center',
       ),
       h.AriaLabel('Edit chain'),
       h.DataAttribute('testid', 'chain-dock'),
@@ -98,7 +101,10 @@ export const chainDock = (h: HtmlBuilder<EditorMessage>, slice: ChainDockSlice):
       ...slice.chain.map((layer) =>
         lazyPill(layer.id, pillView, [
           layer,
-          layer.id === selectedId || slice.phase._tag === 'Drafting',
+          // While a draft is open the draft pill is the only accent one: the
+          // chain is not editable in that state, so highlighting a chain pill
+          // would point at a layer the draft is not editing.
+          slice.phase._tag === 'Drafting' ? false : layer.id === selectedId,
           layer.id === selectedId,
           h,
         ])!,

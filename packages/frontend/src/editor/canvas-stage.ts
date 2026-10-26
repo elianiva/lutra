@@ -3,7 +3,7 @@ import { Mount } from 'foldkit'
 import { type Html, type HtmlBuilder, createLazy } from 'foldkit/html'
 import { button } from '@/components/ui/button'
 import { EditorMessage } from './message'
-import { Empty, ErrorState, Loading } from './phase'
+import { ErrorState, hasImage } from './phase'
 import { canvasRef, registerCanvas } from '../gpu/canvas-ref'
 import { LAYER_UI, lutName } from './layer-meta'
 import { MountElementError } from '../errors'
@@ -455,12 +455,13 @@ const splitDividerView = (splitAt: number, scale: number, h: HtmlBuilder<EditorM
 const splitDivider = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel): Html =>
   lazySplitDivider(splitDividerView, [model.compareSplitAt, model.scale, h])!
 
+/** The placeholder frame before an image is loaded: a 4:5 print. */
+const PLACEHOLDER_RATIO = 0.8
+
 const emptyStage = (h: HtmlBuilder<EditorMessage>) =>
   h.div(
     [
-      h.Class(
-        'flex h-full w-full flex-col items-center justify-center gap-3 text-xs text-muted select-none',
-      ),
+      h.Class('flex h-full w-full flex-col items-center justify-center gap-3 text-xs text-muted'),
       h.AllowDrop(),
       h.OnDropFiles((files) => {
         const file = files[0]
@@ -512,42 +513,7 @@ const errorStage = (h: HtmlBuilder<EditorMessage>, error: string) =>
     ],
   )
 
-const loadedStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel) => {
-  const src = model.source
-  const contentWidth = model.compareMode === 'side-by-side' ? src.width * 2 : src.width
-  return h.div(
-    [
-      h.Class('absolute inset-0 touch-none'),
-      h.OnMount(PanZoom({ imageHeight: src.height, imageWidth: contentWidth })),
-    ],
-    [
-      h.div(
-        [
-          h.Class('relative w-fit origin-top-left'),
-          h.Attribute(
-            'style',
-            `transform: translate(${model.offsetX}px, ${model.offsetY}px) scale(${model.scale})`,
-          ),
-        ],
-        [
-          h.canvas(
-            [
-              h.Id('lutra-canvas'),
-              h.OnMount(RegisterCanvas()),
-              h.Attribute('width', String(contentWidth)),
-              h.Attribute('height', String(src.height)),
-              h.Class('block'),
-            ],
-            [],
-          ),
-          model.compareMode === 'split' ? splitDivider(h, model) : null,
-        ],
-      ),
-    ],
-  )
-}
-
-/** The plate label above the print: what this frame is, not invented metadata. */
+/** The print's plate label: what this frame is, never invented metadata. */
 const plateLabel = (model: CanvasStageModel): readonly [string, string] => {
   const dims =
     model.source.width > 0 && model.source.height > 0
@@ -567,59 +533,132 @@ const printCaption = (model: CanvasStageModel) => {
   }
 }
 
-export const canvasStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel) => {
+/** The content aspect: side-by-side shows two frames side by side. */
+const contentRatio = (model: CanvasStageModel): number => {
+  const width = model.compareMode === 'side-by-side' ? model.source.width * 2 : model.source.width
+  const height = model.source.height
+  return width > 0 && height > 0 ? width / height : PLACEHOLDER_RATIO
+}
+
+/** The frame: plate label, the print area, the serif caption. */
+const mount = (
+  h: HtmlBuilder<EditorMessage>,
+  model: CanvasStageModel,
+  content: Html,
+  ratio: number,
+): Html => {
   const [plate, dims] = plateLabel(model)
   const { name: lookName, strength, chain: chainLine } = printCaption(model)
+  return h.figure(
+    [
+      h.Class(
+        'surface relative m-0 flex w-fit max-w-full flex-col p-5 pb-3 max-lg:p-3 max-lg:pb-2',
+      ),
+      h.AriaLabel('Print preview'),
+    ],
+    [
+      h.figcaption(
+        [h.Class('micro flex items-baseline justify-between gap-4 pb-3')],
+        [h.span([], [plate]), h.span([h.Class('tnum font-mono')], [dims])],
+      ),
+      h.div(
+        [
+          h.Class('print-stage relative overflow-hidden rounded-[8px] bg-[var(--mat-stage)]'),
+          h.Style({ '--ar': ratio.toFixed(4) }),
+        ],
+        [content],
+      ),
+      h.figcaption(
+        [h.Class('mt-3 flex items-baseline justify-between gap-4')],
+        [
+          h.span(
+            [h.Class('flex items-baseline gap-2')],
+            [
+              h.span([h.Class('serif text-[13px] italic text-ink')], [lookName]),
+              ...(strength === null ? [] : [h.span([h.Class('label')], [strength])]),
+            ],
+          ),
+          h.span([h.Class('micro tnum font-mono')], [chainLine]),
+        ],
+      ),
+    ],
+  )
+}
+
+const loadedStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel, ratio: number) => {
+  const src = model.source
+  const contentWidth = model.compareMode === 'side-by-side' ? src.width * 2 : src.width
+  return h.div(
+    [
+      // The whole area pans and zooms, not only the print: the print is a
+      // sheet on the desk, and the desk is the surface you grab.
+      h.Class('absolute inset-0 touch-none'),
+      h.OnMount(PanZoom({ imageHeight: src.height, imageWidth: contentWidth })),
+    ],
+    [
+      h.div(
+        [
+          h.Class('relative w-fit origin-top-left'),
+          h.Attribute(
+            'style',
+            `transform: translate(${model.offsetX}px, ${model.offsetY}px) scale(${model.scale})`,
+          ),
+        ],
+        [
+          mount(
+            h,
+            model,
+            h.div(
+              [h.Class('absolute inset-0')],
+              [
+                h.canvas(
+                  [
+                    h.Id('lutra-canvas'),
+                    h.OnMount(RegisterCanvas()),
+                    h.Attribute('width', String(contentWidth)),
+                    h.Attribute('height', String(src.height)),
+                    h.Class('block h-full w-full'),
+                  ],
+                  [],
+                ),
+                model.compareMode === 'split' ? splitDivider(h, model) : null,
+              ],
+            ),
+            ratio,
+          ),
+        ],
+      ),
+    ],
+  )
+}
+
+export const canvasStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel) => {
+  const ratio = contentRatio(model)
+  const loaded = hasImage(model.phase)
   return h.div(
     [h.Class('relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden')],
     [
-      h.figure(
-        [
-          h.Class(
-            'surface relative m-0 flex w-[min(620px,100%)] flex-col p-5 pb-3 max-lg:p-3 max-lg:pb-2',
-          ),
-          h.AriaLabel('Print preview'),
-        ],
-        [
-          h.figcaption(
-            [h.Class('micro flex items-baseline justify-between gap-4 pb-3')],
-            [h.span([], [plate]), h.span([h.Class('tnum font-mono')], [dims])],
-          ),
-          h.div(
-            [
-              h.Class(
-                'relative h-[min(54vh,540px)] w-full touch-none overflow-hidden rounded-[8px] bg-[var(--mat-stage)] max-lg:h-[46dvh]',
-              ),
-            ],
-            [
-              Match.value(model.phase).pipe(
-                Match.withReturnType<Html>(),
-                Match.when(S.is(ErrorState), () =>
-                  errorStage(h, model.source.error?.message ?? 'Unknown error'),
+      ...(loaded
+        ? [loadedStage(h, model, ratio)]
+        : [
+            h.div(
+              [h.Class('absolute inset-0 flex items-center justify-center')],
+              [
+                mount(
+                  h,
+                  model,
+                  Match.value(model.phase).pipe(
+                    Match.withReturnType<Html>(),
+                    Match.when(S.is(ErrorState), () =>
+                      errorStage(h, model.source.error?.message ?? 'Unknown error'),
+                    ),
+                    Match.orElse(() => emptyStage(h)),
+                  ),
+                  PLACEHOLDER_RATIO,
                 ),
-                Match.when(S.is(Empty), () => emptyStage(h)),
-                Match.when(S.is(Loading), () => emptyStage(h)),
-                Match.orElse(() => loadedStage(h, model)),
-              ),
-            ],
-          ),
-          h.figcaption(
-            [h.Class('mt-3 flex items-baseline justify-between gap-4')],
-            [
-              h.span(
-                [h.Class('flex items-baseline gap-2')],
-                [
-                  h.span([h.Class('serif text-[13px] italic text-ink')], [lookName]),
-                  ...(strength === null ? [] : [h.span([h.Class('label')], [strength])]),
-                ],
-              ),
-              h.span([h.Class('micro tnum font-mono')], [chainLine]),
-            ],
-          ),
-          h.span([h.Class('tick-l')], []),
-          h.span([h.Class('tick-r')], []),
-        ],
-      ),
+              ],
+            ),
+          ]),
     ],
   )
 }

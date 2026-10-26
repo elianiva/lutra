@@ -264,7 +264,7 @@ export const layerDrawer = (
   return h.aside(
     [
       h.Class(
-        `${open ? 'flex' : 'hidden'} absolute inset-x-0 bottom-[64px] z-30 max-h-[70dvh] w-full flex-col overflow-y-auto rounded-t-[18px] bg-s1 shadow-[0_-24px_48px_-20px_var(--mat-shadow-a)] lg:static lg:z-auto lg:max-h-none lg:w-[328px] lg:flex-none lg:overflow-y-visible lg:rounded-none lg:bg-transparent lg:shadow-none`,
+        `${open ? 'flex' : 'hidden'} absolute inset-x-0 bottom-[64px] z-30 max-h-[70dvh] w-full flex-col overflow-y-auto rounded-t-[18px] bg-s1 shadow-[0_-24px_48px_-20px_var(--mat-shadow-a)] lg:static lg:z-auto lg:max-h-[calc(100dvh-104px)] lg:w-[328px] lg:flex-none lg:overflow-y-auto lg:rounded-none lg:bg-transparent lg:shadow-none`,
       ),
       h.AriaLabel('Selected adjustment'),
     ],
@@ -447,7 +447,11 @@ const context = (
       target === 'draft' ? ({ kind: 'draft' } as const) : ({ kind: 'layer', id: layer.id } as const)
     return [
       h.div(
-        [h.Class('well mx-3 mb-3 flex flex-col gap-3 p-3')],
+        [
+          h.Class(
+            'well mx-3 mb-3 flex max-h-[min(440px,calc(100dvh-420px))] flex-col gap-3 overflow-y-auto p-3 [mask-image:linear-gradient(to_bottom,#000_96%,transparent)]',
+          ),
+        ],
         [
           h.div(
             [h.Class('flex items-baseline justify-between gap-3 text-[10px]')],
@@ -528,9 +532,7 @@ const footerButton = (
     [
       h.Class(
         `flex h-9 flex-1 items-center justify-center gap-2 rounded-[10px] text-[10px] uppercase tracking-[0.1em] transition-colors ${
-          primary
-            ? 'bg-accent text-accent-ink shadow-[0_4px_14px_var(--mat-halo)] hover:brightness-110'
-            : 'bg-s2 text-dim hover:bg-s3 hover:text-ink'
+          primary ? 'key bg-accent text-accent-ink' : 'bg-s2 text-dim hover:bg-s3 hover:text-ink'
         }`,
       ),
       h.OnClick(message),

@@ -69,7 +69,7 @@ const header = (h: HtmlBuilder<GalleryMessage>) =>
           h.button(
             [
               h.Class(
-                'flex h-10 items-center gap-2 rounded-full bg-accent px-4 text-[10px] uppercase tracking-[0.1em] text-accent-ink shadow-[0_4px_14px_var(--mat-halo)] hover:brightness-110',
+                'key flex h-10 items-center gap-2 rounded-full bg-accent px-4 text-[10px] uppercase tracking-[0.1em] text-accent-ink',
               ),
               h.OnClick(GalleryMessage.OpenPhotoRequested()),
               h.AriaLabel('Open a photo to start a new edit'),
@@ -156,7 +156,7 @@ const emptyState = (h: HtmlBuilder<GalleryMessage>) =>
           h.button(
             [
               h.Class(
-                'flex h-9 items-center rounded-full bg-accent px-4 text-[10px] uppercase tracking-[0.1em] text-accent-ink shadow-[0_4px_14px_var(--mat-halo)] hover:brightness-110',
+                'key flex h-9 items-center rounded-full bg-accent px-4 text-[10px] uppercase tracking-[0.1em] text-accent-ink',
               ),
               h.OnClick(GalleryMessage.OpenPhotoRequested()),
               h.AriaLabel('Open a photo to start a new edit'),
