@@ -5,11 +5,8 @@ import {
   click,
   given,
   hover,
-  inside,
   role,
   scene,
-  label,
-  testId,
   text,
   expect as sceneExpect,
 } from 'foldkit/scene'
@@ -106,14 +103,13 @@ describe('LUT layer flow', () => {
     expect(model.phase._tag).toBe('Empty')
   })
 
-  it('creates a LUT draft with the first catalog entry and the bar open', () => {
+  it('creates a LUT draft with the first catalog entry', () => {
     const { model } = selectTool(loaded(), 'lut')
     expect(model.phase._tag).toBe('Drafting')
     if (model.phase._tag === 'Drafting' && model.phase.layer.type === 'lut') {
       expect(model.phase.layer.lutId).toBe(lutPrint)
       expect(model.phase.layer.amount).toBe(1)
     }
-    expect(model.lutBarOpen).toBe(true)
   })
 
   it('swaps the draft LUT through the machine and keeps the draft', () => {
@@ -130,28 +126,14 @@ describe('LUT layer flow', () => {
     expect(draftLayerType(model)).toBe('exposure')
   })
 
-  it('confirms the draft into the chain and closes the bar', () => {
+  it('confirms the draft into the chain', () => {
     const { model: withDraft } = selectTool(loaded(), 'lut')
     const { model } = update(withDraft, EditorMessage.ConfirmedDraft())
     expect(model.chain).toHaveLength(1)
     expect(model.phase._tag).toBe('Selected')
-    expect(model.lutBarOpen).toBe(false)
     if (model.chain[0]?.type === 'lut') {
       expect(model.chain[0].lutId).toBe(lutPrint)
     }
-  })
-
-  it('only toggles the bar for a LUT draft or selected LUT layer', () => {
-    const { model: m1 } = update(loaded(), EditorMessage.ToggledLutPicker())
-    expect(m1.lutBarOpen).toBe(false)
-
-    const { model: withDraft } = selectTool(loaded(), 'lut')
-    const { model: m2 } = update(withDraft, EditorMessage.ToggledLutPicker())
-    expect(m2.lutBarOpen).toBe(false)
-
-    const { model: withExposure } = selectTool(loaded(), 'exposure')
-    const { model: m3 } = update(withExposure, EditorMessage.ToggledLutPicker())
-    expect(m3.lutBarOpen).toBe(false)
   })
 })
 
@@ -273,7 +255,6 @@ describe('LUT bar commit + recents', () => {
 
   it('the SelectedTool auto-default does not bump recents', () => {
     const { model } = selectTool(loaded(), 'lut')
-    expect(model.lutBarOpen).toBe(true)
     expect(model.lutRecents).toEqual([])
   })
 
@@ -310,13 +291,10 @@ describe('per-photo LUT thumbnails (lazy generation)', () => {
     expect(genIds(back)).toEqual([lutPrint])
   })
 
-  it('opening the bar via the chevron generates the visible group; closing does not', () => {
+  it('a selected LUT layer has its group generated on the next render of its tab', () => {
     const committed = selectedLut()
-    const { model: opened, commands = [] } = update(committed, EditorMessage.ToggledLutPicker())
-    expect(opened.lutBarOpen).toBe(true)
+    const { commands = [] } = update(committed, EditorMessage.SelectedLutTab({ tab: 'Print' }))
     expect(genIds(commands)).toEqual([lutPrint])
-    const { commands: closed = [] } = update(opened, EditorMessage.ToggledLutPicker())
-    expect(genIds(closed)).toEqual([])
   })
 
   it('the recents tab generates its missing entries', () => {
@@ -445,11 +423,6 @@ describe('preview cleanup on bar-closing transitions', () => {
       make: lutDraft,
       name: 'EditLoaded',
     },
-    {
-      fire: (m) => update(m, EditorMessage.ToggledLutPicker()).model,
-      make: lutDraft,
-      name: 'ToggledLutPicker (closing)',
-    },
   ]
 
   it.each(closingTransitions)('$name clears the hover preview', ({ make, fire }) => {
@@ -568,7 +541,7 @@ describe('LUT bar view', () => {
       sceneExpect(role('button', { name: 'Print' })).toExist(),
       sceneExpect(role('button', { name: 'Bw' })).toExist(),
       sceneExpect(role('button', { name: 'Recents' })).toBeAbsent(),
-      sceneExpect(role('button', { name: 'Print' })).toHaveClass('bg-panel-alt'),
+      sceneExpect(role('button', { name: 'Print' })).toHaveClass('bg-s2'),
       sceneExpect(role('button', { name: 'Apply Kodak 2393 Cuspclip' })).toExist(),
       sceneExpect(role('button', { name: 'Apply Agfa APX 100' })).toBeAbsent(),
       click(role('button', { name: 'Bw' })),
@@ -578,10 +551,9 @@ describe('LUT bar view', () => {
       ...resolveRender(),
       sceneExpect(text('Agfa APX 100 · Bw')).toExist(),
       click(role('button', { name: 'Apply Agfa APX 100' })),
-      sceneExpect(role('button', { name: 'Apply Agfa APX 100' })).toHaveClass('border-accent'),
-      inside(
-        role('button', { name: 'Apply Agfa APX 100' }),
-        sceneExpect(testId('current-lut-check')).toExist(),
+      sceneExpect(role('button', { name: 'Apply Agfa APX 100' })).toHaveAttr(
+        'aria-pressed',
+        'true',
       ),
       sceneExpect(text('Agfa APX 100 · Bw')).toExist(),
       ...resolveRender(),
@@ -595,12 +567,9 @@ describe('LUT bar view', () => {
       sceneConfig,
       given({ ...selectedLut(), lutBarOpen: true }),
       ...stageMounts,
-      sceneExpect(role('button', { name: 'Apply Kodak 2393 Cuspclip' })).toHaveClass(
-        'border-accent',
-      ),
-      inside(
-        role('button', { name: 'Apply Kodak 2393 Cuspclip' }),
-        sceneExpect(testId('current-lut-check')).toExist(),
+      sceneExpect(role('button', { name: 'Apply Kodak 2393 Cuspclip' })).toHaveAttr(
+        'aria-pressed',
+        'true',
       ),
       click(role('button', { name: 'Bw' })),
       resolveThumbFailure(lutBw),
@@ -608,16 +577,9 @@ describe('LUT bar view', () => {
       ...resolveRender(),
       sceneExpect(text('Agfa APX 100 · Bw')).toExist(),
       click(role('button', { name: 'Apply Agfa APX 100' })),
-      sceneExpect(role('button', { name: 'Apply Agfa APX 100' })).toHaveClass('border-accent'),
-      sceneExpect(role('button', { name: 'Apply Kodak 2393 Cuspclip' })).toBeAbsent(),
-      // carries it now.
-      inside(
-        role('button', { name: 'Apply Agfa APX 100' }),
-        sceneExpect(testId('current-lut-check')).toExist(),
-      ),
-      inside(
-        role('button', { name: 'Apply Kodak 2393 Cuspclip' }),
-        sceneExpect(testId('current-lut-check')).toBeAbsent(),
+      sceneExpect(role('button', { name: 'Apply Agfa APX 100' })).toHaveAttr(
+        'aria-pressed',
+        'true',
       ),
       ...resolveRender(),
       Command.resolve(SaveLutRecents, EditorMessage.LutRecentsSaved()),
@@ -631,7 +593,7 @@ describe('LUT bar view', () => {
       given({ ...selectedLut(), lutBarOpen: true, lutTab: 'recents' }),
       ...stageMounts,
       sceneExpect(role('button', { name: 'Recents' })).toBeAbsent(),
-      sceneExpect(role('button', { name: 'Print' })).toHaveClass('bg-panel-alt'),
+      sceneExpect(role('button', { name: 'Print' })).toHaveClass('bg-s2'),
       sceneExpect(role('button', { name: 'Apply Kodak 2393 Cuspclip' })).toExist(),
       sceneExpect(role('button', { name: 'Apply Agfa APX 100' })).toBeAbsent(),
       Command.expectNone(),
@@ -658,23 +620,6 @@ describe('LUT bar view', () => {
         EditorMessage.LutThumbGenerated({ bitmap, lutId: lutBw, url: 'blob:photo' }),
       ),
       sceneExpect(role('img', { name: 'Agfa APX 100' })).toHaveAttr('src', 'blob:photo'),
-      Command.expectNone(),
-    )
-  })
-
-  it('the drawer chevron toggles the bar', () => {
-    scene(
-      sceneConfig,
-      given(lutDraft()),
-      ...stageMounts,
-      // closes it…
-      sceneExpect(label('LUT thumbnails')).toExist(),
-      click(role('button', { name: 'Toggle LUT bar' })),
-      sceneExpect(label('LUT thumbnails')).toBeAbsent(),
-      // …and reopens it.
-      click(role('button', { name: 'Toggle LUT bar' })),
-      resolveThumbFailure(lutPrint),
-      sceneExpect(label('LUT thumbnails')).toExist(),
       Command.expectNone(),
     )
   })

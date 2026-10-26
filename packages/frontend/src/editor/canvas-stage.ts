@@ -1,15 +1,13 @@
 import { Effect, Match, Schema as S, Stream, Queue } from 'effect'
 import { Mount } from 'foldkit'
 import { type Html, type HtmlBuilder, createLazy } from 'foldkit/html'
-import { Eye, EyeOff, SquareSplitHorizontal, Columns2 } from 'lucide'
-import type { IconNode } from 'lucide'
 import { button } from '@/components/ui/button'
-import { EditorMessage, type CompareMode } from './message'
-import { Empty, ErrorState, hasImage, Loading } from './phase'
+import { EditorMessage } from './message'
+import { Empty, ErrorState, Loading } from './phase'
 import { canvasRef, registerCanvas } from '../gpu/canvas-ref'
+import { LAYER_UI, lutName } from './layer-meta'
 import { MountElementError } from '../errors'
 import type { Model } from './model'
-import { icon } from '../components/icon'
 
 export type CanvasStageModel = Pick<
   Model,
@@ -19,9 +17,9 @@ export type CanvasStageModel = Pick<
   | 'offsetY'
   | 'compareMode'
   | 'compareSplitAt'
-  | 'compareToggleBefore'
-  | 'bins'
   | 'phase'
+  | 'chain'
+  | 'catalog'
 >
 
 const ZOOM_SPEED = 0.01
@@ -421,8 +419,6 @@ export const CompareDivider = Mount.defineStream('CompareDivider', {
  * effectively undraggable. Rendered only in Split mode; the canvas blit
  * draws the before/after boundary underneath it.
  */
-const lazyHistogram = createLazy()
-const lazyCompare = createLazy()
 const lazySplitDivider = createLazy()
 
 const splitDividerView = (splitAt: number, scale: number, h: HtmlBuilder<EditorMessage>): Html =>
@@ -439,7 +435,7 @@ const splitDividerView = (splitAt: number, scale: number, h: HtmlBuilder<EditorM
     [
       h.div(
         [
-          h.Class('absolute inset-y-0 left-1/2 -translate-x-1/2 bg-ink/60'),
+          h.Class('absolute inset-y-0 left-1/2 -translate-x-1/2 bg-ink/70'),
           h.Style({ width: `${1 / scale}px` }),
         ],
         [],
@@ -447,7 +443,7 @@ const splitDividerView = (splitAt: number, scale: number, h: HtmlBuilder<EditorM
       h.div(
         [
           h.Class(
-            'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 border border-ink bg-panel',
+            'absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink shadow-[0_2px_8px_var(--mat-shadow-a)]',
           ),
           h.Style({ height: `${12 / scale}px`, width: `${12 / scale}px` }),
         ],
@@ -459,61 +455,12 @@ const splitDividerView = (splitAt: number, scale: number, h: HtmlBuilder<EditorM
 const splitDivider = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel): Html =>
   lazySplitDivider(splitDividerView, [model.compareSplitAt, model.scale, h])!
 
-const COMPARE_MODES: readonly {
-  readonly mode: CompareMode
-  readonly label: string
-  readonly icon: IconNode
-}[] = [
-  { icon: EyeOff, label: 'Off', mode: 'off' },
-  { icon: Eye, label: 'Toggle', mode: 'toggle' },
-  { icon: SquareSplitHorizontal, label: 'Split', mode: 'split' },
-  { icon: Columns2, label: 'Side by side', mode: 'side-by-side' },
-]
-
-/**
- * The Compare control (CONTEXT.md "Compare"): a segmented Off / Toggle /
- * Split / Side by side picker floating at the bottom-center of the canvas
- * stage. Presentation-only — selecting a mode dispatches PresentFrame,
- * never a chain render (docs/adr/0010-editor-ui). Dimmed until an image is loaded. In
- * Toggle mode the segment doubles as the flip button (update flips the
- * side).
- */
-const compareView = (mode: CompareMode, hasImage: boolean, h: HtmlBuilder<EditorMessage>): Html =>
-  h.div(
-    [
-      h.Class(
-        'absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-stretch divide-x divide-border border border-border bg-panel',
-      ),
-      h.AriaLabel('Compare modes'),
-    ],
-    COMPARE_MODES.map(({ mode: m, label, icon: Icon }) => {
-      const active = mode === m
-      return button(
-        {
-          onClick: EditorMessage.ChangedCompareMode({ mode: m }),
-          isDisabled: !hasImage,
-          variant: active ? 'default' : 'ghost',
-          className: active
-            ? 'flex items-center gap-1.5 bg-accent px-3 py-1.5 text-ink'
-            : 'flex items-center gap-1.5 px-3 py-1.5 text-muted hover:bg-panel-alt hover:text-ink',
-          attributes: [h.Key(m), h.AriaLabel(label), h.Title(label)],
-        },
-        [icon(h, Icon, label, 14), h.span([h.Class('hidden text-xs sm:inline')], [label])],
-        h,
-      )
-    }),
-  )
-
-const compareControl = (
-  h: HtmlBuilder<EditorMessage>,
-  model: CanvasStageModel,
-  hasImage: boolean,
-): Html => lazyCompare(compareView, [model.compareMode, hasImage, h])!
-
 const emptyStage = (h: HtmlBuilder<EditorMessage>) =>
   h.div(
     [
-      h.Class('flex flex-col items-center justify-center gap-3 text-sm text-muted select-none'),
+      h.Class(
+        'flex h-full w-full flex-col items-center justify-center gap-3 text-xs text-muted select-none',
+      ),
       h.AllowDrop(),
       h.OnDropFiles((files) => {
         const file = files[0]
@@ -522,38 +469,42 @@ const emptyStage = (h: HtmlBuilder<EditorMessage>) =>
     ],
     [
       h.div(
-        [h.Class('flex h-16 w-16 items-center justify-center border border-border text-muted')],
-        [h.span([h.Class('text-2xl')], ['↑'])],
+        [h.Class('grid size-14 place-items-center rounded-full bg-s2 text-lg text-muted')],
+        ['↑'],
       ),
       h.div(
-        [],
+        [h.Class('flex items-center gap-1')],
         [
           'Drop an image here, or ',
           button(
             {
               onClick: EditorMessage.FilePickRequested(),
               variant: 'link',
-              className: 'h-auto p-0',
+              className: 'h-auto p-0 text-accent',
             },
             'browse',
             h,
           ),
         ],
       ),
-      h.p([h.Class('text-xs text-muted')], ['Supports JPEG, PNG, WebP']),
+      h.p([h.Class('text-[10px] text-dim')], ['Supports JPEG, PNG, WebP']),
     ],
   )
 
 const errorStage = (h: HtmlBuilder<EditorMessage>, error: string) =>
   h.div(
-    [h.Class('flex flex-col items-center justify-center gap-2 text-sm text-muted')],
+    [
+      h.Class(
+        'flex h-full w-full flex-col items-center justify-center gap-2 px-6 text-center text-xs text-muted',
+      ),
+    ],
     [
       h.p([], [`Failed to load image: ${error}`]),
       button(
         {
           onClick: EditorMessage.FilePickRequested(),
           variant: 'link',
-          className: 'h-auto p-0',
+          className: 'h-auto p-0 text-accent',
         },
         'Try another',
         h,
@@ -561,84 +512,11 @@ const errorStage = (h: HtmlBuilder<EditorMessage>, error: string) =>
     ],
   )
 
-const HISTOGRAM_WIDTH = 220
-const HISTOGRAM_HEIGHT = 110
-
-/**
- * The **Histogram overlay**: a filled-area luminance histogram of the frame
- * currently displayed, fixed to the stage's bottom-right corner. Screen
- * space — a sibling of the panned/zoomed image, so pan/zoom never moves it.
- * Purely decorative: `pointer-events-none`, so wheel and drag pass straight
- * through. Linear max-bin normalization; an all-black frame draws a flat
- * baseline. Rendered as SVG in the foldkit view — a pure function of the
- * model's bins, like every other piece of UI.
- */
-const histogramView = (bins: Uint32Array | null, h: HtmlBuilder<EditorMessage>): Html => {
-  if (!bins) {
-    return null
-  }
-
-  let max = 0
-  for (let i = 0; i < 256; i++) {
-    if (bins[i]! > max) {
-      max = bins[i]!
-    }
-  }
-
-  const curve: string[] = []
-  for (let i = 0; i < 256; i++) {
-    const x = (i / 255) * HISTOGRAM_WIDTH
-    const y = max === 0 ? 0 : HISTOGRAM_HEIGHT - (bins[i]! / max) * HISTOGRAM_HEIGHT
-    curve.push(`${x.toFixed(1)},${y.toFixed(1)}`)
-  }
-  const area = [...curve, `${HISTOGRAM_WIDTH},${HISTOGRAM_HEIGHT}`, `0,${HISTOGRAM_HEIGHT}`]
-
-  return h.div(
-    [
-      h.Class(
-        'pointer-events-none absolute bottom-3 right-3 h-[70px] w-[140px] rounded border border-border bg-panel/80 text-ink sm:h-[110px] sm:w-[220px]',
-      ),
-      // (docs/adr/0010-editor-ui.md), where 220px would collide with the Compare control.
-    ],
-    [
-      h.svg(
-        [
-          h.Class('block h-full w-full'),
-          h.Attribute('viewBox', `0 0 ${HISTOGRAM_WIDTH} ${HISTOGRAM_HEIGHT}`),
-        ],
-        [
-          h.polygon(
-            [
-              h.Attribute('points', area.join(' ')),
-              h.Attribute('fill', 'currentColor'),
-              h.Attribute('fill-opacity', '0.25'),
-            ],
-            [],
-          ),
-          h.polyline(
-            [
-              h.Attribute('points', curve.join(' ')),
-              h.Attribute('fill', 'none'),
-              h.Attribute('stroke', 'currentColor'),
-              h.Attribute('stroke-width', '1'),
-            ],
-            [],
-          ),
-        ],
-      ),
-    ],
-  )
-}
-
-const histogramOverlay = (h: HtmlBuilder<EditorMessage>, bins: Uint32Array | null): Html =>
-  lazyHistogram(histogramView, [bins, h])
-
 const loadedStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel) => {
   const src = model.source
   const contentWidth = model.compareMode === 'side-by-side' ? src.width * 2 : src.width
   return h.div(
     [
-      // scroll/zoom — pointer pan and pinch own the stage (docs/adr/0010-editor-ui.md).
       h.Class('absolute inset-0 touch-none'),
       h.OnMount(PanZoom({ imageHeight: src.height, imageWidth: contentWidth })),
     ],
@@ -656,48 +534,92 @@ const loadedStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel) => 
             [
               h.Id('lutra-canvas'),
               h.OnMount(RegisterCanvas()),
-              // configure) the WebGPU swapchain; the GPU backend blits every
               h.Attribute('width', String(contentWidth)),
               h.Attribute('height', String(src.height)),
               h.Class('block'),
             ],
             [],
           ),
-          // under it.
           model.compareMode === 'split' ? splitDivider(h, model) : null,
         ],
       ),
-      histogramOverlay(h, model.bins),
     ],
   )
 }
 
-/** Center stage: shows an upload dropzone until an image is loaded, then the
- *  rendered canvas with pan/zoom, and always the Compare control (dimmed
- *  without an image). Which stage shows is the phase machine's call
- *  (./phase.ts): Empty/Loading → upload zone, Error → error stage,
- *  order-1/min-h-0: in the mobile column layout (docs/adr/0010-editor-ui.md) the stage
- *  is the flex-1 child above the bottom sheets; `lg:` restores the side
- *  column order. */
+/** The plate label above the print: what this frame is, not invented metadata. */
+const plateLabel = (model: CanvasStageModel): readonly [string, string] => {
+  const dims =
+    model.source.width > 0 && model.source.height > 0
+      ? `${String(model.source.width)} × ${String(model.source.height)}`
+      : 'No source'
+  return ['Print', dims]
+}
+
+/** The serif caption under the print: the film look and the chain length. */
+const printCaption = (model: CanvasStageModel) => {
+  const lut = model.chain.find((layer) => layer.type === 'lut')
+  const count = model.chain.length
+  return {
+    name: lut === undefined ? 'No film look' : lutName(model.catalog, lut.lutId),
+    strength: lut === undefined ? null : LAYER_UI.lut.formatValue(lut),
+    chain: count === 0 ? 'Empty chain' : `${String(count)} layer${count === 1 ? '' : 's'}`,
+  }
+}
+
 export const canvasStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel) => {
-  const imageLoaded = hasImage(model.phase)
-  return h.main(
+  const [plate, dims] = plateLabel(model)
+  const { name: lookName, strength, chain: chainLine } = printCaption(model)
+  return h.div(
+    [h.Class('relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden')],
     [
-      h.Class(
-        'order-1 relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden bg-bg lg:order-none',
+      h.figure(
+        [
+          h.Class(
+            'surface relative m-0 flex w-[min(620px,100%)] flex-col p-5 pb-3 max-lg:p-3 max-lg:pb-2',
+          ),
+          h.AriaLabel('Print preview'),
+        ],
+        [
+          h.figcaption(
+            [h.Class('micro flex items-baseline justify-between gap-4 pb-3')],
+            [h.span([], [plate]), h.span([h.Class('tnum font-mono')], [dims])],
+          ),
+          h.div(
+            [
+              h.Class(
+                'relative h-[min(54vh,540px)] w-full touch-none overflow-hidden rounded-[8px] bg-[var(--mat-stage)] max-lg:h-[46dvh]',
+              ),
+            ],
+            [
+              Match.value(model.phase).pipe(
+                Match.withReturnType<Html>(),
+                Match.when(S.is(ErrorState), () =>
+                  errorStage(h, model.source.error?.message ?? 'Unknown error'),
+                ),
+                Match.when(S.is(Empty), () => emptyStage(h)),
+                Match.when(S.is(Loading), () => emptyStage(h)),
+                Match.orElse(() => loadedStage(h, model)),
+              ),
+            ],
+          ),
+          h.figcaption(
+            [h.Class('mt-3 flex items-baseline justify-between gap-4')],
+            [
+              h.span(
+                [h.Class('flex items-baseline gap-2')],
+                [
+                  h.span([h.Class('serif text-[13px] italic text-ink')], [lookName]),
+                  ...(strength === null ? [] : [h.span([h.Class('label')], [strength])]),
+                ],
+              ),
+              h.span([h.Class('micro tnum font-mono')], [chainLine]),
+            ],
+          ),
+          h.span([h.Class('tick-l')], []),
+          h.span([h.Class('tick-r')], []),
+        ],
       ),
-    ],
-    [
-      Match.value(model.phase).pipe(
-        Match.withReturnType<Html>(),
-        Match.when(S.is(ErrorState), () =>
-          errorStage(h, model.source.error?.message ?? 'Unknown error'),
-        ),
-        Match.when(S.is(Empty), () => emptyStage(h)),
-        Match.when(S.is(Loading), () => emptyStage(h)),
-        Match.orElse(() => loadedStage(h, model)),
-      ),
-      compareControl(h, model, imageLoaded),
     ],
   )
 }

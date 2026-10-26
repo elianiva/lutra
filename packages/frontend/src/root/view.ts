@@ -82,7 +82,7 @@ const readyToastView = (ready: boolean, h: HtmlBuilder<AppMessage>): Html =>
         [
           h.OnClick(OfflineMessage.OfflineReadyDismissed()),
           h.Class(
-            'fixed inset-x-4 bottom-4 z-50 cursor-pointer border border-border bg-panel px-4 py-3 text-sm text-ink shadow-lg md:inset-x-auto md:right-4 md:w-64',
+            'surface fixed inset-x-4 bottom-4 z-50 cursor-pointer px-4 py-3 text-sm text-ink md:inset-x-auto md:right-6 md:w-64',
           ),
         ],
         ['Offline ready — Lutra works without a connection'],
@@ -163,7 +163,7 @@ const offlineCardImpl = (offline: Model['offline'], h: HtmlBuilder<AppMessage>):
         // width instead of floating in the corner; `md:` restores the
         // fixed-width corner float.
         h.Class(
-          'fixed inset-x-4 bottom-4 z-50 border border-border bg-panel px-4 py-3 shadow-lg md:inset-x-auto md:right-4 md:w-64',
+          'surface fixed inset-x-4 bottom-4 z-50 px-4 py-3 md:inset-x-auto md:right-6 md:w-64',
         ),
       ],
       content,

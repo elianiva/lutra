@@ -163,7 +163,10 @@ export const EditorMessage = defineMessageUnion({
     id: LayerIdSchema,
     lutId: LutIdSchema,
   },
-  ToggledLutPicker: {},
+  ToggledMode: {},
+  ThemeApplied: {},
+  ToggledPalette: {},
+  ChangedPaletteQuery: { query: S.String },
 
   // LUT bar (bottom filmstrip picker, docs/adr/0002-lut-library)
 

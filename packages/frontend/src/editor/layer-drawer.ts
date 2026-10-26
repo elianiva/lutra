@@ -1,5 +1,18 @@
-import { type Html, type HtmlBuilder, createKeyedLazy, createLazy } from 'foldkit/html'
-import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, Eye, EyeOff, Trash2, X, Check } from 'lucide'
+import { Option, pipe } from 'effect'
+import { type Html, type HtmlBuilder } from 'foldkit/html'
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  EyeOff,
+  Plus,
+  Trash2,
+  X,
+} from 'lucide'
+import type { IconNode } from 'lucide'
 import { button } from '@/components/ui/button'
 import { lutraRangeRow } from '@/components/lutra-range-row'
 import { icon } from '../components/icon'
@@ -15,36 +28,38 @@ import {
 import { EditorMessage } from './message'
 import type { Model } from './model'
 import { toneCurveWidget } from './tone-curve'
+import { lutSheet } from './lut-bar'
+import { lutTarget } from './lut-bar/target'
 import { FieldKey, numField } from '@lutra/engine'
 import type { Layer, LayerId, LayerType } from '@lutra/engine'
 
-type LayerRowSlice = Pick<Model, 'catalog' | 'lutBarOpen' | 'activeFieldIndex' | 'activeMixerColor'>
+type LayerRowSlice = Pick<Model, 'catalog' | 'activeFieldIndex' | 'activeMixerColor'>
 
-export type LayerDrawerSlice = Pick<
+export type InspectorSlice = Pick<
   Model,
-  'chain' | 'phase' | 'lutBarOpen' | 'catalog' | 'activeFieldIndex' | 'activeMixerColor'
+  | 'chain'
+  | 'phase'
+  | 'catalog'
+  | 'activeFieldIndex'
+  | 'activeMixerColor'
+  | 'previewLut'
+  | 'lutTab'
+  | 'lutRecents'
+  | 'lutThumbs'
+  | 'lutDownloads'
+  | 'online'
+  | 'offlineLutNotice'
 >
 
-/** Read a numeric field off a heterogeneous layer. */
 const num = (layer: Layer, key: FieldKey): number => numField(layer, key)
 
-/** One-line drawer summary: "Fuji Velvia 50 · 65%" for LUT layers. */
-const summary = (slice: LayerRowSlice, layer: Layer, ui: (typeof LAYER_UI)[LayerType]) =>
-  layer.type === 'colorMixer'
-    ? mixerSummary(slice, layer)
-    : layer.type === 'lut'
-      ? `${lutName(slice.catalog, layer.lutId)} · ${ui.formatValue(layer)}`
-      : ui.formatValue(layer)
-
-/** The active hue range of a Color Mixer layer's drawer (0..7). */
 const activeMixerColorFor = (slice: LayerRowSlice, layerId: LayerId) =>
   Math.min(7, Math.max(0, Math.round(slice.activeMixerColor[layerId] ?? 0)))
 
-/**
- * One-line drawer summary for a Color Mixer layer: the active range's name
- * plus its non-default slider values (the same numbers the open sliders
- * show). A pristine layer reads just "Red".
- */
+/** One-line readout for the header: the layer's formatted value. */
+const headerValue = (slice: LayerRowSlice, layer: Layer, ui: (typeof LAYER_UI)[LayerType]) =>
+  layer.type === 'colorMixer' ? mixerSummary(slice, layer) : ui.formatValue(layer)
+
 const mixerSummary = (slice: LayerRowSlice, layer: Layer) => {
   const color = MIXER_COLORS[activeMixerColorFor(slice, layer.id)]!
   const value = (suffix: string) => numField(layer, FieldKey(`${color.key}${suffix}`))
@@ -61,31 +76,26 @@ const mixerSummary = (slice: LayerRowSlice, layer: Layer) => {
   return parts.join(' ')
 }
 
-/**
- * The 8 hue-range swatches (docs/adr/0003-adjustment-layers D3): pure-hue dots at the same
- * centers the shader classifies with; the active range gets the ring.
- * Tapping dispatches SelectedMixerColor — presentation-only, no render.
- */
 const mixerSwatches = (
   h: HtmlBuilder<EditorMessage>,
   active: number,
   onSelect: (index: number) => EditorMessage,
 ) =>
   h.div(
-    [h.Class('flex items-center gap-1.5'), h.AriaLabel('Color ranges')],
+    [h.Class('flex items-center gap-2'), h.AriaLabel('Color ranges')],
     MIXER_COLORS.map((color, index) =>
       button(
         {
           onClick: onSelect(index),
           size: 'icon-xs',
           variant: 'ghost',
-          className: `size-5 shrink-0 rounded-full border p-0 ${
-            index === active ? 'border-ink ring-1 ring-ink' : 'border-border hover:border-muted'
+          className: `size-5 shrink-0 rounded-full p-0 ${
+            index === active ? 'ring-2 ring-ink' : 'ring-1 ring-transparent hover:ring-dim'
           }`,
           attributes: [
             h.AriaLabel(`Select ${color.name}`),
             h.AriaPressed(String(index === active)),
-            h.Style({ background: `hsl(${color.hue} 100% 50%)` }),
+            h.Style({ background: `hsl(${String(color.hue)} 100% 50%)` }),
           ],
         },
         [],
@@ -94,10 +104,6 @@ const mixerSwatches = (
     ),
   )
 
-/**
- * The active range's three sliders — HUE / SATURATION / LUMINANCE — bound
- * to the `${color}${channel}` fields on the layer.
- */
 const mixerSliders = (
   h: HtmlBuilder<EditorMessage>,
   layer: Layer,
@@ -117,10 +123,6 @@ const mixerSliders = (
   })
 }
 
-/**
- * The sliders a row shows: the generic per-field list, or — for Color
- * Mixer layers — the swatch row plus the active range's three sliders.
- */
 const layerSliders = (
   h: HtmlBuilder<EditorMessage>,
   slice: LayerRowSlice,
@@ -144,164 +146,10 @@ const layerSliders = (
   if (layer.type === 'toneCurve') {
     return [toneCurveWidget(h, layer)]
   }
-  return Object.keys(ui.fields).map((field) =>
-    kind === 'draft'
-      ? draftSlider(h, layer, FieldKey(field), ui)
-      : chainSlider(h, layer, FieldKey(field), ui, slice),
-  )
-}
-
-// memoization (ADR 0006)
-const lazyDraft = createLazy()
-const lazyRow = createKeyedLazy()
-
-const draftView = (
-  layer: Layer,
-  lutBarOpen: boolean,
-  catalog: Model['catalog'],
-  activeField: number | undefined,
-  activeMixer: number | undefined,
-  h: HtmlBuilder<EditorMessage>,
-): Html => {
-  const slice: LayerRowSlice = {
-    catalog,
-    lutBarOpen,
-    activeFieldIndex: activeField !== undefined ? { [layer.id]: activeField } : {},
-    activeMixerColor: activeMixer !== undefined ? { [layer.id]: activeMixer } : {},
-  }
-  return draftRow(h, slice, layer)
-}
-
-const chainRowView = (
-  layer: Layer,
-  index: number,
-  total: number,
-  selected: boolean,
-  lutBarOpen: boolean,
-  catalog: Model['catalog'],
-  activeField: number | undefined,
-  activeMixer: number | undefined,
-  h: HtmlBuilder<EditorMessage>,
-): Html =>
-  chainRowImpl(h, layer, index, total, selected, lutBarOpen, catalog, activeField, activeMixer)
-
-/**
- * The right "Layers" sidebar (docs/adr/0010-editor-ui.md): always visible as a side
- * column at `lg`+, and a full-width bottom sheet below `lg` — `open` is the
- * mobile sheet state (visible only while its tab is active).
- */
-export const layerDrawer = (
-  h: HtmlBuilder<EditorMessage>,
-  slice: LayerDrawerSlice,
-  open: boolean,
-) =>
-  h.aside(
-    [
-      h.Class(
-        `${open ? 'flex' : 'hidden'} order-2 max-h-[45dvh] shrink-0 flex-col overflow-y-auto border-t border-border bg-panel lg:order-none lg:flex lg:max-h-none lg:w-72 lg:overflow-y-visible lg:border-l lg:border-t-0`,
-      ),
-      h.AriaLabel('Layers'),
-    ],
-    [
-      h.div(
-        [
-          h.Class(
-            'flex items-center justify-between border-b border-border px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-muted',
-          ),
-        ],
-        [
-          h.span([], ['Layers']),
-          h.span([h.Class('tnum text-muted')], [String(slice.chain.length)]),
-        ],
-      ),
-      h.div(
-        [h.Class('flex flex-col overflow-y-auto')],
-        [
-          ...(slice.phase._tag === 'Drafting'
-            ? [
-                lazyDraft(draftView, [
-                  slice.phase.layer,
-                  slice.lutBarOpen,
-                  slice.catalog,
-                  slice.activeFieldIndex[slice.phase.layer.id],
-                  slice.activeMixerColor[slice.phase.layer.id],
-                  h,
-                ]),
-              ]
-            : []),
-          ...slice.chain
-            .map((layer, index) => {
-              const selected = slice.phase._tag === 'Selected' && slice.phase.layerId === layer.id
-              return lazyRow(layer.id, chainRowView, [
-                layer,
-                index,
-                slice.chain.length,
-                selected,
-                slice.lutBarOpen,
-                slice.catalog,
-                slice.activeFieldIndex[layer.id],
-                slice.activeMixerColor[layer.id],
-                h,
-              ])!
-            })
-            .reverse(),
-          ...(slice.chain.length === 0 && slice.phase._tag !== 'Drafting' ? [emptyState(h)] : []),
-        ],
-      ),
-    ],
-  )
-
-const emptyState = (h: HtmlBuilder<EditorMessage>) =>
-  h.div(
-    [h.Class('px-4 py-10 text-center text-xs text-muted')],
-    ['No adjustments yet. Pick one from the left.'],
-  )
-
-const draftRow = (h: HtmlBuilder<EditorMessage>, slice: LayerRowSlice, layer: Layer) => {
-  const ui = LAYER_UI[layer.type]
-  return h.div(
-    [h.Class('border-b border-border bg-panel-alt'), h.AriaLabel(`${ui.label} draft`)],
-    [
-      h.div(
-        [h.Class('flex items-center gap-2 px-4 py-2')],
-        [
-          icon(h, ui.icon, ui.label),
-          h.span([h.Class('min-w-0 flex-1 truncate text-sm font-medium')], [ui.label]),
-          ...(layer.type === 'lut' ? [lutBarToggleImpl(h, slice.lutBarOpen)] : []),
-        ],
-      ),
-      h.div(
-        [h.Class('flex flex-col gap-3 px-4 pb-3')],
-        [...layerSliders(h, slice, layer, ui, 'draft')],
-      ),
-      h.div(
-        [h.Class('flex items-center justify-end gap-2 px-4 py-2')],
-        [
-          button(
-            {
-              onClick: EditorMessage.CancelledDraft(),
-              variant: 'ghost',
-              size: 'icon-sm',
-              className: 'grid place-items-center',
-              attributes: [h.AriaLabel('Cancel draft')],
-            },
-            [icon(h, X, 'Cancel draft')],
-            h,
-          ),
-          button(
-            {
-              onClick: EditorMessage.ConfirmedDraft(),
-              size: 'icon-sm',
-              className: 'grid place-items-center',
-              attributes: [h.AriaLabel('Confirm draft')],
-            },
-            [icon(h, Check, 'Confirm draft')],
-            h,
-          ),
-        ],
-      ),
-    ],
-  )
+  return Object.keys(ui.fields).map((field) => {
+    const key = FieldKey(field)
+    return kind === 'draft' ? draftSlider(h, layer, key, ui) : chainSlider(h, slice, layer, key, ui)
+  })
 }
 
 const draftSlider = (
@@ -318,95 +166,12 @@ const draftSlider = (
   )
 }
 
-const chainRowImpl = (
-  h: HtmlBuilder<EditorMessage>,
-  layer: Layer,
-  index: number,
-  total: number,
-  selected: boolean,
-  lutBarOpen: boolean,
-  catalog: Model['catalog'],
-  activeField: number | undefined,
-  activeMixer: number | undefined,
-) => {
-  const ui = LAYER_UI[layer.type]
-  const rowSlice: LayerRowSlice = {
-    catalog,
-    lutBarOpen,
-    activeFieldIndex: activeField !== undefined ? { [layer.id]: activeField } : {},
-    activeMixerColor: activeMixer !== undefined ? { [layer.id]: activeMixer } : {},
-  }
-  return h.div(
-    [
-      h.Key(layer.id),
-      h.Class(`border-b border-border ${selected ? 'bg-panel-alt' : ''}`),
-      h.DataAttribute('layer-id', layer.id),
-    ],
-    [
-      h.div(
-        [
-          h.Class('flex items-center gap-2 px-4 py-2'),
-          h.OnClick(EditorMessage.SelectedLayer({ id: layer.id })),
-        ],
-        [
-          button(
-            {
-              onClick: EditorMessage.ToggledLayerVisibility({ id: layer.id }),
-              variant: 'ghost',
-              size: 'icon-sm',
-              className: 'grid place-items-center',
-              attributes: [h.AriaLabel(layer.visible ? 'Hide layer' : 'Show layer')],
-            },
-            [icon(h, layer.visible ? Eye : EyeOff, layer.visible ? 'Hide' : 'Show')],
-            h,
-          ),
-          icon(h, ui.icon, ui.label),
-          h.span([h.Class('min-w-0 flex-1 truncate text-sm')], [ui.label]),
-          h.span(
-            [h.Class('tnum min-w-0 truncate text-xs text-muted')],
-            [summary(rowSlice, layer, ui)],
-          ),
-          h.div(
-            [h.Class('flex items-center gap-0.5')],
-            [
-              ...(layer.type === 'lut' ? [lutBarToggleImpl(h, lutBarOpen)] : []),
-              reorderButton(h, 'Move up', ArrowUp, index === total - 1, () =>
-                EditorMessage.ReorderedLayer({ from: index, to: index + 1 }),
-              ),
-              reorderButton(h, 'Move down', ArrowDown, index === 0, () =>
-                EditorMessage.ReorderedLayer({ from: index, to: index - 1 }),
-              ),
-              button(
-                {
-                  onClick: EditorMessage.RemovedLayer({ id: layer.id }),
-                  variant: 'ghost',
-                  size: 'icon-sm',
-                  className: 'grid place-items-center',
-                  attributes: [h.AriaLabel('Delete layer')],
-                },
-                [icon(h, Trash2, 'Delete layer')],
-                h,
-              ),
-            ],
-          ),
-        ],
-      ),
-      selected
-        ? h.div(
-            [h.Class('flex flex-col gap-3 px-4 pb-4')],
-            [...(() => layerSliders(h, rowSlice, layer, ui, 'chain'))()],
-          )
-        : null,
-    ],
-  )
-}
-
 const chainSlider = (
   h: HtmlBuilder<EditorMessage>,
+  slice: LayerRowSlice,
   layer: Layer,
   field: FieldKey,
   ui: (typeof LAYER_UI)[LayerType],
-  slice: LayerRowSlice,
 ) => {
   const fieldUi = ui.fields[field]!
   const { min, max } = fieldBounds(layer.type, field)
@@ -434,40 +199,6 @@ const chainSlider = (
   )
 }
 
-const reorderButton = (
-  h: HtmlBuilder<EditorMessage>,
-  label: string,
-  node: Parameters<typeof icon>[1],
-  disabled: boolean,
-  onClick: () => EditorMessage,
-) =>
-  button(
-    {
-      onClick: onClick(),
-      isDisabled: disabled,
-      variant: 'ghost',
-      size: 'icon-sm',
-      className: 'grid place-items-center disabled:opacity-30',
-      attributes: [h.AriaLabel(label)],
-    },
-    [icon(h, node, label)],
-    h,
-  )
-
-/** The chevron on a drawer LUT row: expands/collapses the bottom LUT bar */
-const lutBarToggleImpl = (h: HtmlBuilder<EditorMessage>, open: boolean) =>
-  button(
-    {
-      onClick: EditorMessage.ToggledLutPicker(),
-      variant: 'ghost',
-      size: 'icon-sm',
-      className: 'grid place-items-center',
-      attributes: [h.AriaExpanded(open), h.AriaLabel('Toggle LUT bar')],
-    },
-    [icon(h, open ? ChevronUp : ChevronDown, 'Toggle LUT bar')],
-    h,
-  )
-
 export const sliderControl = (
   h: HtmlBuilder<EditorMessage>,
   label: string,
@@ -492,3 +223,344 @@ export const sliderControl = (
     toggledLabel && onToggleLabel ? { ...rangeConfig, labelOnClick: onToggleLabel } : rangeConfig
   return h.div([h.Class('flex flex-col gap-1')], [lutraRangeRow(h, finalConfig)])
 }
+
+type Panel =
+  | Readonly<{ kind: 'draft'; layer: Layer }>
+  | Readonly<{ kind: 'chain'; layer: Layer; index: number }>
+  | Readonly<{ kind: 'empty' }>
+
+const panelOf = (slice: InspectorSlice): Panel => {
+  if (slice.phase._tag === 'Drafting') {
+    return { kind: 'draft', layer: slice.phase.layer }
+  }
+  if (slice.phase._tag === 'Selected') {
+    const layerId = slice.phase.layerId
+    const index = slice.chain.findIndex((layer) => layer.id === layerId)
+    const layer = index < 0 ? undefined : slice.chain[index]
+    return layer === undefined ? { kind: 'empty' } : { kind: 'chain', index, layer }
+  }
+  return { kind: 'empty' }
+}
+
+/**
+ * The inspector (docs/adr/0013-materials): a floating panel that shows the
+ * selected layer's parameters — never the chain. The chain is the dock; the
+ * inspector edits.
+ *
+ * A draft has the same shape as a committed layer, with Cancel / Apply in the
+ * footer instead of the layer actions, so the transaction stays visible.
+ */
+export const layerDrawer = (
+  h: HtmlBuilder<EditorMessage>,
+  slice: InspectorSlice,
+  open: boolean,
+) => {
+  const panel = panelOf(slice)
+  const rowSlice: LayerRowSlice = {
+    catalog: slice.catalog,
+    activeFieldIndex: slice.activeFieldIndex,
+    activeMixerColor: slice.activeMixerColor,
+  }
+  return h.aside(
+    [
+      h.Class(
+        `${open ? 'flex' : 'hidden'} absolute inset-x-0 bottom-[64px] z-30 max-h-[70dvh] w-full flex-col overflow-y-auto rounded-t-[18px] bg-s1 shadow-[0_-24px_48px_-20px_var(--mat-shadow-a)] lg:static lg:z-auto lg:max-h-none lg:w-[328px] lg:flex-none lg:overflow-y-visible lg:rounded-none lg:bg-transparent lg:shadow-none`,
+      ),
+      h.AriaLabel('Selected adjustment'),
+    ],
+    [
+      h.div(
+        [
+          h.Class(
+            'surface flex w-full flex-col overflow-hidden rounded-t-[18px] lg:mt-3 lg:rounded-[18px]',
+          ),
+          h.AriaLabel(
+            panel.kind === 'empty'
+              ? 'Adjustment inspector'
+              : `${LAYER_UI[panel.layer.type].label} ${panel.kind === 'draft' ? 'draft' : 'layer'}`,
+          ),
+        ],
+        [
+          panel.kind === 'empty' ? emptyPanel(h) : parameterPanel(h, slice, rowSlice, panel),
+          panelFooter(h, panel),
+        ],
+      ),
+    ],
+  )
+}
+
+const parameterPanel = (
+  h: HtmlBuilder<EditorMessage>,
+  slice: InspectorSlice,
+  rowSlice: LayerRowSlice,
+  panel: Exclude<Panel, { kind: 'empty' }>,
+): Html => {
+  const { layer } = panel
+  const ui = LAYER_UI[layer.type]
+  const stepper = stepperConfig(panel)
+  return h.div(
+    [h.Class('flex flex-col')],
+    [
+      h.div(
+        [h.Class('flex flex-col gap-2 px-4 pb-3 pt-4')],
+        [
+          h.div(
+            [h.Class('flex items-baseline justify-between gap-2')],
+            [
+              h.span(
+                [h.Class('label')],
+                [
+                  panel.kind === 'draft'
+                    ? 'Draft'
+                    : `Module ${String(panel.index + 1).padStart(2, '0')}`,
+                ],
+              ),
+              h.span(
+                [h.Class('label')],
+                [panel.kind === 'draft' ? 'Confirm to add' : layer.visible ? 'Enabled' : 'Hidden'],
+              ),
+            ],
+          ),
+          h.div(
+            [h.Class('flex items-center gap-3')],
+            [
+              h.span([h.Class('text-ink')], [icon(h, ui.icon, ui.label)]),
+              h.span([h.Class('text-base')], [ui.label]),
+              h.span(
+                [h.Class('tnum ml-auto font-mono text-xl leading-none')],
+                [headerValue(rowSlice, layer, ui)],
+              ),
+              ...(stepper === null
+                ? []
+                : [
+                    h.div(
+                      [h.Class('flex gap-1')],
+                      [
+                        stepperButton(h, 'Increase', ChevronUp, stepper(1)),
+                        stepperButton(h, 'Decrease', ChevronDown, stepper(-1)),
+                      ],
+                    ),
+                  ]),
+            ],
+          ),
+        ],
+      ),
+      h.div(
+        [h.Class('flex flex-col gap-3 px-4 pb-4')],
+        [...layerSliders(h, rowSlice, layer, ui, panel.kind === 'draft' ? 'draft' : 'chain')],
+      ),
+      ...(panel.kind === 'chain' ? [positionRow(h, slice, panel.index)] : []),
+      ...context(h, slice, layer, ui),
+    ],
+  )
+}
+
+/** The stepper only exists for layers with exactly one plain numeric field. */
+const stepperConfig = (panel: Exclude<Panel, { kind: 'empty' }>) => {
+  const ui = LAYER_UI[panel.layer.type]
+  const keys = Object.keys(ui.fields)
+  if (ui.toggled || keys.length !== 1 || keys[0] === undefined) {
+    return null
+  }
+  const field = FieldKey(keys[0])
+  const { min, max } = fieldBounds(panel.layer.type, field)
+  const step = (max - min) / 100
+  const current = num(panel.layer, field)
+  return (direction: 1 | -1): EditorMessage => {
+    const value = current + direction * step
+    return panel.kind === 'draft'
+      ? EditorMessage.UpdatedDraftParam({ field, value })
+      : EditorMessage.UpdatedLayerParam({ field, id: panel.layer.id, value })
+  }
+}
+
+const stepperButton = (
+  h: HtmlBuilder<EditorMessage>,
+  label: string,
+  Icon: IconNode,
+  onClick: EditorMessage,
+) =>
+  button(
+    {
+      onClick,
+      variant: 'ghost',
+      size: 'icon-xs',
+      className:
+        'grid size-[26px] place-items-center rounded-[8px] bg-s2 text-dim hover:bg-s3 hover:text-ink',
+      attributes: [h.AriaLabel(label)],
+    },
+    [icon(h, Icon, label, 14)],
+    h,
+  )
+
+/** Where the layer sits in the chain, and the two moves that change it. */
+const positionRow = (h: HtmlBuilder<EditorMessage>, slice: InspectorSlice, index: number): Html => {
+  const total = slice.chain.length
+  return h.div(
+    [h.Class('flex items-center justify-between gap-2 px-4 pb-4')],
+    [
+      moveButton(h, 'Move up', ArrowUp, index === 0, () =>
+        EditorMessage.ReorderedLayer({ from: index, to: index - 1 }),
+      ),
+      h.span([h.Class('micro tnum')], [`Position ${String(index + 1)} of ${String(total)}`]),
+      moveButton(h, 'Move down', ArrowDown, index === total - 1, () =>
+        EditorMessage.ReorderedLayer({ from: index, to: index + 1 }),
+      ),
+    ],
+  )
+}
+
+const moveButton = (
+  h: HtmlBuilder<EditorMessage>,
+  label: string,
+  Icon: IconNode,
+  disabled: boolean,
+  onClick: () => EditorMessage,
+) =>
+  button(
+    {
+      onClick: onClick(),
+      isDisabled: disabled,
+      variant: 'ghost',
+      size: 'icon-xs',
+      className:
+        'grid size-7 place-items-center rounded-[8px] bg-s2 text-dim hover:bg-s3 hover:text-ink disabled:opacity-30',
+      attributes: [h.AriaLabel(label)],
+    },
+    [icon(h, Icon, label, 13)],
+    h,
+  )
+
+const context = (
+  h: HtmlBuilder<EditorMessage>,
+  slice: InspectorSlice,
+  layer: Layer,
+  ui: (typeof LAYER_UI)[LayerType],
+): readonly Html[] => {
+  if (layer.type === 'lut') {
+    const target = pipe(
+      lutTarget(slice.phase, slice.chain),
+      Option.map((t): 'draft' | 'layer' => (t.kind === 'draft' ? 'draft' : 'layer')),
+      Option.getOrElse((): 'draft' | 'layer' => 'draft'),
+    )
+    const commitTarget =
+      target === 'draft' ? ({ kind: 'draft' } as const) : ({ kind: 'layer', id: layer.id } as const)
+    return [
+      h.div(
+        [h.Class('well mx-3 mb-3 flex flex-col gap-3 p-3')],
+        [
+          h.div(
+            [h.Class('flex items-baseline justify-between gap-3 text-[10px]')],
+            [
+              h.span([h.Class('label')], ['Stock']),
+              h.span([h.Class('truncate text-ink')], [lutName(slice.catalog, layer.lutId)]),
+            ],
+          ),
+          h.div(
+            [h.Class('flex items-baseline justify-between gap-3 text-[10px]')],
+            [
+              h.span([h.Class('label')], ['Space']),
+              h.span([h.Class('tnum font-mono text-ink')], ['sRGB · 13³']),
+            ],
+          ),
+          lutSheet(h, slice, commitTarget, Option.some(layer.lutId)),
+        ],
+      ),
+    ]
+  }
+  return [
+    h.div(
+      [h.Class('well mx-3 mb-3 flex flex-col gap-2 p-3')],
+      [
+        h.p([h.Class('text-[11px] leading-snug text-muted')], [ui.description]),
+        h.p([h.Class('text-[10px] leading-snug text-dim')], [ui.when]),
+      ],
+    ),
+  ]
+}
+
+const panelFooter = (h: HtmlBuilder<EditorMessage>, panel: Panel): Html => {
+  if (panel.kind === 'empty') {
+    return null
+  }
+  if (panel.kind === 'draft') {
+    return h.div(
+      [h.Class('flex gap-1.5 px-3 pb-3')],
+      [
+        footerButton(h, 'Cancel draft', X, EditorMessage.CancelledDraft(), false, 'Cancel'),
+        footerButton(h, 'Apply adjustment', Check, EditorMessage.ConfirmedDraft(), true, 'Apply'),
+      ],
+    )
+  }
+  return h.div(
+    [h.Class('flex gap-1.5 px-3 pb-3')],
+    [
+      footerButton(
+        h,
+        panel.layer.visible ? 'Hide layer' : 'Show layer',
+        panel.layer.visible ? Eye : EyeOff,
+        EditorMessage.ToggledLayerVisibility({ id: panel.layer.id }),
+        false,
+        null,
+      ),
+      footerButton(
+        h,
+        'Delete layer',
+        Trash2,
+        EditorMessage.RemovedLayer({ id: panel.layer.id }),
+        false,
+        null,
+      ),
+      footerButton(h, 'Add adjustment', Plus, EditorMessage.ToggledPalette(), false, null),
+    ],
+  )
+}
+
+const footerButton = (
+  h: HtmlBuilder<EditorMessage>,
+  label: string,
+  Icon: IconNode,
+  message: EditorMessage,
+  primary: boolean,
+  text: string | null,
+) =>
+  h.button(
+    [
+      h.Class(
+        `flex h-9 flex-1 items-center justify-center gap-2 rounded-[10px] text-[10px] uppercase tracking-[0.1em] transition-colors ${
+          primary
+            ? 'bg-accent text-accent-ink shadow-[0_4px_14px_var(--mat-halo)] hover:brightness-110'
+            : 'bg-s2 text-dim hover:bg-s3 hover:text-ink'
+        }`,
+      ),
+      h.OnClick(message),
+      h.AriaLabel(label),
+      h.Title(label),
+    ],
+    text === null ? [icon(h, Icon, label, 16)] : [icon(h, Icon, label, 14), text],
+  )
+
+const emptyPanel = (h: HtmlBuilder<EditorMessage>) =>
+  h.div(
+    [h.Class('flex flex-col items-start gap-4 p-4')],
+    [
+      h.div(
+        [h.Class('flex w-full items-baseline justify-between gap-2')],
+        [h.span([h.Class('label')], ['Inspector']), h.span([h.Class('label')], ['No selection'])],
+      ),
+      h.p(
+        [h.Class('text-xs leading-relaxed text-muted')],
+        ['Pick an adjustment from the rail, or search all thirteen in the palette.'],
+      ),
+      h.button(
+        [
+          h.Class(
+            'flex h-8 items-center gap-2 rounded-full bg-s2 px-3 text-[10px] uppercase tracking-[0.1em] text-ink hover:bg-s3',
+          ),
+          h.OnClick(EditorMessage.ToggledPalette()),
+          h.AriaLabel('Add adjustment'),
+        ],
+        ['Add adjustment'],
+      ),
+    ],
+  )

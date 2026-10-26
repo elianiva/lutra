@@ -8,6 +8,7 @@ import { EditorPhase, editorMachine } from './phase'
 import { DownloadState } from '../offline/model'
 import { LutLoadError } from '../luts/store'
 import { LayerCreationError } from '../errors'
+import { Mode, readMode } from '../theme'
 
 const ActiveFieldIndex = Schema.Record(LayerIdSchema, Schema.Number)
 
@@ -42,8 +43,11 @@ export const Model = Schema.Struct({
   catalogError: Schema.NullOr(LutLoadError),
   attachedEdit: AttachedEdit,
   saveStatus: SaveStatus,
-  // canvas — docs/adr/0002-lut-library). The drawer's LUT rows keep summary + sliders
-  lutBarOpen: Schema.Boolean,
+  // The appearance mode (docs/adr/0013-materials): dark or light, persisted.
+  mode: Mode,
+  // The add-adjustment palette (docs/adr/0013-materials): an overlay, not a panel.
+  paletteOpen: Schema.Boolean,
+  paletteQuery: Schema.String,
   // LUT layer) — never touches the chain or the machine (docs/adr/0010-editor-ui
   previewLut: Schema.NullOr(LutIdSchema),
   // category at render.
@@ -92,7 +96,9 @@ export const initialModel = (): Model => ({
   compareToggleBefore: false,
   exportDialog: ExportDialog.init({ id: 'export-dialog', fileStem: 'lutra-edit' }),
   lastRender: null,
-  lutBarOpen: false,
+  mode: readMode(),
+  paletteOpen: false,
+  paletteQuery: '',
   lutDownloads: {},
   lutRecents: [],
   lutTab: 'recents',

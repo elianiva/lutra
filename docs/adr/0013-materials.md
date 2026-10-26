@@ -1,0 +1,55 @@
+# Materials: the app's visual system
+
+## The problem
+
+The editor was drawn with borders. Every region — the tool panel, the canvas, the layer drawer, the LUT bar — was a 1px box on a flat background, with radius 0 everywhere. That worked while the app was one dense screen, but it had three costs:
+
+- **Borders carried the layout.** Adding a region meant adding a line, and the lines competed with the photograph.
+- **Depth was impossible.** A draft, an overlay and a popover all looked equally close to the viewer.
+- **One mode only.** The app was dark by construction: the background was a fixed `#111` and every token was a literal.
+
+## The decision
+
+Separation comes from four devices, and a surface never draws an outline:
+
+1. **Tonal steps.** Four surface roles, borrowed from Material 3's surface containers: page background, surface 1 (panels), surface 2 (grouped strips and chips), surface 3 (overlays). A surface is separated from what is behind it by being a different tone, not by a stroke.
+2. **Rim light.** Every floating surface carries a 1px inset highlight along its top edge, the specular edge Linear's liquid-glass work describes. It reads as a lit edge at any size and replaces the top border.
+3. **Ambient shadow.** A tight contact shadow plus a wide soft one: the contact shadow anchors the surface, the wide one gives height.
+4. **Recessed wells.** Content that belongs together (stock, space, the stock contact sheet) sits one tone _down_ in a `well` with an inset shadow. Grouping is a surface change, not a divider.
+
+Where a separator is genuinely needed — the tool rail's group boundaries, a list that scrolls under a footer — the line is a gradient that fades at both ends, never a solid stroke.
+
+Two modes, one structure: `data-mode="dark|light"` on the document root swaps the token values. Dark is the default, because the editor is a judging surface and a dark surround keeps the eye adapted; light is a warm paper palette for working in daylight. The mode is stored per browser and painted before the first render (`theme.ts`, `SetTheme`).
+
+## The shell
+
+The editor is three floating regions and one overlay, spaced on a single grid:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ LUTRA   edit …                                   modes  save │ 64
+├────┬──────────────────────────────────────────┬──────────────┤
+│    │              print mount                 │  inspector   │
+│rail│        (framed canvas + captions)        │  (the        │
+│ 52 │                                          │  selected    │
+│    │  chain dock (pills)                      │  layer)      │
+│    │  status band (histogram, zoom, compare)   │  328         │
+└────┴──────────────────────────────────────────┴──────────────┘
+```
+
+- **Tool rail** (`tool-panel.ts`): thirteen icons. Hover or focus opens a card with the tool's number, name and copy — labels live in the card so the rail stays narrow enough to float.
+- **Inspector** (`layer-drawer.ts`): the selected layer's parameters only, never the chain. A draft uses the same shape with Cancel / Apply in the footer. A chain layer also carries its position row (move earlier / later), because reordering must stay reachable.
+- **Chain dock** (`chain-dock.ts`): the chain as separate pills — value on top, name below. Selection is the accent wash; the gaps group, so no separators are drawn.
+- **Palette** (`palette.ts`): ⌘K or the dock's `+` opens a searchable list of all thirteen tools, grouped Look / Light / Color / Film / Optics. It dispatches `SelectedTool`, the same message the rail sends.
+- **Status band** (`status-band.ts`): the histogram and the compare control, moved out of the canvas. They sit under the dock, aligned to the canvas column, so the print never carries chrome over it.
+
+Spacing is one 4px scale (4 / 8 / 12 / 16 / 24 / 32 / 48) with 24px gutters, 16px panel padding, 44px rows, and 32 / 36 / 40px controls. Type is one scale: 8 / 9 / 10 / 12 / 16 / 20.
+
+## Consequences
+
+- **ADR 0010's layout no longer applies.** The tool panel, the layer drawer and the LUT bar are gone; the rail, inspector, dock, palette and status band replace them. The compare presentation rule, the draft transaction and the responsive/touch rules from 0010 still hold.
+- **The LUT bar is a contact sheet.** Browsing stocks happens inside the inspector's well (`lut-bar/sheet.ts`). Hover still previews (`PreviewedLut`), click still commits (`ChangedDraftLut` / `ChangedLayerLut`), and per-photo thumbnails and the offline gate are unchanged. The `lutBarOpen` flag and `ToggledLutPicker` are retired: the sheet is shown whenever the target is a LUT.
+- **Reordering moved.** It left the drawer rows for the inspector's position row. The dock shows the chain left to right; "move up" means earlier.
+- **Every mode is a token set.** A new brand colour or a new mode is a change to `styles.css` alone. Components never hardcode a surface colour; they use `bg-s1`, `bg-s2`, `bg-well`, `text-ink`, `text-muted`, `text-dim`, `bg-accent` and the `surface` / `well` / `pill` utilities.
+- **The gallery follows the tokens.** Its structure is unchanged; it inherits the palette, radii and shadows.
+- **Contrast is verified per mode, not per component.** The measured ratios live with the tokens: body text ≥ 14:1, secondary ≥ 5:1, micro labels ≥ 4:1 in both modes.

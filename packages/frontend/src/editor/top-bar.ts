@@ -1,99 +1,55 @@
-import { DateTime, Match } from 'effect'
 import type { Html, HtmlBuilder } from 'foldkit/html'
-import { CopyPlus, Download, Plus } from 'lucide'
-import { button } from '@/components/ui/button'
+import { Check, CopyPlus, Download, Eclipse, Sun } from 'lucide'
 import { icon } from '../components/icon'
 import { EditorMessage } from './message'
 import type { Model } from './model'
 
 /**
- * Top bar: LUTRA wordmark left; right side: the save flow (Save, Save as,
- * and the last save's status), export, and clear.
+ * The editor's top bar (docs/adr/0013-materials). It draws no rule and owns no
+ * background: the wordmark, the document line, the appearance toggle and the
+ * actions float over the canvas tone, separated from the work area by space
+ * alone.
  *
- * On phones (docs/adr/0010-editor-ui.md) the wordmark and Save stay, while Save as and
- * New collapse to icon-only buttons (`sm` restores the text) — the whole
- * action row must fit a ~360px viewport next to the wordmark.
- *
- * Save persists the committed chain through the Edit store — in place when
- * the editor has an attached Edit, creating a new Edit for a fresh in-editor
- * pick. Save as always forks a new Edit, so it stays disabled until the
- * editor has an attached Edit to fork from. Both are disabled while a save
- * is in flight (at most one at a time) and while no image is loaded.
+ * The mode toggle is the only control here that changes the whole app; it
+ * sits next to the save actions because both are "how the session is set up"
+ * rather than "what the photo looks like".
  */
 export const topBar = (
   h: HtmlBuilder<EditorMessage>,
   saveStatus: Model['saveStatus'],
   attachedEdit: Model['attachedEdit'],
+  mode: Model['mode'],
   hasImage: boolean,
-) => {
+): Html => {
   const saving = saveStatus._tag === 'saving'
   const attachedId = attachedEdit?.id ?? null
   return h.header(
-    [h.Class('flex items-center justify-between border-b border-border bg-panel px-4 py-2')],
+    [h.Class('flex h-16 flex-none items-center gap-6')],
     [
-      h.h1([h.Class('text-sm font-semibold tracking-[0.3em] text-accent')], ['LUTRA']),
+      h.h1([h.Class('flex-none text-xs font-semibold tracking-[0.34em] text-accent')], ['LUTRA']),
+      documentLine(h, attachedEdit),
       h.div(
-        [h.Class('flex items-center gap-1')],
+        [h.Class('ml-auto flex items-center gap-3')],
         [
-          saveStatusText(h, saveStatus),
-          button(
-            {
-              onClick: EditorMessage.SaveRequested(),
-              isDisabled: !hasImage || saving,
-              size: 'xs',
-              className: 'disabled:opacity-30',
-              attributes: [h.AriaLabel('Save edit')],
-            },
-            saving ? 'Saving…' : 'Save',
-            h,
-          ),
-          button(
-            {
-              onClick: EditorMessage.SaveAsRequested(),
-              isDisabled: !hasImage || saving || attachedId === null,
-              variant: 'ghost',
-              size: 'xs',
-              className: 'disabled:opacity-30',
-              attributes: [h.AriaLabel('Save as a new edit')],
-            },
+          modeToggle(h, mode),
+          h.div(
+            [h.Class('surface flex h-10 items-center gap-0.5 p-1')],
             [
-              h.span([h.Class('hidden sm:inline')], ['Save as']),
-              h.span(
-                [h.Class('grid size-8 place-items-center sm:hidden')],
-                [icon(h, CopyPlus, 'Save as a new edit')],
-              ),
+              saveStatusText(h, saveStatus),
+              textButton(h, 'Save as', CopyPlus, EditorMessage.SaveAsRequested(), {
+                isDisabled: !hasImage || saving || attachedId === null,
+                iconOnlyOnSmall: true,
+                hideOnSmall: true,
+              }),
+              iconButton(h, 'Export image', Download, EditorMessage.ExportRequested(), {
+                isDisabled: !hasImage,
+              }),
+              textButton(h, 'Save', Check, EditorMessage.SaveRequested(), {
+                isDisabled: !hasImage || saving,
+                primary: true,
+                label: saving ? 'Saving…' : 'Save',
+              }),
             ],
-            h,
-          ),
-          button(
-            {
-              onClick: EditorMessage.ExportRequested(),
-              isDisabled: !hasImage,
-              variant: 'ghost',
-              size: 'icon-sm',
-              className: 'disabled:opacity-30',
-              attributes: [h.AriaLabel('Export image')],
-            },
-            [icon(h, Download, 'Export')],
-            h,
-          ),
-          button(
-            {
-              onClick: EditorMessage.ClearedImage(),
-              isDisabled: !hasImage,
-              variant: 'ghost',
-              size: 'xs',
-              className: 'disabled:opacity-30',
-              attributes: [h.AriaLabel('Start over')],
-            },
-            [
-              h.span([h.Class('hidden sm:inline')], ['New']),
-              h.span(
-                [h.Class('grid size-8 place-items-center sm:hidden')],
-                [icon(h, Plus, 'Start over')],
-              ),
-            ],
-            h,
           ),
         ],
       ),
@@ -101,25 +57,123 @@ export const topBar = (
   )
 }
 
-/**
- * The save flow's status line: the last successful save's time (the gallery
- * tile carries the same `savedAt`) or the last failure's reason. Nothing
- * while idle or saving — the Save button's "Saving…" label covers that.
- */
-const saveStatusText = (h: HtmlBuilder<EditorMessage>, saveStatus: Model['saveStatus']) =>
-  Match.value(saveStatus).pipe(
-    Match.withReturnType<Html>(),
-    Match.when({ _tag: 'saved' }, (status) =>
-      h.span(
-        [h.Class('hidden pr-1 text-[10px] text-muted sm:inline')],
-        [`Saved ${DateTime.formatLocal({ timeStyle: 'short' })(DateTime.makeUnsafe(status.at))}`],
-      ),
-    ),
-    Match.when({ _tag: 'failed' }, (status) =>
-      h.span(
-        [h.Class('hidden pr-1 text-[10px] text-accent sm:inline'), h.Title(status.error.message)],
-        ['Save failed'],
-      ),
-    ),
-    Match.orElse(() => null),
+/** The document line: the edit being worked on, never invented metadata. */
+const documentLine = (h: HtmlBuilder<EditorMessage>, attachedEdit: Model['attachedEdit']) =>
+  h.div(
+    [h.Class('micro tnum hidden items-center gap-3 font-mono md:flex')],
+    [
+      h.span([], [attachedEdit?.id == null ? 'New edit' : `Edit ${attachedEdit.id.slice(0, 8)}`]),
+      h.span([h.Class('opacity-60')], ['sRGB']),
+    ],
   )
+
+const modeToggle = (h: HtmlBuilder<EditorMessage>, mode: Model['mode']): Html => {
+  const segment = (target: 'dark' | 'light', label: string, Icon: typeof Sun) => {
+    const active = mode === target
+    return h.button(
+      [
+        h.Class(
+          `grid h-8 w-10 place-items-center rounded-full transition-colors ${
+            active ? 'bg-accent-soft text-accent' : 'text-dim hover:text-ink'
+          }`,
+        ),
+        h.OnClick(EditorMessage.ToggledMode()),
+        h.AriaLabel(`${label} appearance`),
+        h.AriaPressed(String(active)),
+        h.Title(`${label} appearance`),
+      ],
+      [icon(h, Icon, label, 16)],
+    )
+  }
+  return h.div(
+    [h.Class('surface flex h-10 items-center gap-0.5 p-1'), h.AriaLabel('Appearance')],
+    [segment('dark', 'Dark', Eclipse), segment('light', 'Light', Sun)],
+  )
+}
+
+type ActionConfig = Readonly<{
+  isDisabled: boolean
+  primary?: boolean
+  label?: string
+  iconOnlyOnSmall?: boolean
+  hideOnSmall?: boolean
+}>
+
+const baseActionClass = (disabled: boolean) =>
+  `flex h-8 items-center gap-2 rounded-full px-3 text-[10px] uppercase tracking-[0.1em] transition-colors ${
+    disabled ? 'opacity-30' : 'hover:bg-s2 hover:text-ink'
+  }`
+
+const textButton = (
+  h: HtmlBuilder<EditorMessage>,
+  label: string,
+  Icon: typeof Check,
+  onClick: EditorMessage,
+  config: ActionConfig,
+): Html =>
+  h.button(
+    [
+      h.Class(
+        `${config.hideOnSmall ? 'hidden sm:flex' : 'flex'} ${
+          config.primary
+            ? `h-8 items-center gap-2 rounded-full bg-accent px-4 text-[10px] uppercase tracking-[0.1em] text-accent-ink shadow-[0_4px_14px_var(--mat-halo)] ${
+                config.isDisabled ? 'opacity-40' : 'hover:brightness-110'
+              }`
+            : `${baseActionClass(config.isDisabled)} ${config.isDisabled ? '' : 'text-muted'}`
+        }`,
+      ),
+      h.OnClick(onClick),
+      ...(config.isDisabled ? [h.Disabled(true)] : []),
+      h.AriaLabel(label === 'Save' ? 'Save edit' : 'Save as a new edit'),
+    ],
+    [
+      icon(h, Icon, label, 14),
+      config.iconOnlyOnSmall
+        ? h.span([h.Class('hidden sm:inline')], [config.label ?? label])
+        : (config.label ?? label),
+    ],
+  )
+
+const iconButton = (
+  h: HtmlBuilder<EditorMessage>,
+  label: string,
+  Icon: typeof Download,
+  onClick: EditorMessage,
+  config: ActionConfig,
+): Html =>
+  h.button(
+    [
+      h.Class(
+        `grid h-8 w-8 place-items-center rounded-full transition-colors ${
+          config.isDisabled ? 'opacity-30' : 'text-muted hover:bg-s2 hover:text-ink'
+        }`,
+      ),
+      h.OnClick(onClick),
+      ...(config.isDisabled ? [h.Disabled(true)] : []),
+      h.AriaLabel(label),
+      h.Title(label),
+    ],
+    [icon(h, Icon, label, 16)],
+  )
+
+/**
+ * The save flow's status: the last save's time, or the last failure's reason.
+ * Rendered inline before the actions so it never reflows the buttons.
+ */
+const saveStatusText = (h: HtmlBuilder<EditorMessage>, saveStatus: Model['saveStatus']) => {
+  if (saveStatus._tag === 'saved') {
+    return h.span(
+      [h.Class('hidden px-2 text-[10px] text-dim sm:inline')],
+      [
+        `Saved ${new Date(saveStatus.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+      ],
+    )
+  }
+  if (saveStatus._tag === 'failed') {
+    return h.span(
+      [h.Class('hidden px-2 text-[10px] text-accent sm:inline'), h.Title(saveStatus.error.message)],
+      ['Save failed'],
+    )
+  }
+  return null
+}

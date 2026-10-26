@@ -4,76 +4,177 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Lutra — dark, hard-cornered, Leica/Fuji-styled (mirrors lutra-mobile).
- * No rounded corners anywhere: panels, buttons, inputs, and the canvas all
- * use 0 radius. Thin 1px borders delineate regions on an off-black body;
- * a single red (#cc0000, the mobile app's primary) is the accent — the
- * slider thumbs, the active fills, and the wordmark.
+ * Lutra — materials (docs/adr/0013-materials).
  *
- * foldcn/shadcn CSS variables (:root below) power @/components/ui primitives.
- * Lutra Tailwind tokens (--color-panel, text-ink, bg-accent, …) stay separate
- * so existing views keep their look; foldcn uses primary/muted-foreground, not
- * Lutra's text-muted token.
+ * Separation never comes from a hairline border. Four devices do the work:
+ *
+ *   1. tonal steps     bg → s1 (panels) → s2 (groups) → s3 (overlays)
+ *   2. rim light       a 1px inset highlight along the lit top edge
+ *   3. ambient shadow  a tight contact shadow plus a wide soft one
+ *   4. recessed wells  grouped content sits one tone down, with an inset shadow
+ *
+ * The tokens below are the only colour and depth values in the app; both
+ * modes resolve the same names, so every surface switches with `data-mode`.
+ *
+ * Spacing and type follow one 4px scale (docs/adr/0013-materials):
+ *   4 / 8 / 12 / 16 / 24 / 32 / 48 and 8 / 9 / 10 / 12 / 16 / 20.
  */
+
+:root,
+:root[data-mode='dark'] {
+  --mat-bg: #121010;
+
+  --mat-s1: #201c19;
+  --mat-s2: #241f1d;
+  --mat-s3: #2b2523;
+  --mat-well: #191615;
+
+  --mat-ink: #f6f1ea;
+  --mat-muted: #b5aa9e;
+  --mat-dim: #988e81;
+
+  --mat-accent: #ff7a52;
+  --mat-accent-ink: #1b110c;
+  --mat-accent-soft: rgba(255, 122, 82, 0.14);
+  --mat-halo: rgba(255, 122, 82, 0.18);
+
+  --mat-rim: rgba(255, 255, 255, 0.07);
+  --mat-sheen: radial-gradient(140% 120% at 18% -10%, rgba(255, 255, 255, 0.05), transparent 58%);
+  --mat-fade: rgba(255, 255, 255, 0.08);
+
+  --mat-track: rgba(255, 255, 255, 0.14);
+  --mat-knob: #f7f2ea;
+  --mat-inset: rgba(0, 0, 0, 0.45);
+
+  --mat-shadow-a: rgba(0, 0, 0, 0.55);
+  --mat-shadow-b: rgba(0, 0, 0, 0.3);
+  --mat-elev-1: 0 1px 2px var(--mat-shadow-b), 0 8px 20px -10px var(--mat-shadow-a);
+  --mat-elev-2: 0 2px 6px var(--mat-shadow-b), 0 20px 44px -18px var(--mat-shadow-a);
+  --mat-elev-3: 0 6px 16px var(--mat-shadow-b), 0 34px 80px -26px var(--mat-shadow-a);
+
+  --mat-glass: rgba(32, 28, 25, 0.84);
+  --mat-stage: #0b0908;
+  --mat-pool: radial-gradient(circle at 50% 42%, rgba(255, 122, 82, 0.07), transparent 58%);
+  --mat-hist-top: rgba(255, 122, 82, 0.5);
+  --mat-hist-bottom: rgba(255, 122, 82, 0);
+  --mat-hist-line: rgba(255, 170, 140, 0.75);
+}
+
+:root[data-mode='light'] {
+  --mat-bg: #efebe3;
+
+  --mat-s1: #faf7f1;
+  --mat-s2: #f1ece2;
+  --mat-s3: #fffdf8;
+  --mat-well: #e9e3d7;
+
+  --mat-ink: #1c1813;
+  --mat-muted: #6c6457;
+  --mat-dim: #766d5f;
+
+  --mat-accent: #c04520;
+  --mat-accent-ink: #fff8f2;
+  --mat-accent-soft: rgba(192, 69, 32, 0.12);
+  --mat-halo: rgba(192, 69, 32, 0.16);
+
+  --mat-rim: rgba(255, 255, 255, 0.9);
+  --mat-sheen: radial-gradient(140% 120% at 18% -10%, rgba(255, 255, 255, 0.75), transparent 60%);
+  --mat-fade: rgba(28, 24, 19, 0.1);
+
+  --mat-track: rgba(28, 24, 19, 0.1);
+  --mat-knob: #fffdf8;
+  --mat-inset: rgba(72, 58, 40, 0.18);
+
+  --mat-shadow-a: rgba(62, 50, 34, 0.22);
+  --mat-shadow-b: rgba(62, 50, 34, 0.12);
+  --mat-elev-1: 0 1px 2px var(--mat-shadow-b), 0 8px 20px -12px var(--mat-shadow-a);
+  --mat-elev-2: 0 2px 6px var(--mat-shadow-b), 0 20px 44px -20px var(--mat-shadow-a);
+  --mat-elev-3: 0 6px 16px var(--mat-shadow-b), 0 34px 80px -28px var(--mat-shadow-a);
+
+  --mat-glass: rgba(250, 247, 241, 0.82);
+  --mat-stage: #e2dccf;
+  --mat-pool: radial-gradient(circle at 50% 42%, rgba(192, 69, 32, 0.06), transparent 58%);
+  --mat-hist-top: rgba(192, 69, 32, 0.42);
+  --mat-hist-bottom: rgba(192, 69, 32, 0);
+  --mat-hist-line: rgba(192, 69, 32, 0.6);
+}
+
 @theme {
-  --color-bg: #111111;
-  --color-panel: #1f1f1f;
-  --color-panel-alt: #262626;
-  --color-border: #262626;
-  --color-border-strong: #525252;
-  --color-ink: #fafafa;
-  --color-muted: #a3a3a3;
-  --color-accent: #cc0000;
+  /* surfaces */
+  --color-bg: var(--mat-bg);
+  --color-s1: var(--mat-s1);
+  --color-s2: var(--mat-s2);
+  --color-s3: var(--mat-s3);
+  --color-well: var(--mat-well);
+
+  /* legacy names, mapped onto the material steps so older views follow */
+  --color-panel: var(--mat-s1);
+  --color-panel-alt: var(--mat-s2);
+  --color-border: var(--mat-fade);
+  --color-border-strong: var(--mat-track);
+
+  /* ink */
+  --color-ink: var(--mat-ink);
+  --color-muted: var(--mat-muted);
+  --color-dim: var(--mat-dim);
+
+  /* accent */
+  --color-accent: var(--mat-accent);
+  --color-accent-ink: var(--mat-accent-ink);
+  --color-accent-soft: var(--mat-accent-soft);
 
   --font-sans: 'Electrolize', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
 
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --radius-sm: 0;
-  --radius-md: 0;
-  --radius-lg: 0;
-  --radius-xl: 0;
-  --radius-2xl: 0;
-  --radius-3xl: 0;
-  --radius-4xl: 0;
+  /* radii: one family, three sizes */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
+  --radius-4xl: 28px;
+
+  /* shadcn role names, resolved from the material set */
+  --color-background: var(--mat-bg);
+  --color-foreground: var(--mat-ink);
+  --color-card: var(--mat-s1);
+  --color-card-foreground: var(--mat-ink);
+  --color-popover: var(--mat-s3);
+  --color-popover-foreground: var(--mat-ink);
+  --color-primary: var(--mat-accent);
+  --color-primary-foreground: var(--mat-accent-ink);
+  --color-secondary: var(--mat-s2);
+  --color-secondary-foreground: var(--mat-ink);
+  --color-muted-foreground: var(--mat-muted);
+  --color-accent-foreground: var(--mat-ink);
+  --color-destructive: #c02a1b;
+  --color-destructive-foreground: #fff8f2;
+  --color-input: var(--mat-s2);
+  --color-ring: var(--mat-track);
 }
 
 :root {
-  --radius: 0;
-  --background: #111111;
-  --foreground: #fafafa;
-  --card: #1f1f1f;
-  --card-foreground: #fafafa;
-  --popover: #1f1f1f;
-  --popover-foreground: #fafafa;
-  --primary: #cc0000;
-  --primary-foreground: #fafafa;
-  --secondary: #262626;
-  --secondary-foreground: #fafafa;
-  --muted: #262626;
-  --muted-foreground: #a3a3a3;
-  --accent: #262626;
-  --accent-foreground: #fafafa;
-  --destructive: #cc0000;
-  --destructive-foreground: #fafafa;
-  --border: #262626;
-  --input: #262626;
-  --ring: #525252;
+  --radius: 10px;
+  --background: var(--mat-bg);
+  --foreground: var(--mat-ink);
+  --card: var(--mat-s1);
+  --card-foreground: var(--mat-ink);
+  --popover: var(--mat-s3);
+  --popover-foreground: var(--mat-ink);
+  --primary: var(--mat-accent);
+  --primary-foreground: var(--mat-accent-ink);
+  --secondary: var(--mat-s2);
+  --secondary-foreground: var(--mat-ink);
+  --muted: var(--mat-s2);
+  --muted-foreground: var(--mat-muted);
+  --accent: var(--mat-s2);
+  --accent-foreground: var(--mat-ink);
+  --destructive: #c02a1b;
+  --destructive-foreground: #fff8f2;
+  --border: var(--mat-fade);
+  --input: var(--mat-s2);
+  --ring: var(--mat-track);
 }
 
 html,
@@ -89,14 +190,109 @@ body,
 
 body {
   margin: 0;
-  background: var(--color-bg);
-  color: var(--color-ink);
+  background: var(--mat-bg);
+  color: var(--mat-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   color-scheme: dark;
 }
 
+/* ---------- material primitives ---------- */
+
+/* every floating surface: tone + lit edge + ambient shadow */
+.surface {
+  background-color: var(--mat-s1);
+  background-image: var(--mat-sheen);
+  border-radius: var(--radius-xl);
+  box-shadow:
+    inset 0 1px 0 var(--mat-rim),
+    var(--mat-elev-1);
+  backdrop-filter: blur(20px) saturate(120%);
+}
+
+.surface-raised {
+  background-color: var(--mat-s3);
+  background-image: var(--mat-sheen);
+  border-radius: var(--radius-2xl);
+  box-shadow:
+    inset 0 1px 0 var(--mat-rim),
+    var(--mat-elev-3);
+  backdrop-filter: blur(28px) saturate(130%);
+}
+
+/* grouped content: one tone down, recessed */
+.well {
+  background: var(--mat-well);
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 1px 3px var(--mat-inset);
+}
+
+/* the pill: a control that carries its own surface */
+.pill {
+  background-color: var(--mat-s1);
+  background-image: var(--mat-sheen);
+  border-radius: 999px;
+  box-shadow:
+    inset 0 1px 0 var(--mat-rim),
+    var(--mat-elev-1);
+}
+
+.pill-active {
+  background-color: var(--mat-accent-soft);
+  color: var(--mat-accent);
+  box-shadow:
+    inset 0 1px 0 var(--mat-rim),
+    0 0 0 4px var(--mat-halo),
+    var(--mat-elev-1);
+}
+
+/* type scale */
+.micro {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--mat-dim);
+}
+
+.label {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--mat-dim);
+}
+
+/* a separator that fades out at both ends */
+.seam {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--mat-fade), transparent);
+}
+
+.seam-v {
+  width: 1px;
+  background: linear-gradient(180deg, transparent, var(--mat-fade), transparent);
+}
+
+/* slider knob (the visible thumb of the range row) */
+.knob {
+  background: var(--mat-knob);
+  border-radius: 999px;
+  box-shadow:
+    0 2px 6px var(--mat-shadow-a),
+    0 0 0 4px var(--mat-halo);
+}
+
+.track-fill {
+  background: var(--mat-accent);
+  border-radius: 999px;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* native range input: hidden behind the styled track/knob */
 input[type='range'].lutra-range {
   -webkit-appearance: none;
   appearance: none;
@@ -105,49 +301,36 @@ input[type='range'].lutra-range {
   background: transparent;
   cursor: ew-resize;
 }
+
 input[type='range'].lutra-range::-webkit-slider-runnable-track {
   height: 2px;
-  background: var(--color-border-strong);
+  background: transparent;
 }
+
 input[type='range'].lutra-range::-moz-range-track {
   height: 2px;
-  background: var(--color-border-strong);
+  background: transparent;
 }
+
 input[type='range'].lutra-range::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  margin-top: -7px;
-  width: 16px;
-  height: 16px;
-  background: var(--color-accent);
+  width: 0;
+  height: 0;
+  background: transparent;
   border: none;
-  border-radius: 0;
-}
-input[type='range'].lutra-range::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  background: var(--color-accent);
-  border: none;
-  border-radius: 0;
 }
 
-.tnum {
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum';
+input[type='range'].lutra-range::-moz-range-thumb {
+  width: 0;
+  height: 0;
+  background: transparent;
+  border: none;
 }
 
 @media (pointer: coarse) {
   input[type='range'].lutra-range {
     height: 36px;
-  }
-  input[type='range'].lutra-range::-webkit-slider-thumb {
-    width: 24px;
-    height: 24px;
-    margin-top: -11px;
-  }
-  input[type='range'].lutra-range::-moz-range-thumb {
-    width: 24px;
-    height: 24px;
   }
 }
 
@@ -167,9 +350,7 @@ input[type='range'].lutra-range::-moz-range-thumb {
     display: none;
   }
 }
-/*
- ---break---
- */
+
 @theme inline {
   --font-heading: var(--font-heading);
 }

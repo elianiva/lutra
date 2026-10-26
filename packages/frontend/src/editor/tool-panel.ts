@@ -1,8 +1,4 @@
 import { type Html, type HtmlBuilder, createKeyedLazy } from 'foldkit/html'
-import { button } from '@/components/ui/button'
-import { badge } from '@/components/ui/badge'
-import { tooltipContentClass } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
 import { icon } from '../components/icon'
 import { LAYER_UI, LAYER_TYPES_ORDER } from './layer-meta'
 import { EditorMessage } from './message'
@@ -11,34 +7,35 @@ import type { EditorPhase } from './phase'
 import type { LayerType } from '@lutra/engine'
 
 /**
- * The left "Adjustments" panel: a Photoshop-style **icon rail** on desktop
- * (docs/adr/0010-editor-ui.md D3, superseded 2026-08-23) — one icon-only
- * button per tool; hovering (or keyboard-focusing) a card shows a custom
- * tooltip panel carrying the tool's copy ("what it does" / "when to use
- * it"). The open card is the model's `hoveredTool` field — no submodel, no
- * native `title`; the panel renders straight from the view. Below `lg` the
- * panel is still the full-width mobile bottom sheet (docs/adr/0010-editor-ui.md
- * ui), where hover doesn't exist — there each button keeps its label +
- * visible two-line description and the tooltip panel is display:none. A
- * muted ×N badge pins to the button's top-right corner when the tool is
- * already in the chain. The LUT card's tooltip doubles as the catalog status
- * slot (loading / failed) while the library isn't available.
+ * The tool rail (docs/adr/0013-materials). Thirteen icons in a floating
+ * column; hovering (or focusing) one opens a card with its number, name and
+ * the two-line copy — the labels live in the card, not in the rail, so the
+ * rail stays narrow enough to float.
  *
- * `open` is the mobile sheet state: under `lg` the panel renders as a
- * full-width bottom sheet, visible only while its tab is active; the classes
- * flip back to the in-flow side column at `lg`.
+ * Below `lg` the same component renders as the tools sheet: full-width rows
+ * with the icon, the name and the copy, because a touch device has no hover.
+ *
+ * The rail is disabled until an image is loaded and while a draft is open
+ * (the phase machine owns the real gate; this mirrors it so the buttons read
+ * as disabled rather than dead).
  */
-const lazyCard = createKeyedLazy()
+const lazyTool = createKeyedLazy()
 
-const toolCardView = (
+const lutStatus = (
+  catalog: Model['catalog'],
+  catalogError: Model['catalogError'],
+): string | null =>
+  catalog === null ? (catalogError === null ? 'Loading LUTs…' : 'LUTs unavailable') : null
+
+const toolButton = (
   type: LayerType,
   count: number,
-  editable: boolean,
-  lutEnabled: boolean,
-  catalogError: Model['catalogError'],
-  hoveredTool: Model['hoveredTool'],
+  disabled: boolean,
+  hovered: boolean,
+  status: string | null,
+  error: string | null,
   h: HtmlBuilder<EditorMessage>,
-): Html => toolCardInner(h, type, count, editable, lutEnabled, catalogError, hoveredTool)
+): Html => toolButtonImpl(h, type, count, disabled, hovered, status, error)
 
 export const toolPanel = (
   h: HtmlBuilder<EditorMessage>,
@@ -51,167 +48,189 @@ export const toolPanel = (
 ) => {
   const editable = canPickTool(phase)
   const lutEnabled = catalog !== null
+  const status = lutStatus(catalog, catalogError)
+  const error = catalogError === null ? null : catalogError.message
   return h.aside(
     [
       h.Class(
-        `${open ? 'flex' : 'hidden'} order-3 max-h-[45dvh] shrink-0 flex-col overflow-y-auto border-t border-border bg-panel lg:order-none lg:flex lg:max-h-none lg:w-14 lg:overflow-visible lg:border-r lg:border-t-0`,
+        `${open ? 'flex' : 'hidden'} absolute inset-x-0 bottom-[64px] z-30 max-h-[70dvh] w-full flex-col overflow-y-auto rounded-t-[18px] bg-s1 p-2 shadow-[0_-24px_48px_-20px_var(--mat-shadow-a)] lg:static lg:z-auto lg:flex lg:max-h-none lg:w-[52px] lg:flex-none lg:self-center lg:overflow-visible lg:rounded-[18px] lg:bg-transparent lg:p-0 lg:shadow-none`,
       ),
       h.AriaLabel('Adjustment tools'),
     ],
     [
-      h.div(
+      h.nav(
         [
           h.Class(
-            'border-b border-border px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-muted lg:hidden',
+            'surface flex flex-col gap-1 p-1.5 max-lg:gap-0.5 max-lg:rounded-none max-lg:bg-transparent max-lg:p-0 max-lg:shadow-none',
           ),
         ],
-        ['Adjustments'],
-      ),
-      h.nav(
-        [h.Class('flex min-h-0 flex-1 flex-col overflow-y-auto lg:overflow-visible')],
-        LAYER_TYPES_ORDER.map((type) =>
-          lazyCard(type, toolCardView, [
+        LAYER_TYPES_ORDER.flatMap((type, index) => [
+          lazyTool(type, toolButton, [
             type,
             chainCount(chain, type),
-            editable,
-            lutEnabled,
-            catalogError,
-            hoveredTool,
+            !editable || (type === 'lut' && !lutEnabled),
+            hoveredTool === type,
+            type === 'lut' ? status : null,
+            type === 'lut' ? error : null,
             h,
-          ]),
-        ),
+          ])!,
+          // group seams: Look | Light | Color | Film | Optics
+          ...(index === 0 || index === 5 || index === 8 || index === 10
+            ? [h.div([h.Class('seam mx-2 my-1 hidden lg:block')], [])]
+            : []),
+        ]),
       ),
     ],
   )
 }
 
 /** The machine owns the real gate (no SelectedTool edge from Empty/Loading/
- *  Error/Drafting — see ./phase.ts); this mirrors it so the buttons read
- *  as disabled instead of dead. */
-const canPickTool = (phase: EditorPhase) => phase._tag === 'Idle' || phase._tag === 'Selected'
+ *  Error/Drafting — see ./phase.ts); this mirrors it so the buttons read as
+ *  disabled instead of dead. */
+export const canPickTool = (phase: EditorPhase) =>
+  phase._tag === 'Idle' || phase._tag === 'Selected'
 
-/** How many committed chain layers of this type are in the edit — the
- *  card's "in your edit" badge (docs/adr/0010-editor-ui.md D4). */
+/** How many committed layers of this type are in the edit. */
 export const chainCount = (chain: Model['chain'], type: LayerType): number =>
   chain.filter((layer) => layer.type === type).length
 
-const toolCardInner = (
+const toolButtonImpl = (
   h: HtmlBuilder<EditorMessage>,
   type: LayerType,
   count: number,
-  editable: boolean,
-  lutEnabled: boolean,
-  catalogError: Model['catalogError'],
-  hoveredTool: Model['hoveredTool'],
-) => {
+  disabled: boolean,
+  hovered: boolean,
+  status: string | null,
+  error: string | null,
+): Html => {
   const ui = LAYER_UI[type]
-  const disabled = !editable || (type === 'lut' && !lutEnabled)
-  const catalogStatus =
-    type === 'lut' && !lutEnabled
-      ? catalogError === null
-        ? 'Loading LUTs…'
-        : 'LUTs unavailable'
-      : null
-  const hovered = hoveredTool === type
-  // One hover fact per card: entering (pointer or keyboard focus) names the
-  // card; leaving clears it.
-  const show = EditorMessage.HoveredToolChanged({ type })
-  const hide = EditorMessage.HoveredToolChanged({ type: null })
   return h.div(
     [h.Class('relative')],
     [
-      button(
-        {
-          onClick: EditorMessage.SelectedTool({ type }),
-          isDisabled: disabled,
-          variant: 'ghost',
-          className: disabled
-            ? 'flex w-full cursor-not-allowed flex-col gap-1.5 border-b border-border px-4 py-3 text-left opacity-40 transition-colors lg:items-center lg:gap-0 lg:px-0'
-            : 'flex w-full flex-col gap-1.5 border-b border-border px-4 py-3 text-left transition-colors hover:bg-panel-alt lg:items-center lg:gap-0 lg:px-0',
-          attributes: [
-            h.Key(type),
-            h.OnMouseEnter(show),
-            h.OnMouseLeave(hide),
-            h.OnFocus(show),
-            h.OnBlur(hide),
-            h.AriaLabel(`Add ${ui.label} adjustment`),
-          ],
-        },
+      h.button(
         [
-          h.div(
-            [h.Class('flex items-center gap-3 lg:justify-center')],
+          h.Class(
+            `group relative flex w-full items-center gap-3 rounded-[12px] px-4 py-2.5 text-left transition-colors max-lg:flex-col max-lg:items-start max-lg:gap-1 lg:h-[38px] lg:justify-center lg:px-0 lg:py-0 ${
+              disabled
+                ? 'cursor-not-allowed opacity-35'
+                : 'text-muted hover:bg-s2 hover:text-ink lg:hover:bg-s2'
+            }`,
+          ),
+          h.OnClick(EditorMessage.SelectedTool({ type })),
+          ...(disabled ? [h.Disabled(true)] : []),
+          h.OnMouseEnter(EditorMessage.HoveredToolChanged({ type })),
+          h.OnMouseLeave(EditorMessage.HoveredToolChanged({ type: null })),
+          h.OnFocus(EditorMessage.HoveredToolChanged({ type })),
+          h.OnBlur(EditorMessage.HoveredToolChanged({ type: null })),
+          h.AriaLabel(`Add ${ui.label} adjustment`),
+          h.Key(type),
+        ],
+        [
+          h.span(
+            [h.Class('flex items-center gap-3')],
             [
-              icon(h, ui.icon, ui.label),
-              // Label + two-line copy stay visible only in the mobile
-              // bottom sheet; on the desktop rail the tooltip carries them.
-              h.span([h.Class('text-sm font-medium lg:hidden')], [ui.label]),
+              h.span([h.Class('flex w-4 flex-none justify-center')], [icon(h, ui.icon, ui.label)]),
+              h.span([h.Class('flex-1 text-[13px] lg:hidden')], [ui.label]),
             ],
           ),
-          h.div(
-            [h.Class('text-xs leading-4 text-muted lg:hidden')],
-            catalogStatus === null
-              ? [
-                  h.span([h.Class('block')], [ui.description]),
-                  h.span([h.Class('block')], [ui.when]),
-                ]
-              : [catalogStatus],
-          ),
-          // "Already in your edit": a muted ×N pill pinned to the button's
-          // top-right corner — works for both the wide mobile card and the
-          // narrow desktop icon. Only when the tool is in the chain — a
-          // first-time user sees nothing (docs/adr/0010-editor-ui.md D4).
+          ...(status === null
+            ? [
+                h.span(
+                  [h.Class('hidden text-[10px] leading-snug text-dim max-lg:block')],
+                  [ui.description],
+                ),
+                h.span(
+                  [h.Class('hidden text-[10px] leading-snug text-dim max-lg:block')],
+                  [ui.when],
+                ),
+              ]
+            : [
+                h.span(
+                  [h.Class('hidden text-[10px] leading-snug text-dim max-lg:block')],
+                  [status],
+                ),
+              ]),
+          ...(count > 0
+            ? [h.span([h.Class('hidden text-[10px] text-dim max-lg:block')], [`×${String(count)}`])]
+            : []),
+          ...(count > 0
+            ? [h.span([h.Class('max-lg:block hidden text-[10px] text-dim')], [`×${String(count)}`])]
+            : []),
           ...(count > 0
             ? [
-                badge(
-                  {
-                    variant: 'secondary',
-                    className:
-                      'absolute right-1.5 top-1.5 border-border bg-panel text-[10px] leading-none text-muted',
-                    attributes: [
-                      h.AriaLabel(`In your edit: ${count}`),
-                      h.Attribute('data-testid', 'in-edit-badge'),
-                    ],
-                  },
-                  [`×${count}`],
-                  h,
+                h.span(
+                  [
+                    h.Class(
+                      'absolute right-1 top-1 hidden size-1.5 rounded-full bg-accent lg:block',
+                    ),
+                    h.AriaLabel(`In your edit: ${String(count)}`),
+                    h.DataAttribute('testid', 'in-edit-badge'),
+                  ],
+                  [],
                 ),
               ]
             : []),
         ],
-        h,
       ),
-      // The custom tooltip: floats to the right of the rail while this card
-      // is hovered/focused. Hidden below `lg` — touch has no hover, and
-      // there the copy is already printed on the card.
-      ...(hovered
-        ? [
-            h.div(
-              [
-                h.Attribute('data-testid', 'tool-tooltip'),
-                h.Class(
-                  cn(
-                    tooltipContentClass,
-                    'absolute left-full top-0 z-[70] hidden w-56 border border-border bg-panel px-3 py-2 text-xs leading-snug text-muted shadow-lg lg:block',
-                  ),
-                ),
-              ],
-              [
-                h.span([h.Class('block text-sm font-medium text-ink')], [ui.label]),
-                ...(catalogStatus === null
-                  ? [
-                      h.span([h.Class('mt-1 block')], [ui.description]),
-                      h.span([h.Class('mt-1 block')], [ui.when]),
-                    ]
-                  : [
-                      h.span([h.Class('mt-1 block')], [catalogStatus]),
-                      ...(catalogError !== null
-                        ? [h.span([h.Class('mt-1 block')], [catalogError.message])]
-                        : []),
-                    ]),
-              ],
-            ),
-          ]
-        : []),
+      ...(hovered ? [toolCard(h, type, count, status, error)] : []),
     ],
   )
+}
+
+/** The hover card: number, name, what it does, when to reach for it. */
+const toolCard = (
+  h: HtmlBuilder<EditorMessage>,
+  type: LayerType,
+  count: number,
+  status: string | null,
+  error: string | null,
+): Html => {
+  const ui = LAYER_UI[type]
+  const index = LAYER_TYPES_ORDER.indexOf(type) + 1
+  return h.div(
+    [
+      h.Class(
+        'surface pointer-events-none absolute left-full top-0 z-50 ml-3 hidden w-56 p-3 text-left lg:block',
+      ),
+      h.DataAttribute('testid', 'tool-tooltip'),
+    ],
+    [
+      h.div(
+        [h.Class('micro mb-2 flex items-center justify-between gap-2')],
+        [
+          h.span([], [`${String(index).padStart(2, '0')} · ${groupOf(type)}`]),
+          h.span([], [count > 0 ? `${String(count)} in chain` : '']),
+        ],
+      ),
+      h.div([h.Class('mb-1 text-xs text-ink')], [ui.label]),
+      ...(status === null
+        ? [
+            h.p([h.Class('text-[10px] leading-snug text-muted')], [ui.description]),
+            h.p([h.Class('mt-1 text-[10px] leading-snug text-dim')], [ui.when]),
+          ]
+        : [
+            h.p([h.Class('text-[10px] leading-snug text-muted')], [status]),
+            ...(error === null
+              ? []
+              : [h.p([h.Class('mt-1 text-[10px] leading-snug text-dim')], [error])]),
+          ]),
+    ],
+  )
+}
+
+const groupOf = (type: LayerType): string => {
+  const index = LAYER_TYPES_ORDER.indexOf(type)
+  if (index === 0) {
+    return 'Look'
+  }
+  if (index <= 5) {
+    return 'Light'
+  }
+  if (index <= 8) {
+    return 'Color'
+  }
+  if (index <= 10) {
+    return 'Film'
+  }
+  return 'Optics'
 }

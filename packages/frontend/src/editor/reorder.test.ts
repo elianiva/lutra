@@ -1,27 +1,17 @@
 import { describe, it as vitestIt, expect as vitestExpect } from 'vitest'
 import { it } from '@effect/vitest'
-import {
-  Command,
-  click,
-  expect,
-  given,
-  scene,
-  tap,
-  all,
-  role,
-  nth,
-  attr,
-  findAll,
-} from 'foldkit/scene'
+import { Command, Mount, expect, given, role, scene } from 'foldkit/scene'
 import { initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
 import { createLayerFor } from './command'
 import { EditorMessage } from './message'
+import { PanZoom, RegisterCanvas } from './canvas-stage'
 import type { Model } from './model'
 
-import { Arbitrary, Effect, Option, Schema } from 'effect'
-import type { Scene } from 'foldkit/test'
+import { Arbitrary, Effect, Schema } from 'effect'
+import { MockImageBitmap } from '../vitest-setup'
+import { Idle } from './phase'
 
 const layer = (type: Parameters<typeof createLayerFor>[0]) => Effect.runSync(createLayerFor(type))
 
@@ -30,111 +20,74 @@ const modelWith = (types: Parameters<typeof createLayerFor>[0][]) => {
   return {
     ...initialModel(),
     chain,
+    phase: Idle(),
+    source: { bitmap: new MockImageBitmap(200, 150), error: null, height: 150, width: 200 },
   }
+}
+
+/** Select one layer so the inspector shows its position controls. */
+const withSelected = (model: Model, index: number): Model => {
+  const target = model.chain[index]
+  if (target === undefined) {
+    throw new Error('fixture: expected a layer at that index')
+  }
+  return update(model, EditorMessage.SelectedLayer({ id: target.id })).model
 }
 
 const config = { update, view } as const
 
-// The drawer renders the chain bottom-up (newest on top), so the first
-// [data-layer-id] row in the DOM is chain[last].
-const renderedOrder = (s: Scene.SceneSimulation<unknown, unknown, unknown>) =>
-  findAll(s.html, '[data-layer-id]')
-    .map((r) => attr(r, 'data-layer-id'))
-    .map((o): string => o.pipe(Option.getOrElse(() => '')))
+const stageMounts = [
+  Mount.resolve(PanZoom, EditorMessage.ScaledCanvas({ offsetX: 0, offsetY: 0, scale: 1 })),
+  Mount.resolve(RegisterCanvas, EditorMessage.CanvasRegistered()),
+]
 
-describe('layer reorder buttons', () => {
-  vitestIt('shows Move up enabled only on rows below the top of the stack', () => {
+const ids = (model: Model) => model.chain.map((l) => l.id)
+
+/**
+ * The inspector's position row is the only reorder surface now (the dock
+ * selects, the inspector moves). "Move up" means earlier in the chain —
+ * toward index 0 — because that is what the dock shows left to right.
+ */
+describe('layer reorder controls', () => {
+  vitestIt('the first layer cannot move earlier; the last cannot move later', () => {
     const model = modelWith(['exposure', 'contrast', 'saturation'])
     scene(
       config,
-      given(model),
-      // rendered: saturation (top), contrast, exposure (bottom)
-      tap((s) => {
-        vitestExpect(renderedOrder(s)).toEqual(model.chain.map((l) => l.id).reverse())
-      }),
-      expect(nth(all.role('button', { name: 'Move up' }), 0)).toBeDisabled(),
-      expect(nth(all.role('button', { name: 'Move up' }), 1)).toBeEnabled(),
-      expect(nth(all.role('button', { name: 'Move up' }), 2)).toBeEnabled(),
-      expect(nth(all.role('button', { name: 'Move down' }), 0)).toBeEnabled(),
-      expect(nth(all.role('button', { name: 'Move down' }), 1)).toBeEnabled(),
-      expect(nth(all.role('button', { name: 'Move down' }), 2)).toBeDisabled(),
+      given(withSelected(model, 0)),
+      ...stageMounts,
+      expect(role('button', { name: 'Move up' })).toBeDisabled(),
+      expect(role('button', { name: 'Move down' })).toBeEnabled(),
+      Command.expectNone(),
+    )
+    scene(
+      config,
+      given(withSelected(model, 2)),
+      ...stageMounts,
+      expect(role('button', { name: 'Move up' })).toBeEnabled(),
+      expect(role('button', { name: 'Move down' })).toBeDisabled(),
       Command.expectNone(),
     )
   })
 
-  vitestIt('clicking Move up on the middle row moves it up', () => {
+  vitestIt('Move up and Move down swap the layer with its neighbour', () => {
     const model = modelWith(['exposure', 'contrast', 'saturation'])
-    const ids = model.chain.map((l) => l.id)
-    scene(
-      config,
-      given(model),
-      // "Move up" on the middle row (contrast)
-      click(nth(all.role('button', { name: 'Move up' }), 1)),
-      tap((s) => {
-        // contrast moved to the top: contrast, saturation, exposure
-        vitestExpect(renderedOrder(s)).toEqual([ids[1], ids[2], ids[0]])
-      }),
-      Command.expectNone(),
-    )
-  })
-
-  vitestIt('clicking Move down on the middle row moves it down', () => {
-    const model = modelWith(['exposure', 'contrast', 'saturation'])
-    const ids = model.chain.map((l) => l.id)
-    scene(
-      config,
-      given(model),
-      // "Move down" on the middle row (contrast)
-      click(nth(all.role('button', { name: 'Move down' }), 1)),
-      tap((s) => {
-        // contrast moved to the bottom: saturation, exposure, contrast
-        vitestExpect(renderedOrder(s)).toEqual([ids[2], ids[0], ids[1]])
-      }),
-      Command.expectNone(),
-    )
-  })
-
-  vitestIt('clicking Move down on the top row moves it down', () => {
-    const model = modelWith(['exposure', 'contrast', 'saturation'])
-    const ids = model.chain.map((l) => l.id)
-    scene(
-      config,
-      given(model),
-      // "Move down" on the top row (saturation)
-      click(role('button', { name: 'Move down' })),
-      tap((s) => {
-        // saturation moved below contrast: contrast, saturation, exposure
-        vitestExpect(renderedOrder(s)).toEqual([ids[1], ids[2], ids[0]])
-      }),
-      Command.expectNone(),
-    )
-  })
-
-  vitestIt('clicking Move up on the bottom row moves it up', () => {
-    const model = modelWith(['exposure', 'contrast', 'saturation'])
-    const ids = model.chain.map((l) => l.id)
-    scene(
-      config,
-      given(model),
-      // "Move up" on the bottom row (exposure)
-      click(nth(all.role('button', { name: 'Move up' }), 2)),
-      tap((s) => {
-        // exposure moved above contrast: saturation, exposure, contrast
-        vitestExpect(renderedOrder(s)).toEqual([ids[2], ids[0], ids[1]])
-      }),
-      Command.expectNone(),
-    )
+    const order = ids(model)
+    const earlier = update(
+      withSelected(model, 1),
+      EditorMessage.ReorderedLayer({ from: 1, to: 0 }),
+    ).model
+    vitestExpect(ids(earlier)).toEqual([order[1], order[0], order[2]])
+    const later = update(
+      withSelected(model, 1),
+      EditorMessage.ReorderedLayer({ from: 1, to: 2 }),
+    ).model
+    vitestExpect(ids(later)).toEqual([order[0], order[2], order[1]])
   })
 })
 
-// The buttons dispatch EditorMessage.ReorderedLayer({ from: chainIndex, to: chainIndex ± 1 })
-// — "Move up" targets a higher chain index (the drawer renders bottom-up, so
-// that is visually up), "Move down" a lower one. In rendered (top→bottom)
-// order each click is an adjacent swap. This pins the splice semantics
-// against a reference model for any chain and any click sequence.
-
 // Property tests derive their inputs from Effect Schemas and generate through
 // Effect's `Arbitrary` (docs/adr/0012-property-testing).
+
 const LayerType = Schema.Literals([
   'exposure',
   'contrast',
@@ -143,53 +96,47 @@ const LayerType = Schema.Literals([
   'grain',
   'clarity',
 ])
-const Click = Schema.Struct({
+const Move = Schema.Struct({
   dir: Schema.Literals(['up', 'down']),
-  row: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 7 })),
+  index: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 6 })),
 })
 
 describe('layer reorder semantics (property-based)', () => {
   it.prop(
-    'any click sequence swaps adjacent rows and keeps the chain a permutation',
+    'any sequence of adjacent moves keeps the chain a permutation and swaps only neighbours',
     {
       types: Arbitrary.array(Arbitrary.schema(LayerType), { maxLength: 6, minLength: 1 }),
-      clicks: Arbitrary.array(Arbitrary.schema(Click), { maxLength: 12, minLength: 0 }),
+      moves: Arbitrary.array(Arbitrary.schema(Move), { maxLength: 12, minLength: 0 }),
     },
-    ({ types, clicks }) => {
+    ({ types, moves }) => {
       let model: Model = modelWith(types)
-      const original = model.chain.map((l) => l.id)
-      // The rendered order (top→bottom) the drawer shows: chain reversed.
-      const rendered = [...original].reverse()
+      const original = ids(model)
 
-      for (const click of clicks) {
-        const n = rendered.length
-        // A click on a row that does not exist (the drawer has fewer rows
-        // than the generated index) is not a dispatch at all.
-        if (click.row < 0 || click.row >= n) {
+      for (const move of moves) {
+        const chain = ids(model)
+        const target = move.index
+        if (target < 0 || target >= chain.length) {
           continue
         }
-        const chainIndex = n - 1 - click.row
-        // "Move up" needs a row above (rendered row > 0); "Move down" a
-        // row below. The buttons are disabled otherwise, so the click never
-        // dispatches.
-        const legalUp = click.dir === 'up' && click.row > 0
-        const legalDown = click.dir === 'down' && click.row < n - 1
-        if (!legalUp && !legalDown) {
+        const to = move.dir === 'up' ? target - 1 : target + 1
+        // The buttons are disabled at the ends, so such a click never lands.
+        if (to < 0 || to >= chain.length) {
           continue
         }
 
-        // Reference model: the adjacent swap in rendered order.
-        const neighbor = click.dir === 'up' ? click.row - 1 : click.row + 1
-        ;[rendered[click.row], rendered[neighbor]] = [rendered[neighbor]!, rendered[click.row]!]
+        const before = [...chain]
+        model = update(model, EditorMessage.ReorderedLayer({ from: target, to })).model
+        const after = ids(model)
 
-        // The real update path.
-        const to = click.dir === 'up' ? chainIndex + 1 : chainIndex - 1
-        model = update(model, EditorMessage.ReorderedLayer({ from: chainIndex, to })).model
-
-        vitestExpect(model.chain.map((l) => l.id).reverse()).toEqual(rendered)
-        // The chain is always a permutation of the original layers.
-        vitestExpect(model.chain.map((l) => l.id).sort()).toEqual([...original].sort())
-        vitestExpect(new Set(model.chain.map((l) => l.id)).size).toBe(model.chain.length)
+        // Adjacent swap, everything else untouched.
+        vitestExpect(after[to]).toBe(before[target])
+        vitestExpect(after[target]).toBe(before[to])
+        vitestExpect(after.filter((_, i) => i !== to && i !== target)).toEqual(
+          before.filter((_, i) => i !== to && i !== target),
+        )
+        // Always a permutation of the original layers.
+        vitestExpect([...after].sort()).toEqual([...original].sort())
+        vitestExpect(new Set(after).size).toBe(after.length)
       }
     },
   )

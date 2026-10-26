@@ -60,42 +60,42 @@ const notice = (message: string | null, h: HtmlBuilder<GalleryMessage>) =>
 
 const header = (h: HtmlBuilder<GalleryMessage>) =>
   h.header(
-    [h.Class('flex items-center justify-between border-b border-border bg-panel px-4 py-2')],
+    [h.Class('flex h-16 flex-none items-center gap-6')],
     [
-      h.h1([h.Class('text-sm font-semibold tracking-[0.3em] text-accent')], ['LUTRA']),
+      h.h1([h.Class('text-xs font-semibold tracking-[0.34em] text-accent')], ['LUTRA']),
       h.div(
-        [h.Class('flex items-center gap-2')],
+        [h.Class('ml-auto flex items-center gap-2')],
         [
-          button(
-            {
-              onClick: GalleryMessage.OpenPhotoRequested(),
-              variant: 'outline',
-              size: 'xs',
-              className: 'border-accent text-accent hover:border-ink hover:text-ink',
-              attributes: [h.AriaLabel('Open a photo to start a new edit')],
-            },
-            'Open photo',
-            h,
+          h.button(
+            [
+              h.Class(
+                'flex h-10 items-center gap-2 rounded-full bg-accent px-4 text-[10px] uppercase tracking-[0.1em] text-accent-ink shadow-[0_4px_14px_var(--mat-halo)] hover:brightness-110',
+              ),
+              h.OnClick(GalleryMessage.OpenPhotoRequested()),
+              h.AriaLabel('Open a photo to start a new edit'),
+            ],
+            ['Open photo'],
           ),
-          button(
-            {
-              onClick: GalleryMessage.RefreshRequested(),
-              variant: 'ghost',
-              size: 'xs',
-              attributes: [h.AriaLabel('Refresh')],
-            },
-            'Refresh',
-            h,
+          h.button(
+            [
+              h.Class(
+                'flex h-10 items-center rounded-full px-3 text-[10px] uppercase tracking-[0.1em] text-muted hover:bg-s1 hover:text-ink',
+              ),
+              h.OnClick(GalleryMessage.RefreshRequested()),
+              h.AriaLabel('Refresh'),
+            ],
+            ['Refresh'],
           ),
-          button(
-            {
-              onClick: GalleryMessage.SettingsRequested(),
-              variant: 'ghost',
-              size: 'xs',
-              attributes: [h.AriaLabel('Open settings'), h.DataAttribute('open-settings', 'true')],
-            },
-            'Settings',
-            h,
+          h.button(
+            [
+              h.Class(
+                'flex h-10 items-center rounded-full px-3 text-[10px] uppercase tracking-[0.1em] text-muted hover:bg-s1 hover:text-ink',
+              ),
+              h.OnClick(GalleryMessage.SettingsRequested()),
+              h.AriaLabel('Open settings'),
+              h.DataAttribute('open-settings', 'true'),
+            ],
+            ['Settings'],
           ),
         ],
       ),
@@ -145,29 +145,26 @@ const dropOverlay = (h: HtmlBuilder<GalleryMessage>, active: boolean): Html =>
 const emptyState = (h: HtmlBuilder<GalleryMessage>) =>
   h.div(
     [
-      h.Class('flex flex-1 flex-col items-center justify-center gap-3 text-sm text-muted'),
+      h.Class('flex flex-1 flex-col items-center justify-center gap-4 text-xs text-muted'),
       h.DataAttribute('empty-state', 'true'),
     ],
     [
-      h.p([], ['No saved edits yet.']),
       h.div(
-        [h.Class('flex flex-wrap items-center justify-center gap-2')],
+        [h.Class('well flex w-[min(420px,100%)] flex-col items-center gap-3 p-6 text-center')],
         [
-          button(
-            {
-              onClick: GalleryMessage.OpenPhotoRequested(),
-              size: 'sm',
-              attributes: [h.AriaLabel('Open a photo to start a new edit')],
-            },
-            'Open a photo to start editing',
-            h,
+          h.p([h.Class('text-sm text-ink')], ['No saved edits yet.']),
+          h.button(
+            [
+              h.Class(
+                'flex h-9 items-center rounded-full bg-accent px-4 text-[10px] uppercase tracking-[0.1em] text-accent-ink shadow-[0_4px_14px_var(--mat-halo)] hover:brightness-110',
+              ),
+              h.OnClick(GalleryMessage.OpenPhotoRequested()),
+              h.AriaLabel('Open a photo to start a new edit'),
+            ],
+            ['Open a photo to start editing'],
           ),
-          h.span([h.Class('text-xs text-muted')], ['or drop images here']),
+          h.p([h.Class('text-[10px] text-dim')], ['Or drop images here. Paste also works.']),
         ],
-      ),
-      h.p(
-        [h.Class('text-xs text-muted')],
-        ['Paste (⌘V / Ctrl+V) also works. Your edits will appear here.'],
       ),
     ],
   )
@@ -198,7 +195,11 @@ const hoverReveal = 'opacity-0 group-hover:opacity-100 group-has-focus-visible:o
 
 const gridTiles = (h: HtmlBuilder<GalleryMessage>, summaries: readonly EditSummary[]) =>
   h.div(
-    [h.Class('grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4 p-4')],
+    [
+      h.Class(
+        'grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-5 pb-2 pt-2 max-sm:grid-cols-2',
+      ),
+    ],
     summaries.map((summary) => lazyTile(summary.id, tileView, [summary, h])!),
   )
 
@@ -210,7 +211,7 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) =>
       h.Key(summary.id),
       h.DataAttribute('edit-id', summary.id),
       h.Class(
-        'group relative aspect-square overflow-hidden rounded border border-border bg-panel hover:border-muted',
+        'surface group relative aspect-square overflow-hidden transition-shadow hover:shadow-[inset_0_1px_0_var(--mat-rim),0_18px_40px_-18px_var(--mat-shadow-a)]',
       ),
     ],
     [
@@ -231,12 +232,12 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) =>
       h.div(
         [
           h.Class(
-            `absolute bottom-0 left-0 right-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent px-2 py-1 ${hoverReveal}`,
+            `absolute bottom-0 left-0 right-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent px-3 py-2 ${hoverReveal}`,
           ),
         ],
         [
           h.span(
-            [h.Class('text-[10px] text-white/80')],
+            [h.Class('text-[10px] tracking-[0.08em] text-white/85')],
             [
               summary.savedAt > 0
                 ? DateTime.formatLocal({ dateStyle: 'short' })(DateTime.makeUnsafe(summary.savedAt))

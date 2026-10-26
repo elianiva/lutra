@@ -6,6 +6,7 @@ import {
   change,
   click,
   expect,
+  inside,
   given,
   role,
   scene,
@@ -126,13 +127,13 @@ describe('Export dialog', () => {
       ...openDialog,
       Command.resolve(SnapshotForExport, EditorMessage.ExportSnapshotted()),
       // PNG and 100% are the persisted defaults; their cells are filled.
-      expect(text('PNG')).toHaveClass('bg-accent'),
-      expect(text('100%')).toHaveClass('bg-accent'),
-      expect(text('JPEG')).not.toHaveClass('bg-accent'),
-      expect(text('50%')).not.toHaveClass('bg-accent'),
+      inside(role('dialog'), expect(text('PNG')).toHaveClass('bg-accent')),
+      inside(role('dialog'), expect(text('100%')).toHaveClass('bg-accent')),
+      inside(role('dialog'), expect(text('JPEG')).not.toHaveClass('bg-accent')),
+      inside(role('dialog'), expect(text('50%')).not.toHaveClass('bg-accent')),
       // The pressed state is exposed to assistive tech.
-      expect(text('PNG')).toHaveAttr('aria-pressed', 'true'),
-      expect(text('JPEG')).toHaveAttr('aria-pressed', 'false'),
+      inside(role('dialog'), expect(text('PNG')).toHaveAttr('aria-pressed', 'true')),
+      inside(role('dialog'), expect(text('JPEG')).toHaveAttr('aria-pressed', 'false')),
 
       // Switching moves the fill along with the selection.
       click(text('JPEG')),

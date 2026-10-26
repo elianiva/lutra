@@ -22,7 +22,6 @@ import { EditorMessage } from './message'
 import { PanZoom, RegisterCanvas } from './canvas-stage'
 import { CreateLayer, RenderChain, ReadHistogram } from './command'
 import type { Catalog } from './message'
-import type { Model } from './model'
 
 const lutPrint = LutId('luts/print/kodak_2393_cuspclip.cube')
 
@@ -54,11 +53,6 @@ const loaded = () => ({
   phase: Idle(),
   source: { bitmap: new MockImageBitmap(200, 150), error: null, height: 150, width: 200 },
 })
-
-/** Settle the in-flight render the way RenderedFrame does, so the next
- *  renderNow dispatches a fresh RenderChain (assertable in tests). */
-const settled = (model: Model): Model =>
-  update(model, EditorMessage.RenderedFrame({ handle: stubHandle(), stamp: model.revision })).model
 
 // update flow (docs/adr/0010-editor-ui.md)
 
@@ -166,27 +160,25 @@ const resolveRender = () => [
 ]
 
 describe('mobile tab bar view', () => {
-  it('renders the Adjustments and Layers tabs; no LUT tab without a target', () => {
+  it('renders the Adjustments, Inspector and Add tabs', () => {
     scene(
       sceneConfig,
       given(loaded()),
       ...stageMounts,
       sceneExpect(role('button', { name: 'Adjustments' })).toExist(),
-      sceneExpect(role('button', { name: 'Layers' })).toExist(),
-      sceneExpect(role('button', { name: 'LUT' })).toBeAbsent(),
+      sceneExpect(role('button', { name: 'Inspector' })).toExist(),
+      sceneExpect(role('button', { name: 'Add' })).toExist(),
       Command.expectNone(),
     )
   })
 
-  it('the LUT tab appears only while a LUT target exists and reflects the bar', () => {
-    const lutDraft = settled(selectTool(loaded(), 'lut').model)
+  it('the Inspector tab is the palette-free way into the selected layer', () => {
+    const { model } = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
     scene(
       sceneConfig,
-      given(lutDraft),
+      given(model),
       ...stageMounts,
-      sceneExpect(role('button', { name: 'LUT' })).toExist(),
-      // The bar auto-opens with a LUT draft, so the tab reads pressed.
-      sceneExpect(role('button', { name: 'LUT' })).toHaveAttr('aria-pressed', 'true'),
+      sceneExpect(role('button', { name: 'Inspector' })).toHaveAttr('aria-pressed', 'true'),
       Command.expectNone(),
     )
   })
@@ -204,7 +196,7 @@ describe('mobile tab bar view', () => {
     )
   })
 
-  it('picking a tool from the sheet flips it to Layers (the draft sliders)', () => {
+  it('picking a tool from the sheet flips it to the Inspector (the draft sliders)', () => {
     scene(
       sceneConfig,
       given(loaded()),
@@ -217,7 +209,7 @@ describe('mobile tab bar view', () => {
       ),
       ...resolveRender(),
       sceneExpect(role('button', { name: 'Adjustments' })).toHaveAttr('aria-pressed', 'false'),
-      sceneExpect(role('button', { name: 'Layers' })).toHaveAttr('aria-pressed', 'true'),
+      sceneExpect(role('button', { name: 'Inspector' })).toHaveAttr('aria-pressed', 'true'),
       // The draft row with its sliders is in the Layers sheet.
       sceneExpect(label('Exposure draft')).toExist(),
       Command.expectNone(),

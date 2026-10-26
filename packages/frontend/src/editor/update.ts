@@ -15,6 +15,7 @@ import {
   PresentFrame,
   ReadHistogram,
   SaveEdit,
+  SetTheme,
 } from './command'
 import { editorMachine } from './phase'
 import { LAYER_UI } from '../editor/layer-meta'
@@ -164,7 +165,7 @@ const generateThumbCommands = (
   model: Model,
 ): readonly Command.Command<EditorMessage, never, LutStore | LutThumbnailer>[] => {
   const { bitmap } = model.source
-  if (!model.lutBarOpen || !bitmap || !model.catalog) {
+  if (!bitmap || !model.catalog || Option.isNone(lutTarget(model.phase, model.chain))) {
     return []
   }
   return pipe(
@@ -222,6 +223,17 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       ToggledMobileSheet: ({ sheet }) => ({
         model: { ...model, mobileSheet: model.mobileSheet === sheet ? null : sheet, phase },
       }),
+
+      ToggledMode: () => {
+        const mode = model.mode === 'dark' ? 'light' : 'dark'
+        return { model: { ...model, mode, phase }, commands: [SetTheme({ mode })] }
+      },
+      ThemeApplied: () => ({ model }),
+
+      ToggledPalette: () => ({
+        model: { ...model, paletteOpen: !model.paletteOpen, paletteQuery: '', phase },
+      }),
+      ChangedPaletteQuery: ({ query }) => ({ model: { ...model, paletteQuery: query, phase } }),
 
       CanvasRegistered: () =>
         // The canvas is registered from a forked mount fiber, so the render a
@@ -369,7 +381,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           layerCreationError: null,
           activeFieldIndex: {},
           activeMixerColor: {},
-          lutBarOpen: false,
           previewLut: null,
           compareSplitAt: 0.5,
           mobileSheet: null,
@@ -437,8 +448,9 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           model: {
             ...model,
             layerCreationError: null,
-            lutBarOpen: false,
             mobileSheet: 'layers',
+            paletteOpen: false,
+            paletteQuery: '',
             phase,
             previewLut: null,
           },
@@ -464,7 +476,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           }
           next = {
             ...next,
-            lutBarOpen: true,
             phase: { ...phase, layer: { ...layer, lutId: catalog[0]!.lut_file } },
           }
         }
@@ -488,7 +499,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         return renderNow({
           ...model,
           chain: [...model.chain, from.layer],
-          lutBarOpen: false,
           phase,
           previewLut: null,
         })
@@ -503,7 +513,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           ...model,
           activeFieldIndex: restIndex,
           activeMixerColor: restMixer,
-          lutBarOpen: false,
           phase,
           previewLut: null,
         })
@@ -525,20 +534,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           commands: [...commands, SaveLutRecents({ recents: next.lutRecents })],
         }
       },
-      ToggledLutPicker: () => {
-        if (Option.isNone(lutTarget(model.phase, model.chain))) {
-          return { model }
-        }
-        const open = !model.lutBarOpen
-        const next = {
-          ...model,
-          lutBarOpen: open,
-          phase,
-          previewLut: open ? model.previewLut : null,
-        }
-        return { model: next, commands: open ? generateThumbCommands(next) : [] }
-      },
-
       PreviewedLut: ({ lutId }) => {
         if (!model.source.bitmap) {
           return { model }

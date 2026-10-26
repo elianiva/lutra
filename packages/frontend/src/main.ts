@@ -18,6 +18,7 @@ import { LutStoreLive } from './luts/store'
 import { ImageEncoderWorkerLive } from './encode/worker-layer'
 import { LutThumbnailerLive } from './thumbs/worker-layer'
 import { OfflineFillLive } from './offline/fill'
+import { applyMode, readMode } from './theme'
 
 /**
  * The root application (docs/adr/0006-frontend-architecture): a root Submodel orchestrating the
@@ -33,6 +34,10 @@ import { OfflineFillLive } from './offline/fill'
  * the resource Layer builds at boot even on a GPU-less device.
  */
 const capability = await Effect.runPromise(detectWebGpu)
+
+// Paint the stored appearance before the first render (docs/adr/0013-materials):
+// the app must never flash the wrong mode on boot.
+applyMode(readMode())
 
 export const application = Runtime.makeApplication({
   Model,

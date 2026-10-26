@@ -26,10 +26,23 @@ import {
   ThumbnailEncodeError,
 } from '../errors'
 import { EditorMessage, PresentState } from './message'
+import { type Mode, persistMode } from '../theme'
 import { ENGINE_REGISTRY } from '../editor/layer-meta'
 import { toPreviewBitmap } from '../gpu/preview'
 
 export const createLayerFor = (type: LayerType) => createLayer(type, ENGINE_REGISTRY)
+
+/**
+ * Paint the appearance mode on the document root and remember it
+ * (docs/adr/0013-materials). A command, not an update side effect: the write
+ * is a DOM/storage effect, and `update` stays pure.
+ */
+export const SetTheme = Command.define('SetTheme', {
+  args: { mode: Schema.Literals(['dark', 'light']) },
+  execute: ({ mode }: { mode: Mode }) =>
+    persistMode(mode).pipe(Effect.as(EditorMessage.ThemeApplied())),
+  messages: [EditorMessage.ThemeApplied],
+})
 
 /**
  * Assemble a draft layer outside the synchronous phase transition. A schema

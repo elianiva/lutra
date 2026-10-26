@@ -15,3 +15,4 @@ Durable architectural context only — what we decided, why, and what it constra
 | 0010 | [Editor & gallery UI conventions](0010-editor-ui.md)   | Compare presentation rule, tool panel, destructive actions, multi-select, responsive/touch |
 | 0011 | [Depth of field](0011-depth-of-field.md)               | Focal-plane depth blur layer — focal-plane model, layer shape                              |
 | 0012 | [Property testing](0012-property-testing.md)           | Effect `Arbitrary` derivation, schema-owned bounds, generation budgets                     |
+| 0013 | [Materials](0013-materials.md)                         | Borderless surface system, dark + light tokens, editor shell, spacing scale                |

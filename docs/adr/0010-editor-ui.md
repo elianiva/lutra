@@ -1,5 +1,7 @@
 # Editor & gallery UI conventions
 
+> The shell described here — tool panel, layer drawer, LUT bar, three fixed columns — is superseded by [Materials](0013-materials.md). The compare, draft, destructive-action, multi-select and responsive rules below still apply.
+
 ## Compare presents without re-rendering
 
 Presentation state (compare mode, split position) lives in the model and dispatches blit-only presents — never a chain re-render. Re-rendering per divider tick wastes GPU work on large images and animates grain mid-drag. Side-by-side widens the single canvas to 2× the image width (a session rebuild, still blit-only) so both halves show native resolution.

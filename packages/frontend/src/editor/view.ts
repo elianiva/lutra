@@ -1,47 +1,43 @@
-import { Option } from 'effect'
-import { Submodel } from 'foldkit'
 import { type Html, type HtmlBuilder, createLazy } from 'foldkit/html'
-import { Boxes, Layers as LayersIcon, SlidersHorizontal } from 'lucide'
+import { Layers as LayersIcon, Plus, SlidersHorizontal } from 'lucide'
 import type { IconNode } from 'lucide'
-import { button } from '@/components/ui/button'
+import { Submodel } from 'foldkit'
 import { hasImage } from './phase'
 import type { Model } from './model'
 import { topBar } from './top-bar'
 import { toolPanel } from './tool-panel'
 import { layerDrawer } from './layer-drawer'
 import { canvasStage } from './canvas-stage'
-import type { CanvasStageModel } from './canvas-stage'
-import { lutBar } from './lut-bar'
-import { lutTarget } from './lut-bar/target'
+import { chainDock } from './chain-dock'
+import { palette } from './palette'
+import { statusBand } from './status-band'
 import * as ExportDialog from '../export-dialog'
 import { EditorMessage } from './message'
 import { icon } from '../components/icon'
 
 // lazy islands (ADR 0006)
-// Editor has ~28 Model fields but only a handful change per message.
-// Each island is memoized by its slice's reference (editor uses `modifyFields`,
-// so unchanged keys keep ===). This keeps a slider drag at ~16ms instead
-// of rebuilding the LUT bar's ~300-thumb catalog grouping on every tick.
+// Each island is memoized by the slice references it reads (editor uses
+// `modifyFields`, so unchanged keys keep ===). A slider drag re-renders the
+// inspector and the stage, not the rail's thirteen buttons or the dock.
 const lazyTopBar = createLazy()
-const lazyToolPanel = createLazy()
-const lazyCanvasStage = createLazy()
-const lazyLayerDrawer = createLazy()
-const lazyLutBar = createLazy()
+const lazyRail = createLazy()
+const lazyStage = createLazy()
+const lazyDock = createLazy()
+const lazyStatus = createLazy()
+const lazyInspector = createLazy()
+const lazyPalette = createLazy()
 const lazyMobileTabBar = createLazy()
 const lazyExportDialog = createLazy()
 
-// Module-scope view helpers — stable fn refs for lazy (ADR 0006).
-// Each helper takes only the slice refs the island actually reads, so a
-// `ScaledCanvas` burst (scale/offset) doesn't invalidate `toolPanel` which
-// only cares about chain/catalog/phase.
 const topBarView = (
   saveStatus: Model['saveStatus'],
   attachedEdit: Model['attachedEdit'],
-  hasImage: boolean,
+  mode: Model['mode'],
+  imageLoaded: boolean,
   h: HtmlBuilder<EditorMessage>,
-): Html => topBar(h, saveStatus, attachedEdit, hasImage)
+): Html => topBar(h, saveStatus, attachedEdit, mode, imageLoaded)
 
-const toolPanelView = (
+const railView = (
   chain: Model['chain'],
   catalog: Model['catalog'],
   catalogError: Model['catalogError'],
@@ -51,51 +47,51 @@ const toolPanelView = (
   h: HtmlBuilder<EditorMessage>,
 ): Html => toolPanel(h, chain, catalog, catalogError, phase, hoveredTool, toolsOpen)
 
-const canvasStageView = (
+const stageView = (
   source: Model['source'],
   scale: number,
   offsetX: number,
   offsetY: number,
   compareMode: Model['compareMode'],
   compareSplitAt: number,
-  compareToggleBefore: boolean,
-  bins: Model['bins'],
   phase: Model['phase'],
+  chain: Model['chain'],
+  catalog: Model['catalog'],
   h: HtmlBuilder<EditorMessage>,
-): Html => {
-  const slice: CanvasStageModel = {
+): Html =>
+  canvasStage(h, {
     source,
     scale,
     offsetX,
     offsetY,
     compareMode,
     compareSplitAt,
-    compareToggleBefore,
-    bins,
     phase,
-  }
-  return canvasStage(h, slice)
-}
+    chain,
+    catalog,
+  })
 
-const layerDrawerView = (
+const dockView = (
   chain: Model['chain'],
   phase: Model['phase'],
+  catalog: Model['catalog'],
+  h: HtmlBuilder<EditorMessage>,
+): Html => chainDock(h, { chain, phase, catalog })
+
+const statusView = (
+  bins: Model['bins'],
+  scale: number,
+  compareMode: Model['compareMode'],
+  phase: Model['phase'],
+  h: HtmlBuilder<EditorMessage>,
+): Html => statusBand(h, { bins, scale, compareMode, phase })
+
+const inspectorView = (
+  chain: Model['chain'],
+  phase: Model['phase'],
+  catalog: Model['catalog'],
   activeFieldIndex: Model['activeFieldIndex'],
   activeMixerColor: Model['activeMixerColor'],
-  lutBarOpen: boolean,
-  catalog: Model['catalog'],
-  layersOpen: boolean,
-  h: HtmlBuilder<EditorMessage>,
-): Html =>
-  layerDrawer(
-    h,
-    { chain, phase, activeFieldIndex, activeMixerColor, lutBarOpen, catalog },
-    layersOpen,
-  )
-
-const lutBarView = (
-  catalog: Model['catalog'],
-  lutBarOpen: boolean,
   previewLut: Model['previewLut'],
   lutTab: Model['lutTab'],
   lutRecents: Model['lutRecents'],
@@ -103,54 +99,62 @@ const lutBarView = (
   lutDownloads: Model['lutDownloads'],
   online: boolean,
   offlineLutNotice: Model['offlineLutNotice'],
-  phase: Model['phase'],
-  chain: Model['chain'],
+  layersOpen: boolean,
   h: HtmlBuilder<EditorMessage>,
-): Html | null =>
-  lutBar(h, {
-    catalog,
-    lutBarOpen,
-    previewLut,
-    lutTab,
-    lutRecents,
-    lutThumbs,
-    lutDownloads,
-    online,
-    offlineLutNotice,
-    phase,
-    chain,
-  })
+): Html =>
+  layerDrawer(
+    h,
+    {
+      chain,
+      phase,
+      catalog,
+      activeFieldIndex,
+      activeMixerColor,
+      previewLut,
+      lutTab,
+      lutRecents,
+      lutThumbs,
+      lutDownloads,
+      online,
+      offlineLutNotice,
+    },
+    layersOpen,
+  )
 
-const mobileTabBarView = (
-  mobileSheet: Model['mobileSheet'],
-  lutBarOpen: boolean,
-  hasLutTarget: boolean,
+const paletteView = (
+  paletteOpen: boolean,
+  paletteQuery: string,
+  chain: Model['chain'],
+  catalog: Model['catalog'],
+  catalogError: Model['catalogError'],
+  phase: Model['phase'],
   h: HtmlBuilder<EditorMessage>,
-): Html => mobileTabBarImpl(mobileSheet, lutBarOpen, hasLutTarget, h)
+): Html => palette(h, { paletteOpen, paletteQuery, chain, catalog, catalogError, phase }) ?? h.empty
+
 const exportDialogView = (dialog: Model['exportDialog'], h: HtmlBuilder<EditorMessage>): Html =>
   ExportDialog.exportDialogView(h, dialog, (message) =>
     EditorMessage.GotExportDialogMessage({ message }),
   )
 
 /**
- * The Editor submodel's view (docs/adr/0006-frontend-architecture). Branded via `defineView` so it
- * embeds under the root through `h.submodel`, and its `h` is typed to the
- * Editor's own Message union — every handler this view builds dispatches
- * through the Editor boundary (wrapped up as `GotEditorMessage` by the root).
+ * The Editor submodel's view (docs/adr/0013-materials). A shell of three
+ * floating regions — the tool rail, the print column (stage, chain dock,
+ * status band), and the inspector — plus two overlays: the palette and the
+ * export dialog. No region is drawn with a border; tone, rim light and shadow
+ * separate them.
  */
 export const view = Submodel.defineView<Model, EditorMessage>((model, h) => layout(h, model))
 
 const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
   const imageLoaded = hasImage(model.phase)
-  const hasLutTarget = Option.isSome(lutTarget(model.phase, model.chain))
   return h.div(
-    [h.Class('flex h-full flex-col bg-bg text-ink')],
+    [h.Class('relative flex h-full flex-col bg-bg px-6 pb-6 text-ink max-lg:px-3 max-lg:pb-3')],
     [
-      lazyTopBar(topBarView, [model.saveStatus, model.attachedEdit, imageLoaded, h]),
+      lazyTopBar(topBarView, [model.saveStatus, model.attachedEdit, model.mode, imageLoaded, h]),
       h.div(
-        [h.Class('flex min-h-0 flex-1 flex-col lg:flex-row')],
+        [h.Class('flex min-h-0 flex-1 gap-6 max-lg:flex-col max-lg:gap-3')],
         [
-          lazyToolPanel(toolPanelView, [
+          lazyRail(railView, [
             model.chain,
             model.catalog,
             model.catalogError,
@@ -159,88 +163,99 @@ const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
             model.mobileSheet === 'tools',
             h,
           ]),
-          lazyCanvasStage(canvasStageView, [
-            model.source,
-            model.scale,
-            model.offsetX,
-            model.offsetY,
-            model.compareMode,
-            model.compareSplitAt,
-            model.compareToggleBefore,
-            model.bins,
-            model.phase,
-            h,
-          ]),
-          lazyLayerDrawer(layerDrawerView, [
+          h.main(
+            [h.Class('flex min-h-0 min-w-0 flex-1 flex-col gap-6 pt-3 max-lg:gap-3 max-lg:pt-0')],
+            [
+              lazyStage(stageView, [
+                model.source,
+                model.scale,
+                model.offsetX,
+                model.offsetY,
+                model.compareMode,
+                model.compareSplitAt,
+                model.phase,
+                model.chain,
+                model.catalog,
+                h,
+              ]),
+              lazyDock(dockView, [model.chain, model.phase, model.catalog, h]),
+              lazyStatus(statusView, [model.bins, model.scale, model.compareMode, model.phase, h]),
+            ],
+          ),
+          lazyInspector(inspectorView, [
             model.chain,
             model.phase,
+            model.catalog,
             model.activeFieldIndex,
             model.activeMixerColor,
-            model.lutBarOpen,
-            model.catalog,
+            model.previewLut,
+            model.lutTab,
+            model.lutRecents,
+            model.lutThumbs,
+            model.lutDownloads,
+            model.online,
+            model.offlineLutNotice,
             model.mobileSheet === 'layers',
             h,
           ]),
         ],
       ),
-      lazyLutBar(lutBarView, [
-        model.catalog,
-        model.lutBarOpen,
-        model.previewLut,
-        model.lutTab,
-        model.lutRecents,
-        model.lutThumbs,
-        model.lutDownloads,
-        model.online,
-        model.offlineLutNotice,
-        model.phase,
+      lazyPalette(paletteView, [
+        model.paletteOpen,
+        model.paletteQuery,
         model.chain,
+        model.catalog,
+        model.catalogError,
+        model.phase,
         h,
       ]),
-      lazyMobileTabBar(mobileTabBarView, [model.mobileSheet, model.lutBarOpen, hasLutTarget, h]),
+      lazyMobileTabBar(mobileTabBarView, [model.mobileSheet, model.paletteOpen, h]),
       lazyExportDialog(exportDialogView, [model.exportDialog, h]),
     ],
   )
 }
 
+const mobileTabBarView = (
+  mobileSheet: Model['mobileSheet'],
+  paletteOpen: boolean,
+  h: HtmlBuilder<EditorMessage>,
+): Html => mobileTabBarImpl(mobileSheet, paletteOpen, h)
+
 const mobileTabBarImpl = (
   mobileSheet: Model['mobileSheet'],
-  lutBarOpen: boolean,
-  hasLutTarget: boolean,
+  paletteOpen: boolean,
   h: HtmlBuilder<EditorMessage>,
 ) => {
   const panelTab = (label: string, Icon: IconNode, active: boolean, onClick: () => EditorMessage) =>
-    button(
-      {
-        onClick: onClick(),
-        variant: active ? 'secondary' : 'ghost',
-        className: `flex flex-1 items-center justify-center gap-2 py-2.5 text-xs ${
-          active ? 'bg-panel-alt text-ink' : 'text-muted hover:text-ink'
-        }`,
-        attributes: [h.AriaPressed(String(active)), h.AriaLabel(label)],
-      },
-      [icon(h, Icon, label, 16), h.span([], [label])],
-      h,
+    h.button(
+      [
+        h.Class(
+          `flex flex-1 items-center justify-center gap-2 rounded-full py-2 text-[10px] uppercase tracking-[0.1em] transition-colors ${
+            active ? 'bg-s2 text-ink' : 'text-dim'
+          }`,
+        ),
+        h.OnClick(onClick()),
+        h.AriaPressed(String(active)),
+        h.AriaLabel(label),
+        h.Key(label),
+      ],
+      [icon(h, Icon, label, 14), h.span([], [label])],
     )
   return h.nav(
-    // pb-[env(...)]: the home-indicator safe area on notched phones — the
-    // buttons sit above it (viewport-fit=cover, index.html).
     [
-      h.Class('flex border-t border-border bg-panel pb-[env(safe-area-inset-bottom)] lg:hidden'),
+      h.Class(
+        'flex flex-none items-center gap-1 rounded-full bg-s1 p-1 pb-[max(4px,env(safe-area-inset-bottom))] shadow-[0_-12px_28px_-18px_var(--mat-shadow-a)] lg:hidden',
+      ),
       h.AriaLabel('Editor panels'),
     ],
     [
       panelTab('Adjustments', SlidersHorizontal, mobileSheet === 'tools', () =>
         EditorMessage.ToggledMobileSheet({ sheet: 'tools' }),
       ),
-      panelTab('Layers', LayersIcon, mobileSheet === 'layers', () =>
+      panelTab('Inspector', LayersIcon, mobileSheet === 'layers', () =>
         EditorMessage.ToggledMobileSheet({ sheet: 'layers' }),
       ),
-      // The LUT tab only exists while a LUT target exists (a drafting LUT
-      // layer or a selected chain LUT layer) — same gate as the LUT bar.
-      ...(hasLutTarget
-        ? [panelTab('LUT', Boxes, lutBarOpen, () => EditorMessage.ToggledLutPicker())]
-        : []),
+      panelTab('Add', Plus, paletteOpen, () => EditorMessage.ToggledPalette()),
     ],
   )
 }
