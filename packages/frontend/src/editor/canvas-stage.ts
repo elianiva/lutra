@@ -590,7 +590,7 @@ const mount = (
               h.span(
                 [h.Class('flex items-baseline gap-2')],
                 [
-                  h.span([h.Class('serif text-[13px] italic text-ink')], [lookName]),
+                  h.span([h.Class('serif text-base italic leading-none text-ink')], [lookName]),
                   ...(strength === null ? [] : [h.span([h.Class('label')], [strength])]),
                 ],
               ),

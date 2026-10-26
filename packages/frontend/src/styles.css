@@ -20,30 +20,73 @@
  *   4 / 8 / 12 / 16 / 24 / 32 / 48 and 8 / 9 / 10 / 12 / 16 / 20.
  */
 
+/* Leica: chrome and white panels by day, vulcanite black by night, one red. */
 :root,
+:root[data-mode='light'] {
+  --mat-bg: #e4e4e1;
+
+  --mat-s1: #f5f5f3;
+  --mat-s2: #ebebe9;
+  --mat-s3: #ffffff;
+  --mat-well: #dadad7;
+
+  --mat-ink: #141414;
+  --mat-muted: #5a5a58;
+  --mat-dim: #686866;
+
+  --mat-accent: #c40f18;
+  --mat-accent-ink: #ffffff;
+  --mat-accent-soft: rgba(196, 15, 24, 0.1);
+  --mat-halo: rgba(196, 15, 24, 0.16);
+  /* identity colour: the wordmark, never interactive state */
+  --mat-signal: #c40f18;
+
+  --mat-rim: rgba(255, 255, 255, 0.9);
+  --mat-sheen: radial-gradient(140% 120% at 18% -10%, rgba(255, 255, 255, 0.75), transparent 60%);
+  --mat-fade: rgba(20, 20, 20, 0.1);
+
+  --mat-track: rgba(20, 20, 20, 0.1);
+  --mat-knob: #ffffff;
+  --mat-inset: rgba(40, 40, 40, 0.16);
+
+  --mat-shadow-a: rgba(40, 40, 40, 0.2);
+  --mat-shadow-b: rgba(40, 40, 40, 0.11);
+  --mat-elev-1: 0 1px 2px var(--mat-shadow-b), 0 8px 20px -12px var(--mat-shadow-a);
+  --mat-elev-2: 0 2px 6px var(--mat-shadow-b), 0 20px 44px -20px var(--mat-shadow-a);
+  --mat-elev-3: 0 6px 16px var(--mat-shadow-b), 0 34px 80px -28px var(--mat-shadow-a);
+
+  --mat-glass: rgba(245, 245, 243, 0.82);
+  --mat-stage: #d6d6d3;
+  --mat-pool: radial-gradient(circle at 50% 42%, rgba(196, 15, 24, 0.05), transparent 58%);
+  --mat-hist-top: rgba(196, 15, 24, 0.36);
+  --mat-hist-bottom: rgba(196, 15, 24, 0);
+  --mat-hist-line: rgba(196, 15, 24, 0.6);
+}
+
 :root[data-mode='dark'] {
-  --mat-bg: #121010;
+  --mat-bg: #0e0e0e;
 
-  --mat-s1: #201c19;
-  --mat-s2: #241f1d;
-  --mat-s3: #2b2523;
-  --mat-well: #191615;
+  --mat-s1: #1a1a1a;
+  --mat-s2: #202020;
+  --mat-s3: #272727;
+  --mat-well: #131313;
 
-  --mat-ink: #f6f1ea;
-  --mat-muted: #b5aa9e;
-  --mat-dim: #988e81;
+  --mat-ink: #f1f0ec;
+  --mat-muted: #aaa9a5;
+  --mat-dim: #8e8d89;
 
-  --mat-accent: #ff7a52;
-  --mat-accent-ink: #1b110c;
-  --mat-accent-soft: rgba(255, 122, 82, 0.14);
-  --mat-halo: rgba(255, 122, 82, 0.18);
+  --mat-accent: #ff4a4f;
+  --mat-accent-ink: #1a0405;
+  --mat-accent-soft: rgba(255, 74, 79, 0.14);
+  --mat-halo: rgba(255, 74, 79, 0.18);
+  --mat-signal: #f2353b;
 
   --mat-rim: rgba(255, 255, 255, 0.07);
   --mat-sheen: radial-gradient(140% 120% at 18% -10%, rgba(255, 255, 255, 0.05), transparent 58%);
   --mat-fade: rgba(255, 255, 255, 0.08);
 
   --mat-track: rgba(255, 255, 255, 0.14);
-  --mat-knob: #f7f2ea;
+  --mat-knob: #f1f0ec;
   --mat-inset: rgba(0, 0, 0, 0.45);
 
   --mat-shadow-a: rgba(0, 0, 0, 0.55);
@@ -52,51 +95,12 @@
   --mat-elev-2: 0 2px 6px var(--mat-shadow-b), 0 20px 44px -18px var(--mat-shadow-a);
   --mat-elev-3: 0 6px 16px var(--mat-shadow-b), 0 34px 80px -26px var(--mat-shadow-a);
 
-  --mat-glass: rgba(32, 28, 25, 0.84);
-  --mat-stage: #0b0908;
-  --mat-pool: radial-gradient(circle at 50% 42%, rgba(255, 122, 82, 0.07), transparent 58%);
-  --mat-hist-top: rgba(255, 122, 82, 0.5);
-  --mat-hist-bottom: rgba(255, 122, 82, 0);
-  --mat-hist-line: rgba(255, 170, 140, 0.75);
-}
-
-:root[data-mode='light'] {
-  --mat-bg: #efebe3;
-
-  --mat-s1: #faf7f1;
-  --mat-s2: #f1ece2;
-  --mat-s3: #fffdf8;
-  --mat-well: #e9e3d7;
-
-  --mat-ink: #1c1813;
-  --mat-muted: #6c6457;
-  --mat-dim: #766d5f;
-
-  --mat-accent: #c04520;
-  --mat-accent-ink: #fff8f2;
-  --mat-accent-soft: rgba(192, 69, 32, 0.12);
-  --mat-halo: rgba(192, 69, 32, 0.16);
-
-  --mat-rim: rgba(255, 255, 255, 0.9);
-  --mat-sheen: radial-gradient(140% 120% at 18% -10%, rgba(255, 255, 255, 0.75), transparent 60%);
-  --mat-fade: rgba(28, 24, 19, 0.1);
-
-  --mat-track: rgba(28, 24, 19, 0.1);
-  --mat-knob: #fffdf8;
-  --mat-inset: rgba(72, 58, 40, 0.18);
-
-  --mat-shadow-a: rgba(62, 50, 34, 0.22);
-  --mat-shadow-b: rgba(62, 50, 34, 0.12);
-  --mat-elev-1: 0 1px 2px var(--mat-shadow-b), 0 8px 20px -12px var(--mat-shadow-a);
-  --mat-elev-2: 0 2px 6px var(--mat-shadow-b), 0 20px 44px -20px var(--mat-shadow-a);
-  --mat-elev-3: 0 6px 16px var(--mat-shadow-b), 0 34px 80px -28px var(--mat-shadow-a);
-
-  --mat-glass: rgba(250, 247, 241, 0.82);
-  --mat-stage: #e2dccf;
-  --mat-pool: radial-gradient(circle at 50% 42%, rgba(192, 69, 32, 0.06), transparent 58%);
-  --mat-hist-top: rgba(192, 69, 32, 0.42);
-  --mat-hist-bottom: rgba(192, 69, 32, 0);
-  --mat-hist-line: rgba(192, 69, 32, 0.6);
+  --mat-glass: rgba(26, 26, 26, 0.84);
+  --mat-stage: #080808;
+  --mat-pool: radial-gradient(circle at 50% 42%, rgba(255, 74, 79, 0.06), transparent 58%);
+  --mat-hist-top: rgba(255, 74, 79, 0.5);
+  --mat-hist-bottom: rgba(255, 74, 79, 0);
+  --mat-hist-line: rgba(255, 140, 140, 0.75);
 }
 
 @theme {
@@ -122,9 +126,11 @@
   --color-accent: var(--mat-accent);
   --color-accent-ink: var(--mat-accent-ink);
   --color-accent-soft: var(--mat-accent-soft);
+  --color-signal: var(--mat-signal);
 
-  --font-sans: 'Electrolize', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans: 'Chakra Petch', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+  --font-serif: 'Instrument Serif', ui-serif, Georgia, serif;
 
   /* radii: one family, three sizes */
   --radius-sm: 8px;
@@ -195,7 +201,12 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  color-scheme: dark;
+  color-scheme: light;
+}
+
+/* the print caption: the film look's name, set in the serif italic */
+.serif {
+  font-family: var(--font-serif);
 }
 
 /* ---------- material primitives ---------- */

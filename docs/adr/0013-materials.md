@@ -19,7 +19,15 @@ Separation comes from four devices, and a surface never draws an outline:
 
 Where a separator is genuinely needed — the tool rail's group boundaries, a list that scrolls under a footer — the line is a gradient that fades at both ends, never a solid stroke.
 
-Two modes, one structure: `data-mode="dark|light"` on the document root swaps the token values. Dark is the default, because the editor is a judging surface and a dark surround keeps the eye adapted; light is a warm paper palette for working in daylight. The mode is stored per browser and painted before the first render (`theme.ts`, `SetTheme`).
+Two modes, one structure: `data-mode="dark|light"` on the document root swaps the token values. The mode is stored per browser and painted before the first render (`theme.ts`, `SetTheme`).
+
+## Brand: the Leica palette
+
+The colours come from the Leica M: chrome and white for light mode, black vulcanite for dark mode, and one red. Both modes use near-neutral greys, not tinted ones, so the surround does not shift the eye while grading. **Light is the default**; dark is one toggle away for judging in a dim room.
+
+Red has two roles. **Accent** (`--mat-accent`) marks interactive state: the key button, the selected row, the slider fill. **Signal** (`--mat-signal`, `text-signal`) is identity only: the LUTRA wordmark and the red bar of the L in the app icon. In light mode they share one red (`#c40f18`); in dark mode the accent is lifted to `#ff4a4f` to reach 5:1 on panels.
+
+Type has three faces: **Chakra Petch** (400 / 500 / 600) for the interface and labels, **JetBrains Mono** (400 / 500) for numerals, and **Instrument Serif** italic for the print caption (`.serif`). All three load from `@fontsource` in `entry.ts`; nothing falls back to a system font.
 
 ## The shell
 

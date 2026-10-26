@@ -62,7 +62,7 @@ const header = (h: HtmlBuilder<GalleryMessage>) =>
   h.header(
     [h.Class('flex h-16 flex-none items-center gap-6')],
     [
-      h.h1([h.Class('text-xs font-semibold tracking-[0.34em] text-accent')], ['LUTRA']),
+      h.h1([h.Class('text-xs font-semibold tracking-[0.34em] text-signal')], ['LUTRA']),
       h.div(
         [h.Class('ml-auto flex items-center gap-2')],
         [

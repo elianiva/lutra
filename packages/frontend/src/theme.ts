@@ -5,21 +5,22 @@ import { Effect, Schema } from 'effect'
  * the document root — `data-mode` — switches every surface: the token set in
  * styles.css resolves differently, and nothing else knows about the mode.
  *
- * Dark is the default (the editor is a judging surface for photographs; a
- * dark surround keeps the eye adapted). The choice persists per browser.
+ * Light is the default: the chrome-and-white side of the Leica palette. Dark
+ * (vulcanite black) is one toggle away for judging in a dim room. The choice
+ * persists per browser.
  */
 export const Mode = Schema.Literals(['dark', 'light'])
 export type Mode = typeof Mode.Type
 
 const MODE_KEY = 'lutra-mode'
 
-/** The persisted mode, read once at boot. Anything unknown falls back to dark. */
+/** The persisted mode, read once at boot. Anything unknown falls back to light. */
 export const readMode = (): Mode => {
   try {
     const stored = globalThis.localStorage?.getItem(MODE_KEY)
-    return stored === 'light' ? 'light' : 'dark'
+    return stored === 'dark' ? 'dark' : 'light'
   } catch {
-    return 'dark'
+    return 'light'
   }
 }
 

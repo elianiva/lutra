@@ -30,7 +30,7 @@ export const topBar = (
       ),
     ],
     [
-      h.h1([h.Class('flex-none text-xs font-semibold tracking-[0.34em] text-accent')], ['LUTRA']),
+      h.h1([h.Class('flex-none text-xs font-semibold tracking-[0.34em] text-signal')], ['LUTRA']),
       documentLine(h, attachedEdit),
       h.div(
         [h.Class('pointer-events-auto ml-auto flex items-center gap-3')],
