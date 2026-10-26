@@ -6,6 +6,13 @@
 - Use jj instead of git for version control
 - Docs: ADRs (`docs/adr/`) are the permanent record — no plans directory, fold decisions straight into an ADR
 
+## Orbs
+
+- `.agents/setup` prepares a fresh orb: it checks the Node toolchain, installs `bun` when missing, and runs `pnpm install --frozen-lockfile`. Dependencies are already installed when a thread starts — do not reinstall them.
+- The dev server is declared in `.amp/services.yaml`. Start it with `amp orb services ensure` and share the portal URL it prints; never `nohup`, `&`, or a bare `pnpm dev` on port 5173, and never start it from `.agents/setup`.
+- Open the app in Chrome with `--enable-unsafe-webgpu --enable-unsafe-swiftshader` so the WebGPU gate passes. The main canvas stays black under SwiftShader: verify UI, state, and thumbnails, not the GPU render.
+- `pnpm lint` loads JS plugins (`anti-slop`, `foldkit`) and oxlint has been observed to abort with an allocator panic inside orbs. Use `pnpm typecheck` and `pnpm test` for local signal and let CI be the lint gate.
+
 ## Cursor Cloud specific instructions
 
 - The base image ships Node 22 and the pinned pnpm. `.cursor/install.sh` (wired via `.cursor/environment.json`) also installs `bun`, which `pnpm build` and the icon/service-worker/LUT/RAW scripts need.

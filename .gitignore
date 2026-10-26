@@ -32,3 +32,7 @@ Thumbs.db
 
 # Verification skill scratch evidence (see .cursor/skills/verify-lutra)
 .verify-artifacts/
+
+# Orb runtime state (generated portal manifests and review artifacts)
+.amp/portals/
+.amp/in/

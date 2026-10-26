@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Prepares a fresh orb for Lutra: the pinned Node toolchain, bun (the frontend
+# build scripts shell out to it), and workspace dependencies from the lockfile.
+#
+# Idempotent and non-interactive: a warm snapshot re-runs this in seconds.
+# Long-lived processes belong in .amp/services.yaml, never here.
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+step() { printf '\n== %s\n' "$*"; }
+
+# The tool directories this script may create live under $HOME; login shells
+# started later (Amp, supervised services) must inherit them.
+persist_path() {
+  local dir="$1" marker="# lutra orb setup: $1 on PATH"
+  [ -d "$dir" ] || return 0
+  case ":$PATH:" in *":$dir:"*) ;; *) export PATH="$dir:$PATH" ;; esac
+  if ! grep -Fqx "$marker" "$HOME/.bash_profile" 2>/dev/null; then
+    printf '\n%s\nexport PATH="%s:$PATH"\n' "$marker" "$dir" >>"$HOME/.bash_profile"
+  fi
+}
+
+step "node"
+if ! command -v node >/dev/null 2>&1; then
+  echo "node is not installed in this image; the orb base template provides it" >&2
+  exit 1
+fi
+node_major="$(node -p 'process.versions.node.split(".")[0]')"
+if [ "$node_major" -lt 22 ]; then
+  echo "node $(node --version) is older than the 22 this repository requires" >&2
+  exit 1
+fi
+echo "node $(node --version)"
+
+step "pnpm"
+want_pnpm="$(node -p 'require("./package.json").packageManager.replace(/^pnpm@/, "")')"
+have_pnpm="$(pnpm --version 2>/dev/null || true)"
+if [ "$have_pnpm" != "$want_pnpm" ]; then
+  echo "pnpm ${have_pnpm:-missing} does not match packageManager $want_pnpm; installing"
+  npm install --global "pnpm@$want_pnpm"
+  have_pnpm="$(pnpm --version)"
+fi
+echo "pnpm $have_pnpm"
+
+step "bun"
+# pnpm build runs scripts/build-icons.ts and scripts/build-sw.ts through bun.
+if command -v bun >/dev/null 2>&1; then
+  echo "bun $(bun --version)"
+else
+  echo "bun missing; installing into $HOME/.bun"
+  curl -fsSL https://bun.sh/install | bash
+  persist_path "$HOME/.bun/bin"
+  bun --version
+fi
+
+step "workspace dependencies"
+pnpm install --frozen-lockfile
+
+step "summary"
+printf 'node %s | pnpm %s | bun %s | %s packages installed\n' \
+  "$(node --version)" "$(pnpm --version)" "$(bun --version)" "$(ls -1 packages | wc -l | tr -d ' ')"

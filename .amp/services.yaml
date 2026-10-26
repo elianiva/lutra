@@ -1,0 +1,11 @@
+# Long-lived services for Amp orbs. Run `amp orb services ensure` to start
+# them supervised; Amp writes the generated links to .amp/portals/.
+services:
+  web:
+    command: pnpm exec vite --host 0.0.0.0 --port "$PORT" --strictPort
+    cwd: packages/frontend
+    health: /
+    review: true
+    portal:
+      title: Lutra
+      description: Needs WebGPU — launch Chrome with --enable-unsafe-webgpu --enable-unsafe-swiftshader (see AGENTS.md).
