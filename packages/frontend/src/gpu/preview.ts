@@ -20,17 +20,21 @@ type CanvasWithQuality = CanvasRenderingContext2D & {
   imageSmoothingQuality: string
 }
 
-export const previewDimensions = (nativeWidth: number, nativeHeight: number): PreviewSize => {
-  const longEdge = Math.max(nativeWidth, nativeHeight)
-  if (longEdge <= PREVIEW_LONG_EDGE || longEdge === 0) {
-    return { height: nativeHeight, width: nativeWidth }
+/** `width`×`height` scaled down so its long edge is at most `edge` (never up). */
+export const fitToLongEdge = (width: number, height: number, edge: number): PreviewSize => {
+  const longEdge = Math.max(width, height)
+  if (longEdge <= edge || longEdge === 0) {
+    return { height, width }
   }
-  const scale = PREVIEW_LONG_EDGE / longEdge
+  const scale = edge / longEdge
   return {
-    height: Math.max(1, Math.round(nativeHeight * scale)),
-    width: Math.max(1, Math.round(nativeWidth * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+    width: Math.max(1, Math.round(width * scale)),
   }
 }
+
+export const previewDimensions = (nativeWidth: number, nativeHeight: number): PreviewSize =>
+  fitToLongEdge(nativeWidth, nativeHeight, PREVIEW_LONG_EDGE)
 
 /**
  * Downscale `bitmap` to preview size when native exceeds the cap.

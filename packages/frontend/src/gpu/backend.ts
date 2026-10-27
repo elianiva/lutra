@@ -7,6 +7,8 @@ import { presentModeToWgsl } from './present-mode'
 import type { ComparePresent } from './present-mode'
 import { bindGroupCacheKey } from './pass-descriptor'
 import { toHalfFloats } from './half-float'
+import { linearSourceOf } from './linear-source'
+import type { LinearImage } from '../lib/linear-image'
 import {
   canvasDimensionsEqual,
   canvasDimensionsOf,
@@ -145,6 +147,23 @@ fn fs(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
 
 const roundUp = (n: number, to: number) => Math.ceil(n / to) * to
 
+/** Upload a RAW decode's linear half-float pixels to an `rgba16float` texture. */
+const uploadLinearSource = (device: GPUDevice, image: LinearImage): GPUTexture => {
+  const size = { depthOrArrayLayers: 1, height: image.height, width: image.width }
+  const texture = device.createTexture({
+    format: 'rgba16float',
+    size,
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+  })
+  device.queue.writeTexture(
+    { texture },
+    image.data,
+    { bytesPerRow: image.width * 8, rowsPerImage: image.height },
+    size,
+  )
+  return texture
+}
+
 interface ComputeEntry {
   readonly paramsBuffer: GPUBuffer | null
   readonly bindGroup: GPUBindGroup
@@ -189,6 +208,8 @@ interface Session {
    * image reads the plain view (sRGB bytes straight to the swapchain).
    */
   readonly srcLinearView: GPUTextureView
+  /** The linear half-float texture behind `srcLinearView` for a RAW source; undefined when the 8-bit `srcTex` serves. */
+  readonly srcLinearTex: GPUTexture | undefined
   readonly dstTex: GPUTexture
   /**
    * Ping-pong linear-light rgba16float intermediates. Layer passes read
@@ -370,6 +391,7 @@ export const GpuBackendLive = Layer.effect(
         void Effect.runFork(Effect.logDebug(`[WebGPU] bitmap close skipped: ${String(cause)}`))
       }
       s.srcTex.destroy()
+      s.srcLinearTex?.destroy()
       s.dstTex.destroy()
       if (s.intermediates) {
         s.intermediates[0].destroy()
@@ -476,7 +498,15 @@ export const GpuBackendLive = Layer.effect(
             viewFormats: ['rgba8unorm-srgb'],
           }),
         )
-        const srcLinearView = srcTex.createView({ format: 'rgba8unorm-srgb' })
+        // A RAW decode ships its linear 16-bit pixels alongside the bitmap
+        // (gpu/linear-source.ts); the chain then starts from those and the
+        // 8-bit `srcTex` only feeds the compare blit's "before" half.
+        const linearSource = linearSourceOf(srcBitmap)
+        const srcLinearTex = linearSource
+          ? track(uploadLinearSource(device, linearSource))
+          : undefined
+        const srcLinearView =
+          srcLinearTex?.createView() ?? srcTex.createView({ format: 'rgba8unorm-srgb' })
         device.queue.copyExternalImageToTexture(
           { flipY: false, source: srcBitmap },
           { texture: srcTex },
@@ -588,6 +618,7 @@ export const GpuBackendLive = Layer.effect(
           presentBuffer,
           renders: 0,
           srcBitmap,
+          srcLinearTex,
           srcLinearView,
           srcTex,
           width,

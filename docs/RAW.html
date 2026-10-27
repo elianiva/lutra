@@ -699,7 +699,7 @@
         <div class="arrow">&rarr;</div>
         <div class="box">
           <span class="t">Source bitmap</span
-          ><span class="s">8-bit sRGB pixels, uploaded to the GPU</span>
+          ><span class="s">16-bit linear pixels uploaded to the GPU, 8-bit bitmap for the rest</span>
         </div>
         <div class="arrow">&rarr;</div>
         <div class="box">
@@ -731,24 +731,24 @@
       </p>
 
       <p>
-        <strong>The output is an 8-bit sRGB image.</strong> Here is the decision that makes the
-        whole pipeline drop into place: the decode runs steps 2&ndash;7 of &sect;3 — including the
-        tone encode — and emits <em>sRGB-encoded, 8-bit</em> pixels as an <code>ImageBitmap</code>. That is
-        exactly what a JPEG decode produces (the engine's existing pass-0
-        <code>srgbToLinear</code> inverts the curve exactly — architecture.html &sect;4). The engine
-        never knows the difference between this and a JPEG: same colorspace contract, same
-        pipeline. There
-        is no linear-decoding path, no engine flag, no second chain — the complexity lives entirely
-        in the decoder, where it belongs.
-      </p>
+        <strong>The output is a 16-bit sRGB image.</strong> The decode runs steps 2&ndash;7 of
+        &sect;3 — including the tone encode — and emits <em>sRGB-encoded, 16-bit</em> pixels. The app
+        keeps them in two forms. An 8-bit <code>ImageBitmap</code> is what the rest of the app
+        reads, exactly as for a JPEG. The same pixels, linearized to half-floats, are registered
+        against that bitmap, and the GPU backend uploads them to an <code>rgba16float</code> texture
+        as the source of the grading chain, so the first pass starts from sensor precision instead
+        of 8 bits. The engine never knows the difference: its pass 0 reads linear light either way
+        (architecture.html &sect;4). Scaling to the preview size is done once, on the CPU, in linear
+        light. A 16-bit decode clips highlights at white; the camera's extra highlight range is not
+        used.</p>
 
       <div class="callout">
-        <span class="h">Why not decode to linear light directly?</span> The mathematically
-        &ldquo;purer&rdquo; design feeds the engine linear values and flags the source as linear. It
-        changes four engine sites (pass 0, LUT-at-position-0, the empty-chain passthrough, the
-        compare blit) for a result that is visually identical in an sRGB-authored, 8-bit-export app
-        — the sRGB curve is invertible. A 16-bit source and the linear working space remain documented future steps (it would matter for tone-mapped
-        highlight rolloff), but v1 deliberately chooses zero engine risk (docs/adr/0008-raw-decode).
+        <span class="h">Why not decode to linear light directly?</span> The 16-bit pixels are
+        uploaded as linear half-floats, but the decode itself is sRGB-encoded, and that is
+        deliberate. FlashRaw's sRGB 16-bit output is already oriented and clipped to display range, and
+        the engine's passes read linear light either way, so nothing in the engine changes. A linear
+        working space throughout (tone-mapped highlight rolloff would need one) remains a future
+        step (docs/adr/0008-raw-decode).
       </div>
 
       <h3>6.1 · The previews: tiles, placeholders, and the LUT bar</h3>
@@ -783,7 +783,7 @@
       <h3>6.3 · Memory, and the file's second life</h3>
 
       <p>
-        A 24-megapixel decode occupies roughly 96&nbsp;MB as RGBA pixels in the worker's memory
+        A 24-megapixel decode occupies roughly 192&nbsp;MB as linear RGBA half-floats (plus 96&nbsp;MB for the 8-bit bitmap) in memory
         before upload, and the worker's wasm heap grows to accommodate it — within the
         browser's ~2&nbsp;GB wasm ceiling up to very large sensors. Closing the image closes the
         decoder handle and releases the heap. The original file bytes also live on, untouched, as the Edit's <code>source</code> —
@@ -923,7 +923,8 @@
         docs/adr/0008-raw-decode):
       </p>
 
-      <pre><code>output: 'rgba8'          // 8 bits per channel, the bitmap the editor's source uses
+      <pre><code>output: 'rgb16'          // 16 bits per channel, oriented; kept as linear half-floats
+                         // for the GPU and as an 8-bit bitmap for everything else
 colorSpace: 'srgb'       // sRGB primaries and the sRGB curve — inverted exactly by
                          // the engine's pass-0 srgbToLinear (architecture.html &sect;4)
 demosaic: 'bilinear'     // full resolution, always (&sect;2)
@@ -950,7 +951,7 @@ exposure: 0              // no brightening — the camera's recorded levels, as-
         </tr>
         <tr>
           <td>Memory</td>
-          <td>~96 MB RGBA8 per 24 MP</td>
+          <td>~192 MB linear + ~96 MB 8-bit per 24 MP</td>
           <td>
             released when the decoder handle closes; wasm32's ~2 GB ceiling bounds very large sensors
           </td>

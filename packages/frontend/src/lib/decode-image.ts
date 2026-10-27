@@ -1,3 +1,6 @@
+import { attachLinearSource } from '../gpu/linear-source'
+import { fitToLongEdge } from '../gpu/preview'
+import { toLinearSource } from './linear-image'
 import { defaultRawEngine } from './raw-engine'
 import type { RawEngine } from './raw-engine'
 
@@ -72,8 +75,12 @@ export interface DecodeOptions {
  */
 export const createImageDecoder = (engine: RawEngine) => {
   /**
-   * Decode a RAW file off the main thread into an 8-bit sRGB bitmap
-   * (docs/adr/0008-raw-decode). Orientation is already applied by the decoder.
+   * Decode a RAW file off the main thread (docs/adr/0008-raw-decode). The
+   * bitmap is the 8-bit sRGB rendering every consumer reads; the 16-bit
+   * linear pixels ride along for the GPU through `attachLinearSource`.
+   * Orientation is already applied by the decoder. With a `longEdge` the
+   * result is area-averaged down to it, so the bitmap and the linear pixels
+   * match the preview size the editor sizes its textures to.
    */
   const decodeRaw = async (blob: Blob, longEdge: number | undefined): Promise<ImageBitmap> =>
     await engine.withSession(blob, async (raw) => {
@@ -81,8 +88,13 @@ export const createImageDecoder = (engine: RawEngine) => {
       // sensor has at least twice the pixels the caller will keep.
       const halfSize =
         longEdge !== undefined && Math.max(raw.size.width, raw.size.height) >= longEdge * 2
-      const frame = await raw.rgba8(halfSize)
-      return await createImageBitmap(new ImageData(frame.data, frame.width, frame.height))
+      const frame = await raw.srgb16(halfSize)
+      const target =
+        longEdge === undefined ? undefined : fitToLongEdge(frame.width, frame.height, longEdge)
+      const { linear, srgb8 } = toLinearSource(frame.data, frame.width, frame.height, target)
+      const bitmap = await createImageBitmap(new ImageData(srgb8, linear.width, linear.height))
+      attachLinearSource(bitmap, linear)
+      return bitmap
     })
 
   /**

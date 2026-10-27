@@ -13,7 +13,7 @@ const fakePool = () => {
     getCapabilities: async () => ({}),
     open: async () => ({
       close: vi.fn(),
-      decode: async () => ({ data: new Uint8ClampedArray(4), height: 1, width: 1 }),
+      decode: async () => ({ data: new Uint16Array(3), height: 1, width: 1 }),
       metadata: { height: 1, width: 1 },
       preview: async () => null,
     }),

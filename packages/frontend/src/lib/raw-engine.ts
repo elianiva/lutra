@@ -3,19 +3,20 @@ import { createWorkerPool } from 'flashraw/worker'
 
 /**
  * What the app needs from a RAW decoder (docs/adr/0008-raw-decode): open a
- * file, read its size, decode it to 8-bit sRGB, pull its embedded JPEG. The
+ * file, read its size, decode it to 16-bit sRGB, pull its embedded JPEG. The
  * seam keeps FlashRaw's worker pool, the tools' inline decoder and test
  * doubles interchangeable.
  */
 export interface RawSession {
   /** The sensor image's size after the default crop. */
   readonly size: { readonly width: number; readonly height: number }
-  readonly rgba8: (halfSize: boolean) => Promise<RawFrame>
+  /** Oriented, sRGB-encoded 16-bit RGB, interleaved. */
+  readonly srgb16: (halfSize: boolean) => Promise<RawFrame>
   readonly preview: () => Promise<RawPreview | null>
 }
 
 export interface RawFrame {
-  readonly data: Uint8ClampedArray<ArrayBuffer>
+  readonly data: Uint16Array<ArrayBuffer>
   readonly width: number
   readonly height: number
 }
@@ -38,7 +39,7 @@ interface OpenedRaw {
   readonly decode: (options: {
     readonly colorSpace: 'srgb'
     readonly demosaic: 'bilinear' | 'half-size'
-    readonly output: 'rgba8'
+    readonly output: 'rgb16'
   }) => Promise<RawFrame>
   readonly preview: () => Promise<RawPreview | null>
   readonly close: () => Promise<void> | void
@@ -52,11 +53,11 @@ export interface RawPool {
 
 const sessionOf = (raw: OpenedRaw): RawSession => ({
   preview: async () => await raw.preview(),
-  rgba8: async (halfSize) =>
+  srgb16: async (halfSize) =>
     await raw.decode({
       colorSpace: 'srgb',
       demosaic: halfSize ? 'half-size' : 'bilinear',
-      output: 'rgba8',
+      output: 'rgb16',
     }),
   size: raw.metadata,
 })

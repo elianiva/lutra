@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { linearSourceOf } from '../gpu/linear-source'
 import { createImageDecoder, isBrowserFormat } from './decode-image'
 import type { RawEngine, RawPreview, RawSession } from './raw-engine'
 
@@ -36,22 +37,22 @@ const browserBitmap = { kind: 'browser' }
 const rawBitmap = { kind: 'raw' }
 const createImageBitmapMock = vi.fn<(input: Blob | FakeImageData) => Promise<object>>()
 
-const rgba8 = vi.fn<RawSession['rgba8']>()
+const srgb16 = vi.fn<RawSession['srgb16']>()
 const preview = vi.fn<() => Promise<RawPreview | null>>()
 const engine: RawEngine = {
   warm: vi.fn(),
   withSession: async (_blob, use) =>
-    await use({ preview, rgba8, size: { height: 4000, width: 6000 } }),
+    await use({ preview, srgb16, size: { height: 4000, width: 6000 } }),
 }
 const { decodeImage, rawPreview } = createImageDecoder(engine)
 
 beforeEach(() => {
-  rgba8.mockReset()
+  srgb16.mockReset()
   preview.mockReset()
   createImageBitmapMock.mockReset()
   vi.stubGlobal('createImageBitmap', createImageBitmapMock)
   vi.stubGlobal('ImageData', FakeImageData)
-  rgba8.mockResolvedValue({ data: new Uint8ClampedArray(4), height: 1, width: 1 })
+  srgb16.mockResolvedValue({ data: new Uint16Array([0, 65535, 0]), height: 1, width: 1 })
   createImageBitmapMock.mockImplementation(async (input) =>
     input instanceof FakeImageData ? rawBitmap : browserBitmap,
   )
@@ -70,7 +71,7 @@ describe('decodeImage', () => {
   it('decodes a JPEG with the browser and never opens FlashRaw', async () => {
     const result = await decodeImage(new File([bytes(JPEG)], 'a.jpg'))
     expect(result).toBe(browserBitmap)
-    expect(rgba8).not.toHaveBeenCalled()
+    expect(srgb16).not.toHaveBeenCalled()
   })
 
   it('tries FlashRaw first for non-browser bytes, even without a file name', async () => {
@@ -80,14 +81,14 @@ describe('decodeImage', () => {
   })
 
   it('tries FlashRaw first for a RAW file name, then falls back to the browser', async () => {
-    rgba8.mockRejectedValue(new Error('raw failed'))
+    srgb16.mockRejectedValue(new Error('raw failed'))
     const result = await decodeImage(new File([bytes(JPEG)], 'renamed.dng'))
-    expect(rgba8).toHaveBeenCalledTimes(1)
+    expect(srgb16).toHaveBeenCalledTimes(1)
     expect(result).toBe(browserBitmap)
   })
 
   it('surfaces the browser error when both decoders fail', async () => {
-    rgba8.mockRejectedValue(new Error('raw failed'))
+    srgb16.mockRejectedValue(new Error('raw failed'))
     createImageBitmapMock.mockRejectedValue(new Error('browser failed'))
     await expect(decodeImage(new Blob([bytes(JPEG)]))).rejects.toThrow('browser failed')
     await expect(decodeImage(new Blob([bytes(TIFF)]))).rejects.toThrow('browser failed')
@@ -98,7 +99,24 @@ describe('decodeImage', () => {
     await decodeImage(file) // no target: full size
     await decodeImage(file, { longEdge: 2048 }) // 6000 >= 4096: half size
     await decodeImage(file, { longEdge: 4000 }) // 6000 < 8000: full size
-    expect(rgba8.mock.calls.map(([halfSize]) => halfSize)).toEqual([false, true, false])
+    expect(srgb16.mock.calls.map(([halfSize]) => halfSize)).toEqual([false, true, false])
+  })
+})
+
+describe('RAW sources', () => {
+  it('attaches the linear half-float pixels to the bitmap, with alpha 1', async () => {
+    const result = await decodeImage(new File([bytes(TIFF)], 'a.cr3'))
+    // sRGB codes 0 and 65535 are linear 0 and 1: half-float bits 0x0000 and 0x3c00.
+    expect(linearSourceOf(result)?.data).toEqual(new Uint16Array([0x0000, 0x3c00, 0x0000, 0x3c00]))
+  })
+
+  it('scales the pixels to the target long edge so bitmap and linear data agree', async () => {
+    srgb16.mockResolvedValue({ data: new Uint16Array(4 * 2 * 3), height: 2, width: 4 })
+    await decodeImage(new File([bytes(TIFF)], 'a.cr3'), { longEdge: 2 })
+    const image = createImageBitmapMock.mock.calls
+      .map(([input]) => input)
+      .find((input) => input instanceof FakeImageData)
+    expect(image).toMatchObject({ height: 1, width: 2 })
   })
 })
 
