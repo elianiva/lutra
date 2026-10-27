@@ -24,15 +24,38 @@ const decodeRaw = async (blob: Blob): Promise<ImageBitmap> => {
   return await createImageBitmap(new ImageData(frame.data, frame.width, frame.height))
 }
 
+const ascii = (head: Uint8Array, start: number, text: string): boolean =>
+  text.split('').every((char, index) => head[start + index] === char.charCodeAt(0))
+
+const BROWSER_BRANDS = ['avif', 'avis', 'heic', 'heix', 'hevc', 'mif1', 'msf1']
+
+/**
+ * Whether the leading bytes are a format the browser decodes natively
+ * (JPEG, PNG, GIF, WebP, BMP, AVIF/HEIC). Everything else, TIFF-based RAW
+ * containers and Canon CR3 (an ISO-BMFF `crx ` brand) included, is not.
+ */
+export const isBrowserFormat = (head: Uint8Array): boolean =>
+  (head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) ||
+  (head[0] === 0x89 && ascii(head, 1, 'PNG')) ||
+  ascii(head, 0, 'GIF8') ||
+  ascii(head, 0, 'BM') ||
+  (ascii(head, 0, 'RIFF') && ascii(head, 8, 'WEBP')) ||
+  (ascii(head, 4, 'ftyp') && BROWSER_BRANDS.some((brand) => ascii(head, 8, brand)))
+
+const startsWithBrowserFormat = async (blob: Blob): Promise<boolean> =>
+  isBrowserFormat(new Uint8Array(await blob.slice(0, 16).arrayBuffer()))
+
 /**
  * The one entry point for turning image bytes into an `ImageBitmap`.
- * A picked file named like a RAW file tries FlashRaw first; a stored Edit
- * source has no name, so it tries the browser first and falls back to
- * FlashRaw. Whichever order, the browser decoder's error is the one
- * surfaced (docs/adr/0008-raw-decode).
+ * A file named like RAW, or whose bytes are not a browser format, tries
+ * FlashRaw first; anything else tries the browser first and falls back to
+ * FlashRaw. Either way the browser decoder's error is the one surfaced
+ * (docs/adr/0008-raw-decode).
  */
 export const decodeImage = async (source: Blob): Promise<ImageBitmap> => {
-  if (source instanceof File && isRawFile(source)) {
+  const rawFirst =
+    (source instanceof File && isRawFile(source)) || !(await startsWithBrowserFormat(source))
+  if (rawFirst) {
     try {
       return await decodeRaw(source)
     } catch {
