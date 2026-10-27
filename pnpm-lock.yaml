@@ -121,6 +121,9 @@ importers:
       fflate:
         specifier: ^0.8.3
         version: 0.8.3
+      flashraw:
+        specifier: ^0.1.0
+        version: 0.1.0
       foldkit:
         specifier: ^0.169.0
         version: 0.169.0(@effect/platform-browser@4.0.6(effect@4.0.6))(effect@4.0.6)
@@ -2083,6 +2086,10 @@ packages:
   finalhandler@2.1.1:
     resolution: {integrity: sha512-S8KoZgRZN+a5rNwqTxlZZePjT/4cnm0ROV70LedRHZ0p8u9fRID0hJUZQpkKLzro8LfmC8sx23bY6tVNxv8pQA==}
     engines: {node: '>= 18.0.0'}
+
+  flashraw@0.1.0:
+    resolution: {integrity: sha512-2g0tZhj21DGIYBv9KcHaXC1/pMbNo+fxmjnhabgjK05gkmYBRjMCA1XD5G4KLWZxdai7/PRBm7E7fxRQXhDSSQ==}
+    engines: {node: '>=18'}
 
   flatted@3.4.4:
     resolution: {integrity: sha512-5+ybhBZANEJxaH3X5evAFatUxLfEHSr7n6kYJ+1Qd0mUqr4eu9gIf6GDbWHf8RJijHrjjO8G+la14SlL2SeS1Q==}
@@ -4314,6 +4321,8 @@ snapshots:
       statuses: 2.0.2
     transitivePeerDependencies:
       - supports-color
+
+  flashraw@0.1.0: {}
 
   flatted@3.4.4: {}
 

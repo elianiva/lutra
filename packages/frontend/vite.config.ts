@@ -8,6 +8,8 @@ const here = import.meta.dirname
 
 export default defineConfig({
   optimizeDeps: {
+    // flashraw resolves its .wasm via new URL(..., import.meta.url)
+    exclude: ['flashraw'],
     entries: ['src/entry.ts'],
     // NOTE: @lutra/engine is intentionally NOT in `include`. It is a
     // build-less workspace package aliased to its TS source above, so
@@ -20,6 +22,7 @@ export default defineConfig({
   // DevTools: the plugin serves its MCP relay at /__foldkit/devtools-mcp and
   // publishes a token-protected address to a per-user registry, which the
   // `foldkit-devtools` MCP server discovers. No fixed port to keep in sync.
+  worker: { format: 'es' },
   plugins: [foldkit(), tailwindcss()],
   resolve: {
     alias: {

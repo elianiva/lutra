@@ -28,6 +28,7 @@ import {
 import { EditorMessage, PresentState } from './message'
 import { type Mode, persistMode } from '../theme'
 import { ENGINE_REGISTRY } from '../editor/layer-meta'
+import { decodeImage, RAW_EXTENSIONS } from '../lib/decode-image'
 import { previewDimensions, toPreviewBitmap } from '../gpu/preview'
 
 export const createLayerFor = (type: LayerType) => createLayer(type, ENGINE_REGISTRY)
@@ -86,7 +87,7 @@ export const CreateLayer = Command.define('CreateLayer', {
  * `FilePickCancelled`.
  */
 export const PickImageFile = Command.define('PickImageFile', {
-  execute: FoldkitFile.select(['image/*', '.jpg', '.jpeg', '.png', '.webp', '.avif']).pipe(
+  execute: FoldkitFile.select(['image/*', '.jpg', '.jpeg', '.png', '.webp', '.avif', ...RAW_EXTENSIONS]).pipe(
     Effect.map(
       Option.match({
         onNone: () => EditorMessage.FilePickCancelled(),
@@ -120,7 +121,7 @@ export const DecodeImage = Command.define('DecodeImage', {
             message: `Failed to decode image: ${String(cause)}`,
             cause,
           }),
-        try: async () => await createImageBitmap(file),
+        try: async () => await decodeImage(file),
       })
       const bitmap = yield* Effect.tryPromise({
         catch: (cause) =>
@@ -166,7 +167,7 @@ export const LoadEdit = Command.define('LoadEdit', {
       const nativeBitmap = yield* Effect.tryPromise({
         // SAFETY: the store hands back image bytes over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
         // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, typescript/consistent-type-assertions -- SAFETY: documented BlobPart boundary
-        try: async () => await createImageBitmap(new Blob([edit.source as BlobPart])),
+        try: async () => await decodeImage(new Blob([edit.source as BlobPart])),
         catch: (cause) =>
           new ImageDecodeError({
             cause,

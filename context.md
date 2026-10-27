@@ -13,8 +13,8 @@ The web application. Owns the WebGPU pipeline setup (device, bind groups, comput
 **Store** (`@lutra/store`):
 The persistence seam. Owns the **Edit** / **Edit summary** schemas, the **Edit store** service contract (save/load/list/delete), and the browser's IndexedDB `EditStoreLive` implementation (docs/adr/0005-storage). A server/account-side `EditStoreLive` swaps in behind the same seam. Depends on `@lutra/engine` (for the `Layer` schema); the frontend consumes both engine and store.
 
-**Raw decoder** (`@lutra/raw-decoder`):
-The RAW file decoding package (docs/adr/0008-raw-decode). Owns the fork of the LibRaw-Wasm build — the C++ wrapper, the Emscripten build script, the committed wasm dist, and the TypeScript client (`open`/`metadata`/`imageData`/`rawImageData`/`thumbnailData`/`onProgress`/`dispose`) — plus the **RAW decode** settings schema and the **Raw decode error**. Rebuilds via `bun run build:raw`; the frontend consumes it as a workspace package.
+**Raw decoder** (`flashraw`):
+The npm package that decodes RAW files (docs/adr/0008-raw-decode): a Rust decoder compiled to WebAssembly (`FlashRaw.open`/`metadata`/`preview`/`decode`/`close`, with a worker pool). The app owns the **RAW decode** settings and the **Raw decode error**; the frontend depends on the package directly.
 
 **Frontend structure** (`@lutra/frontend`):
 A **root Submodel** owns the top-level `route` and one Submodel per route arm. **Gallery** is a thin Submodel (list of **Edit summaries**); **Editor** is a Submodel hosting the existing editor (phase machine, chain, draft, render, export). Route-driven state lives in the Submodel: each exposes `init(route)` (cold load) and `informRouteChanged(route)` (navigation) calling the shared route-firing Commands, so reload and in-app navigation behave identically. Editor Messages wrap as `GotEditorMessage`, Gallery as `GotGalleryMessage` (docs/adr/0006-frontend-architecture).
@@ -124,7 +124,7 @@ The tagged error a failed image load raises — reading a picked file's bytes, d
 _Avoid_: plain `Error` (the pre-taxonomy slop), "invalid image" (implies the file is at fault when a plain read can fail too).
 
 **Raw decode error**:
-The tagged error a failed **RAW decode** raises — LibRaw rejected the file, the wasm decode failed (unsupported compression, out-of-memory). A distinct defect class from **Image decode error** (a different mechanism, docs/adr/0006-frontend-architecture): after a raw failure the pick flow retries the browser decode once, and the user-visible failure stays "the image cannot be opened" — the raw error rides the cause chain (docs/adr/0008-raw-decode).
+The tagged error a failed **RAW decode** raises — FlashRaw rejected the file, the wasm decode failed (unsupported compression, corrupt data, out-of-memory). A distinct defect class from **Image decode error** (a different mechanism, docs/adr/0006-frontend-architecture): after a raw failure the pick flow retries the browser decode once, and the user-visible failure stays "the image cannot be opened" — the raw error rides the cause chain (docs/adr/0008-raw-decode).
 _Avoid_: reusing `ImageDecodeError` for wasm failures — the tags exist so the failure set stays discriminable.
 
 **LUT load error**:
@@ -141,7 +141,7 @@ _Avoid_: reusing `EncodeError` — the thumbnail pipeline is a different mechani
 ### RAW files
 
 **RAW decode**:
-The full-resolution conversion of a RAW file's sensor data into a displayable image: unpack, black/white normalization, as-shot white balance, demosaic, camera color matrix, sRGB encode (LibRaw in wasm, docs/adr/0008-raw-decode). Runs in the editor's `Loading` phase behind stage-based progress, with the **embedded JPEG preview** as the placeholder.
+The full-resolution conversion of a RAW file's sensor data into a displayable image: unpack, black/white normalization, as-shot white balance, demosaic, camera color matrix, sRGB encode (FlashRaw in wasm, docs/adr/0008-raw-decode). Runs in the editor's `Loading` phase behind an indeterminate loading state, with the **embedded JPEG preview** as the placeholder.
 _Avoid_: "import", "convert" (the mobile app's platform transcode is a different, lesser thing — it lands on the embedded thumbnail).
 
 **Embedded JPEG preview**:
@@ -152,7 +152,7 @@ _Avoid_: "thumbnail" on its own (the gallery's thumbnail is the graded **Edit su
 The camera's recorded WB multipliers, applied at **RAW decode** time so the untouched image matches what the camera previewed. The **White balance** layer then trims _relative_ to as-shot — its ±30% R/B range would be too small to fix a neutral decode under tungsten.
 
 **Bayer / X-Trans**:
-The sensor mosaic patterns in RAW files. X-Trans (Fuji RAF) needs dedicated demosaicing; LibRaw handles both on the CPU, which is why the decode is CPU-side rather than a GPU demosaic (docs/adr/0008-raw-decode).
+The sensor mosaic patterns in RAW files. X-Trans (Fuji RAF) needs dedicated demosaicing; FlashRaw handles both in its single-pass decode (docs/adr/0008-raw-decode).
 
 ### Editor UI
 

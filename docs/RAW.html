@@ -495,12 +495,12 @@
       </p>
 
       <p>
-        The algorithm Lutra uses, <strong>AHD</strong> (adaptive homogeneity-directed demosaicing),
-        is exactly that kind of edge-aware reconstruction: it produces two candidate guesses for
-        each pixel (one from horizontal structure, one from vertical), and picks the better one by
-        comparing which guess makes a smoother neighborhood. It comes from the dcraw lineage and is
-        the standard mid-tier choice: dramatically better than naive interpolation, a bit slower,
-        and — relevantly for &sect;7 — the best algorithm this build is <em>allowed</em> to ship.
+        The algorithm Lutra uses is <strong>bilinear</strong> interpolation, the one FlashRaw
+        (&sect;7) ships: each missing value is the average of the nearest sites that measured it.
+        It is the simplest reconstruction and the fastest, which is what lets the decoder fuse
+        demosaicing with white balance and color conversion in a single pass. Edge-aware
+        algorithms such as AHD look at the structure of the neighborhood first and interpolate
+        <em>along</em> edges; they are slower, and FlashRaw does not offer them.
       </p>
 
       <p>
@@ -694,12 +694,12 @@
         <div class="arrow">&rarr;</div>
         <div class="box loop">
           <span class="t">Decode worker</span
-          ><span class="s">LibRaw in wasm, stage-based progress (&sect;7)</span>
+          ><span class="s">FlashRaw in wasm (&sect;7)</span>
         </div>
         <div class="arrow">&rarr;</div>
         <div class="box">
-          <span class="t">RGBA16 texture</span
-          ><span class="s">16-bit sRGB pixels, uploaded to the GPU</span>
+          <span class="t">Source bitmap</span
+          ><span class="s">8-bit sRGB pixels, uploaded to the GPU</span>
         </div>
         <div class="arrow">&rarr;</div>
         <div class="box">
@@ -724,21 +724,20 @@
       <p>
         <strong>The decode runs in a worker.</strong> A 24-megapixel RAW takes on the order of a
         second to decode on desktop hardware — long enough that doing it on the UI thread would
-        freeze the whole app. It runs in a Web Worker instead, with the decode split into coarse
-        stages (unpack, white balance, demosaic, color conversion) and each stage reported back as
-        progress. The main thread stays responsive; the progress bar is honest, and the embedded
-        JPEG fills the wait.
+        freeze the whole app. It runs in a Web Worker instead. FlashRaw fuses unpack, white balance,
+        demosaic and color conversion into one pass, so there are no stages to report: the loading
+        state is indeterminate. The main thread stays responsive, and the embedded JPEG fills the
+        wait.
       </p>
 
       <p>
-        <strong>The output is a 16-bit sRGB image.</strong> Here is the decision that makes the
+        <strong>The output is an 8-bit sRGB image.</strong> Here is the decision that makes the
         whole pipeline drop into place: the decode runs steps 2&ndash;7 of &sect;3 — including the
-        tone encode — and emits <em>sRGB-encoded, 16-bit</em> pixels. That is the same encoding a
-        JPEG file stores, just with more precision per channel (the engine's existing pass-0
-        <code>srgbToLinear</code> inverts the curve exactly — architecture.html &sect;4). The GPU
-        upload pads the three color channels to four (WebGPU has no RGB16 format) and writes an
-        <code>rgba16unorm</code> texture. The engine never knows the difference between this and a
-        JPEG: same colorspace contract, same pipeline, just 16 bits of precision instead of 8. There
+        tone encode — and emits <em>sRGB-encoded, 8-bit</em> pixels as an <code>ImageBitmap</code>. That is
+        exactly what a JPEG decode produces (the engine's existing pass-0
+        <code>srgbToLinear</code> inverts the curve exactly — architecture.html &sect;4). The engine
+        never knows the difference between this and a JPEG: same colorspace contract, same
+        pipeline. There
         is no linear-decoding path, no engine flag, no second chain — the complexity lives entirely
         in the decoder, where it belongs.
       </p>
@@ -748,8 +747,7 @@
         &ldquo;purer&rdquo; design feeds the engine linear values and flags the source as linear. It
         changes four engine sites (pass 0, LUT-at-position-0, the empty-chain passthrough, the
         compare blit) for a result that is visually identical in an sRGB-authored, 8-bit-export app
-        — the sRGB curve is invertible, and 16-bit quantization is invisible in both directions. The
-        linear working space remains a documented future step (it would matter for tone-mapped
+        — the sRGB curve is invertible. A 16-bit source and the linear working space remain documented future steps (it would matter for tone-mapped
         highlight rolloff), but v1 deliberately chooses zero engine risk (docs/adr/0008-raw-decode).
       </div>
 
@@ -785,63 +783,56 @@
       <h3>6.3 · Memory, and the file's second life</h3>
 
       <p>
-        A 24-megapixel decode occupies roughly 192&nbsp;MB as RGBA16 pixels in the worker's memory
-        before upload, and the worker's wasm heap grows from 256&nbsp;MB to accommodate it —
-        comfortably within the browser's ~2&nbsp;GB wasm ceiling up to very large sensors
-        (~100&nbsp;MP is the practical cap). Closing the image disposes the worker and releases the
-        heap. The original file bytes also live on, untouched, as the Edit's <code>source</code> —
+        A 24-megapixel decode occupies roughly 96&nbsp;MB as RGBA pixels in the worker's memory
+        before upload, and the worker's wasm heap grows to accommodate it — within the
+        browser's ~2&nbsp;GB wasm ceiling up to very large sensors. Closing the image closes the
+        decoder handle and releases the heap. The original file bytes also live on, untouched, as the Edit's <code>source</code> —
         an Edit row is now commonly 25&ndash;100&nbsp;MB, which IndexedDB handles fine (a
         storage-persistence request at first save guards against eviction; per-edit size has always
         been part of the Edit summary, context.md).
       </p>
 
-      <h2>7 · The decoder: LibRaw in your browser</h2>
+      <h2>7 · The decoder: FlashRaw in your browser</h2>
 
       <p>
-        The decode itself is performed by <strong>LibRaw</strong>, the open-source C++ library at
-        the heart of most RAW software — it understands the sensor formats and compression schemes
-        of essentially every camera that makes RAW files, including Fuji's X-Trans mosaics and the
-        newest bodies (as long as the library version is recent enough). Browsers cannot run C++
-        directly, so LibRaw is compiled to <em>WebAssembly</em> — a low-level binary format browsers
-        execute at near-native speed — and bundled with the app (~1.4&nbsp;MB, built with SIMD and
-        multithreading enabled). The wasm build, the thin C++ wrapper around it, and the TypeScript
-        client are <strong>ours</strong>: a fork of the LibRaw-Wasm project, rebuilt from source by
-        <code>bun run build:raw</code> (docs/adr/0008-raw-decode).
+        The decode itself is performed by <strong>FlashRaw</strong>, an open-source decoder written
+        in Rust (MIT&nbsp;/&nbsp;Apache-2.0) that understands about 40 RAW formats — Canon CR3
+        including C-RAW, Fuji compressed RAF and X-Trans mosaics, JPEG&nbsp;XL DNG, Sigma X3F and
+        most others. It is compiled to <em>WebAssembly</em> — a low-level binary format browsers
+        execute at near-native speed — and ships in the <code>flashraw</code> npm package
+        (~750&nbsp;KiB compressed, built with SIMD, multithreaded when the page is cross-origin
+        isolated). The app installs the package; there is no build of our own to maintain
+        (docs/adr/0008-raw-decode).
       </p>
 
-      <p>Owning the build is a deliberate choice, and it buys three concrete things:</p>
+      <p>Using a maintained package buys three concrete things:</p>
 
       <ul>
         <li>
-          <strong>Progress.</strong> The stock wrapper reports nothing during a decode; ours wires
-          LibRaw's progress callback so the editor can show the stage-based bar of &sect;6.
+          <strong>Memory safety.</strong> The parsers of untrusted files are memory-safe Rust,
+          with bounds-checked parsing and allocation limits.
         </li>
         <li>
-          <strong>Version freedom.</strong> Cameras ship new formats on their own schedule (Canon
-          C-RAW, Nikon HE*, new bodies). The build pins LibRaw 0.22.1 and can be bumped and rebuilt
-          whenever — a rebuild, not a rewrite.
+          <strong>Speed.</strong> Every codec decodes on several cores, and RAW to RGB runs as a
+          single fused pass.
         </li>
         <li>
-          <strong>Trust.</strong> The shipped wasm binary is built from pinned, inspectable sources
-          rather than consumed from a third party.
+          <strong>Version freedom.</strong> Cameras ship new formats on their own schedule. Picking
+          them up is a package bump, not a rebuild.
         </li>
       </ul>
 
       <p>
-        One boundary is worth naming plainly. LibRaw's best demosaic algorithms (AMaZE, DCB, and
-        friends) are licensed GPL, and including them would drag the whole app's licensing posture
-        along. The build therefore stops at <strong>AHD</strong> (&sect;2) — the best algorithm in
-        the permissively-licensed core. AHD is a perfectly respectable quality tier; it is simply
-        not the absolute ceiling, and the ceiling is a licensing decision, not a technical one.
+        One boundary is worth naming plainly. Nikon High Efficiency NEF (TicoRAW) is a proprietary
+        codec that no open decoder supports; those files fail with a readable error and the app
+        retries the browser decode once before reporting that the image cannot be opened.
       </p>
 
       <div class="callout">
-        <span class="h">The future watch item: Rust.</span> A Rust-based decode stack (rawler + a
-        pure-Rust demosaic crate, or — more promising — darktable's RawSpeed library, whose official
-        Rust port is in progress) would be licensing-clean end to end. It is not today's choice:
-        coverage and proven demosaic quality favor LibRaw, and the seam (a settings schema plus a
-        service contract) does not block switching later. When RawSpeed-Rust ships with
-        darktable-grade quality, it becomes a serious candidate.
+        <span class="h">The future option: GPU demosaic.</span> FlashRaw can return the
+        black-subtracted, white-normalized mosaic itself, and has a WebGPU backend. A demosaic
+        written for the editor's own pipeline would not change the service seam: it is a different
+        output mode and a different shader.
       </div>
 
       <h2>8 · The formats</h2>
@@ -870,7 +861,7 @@
           <td>Canon</td>
           <td>
             CR3 is the modern container; C-RAW (the &ldquo;c&rdquo; is for compressed) is lossy and
-            needs a recent LibRaw.
+            needs a recent decoder.
           </td>
         </tr>
         <tr>
@@ -914,8 +905,7 @@
         <em>already-demosaiced</em> RGB — three values per pixel, no mosaic — but still linear
         (un-tonemapped) and still carrying the calibration metadata. iPhone ProRAW (12&nbsp;MP) is
         exactly this: the file is already a &ldquo;photo,&rdquo; missing only the color matrix and
-        tone curve. Lutra gives linear DNGs no special treatment: if LibRaw decodes them (it does,
-        for dcraw-style pipelines), they work; if a file fails, the failure is an honest, readable
+        tone curve. Lutra gives linear DNGs no special treatment: if FlashRaw decodes them, they work; if a file fails, the failure is an honest, readable
         error. The 48&nbsp;MP ProRAW variant, by contrast, is a normal Bayer DNG.
       </p>
 
@@ -933,20 +923,12 @@
         docs/adr/0008-raw-decode):
       </p>
 
-      <pre><code>useCameraWb: true        // as-shot white balance (&sect;4) — the untouched image
-                         // matches what the camera previewed
-useCameraMatrix: 3       // always apply the camera color matrix (&sect;5)
-outputColor: 1           // sRGB primaries
-outputBps: 16            // 16 bits per channel
-gamm: [1/2.4, 12.92]     // the sRGB curve — inverted exactly by the engine's
-                         // pass-0 srgbToLinear (architecture.html &sect;4)
-userQual: 3              // AHD demosaic (&sect;2) — the ceiling of this build
-highlight: 2             // blend: blown highlights reconstruct from neighbors
-                         // instead of clipping to a tinted white
-noAutoBright: true       // no histogram brightening — the camera's recorded
-                         // levels, as-is; the Exposure layer owns brightness
-userFlip: -1             // apply the EXIF orientation
-halfSize: false          // full resolution, always</code></pre>
+      <pre><code>output: 'rgba8'          // 8 bits per channel, the bitmap the editor's source uses
+colorSpace: 'srgb'       // sRGB primaries and the sRGB curve — inverted exactly by
+                         // the engine's pass-0 srgbToLinear (architecture.html &sect;4)
+demosaic: 'bilinear'     // full resolution, always (&sect;2)
+exposure: 0              // no brightening — the camera's recorded levels, as-is;
+                         // the Exposure layer owns brightness</code></pre>
 
       <table>
         <tr>
@@ -963,22 +945,21 @@ halfSize: false          // full resolution, always</code></pre>
           <td>Decode time (24 MP)</td>
           <td>~0.6&ndash;1.4 s desktop</td>
           <td>
-            measured with LibRaw 0.22 in wasm; phones slower — progress bar + embedded JPEG cover it
+            vendor-reported for FlashRaw in wasm; phones slower — the embedded JPEG covers the wait
           </td>
         </tr>
         <tr>
           <td>Memory</td>
-          <td>~192 MB RGBA16 per 24 MP</td>
+          <td>~96 MB RGBA8 per 24 MP</td>
           <td>
-            worker heap grows from 256 MB; released on dispose; ~100 MP is the practical ceiling
+            released when the decoder handle closes; wasm32's ~2 GB ceiling bounds very large sensors
           </td>
         </tr>
         <tr>
           <td>Wasm</td>
-          <td>~1.4 MB</td>
+          <td>~750 KiB (brotli)</td>
           <td>
-            built from pinned sources via <code>bun run build:raw</code>; pre-warmed in a hidden
-            worker at startup
+            shipped by the <code>flashraw</code> npm package; loads in the background
           </td>
         </tr>
         <tr>
@@ -996,21 +977,20 @@ halfSize: false          // full resolution, always</code></pre>
         </tr>
         <tr>
           <td>Demosaic</td>
-          <td>AHD</td>
-          <td>edge-aware, from the dcraw lineage; the licensing ceiling (&sect;7)</td>
+          <td>Bilinear</td>
+          <td>the demosaic FlashRaw ships (&sect;2)</td>
         </tr>
         <tr>
           <td>License</td>
-          <td>LGPL-2.1 / CDDL LibRaw</td>
-          <td>wrapper ISC, LCMS MIT; no GPL components in the build</td>
+          <td>MIT / Apache-2.0 FlashRaw</td>
+          <td>no copyleft components</td>
         </tr>
       </table>
 
       <footer class="fineprint">
         <p class="sans">
           Lutra &mdash; a color-grading app for film simulation. The RAW pipeline's design
-          decisions: docs/adr/0008-raw-decode; the full research trail:
-          <code>docs/research/raw-support.md</code>. The surrounding render pipeline is documented
+          decisions: docs/adr/0008-raw-decode. The surrounding render pipeline is documented
           in <code>docs/architecture.html</code>; the LUT layer and its filmstrip previews in
           <code>docs/LUT.html</code>. The vocabulary (&ldquo;RAW decode,&rdquo; &ldquo;embedded JPEG
           preview,&rdquo; &ldquo;as-shot white balance,&rdquo; &hellip;) lives in

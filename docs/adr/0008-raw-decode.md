@@ -1,13 +1,14 @@
 # RAW decode
 
-**Status**: decided (`packages/raw-decoder` does not exist yet).
+**Status**: implemented (`packages/frontend/src/lib/decode-image.ts`).
 
-RAW files (CR2/CR3, NEF, ARW, RW2, ORF, RAF, DNG) decode client-side at full resolution via an **owned LibRaw wasm build** in `packages/raw-decoder` — our fork of LibRaw-Wasm (C++ wrapper + Emscripten build script + committed dist + TypeScript client), rebuilt via `bun run build:raw`. Owning the build buys progress callbacks, LibRaw version freedom, and flag control; the cost is maintaining the wrapper and version bumps.
+RAW files (CR2/CR3, NEF, ARW, RW2, ORF, RAF, DNG, and about 30 more) decode client-side at full resolution with [FlashRaw](https://flashraw.ybouane.com), a Rust decoder compiled to WebAssembly and installed from npm (`flashraw`). There is no owned build, no native toolchain and no committed binary: the npm package ships the wasm.
 
-- **Decode lands as an sRGB-encoded 16-bit source texture** (rgba16unorm; RGB→RGBA padded in-worker): the engine changes nothing, since pass 0's linearize step inverts exactly this curve. A linear working space is a documented future option — not worth touching four engine sites for near-zero visible difference in an sRGB-authored app.
-- The full pipeline runs on CPU via LibRaw (`imageData()`): unpack, levels, as-shot white balance, camera matrix, AHD demosaic, sRGB encode — in a dedicated worker with stage-based progress and an embedded-JPEG placeholder during decode.
-- Decode settings are deliberate: as-shot WB (the White balance layer adjusts relative to it — its range cannot fix a neutral decode under tungsten), camera matrix always applied, **AHD demosaic** (the licensing ceiling — AMaZE/DCB/DHT are GPL2 and would drag the app's posture along), highlight blend, no auto-brightness (don't fight the Exposure layer), EXIF orientation ignored.
-- Routing sniffs RAW (TIFF magic + extension set) → wasm path, else `createImageBitmap`; a raw decode failure retries the browser decode once before surfacing a tagged error.
-- Gallery/loading placeholders use the **embedded JPEG** (instant); LUT-bar thumbnails use a decode-derived preview instead — embedded JPEGs carry the camera tone curve and would mismatch how the editor renders.
-- Licensing: LGPL-2.1/CDDL LibRaw, ISC wrapper, MIT LCMS; attribution ships with the dist. ProRAW / linear DNGs get zero special investment (core LibRaw decodes them or they fail with a readable error).
-- The Rust demosaic stack (rawler; RawSpeed's official Rust port) remains the watch-item alternative — the service seam and settings schema don't block it.
+- **Decode lands as an 8-bit sRGB `ImageBitmap`** (`output: 'rgba8'`, `colorSpace: 'srgb'`): the editor's source is an `ImageBitmap` for every format, so the engine changes nothing and pass 0's linearize step inverts exactly this curve. A 16-bit source (`rgb16`) or a linear working space (`linear-rgb16`) is a future option that needs a new source-texture path.
+- FlashRaw runs unpack, black/white normalization, as-shot white balance, demosaic, camera matrix and sRGB encode in one pass. It runs in a Web Worker (`flashraw/worker`, pool of one) so the editor stays responsive. It is multithreaded when the page is cross-origin isolated and single-threaded otherwise.
+- Decode settings are deliberate: as-shot WB (the White balance layer adjusts relative to it — its range cannot fix a neutral decode under tungsten), full-size output (the `half-size` demosaic is a future quality tier), no exposure, black-point or white-point adjustment (don't fight the Exposure layer). The demosaic is bilinear; FlashRaw offers no other algorithm.
+- Routing: one `decodeImage(blob)` function. A picked file with a RAW extension tries FlashRaw first; any other blob (a saved Edit's source has no name) tries `createImageBitmap` first and falls back to FlashRaw. The browser decoder's error is the one surfaced.
+- Gallery/loading placeholders use the **embedded JPEG** (`raw.preview()`, instant); LUT-bar thumbnails use a decode-derived preview instead — embedded JPEGs carry the camera tone curve and would mismatch how the editor renders.
+- Licensing: FlashRaw is MIT OR Apache-2.0. No copyleft component ships with the app.
+- Nikon High Efficiency NEF (TicoRAW) is not decodable by any open decoder. It fails with `UnsupportedCompression` and takes the error path above.
+- FlashRaw can also return the undemosaiced, normalized CFA (`output: 'normalized'`) and has a WebGPU backend, so a GPU demosaic stays possible without changing the service seam.

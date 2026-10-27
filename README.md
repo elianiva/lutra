@@ -31,7 +31,7 @@ It's a monorepo with a few packages under `packages/`. Everything is built with 
 
 - **`@lutra/store`** — the persistence seam. Defines the Edit/Edit summary schemas, the Edit store service contract, and the browser IndexedDB implementation. A future server-side store swaps in behind the same interface.
 
-- **`@lutra/raw-decoder`** — RAW file decoding. A fork of LibRaw-Wasm — the C++ wrapper, Emscripten build, committed wasm dist, and a TypeScript client. Rebuilds via `bun run build:raw`.
+- **RAW decoding** — [FlashRaw](https://flashraw.ybouane.com), a Rust decoder compiled to WebAssembly, installed from npm (`flashraw`).
 
 ## How it works
 
