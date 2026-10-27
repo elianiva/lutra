@@ -9,6 +9,7 @@ import type { EditStore } from '@lutra/store'
 import * as ExportDialog from '../export-dialog'
 import type { AppRoute } from '../route'
 import { initialModel } from './model'
+import { Loading } from './phase'
 import type { Model } from './model'
 import { EditorMessage } from './message'
 import { LoadCatalog, LoadEdit, LoadEditPlaceholder, LoadLutRecents } from './command'
@@ -42,5 +43,7 @@ export const init = (route: AppRoute): InitReturn => {
     route._tag === 'Editor'
       ? [LoadEditPlaceholder({ id: route.editId }), LoadEdit({ id: route.editId }), ...boot]
       : boot
-  return { model: initialModel(), commands }
+  // An attached Edit decodes from the first frame: skip the upload zone.
+  const model = route._tag === 'Editor' ? { ...initialModel(), phase: Loading() } : initialModel()
+  return { model, commands }
 }

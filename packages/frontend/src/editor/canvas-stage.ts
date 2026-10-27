@@ -8,6 +8,7 @@ import { canvasRef, registerCanvas } from '../gpu/canvas-ref'
 import { chainDock } from './chain-dock'
 import { viewBar } from './frame-bar'
 import { MountElementError } from '../errors'
+import { revealPhoto } from './photo-reveal'
 import type { Model } from './model'
 
 export type CanvasStageModel = Pick<
@@ -337,11 +338,15 @@ export const PanZoom = Mount.defineStream('PanZoom', {
  * Commands and Subscriptions.
  */
 export const RegisterCanvas = Mount.define('RegisterCanvas', {
+  args: { bitmap: S.NullOr(S.instanceOf(ImageBitmap)) },
   messages: [EditorMessage.CanvasRegistered],
-  execute: ({ element }) =>
+  execute: ({ element, bitmap }) =>
     Effect.gen(function* () {
       if (element instanceof HTMLCanvasElement) {
         yield* registerCanvas(canvasRef, element)
+        if (bitmap !== null) {
+          yield* revealPhoto(element, bitmap)
+        }
       }
       return EditorMessage.CanvasRegistered()
     }),
@@ -489,17 +494,19 @@ const splitDivider = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel): H
 /** The placeholder frame before an image is loaded: a 4:5 print. */
 const PLACEHOLDER_RATIO = 0.8
 
-/** The saved thumbnail, softened, while the attached Edit's source decodes. */
-const placeholderStage = (h: HtmlBuilder<EditorMessage>, url: string) =>
+/** The saved thumbnail, softened (or the bare print without one), while the source decodes. */
+const placeholderStage = (h: HtmlBuilder<EditorMessage>, url: string | null) =>
   h.div(
     [h.Class('flex h-full w-full items-center justify-center'), h.AriaLabel('Loading photo')],
-    [
-      h.img([
-        h.Src(url),
-        h.Alt(''),
-        h.Class('breathe max-h-full max-w-full object-contain blur-sm'),
-      ]),
-    ],
+    url === null
+      ? []
+      : [
+          h.img([
+            h.Src(url),
+            h.Alt(''),
+            h.Class('breathe max-h-full max-w-full object-contain blur-sm'),
+          ]),
+        ],
   )
 
 const emptyStage = (h: HtmlBuilder<EditorMessage>) =>
@@ -639,7 +646,7 @@ const loadedStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel, rat
                 h.canvas(
                   [
                     h.Id('lutra-canvas'),
-                    h.OnMount(RegisterCanvas()),
+                    h.OnMount(RegisterCanvas({ bitmap: src.bitmap })),
                     h.Attribute('width', String(contentWidth)),
                     h.Attribute('height', String(src.height)),
                     h.Class('block h-full w-full'),
@@ -684,9 +691,9 @@ export const canvasStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageMod
                       errorStage(h, model.source.error?.message ?? 'Unknown error'),
                     ),
                     Match.orElse(() =>
-                      model.placeholderUrl === null
-                        ? emptyStage(h)
-                        : placeholderStage(h, model.placeholderUrl),
+                      model.phase._tag === 'Loading' || model.placeholderUrl !== null
+                        ? placeholderStage(h, model.placeholderUrl)
+                        : emptyStage(h),
                     ),
                   ),
                   PLACEHOLDER_RATIO,

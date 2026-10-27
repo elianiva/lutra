@@ -17,7 +17,10 @@ import { canvasRef } from './canvas-ref'
 const mountCanvas = (element: Element): Effect.Effect<Fiber.Fiber<void>, never, Scope.Scope> =>
   Effect.gen(function* mountCanvas() {
     const fiber = yield* Effect.forkScoped(
-      Stream.runForEach(RegisterCanvas().f(element, liveViewStateChanges), () => Effect.void),
+      Stream.runForEach(
+        RegisterCanvas({ bitmap: null }).f(element, liveViewStateChanges),
+        () => Effect.void,
+      ),
     )
     let current: Option.Option<HTMLCanvasElement> = Option.none()
     for (let i = 0; i < 100; i++) {
@@ -55,9 +58,9 @@ describe('RegisterCanvas mount', () => {
 
     const messages = await Effect.runPromise(
       Effect.scoped(
-        Stream.runCollect(Stream.take(RegisterCanvas().f(el, liveViewStateChanges), 1)).pipe(
-          Effect.map((chunk) => [...chunk]),
-        ),
+        Stream.runCollect(
+          Stream.take(RegisterCanvas({ bitmap: null }).f(el, liveViewStateChanges), 1),
+        ).pipe(Effect.map((chunk) => [...chunk])),
       ),
     )
 

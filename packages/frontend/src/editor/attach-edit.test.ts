@@ -27,6 +27,15 @@ describe('attached edit load (gallery → /edit/:id)', () => {
     expect(names).toContain('LoadLutRecents')
   })
 
+  it('init boots straight into Loading on an Edit route, Empty on the gallery', () => {
+    expect(init(editorRoute).model.phase._tag).toBe('Loading')
+    expect(init({ _tag: 'Gallery' }).model.phase._tag).toBe('Empty')
+  })
+
+  it('informRouteChanged onto an Edit swaps the upload zone for Loading', () => {
+    expect(informRouteChanged(initialModel(), editorRoute).model.phase._tag).toBe('Loading')
+  })
+
   it('init does not fire LoadEdit when the boot route is the gallery', () => {
     const { commands = [] } = init({ _tag: 'Gallery' })
     expect(commands.map((c) => c.name)).not.toContain('LoadEdit')

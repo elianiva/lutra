@@ -10,6 +10,7 @@ import { EditorMessage } from './message'
 import type { Model } from './model'
 import type { AppRoute } from '../route'
 import * as ExportDialog from '../export-dialog'
+import { Loading } from './phase'
 import { LoadCatalog, LoadEdit, LoadEditPlaceholder, LoadLutRecents } from './command'
 
 type Resource =
@@ -46,5 +47,9 @@ export const informRouteChanged = (model: Model, route: AppRoute): RouteChangedR
     route._tag === 'Editor'
       ? [LoadEditPlaceholder({ id: route.editId }), LoadEdit({ id: route.editId }), ...boot]
       : boot
-  return { model, commands }
+  // Arriving on an Edit with no image up swaps the upload zone (or a stale
+  // error) for the develop stage; an open image stays until the new one lands.
+  const awaiting =
+    route._tag === 'Editor' && (model.phase._tag === 'Empty' || model.phase._tag === 'Error')
+  return { model: awaiting ? { ...model, phase: Loading() } : model, commands }
 }
