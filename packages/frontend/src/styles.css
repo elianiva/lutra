@@ -279,11 +279,6 @@ body {
   background: linear-gradient(90deg, transparent, var(--mat-fade), transparent);
 }
 
-.seam-v {
-  width: 1px;
-  background: linear-gradient(180deg, transparent, var(--mat-fade), transparent);
-}
-
 /* slider knob (the visible thumb of the range row) */
 .knob {
   background: var(--mat-knob);
@@ -419,4 +414,73 @@ input[type='range'].lutra-range::-moz-range-thumb {
 
 @theme inline {
   --font-heading: var(--font-heading);
+}
+
+/* Page navigation (docs/adr/0013-materials): Edits and Tools are routes of one app, so
+   the move runs in a same-document view transition. The nav stays
+   put, its active tab slides, and the page slides in the direction of travel
+   (the transition type, set by `viewTransition` in main.ts). */
+::view-transition-group(nav-tab),
+::view-transition-group(nav) {
+  animation-duration: 0.35s;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+::view-transition-old(nav-tab),
+::view-transition-new(nav-tab) {
+  animation: none;
+  mix-blend-mode: normal;
+  height: 100%;
+}
+
+@keyframes page-out-left {
+  to {
+    transform: translateX(-12%);
+    opacity: 0;
+  }
+}
+@keyframes page-in-right {
+  from {
+    transform: translateX(12%);
+    opacity: 0;
+  }
+}
+@keyframes page-out-right {
+  to {
+    transform: translateX(12%);
+    opacity: 0;
+  }
+}
+@keyframes page-in-left {
+  from {
+    transform: translateX(-12%);
+    opacity: 0;
+  }
+}
+
+::view-transition-old(page),
+::view-transition-new(page) {
+  animation-duration: 0.35s;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  animation-fill-mode: both;
+}
+
+html:active-view-transition-type(to-tools)::view-transition-old(page) {
+  animation-name: page-out-left;
+}
+html:active-view-transition-type(to-tools)::view-transition-new(page) {
+  animation-name: page-in-right;
+}
+html:active-view-transition-type(to-edits)::view-transition-old(page) {
+  animation-name: page-out-right;
+}
+html:active-view-transition-type(to-edits)::view-transition-new(page) {
+  animation-name: page-in-left;
+}
+
+/* The nav is the same on both pages: swap it instantly, no cross-fade. */
+::view-transition-old(nav),
+::view-transition-new(nav) {
+  animation: none;
+  mix-blend-mode: normal;
 }

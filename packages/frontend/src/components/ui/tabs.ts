@@ -34,7 +34,7 @@ export type RenderInfo<Value extends string = string> = FoldkitTabs.RenderInfo<V
 export type TabsListVariant = 'default' | 'line'
 
 const tabsListBaseClass =
-  'rounded-lg p-[3px] group-data-horizontal/tabs:h-8 data-[variant=line]:rounded-none group/tabs-list inline-flex w-fit items-center justify-center text-muted-foreground group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col'
+  'relative rounded-lg p-[3px] group-data-horizontal/tabs:h-8 data-[variant=line]:rounded-none group/tabs-list inline-flex w-fit items-center justify-center text-muted-foreground group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col'
 
 const tabsListVariantClasses = {
   default: 'bg-muted',
@@ -52,6 +52,38 @@ export const tabsTriggerClass = cn(
   'data-selected:bg-background data-selected:text-foreground dark:data-selected:border-input dark:data-selected:bg-input/30 dark:data-selected:text-foreground',
   'after:absolute after:bg-foreground after:opacity-0 after:transition-opacity group-data-horizontal/tabs:after:inset-x-0 group-data-horizontal/tabs:after:bottom-[-5px] group-data-horizontal/tabs:after:h-0.5 group-data-vertical/tabs:after:inset-y-0 group-data-vertical/tabs:after:-right-1 group-data-vertical/tabs:after:w-0.5 group-data-[variant=line]/tabs-list:data-selected:after:opacity-100',
 )
+
+/** foldcn extra (upstream Base UI animates its active indicator the same way):
+ *  one persistent pill under the list's triggers that slides to the selected
+ *  one. Columns must be equal width — give the list `grid grid-flow-col
+ *  auto-cols-fr` and the triggers a transparent selected background. `pad` is
+ *  the list's padding in px. */
+export const indicator = <M>(
+  config: Readonly<{ index: number; count: number; pad?: number; className?: string }>,
+  h: HtmlBuilder<M>,
+): Html => {
+  const pad = config.pad ?? 3
+  return h.span(
+    [
+      h.AriaHidden(true),
+      h.DataAttribute('slot', 'tabs-indicator'),
+      h.Class(
+        cn(
+          'pointer-events-none absolute rounded-md bg-background shadow-sm transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none dark:bg-input/30',
+          config.className,
+        ),
+      ),
+      h.Style({
+        top: `${pad}px`,
+        bottom: `${pad}px`,
+        left: `${pad}px`,
+        width: `calc((100% - ${pad * 2}px) / ${config.count})`,
+        transform: `translateX(${config.index * 100}%)`,
+      }),
+    ],
+    [],
+  )
+}
 
 export const tabsContentClass = 'text-sm flex-1 outline-none'
 
@@ -119,6 +151,8 @@ export const styledViewInputs = <M, Value extends string = string>(
 ): ViewInputs<Value> => {
   const isVertical = viewInputs.orientation === 'Vertical'
   const variant = viewInputs.variant ?? 'default'
+  // the selected pill slides between equal-width columns (see `indicator`)
+  const slides = variant === 'default' && !isVertical
   const base: ViewInputs<Value> = {
     tabs: viewInputs.tabs,
     selectedValue: viewInputs.selectedValue,
@@ -143,18 +177,34 @@ export const styledViewInputs = <M, Value extends string = string>(
               ...tablist,
               h.DataAttribute('slot', 'tabs-list'),
               h.Attribute('data-variant', variant),
-              h.Class(cn(tabsListClass(variant), viewInputs.listClass)),
-            ],
-            tabs.map((tab) =>
-              h.button(
-                [
-                  ...tab.tab,
-                  h.DataAttribute('slot', 'tabs-trigger'),
-                  h.Class(cn(tabsTriggerClass, viewInputs.triggerClass)),
-                ],
-                [h.span([], [tab.value])],
+              h.Class(
+                cn(
+                  tabsListClass(variant),
+                  slides && 'grid grid-flow-col auto-cols-fr',
+                  viewInputs.listClass,
+                ),
               ),
-            ),
+            ],
+            [
+              slides ? indicator({ index: activeIndex, count: tabs.length }, h) : null,
+              ...tabs.map((tab) =>
+                h.button(
+                  [
+                    ...tab.tab,
+                    h.DataAttribute('slot', 'tabs-trigger'),
+                    h.Class(
+                      cn(
+                        tabsTriggerClass,
+                        slides &&
+                          'z-10 data-selected:bg-transparent dark:data-selected:border-transparent dark:data-selected:bg-transparent',
+                        viewInputs.triggerClass,
+                      ),
+                    ),
+                  ],
+                  [h.span([], [tab.value])],
+                ),
+              ),
+            ],
           ),
           ...tabs
             .filter((tab) => tab.index === activeIndex)

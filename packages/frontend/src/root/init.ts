@@ -10,6 +10,8 @@ import type { EditStore } from '@lutra/store'
 import { AppMessage, RootMessage } from './message'
 import type { Model } from './model'
 import { GalleryRoute, EditorRoute, parseRoute } from '../route'
+import * as Tools from '../tools'
+import type { ImageWorkers } from '../tools/pipeline/pool'
 import * as Gallery from '../gallery'
 import * as Editor from '../editor'
 import type { LutThumbnailer } from '../thumbs/worker-layer'
@@ -27,17 +29,19 @@ type Resource =
   | EditStore
   | LutThumbnailer
   | OfflineFill
+  | ImageWorkers
 
 export type InitReturn = Update.Return<Model, AppMessage, Resource>
 
 /**
  * The root's cold-load `init` (docs/adr/0006-frontend-architecture, routing-and-navigation). Parses
- * the boot URL into a route, seeds BOTH Submodels (they hold persistent
+ * the boot URL into a route, seeds ALL Submodels (they hold persistent
  * cross-route state — a user can navigate between them without a reload), and
  * fires only the active route's boot Commands:
  *
  *   Gallery → `Gallery.init` (fires `ListEdits` so the grid populates)
  *   Editor  → `Editor.init`  (fires the LUT catalog + export-settings loads)
+ *   Tools   → none (its state is local until a photo is added)
  *   NotFound → none
  */
 export const init = (capability: WebGpuCapability, url: Url.Url): InitReturn => {
@@ -64,6 +68,7 @@ export const init = (capability: WebGpuCapability, url: Url.Url): InitReturn => 
       gallery,
       offline,
       route,
+      tools: Tools.init(),
       webgpu: capability,
     },
     // The offline fill's boot auto-start (docs/adr/0007-offline): unless the device

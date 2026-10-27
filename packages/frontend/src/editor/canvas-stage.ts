@@ -50,9 +50,11 @@ export const asHtmlElement = (element: Element): HTMLElement => {
  */
 export const PanZoom = Mount.defineStream('PanZoom', {
   args: { imageHeight: S.Number, imageWidth: S.Number },
-  messages: [EditorMessage.ScaledCanvas],
+  messages: [EditorMessage.ScaledCanvas, EditorMessage.DeselectedAll],
   execute: ({ element, imageWidth, imageHeight }) =>
-    Stream.callback<typeof EditorMessage.ScaledCanvas.Type>((queue) =>
+    Stream.callback<
+      typeof EditorMessage.ScaledCanvas.Type | typeof EditorMessage.DeselectedAll.Type
+    >((queue) =>
       Effect.gen(function* () {
         const stage = asHtmlElement(element)
         const state = {
@@ -74,6 +76,10 @@ export const PanZoom = Mount.defineStream('PanZoom', {
           startMidY: number
         } | null = null
         let lastTap = { at: 0, x: 0, y: 0 }
+        // Where the press began: a release that has not moved is a click, and a
+        // click on bare canvas (not on the chain, the view bar or any control)
+        // deselects, like clicking the empty artboard in a design tool.
+        let press: { x: number; y: number; onCanvas: boolean } | null = null
         const emit = (scale: number, offsetX: number, offsetY: number) =>
           Queue.offerUnsafe(queue, EditorMessage.ScaledCanvas({ offsetX, offsetY, scale }))
 
@@ -186,6 +192,13 @@ export const PanZoom = Mount.defineStream('PanZoom', {
           }
           state.touched = true
           pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+          press =
+            pointers.size === 1 &&
+            e.target instanceof Element &&
+            e.target.closest('button, a, input, select, textarea, label, [data-keep-selection]') ===
+              null
+              ? { x: e.clientX, y: e.clientY, onCanvas: true }
+              : null
           if (pointers.size === 1) {
             const now = performance.now()
             if (
@@ -246,6 +259,15 @@ export const PanZoom = Mount.defineStream('PanZoom', {
           emit(state.scale, state.offsetX, state.offsetY)
         }
         const onUp = (e: PointerEvent) => {
+          if (
+            e.type === 'pointerup' &&
+            press?.onCanvas === true &&
+            pointers.size === 1 &&
+            Math.hypot(e.clientX - press.x, e.clientY - press.y) < 4
+          ) {
+            Queue.offerUnsafe(queue, EditorMessage.DeselectedAll())
+          }
+          press = null
           pointers.delete(e.pointerId)
           if (pointers.size === 0) {
             state.dragging = false

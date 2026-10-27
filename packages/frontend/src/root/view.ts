@@ -3,9 +3,10 @@ import { Match, Schema as S } from 'effect'
 import type { Model } from './model'
 import { AppMessage, RootMessage } from './message'
 import { OfflineMessage } from '../offline/messages'
-import { GalleryRoute, EditorRoute } from '../route'
+import { GalleryRoute, EditorRoute, ToolsRoute } from '../route'
 import * as Gallery from '../gallery'
 import * as Editor from '../editor'
+import * as Tools from '../tools'
 import { button } from '@/components/ui/button'
 
 /**
@@ -33,6 +34,10 @@ const toGalleryParent = (
 const toEditorParent = (
   message: Parameters<typeof RootMessage.GotEditorMessage>[0]['message'],
 ): RootMessage => RootMessage.GotEditorMessage({ message })
+
+const toToolsParent = (
+  message: Parameters<typeof RootMessage.GotToolsMessage>[0]['message'],
+): RootMessage => RootMessage.GotToolsMessage({ message })
 
 // Module-scope helpers for lazy — stable fn references (lazy compares fn === prevFn)
 const unsupportedScreenView = (webgpu: Model['webgpu'], h: HtmlBuilder<AppMessage>): Html =>
@@ -96,6 +101,7 @@ const activeRouteView = (
   route: Model['route'],
   gallery: Model['gallery'],
   editor: Model['editor'],
+  tools: Model['tools'],
   h: HtmlBuilder<AppMessage>,
 ): Html =>
   Match.value(route).pipe(
@@ -116,6 +122,14 @@ const activeRouteView = (
         view: Editor.view,
       }),
     ),
+    Match.when(S.is(ToolsRoute), () =>
+      h.submodel({
+        model: tools,
+        slotId: 'tools',
+        toParentMessage: toToolsParent,
+        view: Tools.view,
+      }),
+    ),
     Match.orElse(() => notFound(h)),
   )
 
@@ -128,7 +142,7 @@ export const view = (model: Model, h: HtmlBuilder<AppMessage>): Document => {
   }
   return {
     body: h.div(
-      [h.Class('flex h-full flex-col bg-bg text-ink')],
+      [h.Class('flex h-full flex-col bg-bg text-ink [view-transition-name:page]')],
       [
         lazyReadyToast(readyToastView, [model.offline.readyToast, h]),
         ...Match.value(model.route).pipe(
@@ -139,7 +153,13 @@ export const view = (model: Model, h: HtmlBuilder<AppMessage>): Document => {
           }),
           Match.orElse(() => []),
         ),
-        lazyActiveRoute(activeRouteView, [model.route, model.gallery, model.editor, h])!,
+        lazyActiveRoute(activeRouteView, [
+          model.route,
+          model.gallery,
+          model.editor,
+          model.tools,
+          h,
+        ])!,
       ],
     ),
     title: 'Lutra',

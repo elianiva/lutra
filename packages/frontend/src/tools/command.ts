@@ -1,7 +1,7 @@
 import { Effect, Option, Schema as S } from 'effect'
 import { Command, File as FoldkitFile } from 'foldkit'
 import { zipSync } from 'fflate'
-import { load } from 'foldkit/navigation'
+import { pushUrl } from 'foldkit/navigation'
 import { pageUrl } from '@/components/nav-pill'
 import { Adjust, Template } from './collage/layout'
 import { isImageFile, outputFileName, timestamp, uniqueName } from './format'
@@ -227,9 +227,9 @@ export const SaveCollage = Command.define('SaveCollage', {
   messages: [Message.CollageSaved, Message.CollageSaveFailed],
 })
 
-/** Open another page of the site from the pill: a separate document, so a page load. */
+/** Open another page of the site from the pill: a URL push; the root animates it. */
 export const OpenPage = Command.define('OpenPage', {
   args: { page: S.Literals(['edits', 'tools']) },
-  execute: ({ page }) => load(pageUrl(page)).pipe(Effect.as(Message.PageOpened())),
+  execute: ({ page }) => pushUrl(pageUrl(page)).pipe(Effect.as(Message.PageOpened())),
   messages: [Message.PageOpened],
 })

@@ -3,6 +3,7 @@ import { defineMessageUnion } from 'foldkit/message'
 import { AppRoute } from '../route'
 import * as Gallery from '../gallery/message'
 import * as Editor from '../editor/message'
+import { Message as ToolsMessage } from '../tools/message'
 import { OfflineMessage } from '../offline/messages'
 
 // The root orchestrated Submodel Messages (docs/adr/0006-frontend-architecture): routing facts the
@@ -16,6 +17,7 @@ export const RootMessage = defineMessageUnion({
   Navigated: { request: S.Unknown },
   GotGalleryMessage: { message: Gallery.GalleryMessage },
   GotEditorMessage: { message: Editor.EditorMessage },
+  GotToolsMessage: { message: ToolsMessage },
   /** The root pushed `/edit/:id` in response to a Gallery `OpenedEdit` fact.
    *  Observability only — the URL change itself drives the route transition. */
   NavigatedTo: {},

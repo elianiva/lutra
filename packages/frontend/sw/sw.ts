@@ -50,8 +50,7 @@ self.addEventListener('fetch', (event: FetchEvent) => {
       fetch(request).catch(
         async () =>
           await caches
-            // The tools page is its own document (docs/adr/0014-tools).
-            .match(url.pathname.startsWith('/tools') ? '/tools/index.html' : '/index.html')
+            .match('/index.html')
             .then((hit: Response | undefined) => hit ?? Response.error()),
       ),
     )

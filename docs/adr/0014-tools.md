@@ -2,9 +2,9 @@
 
 ## The decision
 
-The tools page (`/tools/`) is a second page of the Lutra site, reached from the gallery header. It ports [elianiva/imgutils](https://github.com/elianiva/imgutils) — a batch resizer, framer and collage maker — onto the editor's stack: foldkit TEA, Effect, Tailwind and the foldcn components.
+The tools page (`/tools/`) is a second page of the Lutra site, reached from the nav pill. It ports [elianiva/imgutils](https://github.com/elianiva/imgutils) — a batch resizer, framer and collage maker — onto the editor's stack: foldkit TEA, Effect, Tailwind and the foldcn components.
 
-- **A page, not a route.** The tools live in `packages/frontend/src/tools/` with their own document (`tools/index.html`) and their own foldkit application. Vite builds both pages in one build, so one worker serves both and they share an origin: one deploy, one appearance setting, one service worker. The gallery opens the page with a full load (`OpenTools`), because the editor's router does not own it. The tools page needs no WebGPU, so it sits outside the editor's capability gate.
+- **A route, not a document.** Tools is the `/tools` route of the one foldkit application, owned by a Tools Submodel (`packages/frontend/src/tools/`) next to the Gallery and Editor. One worker, one origin, one service worker, and a half-built batch survives a visit to the gallery. Moving between Edits and Tools pushes the URL inside a view transition (`navigate.ts`): the nav's pill slides and the page slides in the direction of travel. The tools need no WebGPU, but the root's capability gate still covers them.
 - **One codec stack.** Encoding goes through the engine's `encodeImage` (jSquash), so the tools get every format the editor exports, AVIF included. The pipeline does its own exact-size resize first and encodes with `scale: 1`.
 - **One visual system.** The page uses the editor's `styles.css`, materials (docs/adr/0013-materials) and foldcn components as they are.
 - **Bounded memory.** Image work runs in a fixed pool of module workers, an Effect service (`ImageWorkers`) that hands each job an idle worker from a queue. A decoded 24 MP photo costs ~96 MB, so the pool holds at most three.
@@ -13,5 +13,5 @@ The tools page (`/tools/`) is a second page of the Lutra site, reached from the 
 
 ## Consequences
 
-- The service worker precaches `/tools/index.html` and falls back to it for `/tools` navigations, so the tools work offline like the editor (docs/adr/0007-offline).
+- The tools work offline like the editor (docs/adr/0007-offline): `/tools` falls back to the one app shell.
 - Collage zoom uses the slider; the reference's scroll-to-zoom is not ported.

@@ -29,7 +29,8 @@ export const group = <M>(h: HtmlBuilder<M>, title: string, children: ReadonlyArr
 export const field = <M>(h: HtmlBuilder<M>, children: ReadonlyArray<Html>): Html =>
   h.div([h.Class('flex flex-col gap-1.5')], children)
 
-/** A segmented choice: a well of pill buttons, the selected one in the accent. */
+/** A segmented choice: a well of pill buttons. One pill slides to the
+ *  selected option, across rows as well as columns. */
 export const segmented = <M, T extends string>(
   h: HtmlBuilder<M>,
   config: Readonly<{
@@ -39,36 +40,53 @@ export const segmented = <M, T extends string>(
     onSelect: (value: T) => M
     columns?: number
   }>,
-): Html =>
-  h.div(
+): Html => {
+  const columns = config.columns ?? config.options.length
+  const index = Math.max(
+    0,
+    config.options.findIndex(({ value }) => value === config.selected),
+  )
+  const [row, column] = [Math.floor(index / columns), index % columns]
+  return h.div(
     [
-      h.Class('well grid gap-1 p-1'),
-      h.Style({
-        'grid-template-columns': `repeat(${config.columns ?? config.options.length}, minmax(0, 1fr))`,
-      }),
+      h.Class('well relative grid gap-1 p-1'),
+      h.Style({ 'grid-template-columns': `repeat(${columns}, minmax(0, 1fr))` }),
       h.Role('group'),
       h.AriaLabel(config.ariaLabel),
     ],
-    config.options.map(({ label: text, value }) => {
-      const active = value === config.selected
-      return h.button(
+    [
+      h.span(
         [
-          h.Type('button'),
+          h.AriaHidden(true),
           h.Class(
-            cn(
-              'h-7 rounded-[10px] px-1 text-[10px] uppercase tracking-[0.1em] transition-colors',
-              active
-                ? 'bg-s3 text-accent shadow-[inset_0_1px_0_var(--mat-rim),0_1px_3px_var(--mat-shadow-b)]'
-                : 'text-muted hover:text-ink',
-            ),
+            'pointer-events-none absolute left-1 top-1 h-7 rounded-[10px] bg-s3 shadow-[inset_0_1px_0_var(--mat-rim),0_1px_3px_var(--mat-shadow-b)] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none',
           ),
-          h.AriaPressed(String(active)),
-          h.OnClick(config.onSelect(value)),
+          h.Style({
+            width: `calc((100% - 8px - ${(columns - 1) * 4}px) / ${columns})`,
+            transform: `translate(calc(${column} * (100% + 4px)), calc(${row} * (100% + 4px)))`,
+          }),
         ],
-        [text],
-      )
-    }),
+        [],
+      ),
+      ...config.options.map(({ label: text, value }) =>
+        h.button(
+          [
+            h.Type('button'),
+            h.Class(
+              cn(
+                'relative h-7 rounded-[10px] px-1 text-[10px] uppercase tracking-[0.1em] transition-colors',
+                value === config.selected ? 'text-accent' : 'text-muted hover:text-ink',
+              ),
+            ),
+            h.AriaPressed(String(value === config.selected)),
+            h.OnClick(config.onSelect(value)),
+          ],
+          [text],
+        ),
+      ),
+    ],
   )
+}
 
 export const numberInput = <M>(
   h: HtmlBuilder<M>,

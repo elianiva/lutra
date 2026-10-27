@@ -195,7 +195,7 @@ describe('gallery: opening several photos at once', () => {
     scene(
       config,
       given(initialModel()),
-      click(selector('nav[aria-label="Navigation"] button:not([aria-pressed])')),
+      click(selector('nav[aria-label="Navigation"] [role="tab"][aria-selected="false"]')),
       Command.expectHas(OpenPage),
       Command.resolve(OpenPage, GalleryMessage.PageOpened()),
       expectNoOutMessage(),

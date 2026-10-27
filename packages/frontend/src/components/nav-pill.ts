@@ -1,7 +1,9 @@
 import type { Html, HtmlBuilder } from 'foldkit/html'
 import { Eclipse, LayoutGrid, Sun, Wrench } from 'lucide'
 import type { Mode } from '../theme'
+import { cn } from '@/lib/utils'
 import { icon } from './icon'
+import * as Tabs from './ui/tabs'
 import { mark } from './wordmark'
 
 /** The site's pages. Each is its own document, so moving between them is a page load. */
@@ -11,6 +13,9 @@ const PAGES = [
   { page: 'edits', label: 'Edits', glyph: LayoutGrid },
   { page: 'tools', label: 'Tools', glyph: Wrench },
 ] as const
+
+const tabClass =
+  'z-10 h-9 gap-2 rounded-full px-4 text-[11px] uppercase tracking-[0.1em] text-muted hover:text-ink data-selected:bg-transparent data-selected:text-ink dark:text-muted dark:hover:text-ink dark:data-selected:border-transparent dark:data-selected:bg-transparent dark:data-selected:text-ink'
 
 /**
  * The floating navigation (docs/adr/0013-materials): logo, the site's pages,
@@ -46,39 +51,47 @@ export const navPill = <M>(
   return h.nav(
     [
       h.Class(
-        'surface-raised fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-1 rounded-full! p-1.5',
+        'surface-raised fixed bottom-5 left-1/2 z-40 flex [view-transition-name:nav] -translate-x-1/2 items-center gap-1.5 rounded-full! p-1.5',
       ),
       h.AriaLabel('Navigation'),
     ],
     [
       h.span(
-        [h.Class('mx-1 grid h-8 w-8 place-items-center rounded-[10px] bg-accent-soft text-ink')],
+        [h.Class('mx-1 grid h-8 w-8 place-items-center rounded-full bg-accent-soft text-ink')],
         [mark(h, 'block h-4 w-auto')],
       ),
-      h.span([h.Class('seam-v mx-1.5 h-4')], []),
-      ...PAGES.map(({ page, label, glyph }) =>
-        page === config.current
-          ? h.span(
-              [
-                h.Class(
-                  'flex h-9 items-center gap-2 rounded-full bg-s2 px-4 text-[11px] uppercase tracking-[0.1em] text-ink',
-                ),
-                h.AriaCurrent('page'),
-              ],
-              [icon(h, glyph, label, 15), label],
-            )
-          : h.button(
+      Tabs.list(
+        { className: 'h-auto grid-flow-col auto-cols-fr grid rounded-none bg-transparent p-0' },
+        [
+          Tabs.indicator(
+            {
+              index: PAGES.findIndex(({ page }) => page === config.current),
+              count: PAGES.length,
+              pad: 0,
+              className: 'rounded-full bg-s2 shadow-none [view-transition-name:nav-tab]',
+            },
+            h,
+          ),
+          ...PAGES.map(({ page, label, glyph }) =>
+            h.button(
               [
                 h.Type('button'),
-                h.Class(
-                  'flex h-9 items-center gap-2 rounded-full px-4 text-[11px] uppercase tracking-[0.1em] text-muted transition-colors hover:bg-s2 hover:text-ink',
-                ),
-                h.OnClick(config.onNavigate(page)),
+                h.Role('tab'),
+                h.AriaSelected(page === config.current),
+                h.DataAttribute('slot', 'tabs-trigger'),
+                ...(page === config.current ? [h.DataAttribute('selected', '')] : []),
+                h.Class(cn(Tabs.tabsTriggerClass, tabClass)),
+                // Its own transition group, painted above the sliding pill (groups
+                // stack in document order) so the labels stay readable mid-slide.
+                h.Style({ 'view-transition-name': `nav-label-${page}` }),
+                ...(page === config.current ? [] : [h.OnClick(config.onNavigate(page))]),
               ],
               [icon(h, glyph, label, 15), label],
             ),
+          ),
+        ],
+        h,
       ),
-      h.span([h.Class('seam-v mx-1.5 h-4')], []),
       h.div(
         [
           h.Class('well flex items-center gap-0.5 rounded-full! p-[3px]'),
@@ -91,4 +104,4 @@ export const navPill = <M>(
 }
 
 /** Where each page lives on the site. */
-export const pageUrl = (page: Page): string => (page === 'tools' ? '/tools/' : '/')
+export const pageUrl = (page: Page): string => (page === 'tools' ? '/tools' : '/')

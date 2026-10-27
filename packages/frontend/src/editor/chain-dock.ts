@@ -109,6 +109,7 @@ export const chainDock = (h: HtmlBuilder<EditorMessage>, slice: ChainDockSlice):
       h.Class('surface flex flex-none flex-col py-2 lg:w-[212px] lg:self-start'),
       h.AriaLabel('Edit chain'),
       h.DataAttribute('testid', 'chain-dock'),
+      h.DataAttribute('keep-selection', ''),
     ],
     [
       h.div(

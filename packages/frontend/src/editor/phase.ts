@@ -153,6 +153,7 @@ export const editorMachine = Machine.define({
             'Selected',
             ({ guardValue }) => ({ model: Selected({ layerId: guardValue }) }),
           ),
+          otherwise(to('Idle', () => ({ model: Idle() }))),
         ],
         RemovedLayer: [
           when(

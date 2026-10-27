@@ -1,6 +1,4 @@
 import { type Html, type HtmlBuilder, createKeyedLazy } from 'foldkit/html'
-import { ImageUp } from 'lucide'
-import { icon } from '@/components/icon'
 import { pillButton } from '@/tools/controls'
 import { cn } from '@/lib/utils'
 import { outputName } from '../command'
@@ -9,7 +7,7 @@ import { Message } from '../message'
 import type { Item, Model } from '../model'
 
 /**
- * Single mode's workspace: the drop target, the batch progress and the result
+ * Single mode's workspace: the batch progress and the result
  * cards. Each card shows the item's state, its size change and its own save.
  */
 const lazyCard = createKeyedLazy()
@@ -19,7 +17,6 @@ export const singleView = (h: HtmlBuilder<Message>, model: Model): Html => {
   return h.div(
     [h.Class('flex min-w-0 flex-1 flex-col gap-5')],
     [
-      dropZone(h, model.items.length === 0),
       working === 0 ? null : progress(h, model.items.length - working, model.items.length),
       model.items.length === 0
         ? null
@@ -35,38 +32,6 @@ export const singleView = (h: HtmlBuilder<Message>, model: Model): Html => {
     ],
   )
 }
-
-const dropZone = (h: HtmlBuilder<Message>, empty: boolean): Html =>
-  h.button(
-    [
-      h.Type('button'),
-      h.Class(
-        cn(
-          'well group flex w-full items-center justify-center gap-4 text-muted transition-colors hover:text-ink',
-          empty ? 'min-h-[320px] flex-col' : 'h-20',
-        ),
-      ),
-      h.OnClick(Message.AddRequested()),
-      h.DataAttribute('drop-zone', 'true'),
-    ],
-    [
-      h.span(
-        [
-          h.Class(
-            cn(
-              'grid place-items-center rounded-full bg-s1 text-accent shadow-[inset_0_1px_0_var(--mat-rim),var(--mat-elev-1)]',
-              empty ? 'size-14' : 'size-10',
-            ),
-          ),
-        ],
-        [icon(h, ImageUp, 'Add images', empty ? 24 : 18)],
-      ),
-      h.span(
-        [h.Class(cn(empty ? 'text-sm text-ink' : 'text-[13px]'))],
-        ['Drop images here or choose files'],
-      ),
-    ],
-  )
 
 const progress = (h: HtmlBuilder<Message>, done: number, total: number): Html =>
   h.div(
@@ -129,9 +94,17 @@ const card = (h: HtmlBuilder<Message>, item: Item): Html => {
             : h.img([
                 h.Src(done === null ? item.sourceUrl : done.result.url),
                 h.Alt(''),
+                h.AriaHidden(true),
+                h.Class('absolute inset-0 size-full scale-125 object-cover opacity-60 blur-2xl'),
+              ]),
+          status._tag === 'Failed'
+            ? null
+            : h.img([
+                h.Src(done === null ? item.sourceUrl : done.result.url),
+                h.Alt(''),
                 h.Class(
                   cn(
-                    'size-full object-contain transition-opacity',
+                    'relative size-full object-contain transition-opacity',
                     done === null || done.stale ? 'opacity-40' : '',
                   ),
                 ),

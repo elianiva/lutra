@@ -1,6 +1,6 @@
 import { Array, DateTime, Effect, Schema as S } from 'effect'
 import { Command, File as FoldkitFile } from 'foldkit'
-import { load } from 'foldkit/navigation'
+import { pushUrl } from 'foldkit/navigation'
 import { pageUrl } from '../components/nav-pill'
 import type { StoreError } from '@lutra/store'
 import { EditStore, EditIdSchema, Edit, EditId, newEditId } from '@lutra/store'
@@ -271,11 +271,11 @@ export const SetTheme = Command.define('SetTheme', {
 })
 
 /**
- * Open another page of the site from the pill (docs/adr/0014-tools). The tools
- * page is its own document, not a route of this app, so it is a full load.
+ * Open another page of the site from the pill (docs/adr/0014-tools). Tools is a route of this app, so
+ * this is a URL push; the root animates it as a view transition.
  */
 export const OpenPage = Command.define('OpenPage', {
   args: { page: S.Literals(['edits', 'tools']) },
-  execute: ({ page }) => load(pageUrl(page)).pipe(Effect.as(GalleryMessage.PageOpened())),
+  execute: ({ page }) => pushUrl(pageUrl(page)).pipe(Effect.as(GalleryMessage.PageOpened())),
   messages: [GalleryMessage.PageOpened],
 })

@@ -211,6 +211,14 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
     return { model }
   }
 
+  if (message._tag === 'DeselectedAll') {
+    return model.phase._tag === 'Drafting'
+      ? update(model, EditorMessage.CancelledDraft())
+      : model.phase._tag === 'Selected'
+        ? update(model, EditorMessage.SelectedLayer({ id: null }))
+        : { model }
+  }
+
   const from = model.phase
   const result = editorMachine.step(model.phase, message)
   const phase = result.state

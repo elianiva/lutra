@@ -2,6 +2,7 @@ import { Schema as S } from 'effect'
 import { AppRoute } from '../route'
 import { Model as GalleryModel } from '../gallery/model'
 import { Model as EditorModel } from '../editor/model'
+import { Model as ToolsModel } from '../tools/model'
 import { Offline } from '../offline/model'
 import { WebGpuCapability } from '../gpu/capability'
 
@@ -19,6 +20,7 @@ export const Model = S.Struct({
   gallery: GalleryModel,
   offline: Offline,
   route: AppRoute,
+  tools: ToolsModel,
   webgpu: WebGpuCapability,
 })
 export type Model = typeof Model.Type

@@ -146,6 +146,9 @@ export const EditorMessage = defineMessageUnion({
   ChangedDraftLut: { lutId: LutIdSchema },
 
   SelectedLayer: { id: S.NullOr(LayerIdSchema) },
+  /** A plain click on the canvas: nothing stays selected. A draft in progress
+   *  is dropped, as if cancelled. */
+  DeselectedAll: {},
   RemovedLayer: { id: LayerIdSchema },
   ReorderedLayer: {
     from: S.Number,

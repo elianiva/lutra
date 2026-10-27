@@ -1,7 +1,9 @@
-import type { Document, Html, HtmlBuilder } from 'foldkit/html'
+import { Submodel } from 'foldkit'
+import type { Html, HtmlBuilder } from 'foldkit/html'
 import { Archive, ImagePlus, RefreshCw, Upload } from 'lucide'
 import { icon } from '@/components/icon'
 import { navPill } from '@/components/nav-pill'
+import * as Tabs from '@/components/ui/tabs'
 import { pillButton } from '@/tools/controls'
 import { cn } from '@/lib/utils'
 import { collageView } from './collage/view'
@@ -20,9 +22,8 @@ import { reprocessTargets } from './update'
  * the settings panel floats at the left; the workspace takes the rest. Below
  * `lg` the panel collapses and the actions dock to the bottom edge.
  */
-export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
-  title: 'Tools — Lutra',
-  body: h.div(
+export const view = Submodel.defineView<Model, Message>((model, h) =>
+  h.div(
     [
       h.Class('relative flex min-h-full flex-col bg-bg text-ink'),
       h.OnDragEnter(Message.DragEntered()),
@@ -57,7 +58,7 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
       model.dragOver ? dropOverlay(h, model.tab) : null,
     ],
   ),
-})
+)
 
 const summary = (model: Model): string => {
   if (model.tab === 'collage' || model.items.length === 0) return ''
@@ -80,26 +81,43 @@ const header = (h: HtmlBuilder<Message>, model: Model): Html =>
     ],
   )
 
+const TABS = ['single', 'collage'] as const
+
 const tabs = (h: HtmlBuilder<Message>, active: Tab): Html =>
   h.div(
-    [h.Class('surface flex h-10 items-center gap-0.5 p-1'), h.Role('tablist'), h.AriaLabel('Mode')],
-    (['single', 'collage'] as const).map((tab) =>
-      h.button(
-        [
-          h.Type('button'),
-          h.Role('tab'),
-          h.AriaSelected(tab === active),
-          h.Class(
-            cn(
-              'flex h-8 items-center rounded-full px-3 text-[10px] uppercase tracking-[0.1em] transition-colors sm:px-4',
-              tab === active ? 'bg-accent-soft text-accent' : 'text-muted hover:text-ink',
-            ),
-          ),
-          h.OnClick(Message.SelectedTab({ tab })),
-        ],
-        [tab === 'single' ? 'Batch' : 'Collage'],
+    [
+      h.Class('surface relative grid h-10 grid-flow-col auto-cols-fr items-center p-1'),
+      h.Role('tablist'),
+      h.AriaLabel('Mode'),
+    ],
+    [
+      Tabs.indicator(
+        {
+          index: TABS.indexOf(active),
+          count: TABS.length,
+          pad: 4,
+          className: 'rounded-full bg-accent-soft shadow-none dark:bg-accent-soft',
+        },
+        h,
       ),
-    ),
+      ...TABS.map((tab) =>
+        h.button(
+          [
+            h.Type('button'),
+            h.Role('tab'),
+            h.AriaSelected(tab === active),
+            h.Class(
+              cn(
+                'z-10 flex h-8 items-center justify-center rounded-full px-3 text-[10px] uppercase tracking-[0.1em] transition-colors sm:px-4',
+                tab === active ? 'text-accent' : 'text-muted hover:text-ink',
+              ),
+            ),
+            h.OnClick(Message.SelectedTab({ tab })),
+          ],
+          [tab === 'single' ? 'Batch' : 'Collage'],
+        ),
+      ),
+    ],
   )
 
 /** The batch actions. They float in the header, and dock to the bottom on a phone. */

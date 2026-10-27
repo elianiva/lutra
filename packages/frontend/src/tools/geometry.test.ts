@@ -12,7 +12,7 @@ describe('outputGeometry', () => {
   it('keeps the output on the target width when a border wraps a 4:5 frame', () => {
     const { canvas, border, photo } = outputGeometry(
       { width: 4000, height: 3000 },
-      { width: 1080, frame: '4:5', borderPercent: 4 },
+      { width: 1080, height: null, frame: '4:5', borderPercent: 4 },
     )
     // 4% of the frame is 40 px per side; 1080 − 80 leaves a 1000 × 1250 frame.
     expect(border).toBe(40)
@@ -25,7 +25,7 @@ describe('outputGeometry', () => {
   it('fits a portrait photo by its height inside a landscape frame', () => {
     const { photo } = outputGeometry(
       { width: 2400, height: 3600 },
-      { width: 1080, frame: '16:9', borderPercent: 0 },
+      { width: 1080, height: null, frame: '16:9', borderPercent: 0 },
     )
     expect(photo).toEqual({ width: 405, height: 608 })
   })
@@ -33,7 +33,7 @@ describe('outputGeometry', () => {
   it('never upscales a photo smaller than the target', () => {
     const { canvas, photo } = outputGeometry(
       { width: 640, height: 480 },
-      { width: 1080, frame: 'original', borderPercent: 0 },
+      { width: 1080, height: null, frame: 'original', borderPercent: 0 },
     )
     expect(photo).toEqual({ width: 640, height: 480 })
     expect(canvas).toEqual(photo)
@@ -91,5 +91,16 @@ describe('collage layout', () => {
     expect(moved.fx).toBeCloseTo(0.2)
     // Nothing to pan vertically: the photo's height already fills the cell.
     expect(moved.fy).toBe(0.5)
+  })
+
+  it('makes an unlocked height the exact output size, border included', () => {
+    const { canvas, border, photo } = outputGeometry(
+      { width: 4000, height: 3000 },
+      { width: 1000, height: 500, frame: 'original', borderPercent: 4 },
+    )
+    // 4% of the frame is 37 px per side; the border takes its share of both axes.
+    expect(canvas.width + border * 2).toBe(1000)
+    expect(canvas.height + border * 2).toBe(500)
+    expect(photo.height).toBeLessThanOrEqual(canvas.height)
   })
 })

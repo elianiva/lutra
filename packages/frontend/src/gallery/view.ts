@@ -52,7 +52,7 @@ export const view = Submodel.defineView<Model, GalleryMessage>((model, h) => {
       lazyNotice(noticeView, [model.notice, h]) ?? notice(model.notice, h),
       h.main(
         [h.Class('flex min-h-0 flex-1 flex-col overflow-auto px-8 pb-28 pt-6')],
-        [header(h, grid), gridBody(h, grid)],
+        [gridBody(h, grid)],
       ),
       lazyPill(pillView, [model.mode, h])!,
       deleteDialogView(h, model),
@@ -65,26 +65,6 @@ const notice = (message: string | null, h: HtmlBuilder<GalleryMessage>) =>
   message === null
     ? null
     : h.div([h.Class('border-b border-border bg-panel px-4 py-1 text-xs text-accent')], [message])
-
-const header = (
-  h: HtmlBuilder<GalleryMessage>,
-  grid: AsyncData.AsyncData<readonly EditSummary[], StoreError>,
-) =>
-  h.header(
-    [h.Class('mb-4 flex h-8 flex-none items-center gap-3 text-xs')],
-    [
-      h.h1(
-        [h.Class('font-normal')],
-        [
-          'Edits',
-          AsyncData.isSuccess(grid) && grid.data.length > 0
-            ? h.span([h.Class('ml-2 text-dim tnum')], [String(grid.data.length)])
-            : null,
-        ],
-      ),
-      h.span([h.Class('ml-auto text-[11px] text-dim')], ['Drop or paste a photo']),
-    ],
-  )
 
 const gridBody = (
   h: HtmlBuilder<GalleryMessage>,

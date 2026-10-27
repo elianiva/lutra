@@ -12,10 +12,12 @@ import type { ImageEncoder } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/persistence/KeyValueStore'
 import { AppMessage, RootMessage } from './message'
 import type { Model } from './model'
-import { GalleryRoute, EditorRoute } from '../route'
+import { GalleryRoute, EditorRoute, ToolsRoute } from '../route'
 import type { AppRoute } from '../route'
 import * as Gallery from '../gallery'
 import * as Editor from '../editor'
+import * as Tools from '../tools'
+import type { ImageWorkers } from '../tools/pipeline/pool'
 import { OfflineMessage } from '../offline/messages'
 import { offlineMachine } from '../offline/machine'
 import type { Offline } from '../offline/model'
@@ -32,6 +34,7 @@ type Resource =
   | EditStore
   | LutThumbnailer
   | OfflineFill
+  | ImageWorkers
 
 export type UpdateReturn = Update.Return<Model, AppMessage, Resource>
 
@@ -72,6 +75,14 @@ const applyRoute = (model: Model, route: AppRoute) =>
       const mapped = Command.mapMessages(cmds, (m) => RootMessage.GotEditorMessage({ message: m }))
       return {
         model: withRoute(modifyFields(model, { editor: (_) => nextEditor }), route),
+        commands: mapped,
+      }
+    }),
+    Match.when(S.is(ToolsRoute), (route) => {
+      const { model: nextTools, commands: cmds = [] } = Tools.informRouteChanged(model.tools)
+      const mapped = Command.mapMessages(cmds, (m) => RootMessage.GotToolsMessage({ message: m }))
+      return {
+        model: withRoute(modifyFields(model, { tools: (_) => nextTools }), route),
         commands: mapped,
       }
     }),
@@ -160,6 +171,13 @@ export const update = (model: Model, message: AppMessage): UpdateReturn => {
         return {
           model: modifyFields(model, { editor: (_) => nextEditor }),
           commands: [...mapped, NavigateToEdit({ id: out.id })],
+        }
+      },
+      GotToolsMessage: ({ message: toolsMessage }) => {
+        const { model: nextTools, commands: cmds = [] } = Tools.update(model.tools, toolsMessage)
+        return {
+          model: modifyFields(model, { tools: (_) => nextTools }),
+          commands: Command.mapMessages(cmds, (m) => RootMessage.GotToolsMessage({ message: m })),
         }
       },
       NavigatedTo: () => ({ model }),

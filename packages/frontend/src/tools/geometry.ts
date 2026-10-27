@@ -52,6 +52,23 @@ const fitInside = (source: Size, boxWidth: number, boxHeight: number): Size => {
   }
 }
 
+/** The whole output (border included) for settings that fix its shape, or
+ *  `null` when it follows each photo's own ratio. */
+export const fixedOutputSize = (
+  settings: Readonly<{
+    width: number
+    height: number | null
+    frame: Frame
+    borderPercent: number
+  }>,
+): Size | null => {
+  if (settings.height !== null) return { width: settings.width, height: settings.height }
+  if (settings.frame === 'original') return null
+  const border = borderWidth(settings.width, settings.borderPercent)
+  const frame = frameSize(settings.width, ratioValue(settings.frame), settings.borderPercent)
+  return { width: settings.width, height: frame.height + border * 2 }
+}
+
 export type OutputGeometry = Readonly<{ canvas: Size; border: number; photo: Size }>
 
 /**
@@ -61,9 +78,22 @@ export type OutputGeometry = Readonly<{ canvas: Size; border: number; photo: Siz
  */
 export const outputGeometry = (
   source: Size,
-  settings: Readonly<{ width: number; frame: Frame; borderPercent: number }>,
+  settings: Readonly<{
+    width: number
+    height: number | null
+    frame: Frame
+    borderPercent: number
+  }>,
 ): OutputGeometry => {
   const border = borderWidth(settings.width, settings.borderPercent)
+  // An unlocked height fixes the whole output: the frame is what the border leaves.
+  if (settings.height !== null) {
+    const canvas = {
+      width: settings.width - border * 2,
+      height: Math.max(1, settings.height - border * 2),
+    }
+    return { canvas, border, photo: fitInside(source, canvas.width, canvas.height) }
+  }
   // Without a frame the canvas is the photo, so the two always agree.
   if (settings.frame === 'original') {
     const photo = fitInside(source, settings.width - border * 2, Infinity)

@@ -18,6 +18,7 @@ import { LutStoreLive } from './luts/store'
 import { ImageEncoderWorkerLive } from './encode/worker-layer'
 import { LutThumbnailerLive } from './thumbs/worker-layer'
 import { OfflineFillLive } from './offline/fill'
+import { ImageWorkersLive } from './tools/pipeline/pool'
 import { applyMode, readMode } from './theme'
 
 /**
@@ -52,6 +53,8 @@ export const application = Runtime.makeApplication({
     // Uint8Array/ImageBitmap inside). Exclude them so history stays
     // useful and time-travel replay stays cheap — ADR 0006.
     excludeFromHistory: [
+      'MovedPointer',
+      'DragEntered',
       'ScaledCanvas',
       'CurvePointDragged',
       'ChangedSplitPosition',
@@ -73,21 +76,24 @@ export const application = Runtime.makeApplication({
   },
   init: (url: Url.Url) => init(capability, url),
   resources: Layer.merge(
-    GpuBackendLive,
+    ImageWorkersLive,
     Layer.merge(
-      OfflineFillLive,
+      GpuBackendLive,
       Layer.merge(
-        LutStoreLive,
+        OfflineFillLive,
         Layer.merge(
-          CanvasRefLive,
+          LutStoreLive,
           Layer.merge(
-            ImageEncoderWorkerLive,
+            CanvasRefLive,
             Layer.merge(
-              LutThumbnailerLive,
+              ImageEncoderWorkerLive,
               Layer.merge(
-                BrowserKeyValueStore.layerLocalStorage,
-                // The local IndexedDB backends (docs/adr/0005-storage).
-                EditStoreIndexedDb,
+                LutThumbnailerLive,
+                Layer.merge(
+                  BrowserKeyValueStore.layerLocalStorage,
+                  // The local IndexedDB backends (docs/adr/0005-storage).
+                  EditStoreIndexedDb,
+                ),
               ),
             ),
           ),
@@ -95,6 +101,14 @@ export const application = Runtime.makeApplication({
       ),
     ),
   ),
+  // Edits ⇄ Tools is the one animated move: the nav pill slides and the page
+  // slides in the direction of travel (styles.css, by transition type).
+  viewTransition: ({ previousModel, model }) => {
+    const [from, to] = [previousModel.route._tag, model.route._tag]
+    if (from === 'Gallery' && to === 'Tools') return { types: ['to-tools'] }
+    if (from === 'Tools' && to === 'Gallery') return { types: ['to-edits'] }
+    return false
+  },
   routing: {
     onUrlChange: (url: Url.Url) => RootMessage.ChangedRoute({ route: parseRoute(url) }),
     onUrlRequest: (request: UrlRequest) => RootMessage.Navigated({ request }),
