@@ -7,13 +7,14 @@ import { Adjust, Template } from './collage/layout'
 import { isImageFile, outputFileName, timestamp, uniqueName } from './format'
 import { CollageRatio } from './geometry'
 import { Message } from './message'
+import { decodeImage, displayUrl, RAW_EXTENSIONS } from '@/lib/decode-image'
 import { Item, Slot } from './model'
 import type { Result } from './model'
 import { ImageWorkers } from './pipeline/pool'
 import { Settings, extensionFor } from './settings'
 import { Mode, persistMode } from '@/theme'
 
-const ACCEPT = ['image/*', '.jpg', '.jpeg', '.png', '.webp', '.avif', '.heic', '.heif']
+const ACCEPT = ['image/*', '.jpg', '.jpeg', '.png', '.webp', '.avif', '.heic', '.heif', ...RAW_EXTENSIONS]
 
 const mimeFor = (format: Settings['format']) => `image/${format}`
 
@@ -48,16 +49,18 @@ export const PickFiles = Command.define('PickFiles', {
 export const PrepareItems = Command.define('PrepareItems', {
   args: { files: S.Array(S.instanceOf(File)), firstId: S.Number },
   execute: ({ files, firstId }) =>
-    Effect.sync(() =>
-      Message.ItemsPrepared({
-        items: files.filter(isImageFile).map((file, index): Item => ({
+    Effect.promise(async () => {
+      const images = files.filter(isImageFile)
+      const urls = await Promise.all(images.map(displayUrl))
+      return Message.ItemsPrepared({
+        items: images.map((file, index): Item => ({
           id: firstId + index,
           file,
-          sourceUrl: URL.createObjectURL(file),
+          sourceUrl: urls[index] ?? URL.createObjectURL(file),
           status: { _tag: 'Working' },
         })),
-      }),
-    ),
+      })
+    }),
   messages: [Message.ItemsPrepared],
 })
 
@@ -126,12 +129,15 @@ export const outputName = (file: File, result: Result) =>
 
 /** Read a photo's oriented size and make its preview URL. */
 const prepareSlot = (file: File, key: number): Effect.Effect<Option.Option<Slot>> =>
-  Effect.tryPromise(() => createImageBitmap(file, { imageOrientation: 'from-image' })).pipe(
-    Effect.map((bitmap) => {
+  Effect.tryPromise(async () => ({
+    bitmap: await decodeImage(file, { imageOrientation: 'from-image' }),
+    url: await displayUrl(file),
+  })).pipe(
+    Effect.map(({ bitmap, url }) => {
       const slot: Slot = {
         key,
         file,
-        url: URL.createObjectURL(file),
+        url,
         width: bitmap.width,
         height: bitmap.height,
         adjust: { zoom: 1, fx: 0.5, fy: 0.5 },

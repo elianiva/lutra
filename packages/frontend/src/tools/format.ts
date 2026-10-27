@@ -1,3 +1,4 @@
+import { isRawFile } from '@/lib/decode-image'
 /** Human-readable sizes and output file names. */
 
 export const formatBytes = (bytes: number): string => {
@@ -39,4 +40,6 @@ export const timestamp = (date: Date): string => {
 }
 
 export const isImageFile = (file: File): boolean =>
-  file.type.startsWith('image/') || /\.(jpe?g|png|webp|avif|heic|heif)$/i.test(file.name)
+  file.type.startsWith('image/') ||
+  isRawFile(file) ||
+  /\.(jpe?g|png|webp|avif|heic|heif)$/i.test(file.name)

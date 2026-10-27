@@ -5,6 +5,7 @@ import { OfflineMessage, fillEventToMessage } from '../offline/messages'
 import { AppMessage, RootMessage } from './message'
 import { EditorMessage } from '../editor/message'
 import type { Model } from './model'
+import { isRawFile } from '../lib/decode-image'
 import { GalleryMessage } from '../gallery/message' /**
  * The root's subscriptions (docs/adr/0007-offline): the three bridges that feed
  * the offline slice from the outside world.
@@ -21,6 +22,7 @@ import { GalleryMessage } from '../gallery/message' /**
  */
 const isImageFileForPaste = (file: File): boolean =>
   file.type.startsWith('image/') ||
+  isRawFile(file) ||
   /\.(jpe?g|png|webp|avif|gif|bmp|tiff|heic|heif)$/i.test(file.name)
 
 const pasteTarget = (): EventTarget => ('window' in globalThis ? globalThis.window : document)

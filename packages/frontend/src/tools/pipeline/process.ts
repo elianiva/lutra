@@ -1,3 +1,4 @@
+import { decodeImage } from '@/lib/decode-image'
 import resize from '@jsquash/resize'
 import { encodeImage } from '@lutra/engine'
 import { clampGap, coverSourceRect, layoutCells } from '../collage/layout'
@@ -29,7 +30,7 @@ const context2d = (size: Size): OffscreenCanvasRenderingContext2D => {
 
 const decode = async (file: File, failure: string): Promise<ImageBitmap> => {
   try {
-    return await createImageBitmap(file, { imageOrientation: 'from-image' })
+    return await decodeImage(file, { imageOrientation: 'from-image' })
   } catch {
     throw new Error(failure)
   }

@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const poolDecode = vi.fn()
+const poolPreview = vi.fn()
 vi.mock('flashraw/worker', () => ({
-  createWorkerPool: () => ({ decode: poolDecode, terminate: vi.fn() }),
+  createWorkerPool: () => ({
+    open: async () => ({ close: vi.fn(), decode: poolDecode, preview: poolPreview }),
+  }),
 }))
 
-import { decodeImage, isBrowserFormat } from './decode-image'
+import { decodeImage, isBrowserFormat, rawPreview } from './decode-image'
 
 // decodeImage routes by the bytes' magic number first and the file name
 // second, and surfaces the browser decoder's error whichever order ran
@@ -33,6 +36,7 @@ class MockImageData {
 
 beforeEach(() => {
   poolDecode.mockReset()
+  poolPreview.mockReset()
   createImageBitmapMock.mockReset()
   vi.stubGlobal('createImageBitmap', createImageBitmapMock)
   vi.stubGlobal('ImageData', MockImageData)
@@ -76,5 +80,16 @@ describe('decodeImage', () => {
     createImageBitmapMock.mockRejectedValue(new Error('browser failed'))
     await expect(decodeImage(new Blob([bytes(JPEG)]))).rejects.toThrow('browser failed')
     await expect(decodeImage(new Blob([bytes(TIFF)]))).rejects.toThrow('browser failed')
+  })
+})
+
+describe('rawPreview', () => {
+  it('returns the embedded JPEG, or null when there is none or it is not a JPEG', async () => {
+    poolPreview.mockResolvedValueOnce({ data: bytes(JPEG), mimeType: 'image/jpeg' })
+    expect((await rawPreview(new Blob([bytes(TIFF)])))?.type).toBe('image/jpeg')
+    poolPreview.mockResolvedValueOnce(null)
+    expect(await rawPreview(new Blob([bytes(TIFF)]))).toBeNull()
+    poolPreview.mockResolvedValueOnce({ data: bytes(JPEG), mimeType: 'image/tiff' })
+    expect(await rawPreview(new Blob([bytes(TIFF)]))).toBeNull()
   })
 })
