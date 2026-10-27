@@ -29,7 +29,7 @@ import { EditorMessage, PresentState } from './message'
 import { type Mode, persistMode } from '../theme'
 import { ENGINE_REGISTRY } from '../editor/layer-meta'
 import { decodeImage, RAW_EXTENSIONS, warmRawDecoder } from '../lib/decode-image'
-import { previewDimensions, toPreviewBitmap } from '../gpu/preview'
+import { PREVIEW_LONG_EDGE, previewDimensions, toPreviewBitmap } from '../gpu/preview'
 
 export const createLayerFor = (type: LayerType) => createLayer(type, ENGINE_REGISTRY)
 
@@ -124,7 +124,7 @@ export const DecodeImage = Command.define('DecodeImage', {
             message: `Failed to decode image: ${String(cause)}`,
             cause,
           }),
-        try: async () => await decodeImage(file),
+        try: async () => await decodeImage(file, { longEdge: PREVIEW_LONG_EDGE }),
       })
       const bitmap = yield* Effect.tryPromise({
         catch: (cause) =>
@@ -198,7 +198,8 @@ export const LoadEdit = Command.define('LoadEdit', {
       const nativeBitmap = yield* Effect.tryPromise({
         // SAFETY: the store hands back image bytes over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
         // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, typescript/consistent-type-assertions -- SAFETY: documented BlobPart boundary
-        try: async () => await decodeImage(new Blob([edit.source as BlobPart])),
+        try: async () =>
+          await decodeImage(new Blob([edit.source as BlobPart]), { longEdge: PREVIEW_LONG_EDGE }),
         catch: (cause) =>
           new ImageDecodeError({
             cause,

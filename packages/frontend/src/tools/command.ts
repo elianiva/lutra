@@ -130,7 +130,7 @@ export const outputName = (file: File, result: Result) =>
 /** Read a photo's oriented size and make its preview URL. */
 const prepareSlot = (file: File, key: number): Effect.Effect<Option.Option<Slot>> =>
   Effect.tryPromise(async () => ({
-    bitmap: await decodeImage(file, { imageOrientation: 'from-image' }),
+    bitmap: await decodeImage(file, { bitmap: { imageOrientation: 'from-image' } }),
     url: await displayUrl(file),
   })).pipe(
     Effect.map(({ bitmap, url }) => {

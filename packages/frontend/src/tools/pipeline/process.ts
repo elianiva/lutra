@@ -30,7 +30,7 @@ const context2d = (size: Size): OffscreenCanvasRenderingContext2D => {
 
 const decode = async (file: File, failure: string): Promise<ImageBitmap> => {
   try {
-    return await decodeImage(file, { imageOrientation: 'from-image' })
+    return await decodeImage(file, { bitmap: { imageOrientation: 'from-image' } })
   } catch {
     throw new Error(failure)
   }

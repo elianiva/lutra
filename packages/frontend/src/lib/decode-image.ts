@@ -57,11 +57,14 @@ export const warmRawDecoder = (): void => {
 const inWorker = typeof window === 'undefined'
 
 interface RawHandle {
-  readonly rgba8: () => Promise<{ data: Uint8ClampedArray<ArrayBuffer>; width: number; height: number }>
+  /** The sensor image's size after the default crop. */
+  readonly size: { width: number; height: number }
+  readonly rgba8: (halfSize: boolean) => Promise<{ data: Uint8ClampedArray<ArrayBuffer>; width: number; height: number }>
   readonly preview: () => Promise<{ data: Uint8Array<ArrayBuffer>; mimeType: string } | null>
 }
 
-const decodeOptions = { colorSpace: 'srgb', output: 'rgba8' } as const
+const decodeOptions = (halfSize: boolean) =>
+  ({ colorSpace: 'srgb', demosaic: halfSize ? 'half-size' : 'bilinear', output: 'rgba8' }) as const
 
 /** Open `blob` with FlashRaw, run `use`, and always close the handle. */
 const withRaw = async <A>(blob: Blob, use: (raw: RawHandle) => Promise<A>): Promise<A> => {
@@ -70,7 +73,8 @@ const withRaw = async <A>(blob: Blob, use: (raw: RawHandle) => Promise<A>): Prom
     try {
       return await use({
         preview: async () => await raw.preview(),
-        rgba8: async () => await raw.decode(decodeOptions),
+        rgba8: async (halfSize) => await raw.decode(decodeOptions(halfSize)),
+        size: raw.metadata,
       })
     } finally {
       raw.close()
@@ -82,7 +86,8 @@ const withRaw = async <A>(blob: Blob, use: (raw: RawHandle) => Promise<A>): Prom
     try {
       return await use({
         preview: async () => await raw.preview(),
-        rgba8: async () => await raw.decode(decodeOptions),
+        rgba8: async (halfSize) => await raw.decode(decodeOptions(halfSize)),
+        size: raw.metadata,
       })
     } finally {
       await raw.close()
@@ -96,9 +101,13 @@ const withRaw = async <A>(blob: Blob, use: (raw: RawHandle) => Promise<A>): Prom
  * Decode a RAW file off the main thread into an 8-bit sRGB bitmap
  * (docs/adr/0008-raw-decode). Orientation is already applied by the decoder.
  */
-const decodeRaw = async (blob: Blob): Promise<ImageBitmap> =>
+const decodeRaw = async (blob: Blob, longEdge: number | undefined): Promise<ImageBitmap> =>
   await withRaw(blob, async (raw) => {
-    const frame = await raw.rgba8()
+    // Half-size demosaic is cheaper and still covers the target when the
+    // sensor has at least twice the pixels the caller will keep.
+    const halfSize =
+      longEdge !== undefined && Math.max(raw.size.width, raw.size.height) >= longEdge * 2
+    const frame = await raw.rgba8(halfSize)
     return await createImageBitmap(new ImageData(frame.data, frame.width, frame.height))
   })
 
@@ -173,24 +182,30 @@ const startsWithBrowserFormat = async (blob: Blob): Promise<boolean> =>
  * FlashRaw. Either way the browser decoder's error is the one surfaced
  * (docs/adr/0008-raw-decode).
  */
+export interface DecodeOptions {
+  readonly bitmap?: ImageBitmapOptions
+  /** The longest edge the caller will keep; lets a RAW decode skip detail it would discard. */
+  readonly longEdge?: number
+}
+
 export const decodeImage = async (
   source: Blob,
-  options: ImageBitmapOptions = {},
+  { bitmap = {}, longEdge }: DecodeOptions = {},
 ): Promise<ImageBitmap> => {
   const rawFirst =
     (source instanceof File && isRawFile(source)) || !(await startsWithBrowserFormat(source))
   if (rawFirst) {
     try {
-      return await decodeRaw(source)
+      return await decodeRaw(source, longEdge)
     } catch {
-      return await createImageBitmap(source, options)
+      return await createImageBitmap(source, bitmap)
     }
   }
   try {
-    return await createImageBitmap(source, options)
+    return await createImageBitmap(source, bitmap)
   } catch (browserError) {
     try {
-      return await decodeRaw(source)
+      return await decodeRaw(source, longEdge)
     } catch {
       throw browserError
     }

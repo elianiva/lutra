@@ -7,7 +7,7 @@ const { poolDecode, poolPreview, poolTerminate, createWorkerPool } = vi.hoisted(
   return {
     createWorkerPool: vi.fn(() => ({
       getCapabilities: async () => ({}),
-      open: async () => ({ close: vi.fn(), decode, preview }),
+      open: async () => ({ close: vi.fn(), decode, metadata: { height: 4000, width: 6000 }, preview }),
       terminate,
     })),
     poolDecode: decode,
@@ -91,6 +91,20 @@ describe('decodeImage', () => {
     createImageBitmapMock.mockRejectedValue(new Error('browser failed'))
     await expect(decodeImage(new Blob([bytes(JPEG)]))).rejects.toThrow('browser failed')
     await expect(decodeImage(new Blob([bytes(TIFF)]))).rejects.toThrow('browser failed')
+  })
+})
+
+describe('decodeImage preview size', () => {
+  it('uses the half-size demosaic only when the sensor has twice the pixels the caller keeps', async () => {
+    const file = new File([bytes(TIFF)], 'a.cr3')
+    await decodeImage(file) // no target: full size
+    await decodeImage(file, { longEdge: 2048 }) // 6000 >= 4096: half size
+    await decodeImage(file, { longEdge: 4000 }) // 6000 < 8000: full size
+    expect(poolDecode.mock.calls.map(([options]) => options.demosaic)).toEqual([
+      'bilinear',
+      'half-size',
+      'bilinear',
+    ])
   })
 })
 
