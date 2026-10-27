@@ -261,4 +261,25 @@ describe('EditStoreIndexedDb (IndexedDB local backend)', () => {
     )
     expect(await run(list())).toEqual([])
   })
+
+  vitestIt('list skips and removes a row that no longer decodes instead of failing', async () => {
+    const good = edit('11111111-1111-4111-8111-111111111111', 1)
+    await run(save(good))
+    // A row the schema rejects (e.g. an old shape), written behind the store's back.
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('lutra')
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction('edits', 'readwrite')
+      tx.objectStore('edits').put({ id: '22222222-2222-4222-8222-222222222222', savedAt: 'bad' })
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+    db.close()
+
+    expect(await run(list())).toEqual([summaryOf(good)])
+    expect(await run(list())).toEqual([summaryOf(good)])
+  })
 })

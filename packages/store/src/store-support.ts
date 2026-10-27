@@ -1,4 +1,4 @@
-import { Effect, Layer, Option } from 'effect'
+import { Effect, Layer, MutableRef, Option } from 'effect'
 import type { Context } from 'effect'
 import type {
   IndexedDbDatabase,
@@ -55,6 +55,41 @@ export const tableCrud = <Table extends IndexedDbTable.AnyWithProps, Summary>({
   const mapQueryError = (cause: unknown): StoreError =>
     new StoreError({ cause, message: `${label} store query failed` })
 
+  /**
+   * Self-heal for a failed table scan: one row that no longer decodes (an old
+   * shape, a torn write) fails the whole `select()`. Read the primary keys
+   * straight from the object store (no decoding), load each row on its own,
+   * keep the ones that decode and delete the ones that cannot — they could
+   * never open again. A failure that is not about a row (database closed,
+   * store missing) fails the key read too and surfaces as the original error.
+   */
+  const salvage = Effect.gen(function* salvage() {
+    const keys = yield* Effect.callback<IDBValidKey[], unknown>((resume) => {
+      const request = MutableRef.get(table.database)
+        .transaction(table.table.tableName, 'readonly')
+        .objectStore(table.table.tableName)
+        .getAllKeys()
+      request.onsuccess = () => resume(Effect.succeed(request.result))
+      request.onerror = () => resume(Effect.fail(request.error))
+    })
+    const rows: IndexedDbQueryBuilder.IndexedDbQuery.SelectType<Table>[] = []
+    for (const key of keys) {
+      const row = yield* table
+        .select()
+        .equals(key as never)
+        .pipe(Effect.option)
+      if (Option.isSome(row)) {
+        rows.push(...row.value)
+      } else {
+        yield* table
+          .delete()
+          .equals(key as never)
+          .pipe(Effect.ignore)
+      }
+    }
+    return rows
+  })
+
   return {
     save: (row) => table.upsert(row).pipe(Effect.asVoid, Effect.mapError(mapQueryError)),
 
@@ -69,6 +104,7 @@ export const tableCrud = <Table extends IndexedDbTable.AnyWithProps, Summary>({
 
     list: () =>
       table.select().pipe(
+        Effect.catch(() => salvage),
         Effect.map((rows) => rows.map(toSummary).sort((a, b) => b.savedAt - a.savedAt)),
         Effect.mapError(mapQueryError),
       ),
