@@ -14,6 +14,30 @@ const RAW_PATTERN = new RegExp(`(${RAW_EXTENSIONS.join('|').replaceAll('.', '\\.
 export const isRawFile = (file: File): boolean => RAW_PATTERN.test(file.name)
 
 let pool: ReturnType<typeof createWorkerPool> | undefined
+let busy = 0
+let idleTimer: ReturnType<typeof setTimeout> | undefined
+
+/** How long an unused pool keeps its worker (and the wasm heap) alive. */
+const POOL_IDLE_MS = 30_000
+
+/** The pool, created on demand; it stays alive while any call holds it. */
+const acquirePool = (): NonNullable<typeof pool> => {
+  clearTimeout(idleTimer)
+  busy += 1
+  pool ??= createWorkerPool({ size: 1 })
+  return pool
+}
+
+/** Release one hold; an idle pool is terminated so the worker's heap is freed. */
+const releasePool = (): void => {
+  busy -= 1
+  if (busy === 0) {
+    idleTimer = setTimeout(() => {
+      pool?.terminate()
+      pool = undefined
+    }, POOL_IDLE_MS)
+  }
+}
 
 /** The tools' image workers decode inline; the main thread uses a worker pool. */
 const inWorker = typeof window === 'undefined'
@@ -38,15 +62,19 @@ const withRaw = async <A>(blob: Blob, use: (raw: RawHandle) => Promise<A>): Prom
       raw.close()
     }
   }
-  pool ??= createWorkerPool({ size: 1 })
-  const raw = await pool.open(blob)
+  const held = acquirePool()
   try {
-    return await use({
-      preview: async () => await raw.preview(),
-      rgba8: async () => await raw.decode(decodeOptions),
-    })
+    const raw = await held.open(blob)
+    try {
+      return await use({
+        preview: async () => await raw.preview(),
+        rgba8: async () => await raw.decode(decodeOptions),
+      })
+    } finally {
+      await raw.close()
+    }
   } finally {
-    await raw.close()
+    releasePool()
   }
 }
 

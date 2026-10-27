@@ -1,12 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const poolDecode = vi.fn()
-const poolPreview = vi.fn()
-vi.mock('flashraw/worker', () => ({
-  createWorkerPool: () => ({
-    open: async () => ({ close: vi.fn(), decode: poolDecode, preview: poolPreview }),
-  }),
-}))
+const { poolDecode, poolPreview, poolTerminate, createWorkerPool } = vi.hoisted(() => {
+  const decode = vi.fn()
+  const preview = vi.fn()
+  const terminate = vi.fn()
+  return {
+    createWorkerPool: vi.fn(() => ({
+      open: async () => ({ close: vi.fn(), decode, preview }),
+      terminate,
+    })),
+    poolDecode: decode,
+    poolPreview: preview,
+    poolTerminate: terminate,
+  }
+})
+vi.mock('flashraw/worker', () => ({ createWorkerPool }))
 
 import { decodeImage, isBrowserFormat, rawPreview } from './decode-image'
 
@@ -37,6 +45,8 @@ class MockImageData {
 beforeEach(() => {
   poolDecode.mockReset()
   poolPreview.mockReset()
+  poolTerminate.mockReset()
+  createWorkerPool.mockClear()
   createImageBitmapMock.mockReset()
   vi.stubGlobal('createImageBitmap', createImageBitmapMock)
   vi.stubGlobal('ImageData', MockImageData)
@@ -91,5 +101,29 @@ describe('rawPreview', () => {
     expect(await rawPreview(new Blob([bytes(TIFF)]))).toBeNull()
     poolPreview.mockResolvedValueOnce({ data: bytes(JPEG), mimeType: 'image/tiff' })
     expect(await rawPreview(new Blob([bytes(TIFF)]))).toBeNull()
+  })
+})
+
+describe('worker pool lifetime', () => {
+  it('terminates the pool after it has been idle and builds a fresh one on the next decode', async () => {
+    // A fresh module: earlier tests left a pool (and its idle timer) behind.
+    vi.resetModules()
+    const { decodeImage: freshDecodeImage } = await import('./decode-image')
+    vi.useFakeTimers()
+    try {
+      await freshDecodeImage(new Blob([bytes(TIFF)]))
+      await freshDecodeImage(new Blob([bytes(TIFF)]))
+      expect(createWorkerPool).toHaveBeenCalledTimes(1)
+      expect(poolTerminate).not.toHaveBeenCalled()
+
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(poolTerminate).toHaveBeenCalledTimes(1)
+
+      await freshDecodeImage(new Blob([bytes(TIFF)]))
+      expect(createWorkerPool).toHaveBeenCalledTimes(2)
+    } finally {
+      await vi.runAllTimersAsync()
+      vi.useRealTimers()
+    }
   })
 })
