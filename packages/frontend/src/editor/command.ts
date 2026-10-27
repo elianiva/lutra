@@ -457,7 +457,7 @@ export const SnapshotForExport = Command.define('SnapshotForExport', {
             // SAFETY: the store hands back image bytes over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
             // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, typescript/consistent-type-assertions -- SAFETY: documented BlobPart boundary
             const blob = new Blob([source as BlobPart])
-            return await createImageBitmap(blob)
+            return await decodeImage(blob)
           },
         })
         try {
