@@ -17,6 +17,13 @@ const here = import.meta.dirname
 const frontend = path.resolve(here, '../packages/frontend')
 const dist = path.join(frontend, 'dist')
 
+/** FlashRaw ships six wasm builds and a page downloads one. Precache only the
+ *  SIMD pair (single-threaded and threaded); the scalar, GPU and JPEG XL
+ *  builds load on demand, so offline they fail like any other uncached
+ *  optional asset instead of taxing every first visit with ~9 MB. */
+export const isPrecached = (asset: string): boolean =>
+  !/^flashraw(?!_simd(_threads)?-).*\.wasm$/.test(asset)
+
 /** The shell cache name for a deploy: a short hash of the precache
  *  manifest. The manifest changes whenever any hashed asset does, so every
  *  deploy installs into a fresh cache and activate purges the previous
@@ -59,7 +66,7 @@ const run = async (): Promise<void> => {
     '/tools/index.html',
     '/manifest.webmanifest',
     ...icons.map((file) => `/icons/${file}`),
-    ...assets.map((file) => `/assets/${file}`),
+    ...assets.filter(isPrecached).map((file) => `/assets/${file}`),
   ]
 
   const source = await readFile(path.join(frontend, 'sw/sw.ts'), 'utf-8')

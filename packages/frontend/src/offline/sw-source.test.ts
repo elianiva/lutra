@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { generateSwSource, shellCacheName } from '../../../../scripts/build-sw'
+import { generateSwSource, isPrecached, shellCacheName } from '../../../../scripts/build-sw'
 import { LUT_CACHE_NAME } from './cache'
 
 // The service worker and the page share facts that must never drift
@@ -66,5 +66,18 @@ describe('service worker / page coupling', () => {
     )
     expect(purgeBlock).toContain('lutra-shell-')
     expect(purgeBlock).not.toContain(LUT_CACHE_NAME)
+  })
+})
+
+describe('precache manifest', () => {
+  it('keeps the SIMD FlashRaw builds and leaves the optional ones out', () => {
+    expect(isPrecached('flashraw_simd-BzT36scQ.wasm')).toBe(true)
+    expect(isPrecached('flashraw_simd_threads-96E8OEJx.wasm')).toBe(true)
+    expect(isPrecached('flashraw-Cy5lucLY.wasm')).toBe(false)
+    expect(isPrecached('flashraw_simd_gpu-CcNv8wjJ.wasm')).toBe(false)
+    expect(isPrecached('flashraw_simd_jxl-C7e6SE9o.wasm')).toBe(false)
+    expect(isPrecached('flashraw_simd_threads_jxl-CGTMj-_G.wasm')).toBe(false)
+    expect(isPrecached('webp_enc-BpZvKflB.wasm')).toBe(true)
+    expect(isPrecached('flashraw_bindgen_jxl-BoDN7Eop.js')).toBe(true)
   })
 })
