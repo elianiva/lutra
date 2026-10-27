@@ -198,7 +198,7 @@ const mobileTabBarImpl = (mobileSheet: Model['mobileSheet'], h: HtmlBuilder<Edit
     h.button(
       [
         h.Class(
-          `flex flex-1 items-center justify-center gap-2 rounded-full py-2 text-[10px] uppercase tracking-[0.1em] transition-colors ${
+          `flex flex-1 items-center justify-center gap-2 rounded-full py-2 text-[10px] uppercase tracking-[0.1em] transition-colors duration-150 ${
             active ? 'bg-s2 text-ink' : 'text-dim'
           }`,
         ),
@@ -212,7 +212,7 @@ const mobileTabBarImpl = (mobileSheet: Model['mobileSheet'], h: HtmlBuilder<Edit
   return h.nav(
     [
       h.Class(
-        'absolute inset-x-3 bottom-3 z-30 flex items-center gap-1 rounded-full bg-s1 p-1 pb-[max(4px,env(safe-area-inset-bottom))] shadow-[0_12px_28px_-12px_var(--mat-shadow-a)] lg:hidden',
+        'enter-sheet absolute inset-x-3 bottom-3 z-30 flex items-center gap-1 rounded-full bg-s1 p-1 pb-[max(4px,env(safe-area-inset-bottom))] shadow-[0_12px_28px_-12px_var(--mat-shadow-a)] lg:hidden',
       ),
       h.AriaLabel('Editor panels'),
     ],

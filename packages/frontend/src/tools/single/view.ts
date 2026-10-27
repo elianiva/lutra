@@ -58,7 +58,7 @@ const badge = (h: HtmlBuilder<Message>, text: string, tone: 'neutral' | 'accent'
     [
       h.Class(
         cn(
-          'pill absolute left-2 top-2 px-2 py-1 text-[9px] uppercase tracking-[0.14em]',
+          'pill enter-pop absolute left-2 top-2 px-2 py-1 text-[9px] uppercase tracking-[0.14em]',
           tone === 'accent' ? 'text-accent' : 'text-muted',
         ),
       ),
@@ -75,7 +75,7 @@ const card = (h: HtmlBuilder<Message>, item: Item): Html => {
     [
       h.Key(String(item.id)),
       h.DataAttribute('status', status._tag),
-      h.Class('surface flex min-w-0 flex-col overflow-hidden'),
+      h.Class('surface enter-rise flex min-w-0 flex-col overflow-hidden'),
     ],
     [
       h.button(
@@ -104,7 +104,7 @@ const card = (h: HtmlBuilder<Message>, item: Item): Html => {
                 h.Alt(''),
                 h.Class(
                   cn(
-                    'relative size-full object-contain transition-opacity',
+                    'relative size-full object-contain transition-opacity duration-200 ease-out',
                     done === null || done.stale ? 'opacity-40' : '',
                   ),
                 ),

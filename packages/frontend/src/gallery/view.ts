@@ -64,7 +64,7 @@ export const view = Submodel.defineView<Model, GalleryMessage>((model, h) => {
 const notice = (message: string | null, h: HtmlBuilder<GalleryMessage>) =>
   message === null
     ? null
-    : h.div([h.Class('border-b border-border bg-panel px-4 py-1 text-xs text-accent')], [message])
+    : h.div([h.Class('enter-fade border-b border-border bg-panel px-4 py-1 text-xs text-accent')], [message])
 
 const gridBody = (
   h: HtmlBuilder<GalleryMessage>,
@@ -80,14 +80,14 @@ const gridBody = (
   })
 
 const spinner = (h: HtmlBuilder<GalleryMessage>) =>
-  h.div([h.Class('flex flex-1 items-center justify-center text-sm text-muted')], ['Loading…'])
+  h.div([h.Class('breathe flex flex-1 items-center justify-center text-sm text-muted')], ['Loading…'])
 
 const dropOverlay = (h: HtmlBuilder<GalleryMessage>, active: boolean): Html =>
   active
     ? h.div(
         [
           h.Class(
-            'pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 border-2 border-dashed border-accent bg-bg/80 backdrop-blur-sm',
+            'enter-fade pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 border-2 border-dashed border-accent bg-bg/80 backdrop-blur-sm',
           ),
           h.DataAttribute('drop-overlay', 'true'),
         ],
@@ -95,7 +95,7 @@ const dropOverlay = (h: HtmlBuilder<GalleryMessage>, active: boolean): Html =>
           h.div(
             [
               h.Class(
-                'flex h-16 w-16 items-center justify-center rounded-full border-2 border-accent bg-panel text-accent',
+                'enter-pop flex h-16 w-16 items-center justify-center rounded-full border-2 border-accent bg-panel text-accent',
               ),
             ],
             [icon(h, Drop, 'Drop photos', 28)],
@@ -114,7 +114,7 @@ const emptyState = (h: HtmlBuilder<GalleryMessage>) =>
     ],
     [
       h.div(
-        [h.Class('well flex w-[min(420px,100%)] flex-col items-center gap-3 p-6 text-center')],
+        [h.Class('well enter-rise flex w-[min(420px,100%)] flex-col items-center gap-3 p-6 text-center')],
         [
           h.p([h.Class('text-sm text-ink')], ['No saved edits yet.']),
           h.button(
@@ -155,11 +155,12 @@ const errorState = (h: HtmlBuilder<GalleryMessage>, error: string) =>
  *  transition. Focus uses `:focus-visible` (not plain focus) so a mouse
  *  click that lands on a control doesn't latch the overlays open after the
  *  pointer leaves; tabbing in still reveals them for keyboard users. */
-const hoverReveal = 'opacity-0 group-hover:opacity-100 group-has-focus-visible:opacity-100'
+const hoverReveal =
+  'opacity-0 transition-opacity duration-150 ease-out group-hover:opacity-100 group-has-focus-visible:opacity-100'
 
 const gridTiles = (h: HtmlBuilder<GalleryMessage>, summaries: readonly EditSummary[]) =>
   h.div(
-    [h.Class('grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-4 max-sm:grid-cols-2')],
+    [h.Class('stagger grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-4 max-sm:grid-cols-2')],
     [newEditTile(h), ...summaries.map((summary) => lazyTile(summary.id, tileView, [summary, h])!)],
   )
 
@@ -187,7 +188,7 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) =>
       h.Key(summary.id),
       h.DataAttribute('edit-id', summary.id),
       h.Class(
-        'surface group relative aspect-square overflow-hidden transition-shadow hover:shadow-[inset_0_1px_0_var(--mat-rim),0_18px_40px_-18px_var(--mat-shadow-a)]',
+        'surface group relative aspect-square overflow-hidden transition-[box-shadow,translate] duration-200 ease-out hover:shadow-[inset_0_1px_0_var(--mat-rim),0_18px_40px_-18px_var(--mat-shadow-a)]',
       ),
     ],
     [

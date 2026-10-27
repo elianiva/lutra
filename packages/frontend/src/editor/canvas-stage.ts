@@ -486,7 +486,7 @@ const PLACEHOLDER_RATIO = 0.8
 const emptyStage = (h: HtmlBuilder<EditorMessage>) =>
   h.div(
     [
-      h.Class('flex h-full w-full flex-col items-center justify-center gap-3 text-xs text-muted'),
+      h.Class('stagger flex h-full w-full flex-col items-center justify-center gap-3 text-xs text-muted'),
       h.AllowDrop(),
       h.OnDropFiles((files) => {
         const file = files[0]
@@ -521,7 +521,7 @@ const errorStage = (h: HtmlBuilder<EditorMessage>, error: string) =>
   h.div(
     [
       h.Class(
-        'flex h-full w-full flex-col items-center justify-center gap-2 px-6 text-center text-xs text-muted',
+        'enter-rise flex h-full w-full flex-col items-center justify-center gap-2 px-6 text-center text-xs text-muted',
       ),
     ],
     [

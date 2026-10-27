@@ -153,7 +153,7 @@ export const exportBarView = <P>(
 ) =>
   h.div(
     [
-      h.Class('flex flex-col gap-3 border border-border bg-panel px-3 py-3'),
+      h.Class('enter-rise flex flex-col gap-3 border border-border bg-panel px-3 py-3'),
       h.DataAttribute('export-bar', 'true'),
     ],
     [

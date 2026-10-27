@@ -59,7 +59,7 @@ export const tooltipTriggerClass =
  *
  */
 export const tooltipContentClass =
-  'inline-flex items-center gap-1.5 rounded-none border border-border bg-panel px-3 py-1.5 text-xs text-ink shadow-lg z-50 w-fit max-w-xs'
+  'enter-pop inline-flex items-center gap-1.5 rounded-none border border-border bg-panel px-3 py-1.5 text-xs text-ink shadow-lg z-50 w-fit max-w-xs'
 
 // Mirrors the shadcn v4 base tooltip arrow (`cn-tooltip-arrow` +
 // `cn-tooltip-arrow-logical` + Arrow props), inlined and mapped to

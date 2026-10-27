@@ -407,7 +407,7 @@ const thumb = (
             [
               h.Type('button'),
               h.Class(
-                'pill absolute -right-1 -top-1 grid size-5 place-items-center text-muted hover:text-accent',
+                'pill enter-pop absolute -right-1 -top-1 grid size-5 place-items-center text-muted hover:text-accent',
               ),
               h.AriaLabel(`Remove photo ${index + 1}`),
               h.OnClick(Message.RemovedCell({ index })),

@@ -484,3 +484,158 @@ html:active-view-transition-type(to-edits)::view-transition-new(page) {
   animation: none;
   mix-blend-mode: normal;
 }
+
+/* ---------- motion ----------
+   Emil Kowalski's rules: strong custom ease-out for entrances, UI under
+   300ms, exits faster than enters, press feedback on everything pressable,
+   no motion on keyboard-initiated surfaces (the ⌘K palette). */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* every pressable answers the press at once */
+button:not(:disabled):active,
+[role='button']:not([aria-disabled='true']):active {
+  scale: 0.97;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@keyframes slide-in-side {
+  from {
+    opacity: 0;
+    transform: translateX(-6px) scale(0.97);
+  }
+}
+
+/* a surface that appears: rises from just below */
+.enter-rise {
+  animation: rise-in 260ms var(--ease-out) both;
+}
+
+.enter-fade {
+  animation: fade-in 200ms var(--ease-out) both;
+}
+
+/* a popover that grows from its trigger (set --origin inline if needed) */
+.enter-pop {
+  transform-origin: var(--origin, center);
+  animation: pop-in 150ms var(--ease-out) both;
+}
+
+.enter-side {
+  transform-origin: left center;
+  animation: slide-in-side 150ms var(--ease-out) both;
+}
+
+/* children cascade in, 40ms apart, first twelve only */
+.stagger > * {
+  animation: rise-in 300ms var(--ease-out) both;
+}
+.stagger > :nth-child(1) { animation-delay: 0ms; }
+.stagger > :nth-child(2) { animation-delay: 40ms; }
+.stagger > :nth-child(3) { animation-delay: 80ms; }
+.stagger > :nth-child(4) { animation-delay: 120ms; }
+.stagger > :nth-child(5) { animation-delay: 160ms; }
+.stagger > :nth-child(6) { animation-delay: 200ms; }
+.stagger > :nth-child(7) { animation-delay: 240ms; }
+.stagger > :nth-child(8) { animation-delay: 280ms; }
+.stagger > :nth-child(9) { animation-delay: 320ms; }
+.stagger > :nth-child(10) { animation-delay: 360ms; }
+.stagger > :nth-child(11) { animation-delay: 400ms; }
+.stagger > :nth-child(12) { animation-delay: 440ms; }
+
+/* the loading dots breathe */
+@keyframes breathe {
+  50% {
+    opacity: 0.45;
+  }
+}
+.breathe {
+  animation: breathe 1.4s ease-in-out infinite;
+}
+
+/* reduced motion: keep fades, drop movement and scale */
+@media (prefers-reduced-motion: reduce) {
+  button:not(:disabled):active,
+  [role='button']:active {
+    scale: none;
+  }
+  .enter-rise,
+  .enter-pop,
+  .enter-side,
+  .stagger > * {
+    animation-name: fade-in;
+    animation-delay: 0ms;
+  }
+  .breathe {
+    animation: none;
+  }
+  ::view-transition-old(page),
+  ::view-transition-new(page) {
+    animation-name: fade-in !important;
+  }
+}
+
+/* bottom sheets (phone): slide up from their own height; below lg only,
+   because on desktop the same panels are static floating surfaces */
+@keyframes sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+@media (max-width: 1023px) {
+  .enter-sheet {
+    animation: sheet-up 260ms var(--ease-drawer) both;
+  }
+}
+
+/* a keyed row that joins a list */
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+}
+.enter-row {
+  animation: row-in 200ms var(--ease-out) both;
+}
+
+/* a value that just changed: a quick settle */
+@keyframes settle {
+  from {
+    opacity: 0.4;
+    transform: translateY(2px);
+  }
+}
+.enter-settle {
+  animation: settle 160ms var(--ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enter-sheet,
+  .enter-row,
+  .enter-settle {
+    animation-name: fade-in;
+  }
+}

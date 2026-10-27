@@ -44,15 +44,15 @@ export const dialogClass = 'bg-transparent p-0 open:flex items-center justify-ce
 // `data-open:`/`data-closed:` animation utilities to these windows during token
 // sync; persistent `data-open:` styling passes through untouched.
 export const dialogBackdropClass =
-  'data-enter:animate-in data-leave:animate-out data-leave:fade-out-0 data-enter:fade-in-0 bg-black/60 duration-100 fixed inset-0 isolate z-[59]'
+  'data-enter:animate-in data-leave:animate-out data-leave:fade-out-0 data-enter:fade-in-0 bg-black/60 duration-200 data-leave:duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] fixed inset-0 isolate z-[59]'
 
 export const dialogPanelClass =
-  'bg-panel text-ink data-enter:animate-in data-leave:animate-out data-leave:fade-out-0 data-enter:fade-in-0 data-leave:zoom-out-95 data-enter:zoom-in-95 grid max-w-[calc(100%-2rem)] gap-0 rounded-none border border-border p-0 text-sm shadow-lg duration-100 fixed top-1/2 left-1/2 z-[60] w-full -translate-x-1/2 -translate-y-1/2 outline-none'
+  'bg-panel text-ink data-enter:animate-in data-leave:animate-out data-leave:fade-out-0 data-enter:fade-in-0 data-leave:zoom-out-95 data-enter:zoom-in-95 grid max-w-[calc(100%-2rem)] gap-0 rounded-none border border-border p-0 text-sm shadow-lg duration-200 data-leave:duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] fixed top-1/2 left-1/2 z-[60] w-full -translate-x-1/2 -translate-y-1/2 outline-none'
 
 /** Upstream renders its close control as `<Button variant="ghost" size="icon-sm"
  *  className="cn-dialog-close">`; compose the same tokens here. */
 export const dialogCloseButtonClass =
-  "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 border border-transparent bg-clip-padding text-sm font-medium focus-visible:ring-3 aria-invalid:ring-3 active:not-aria-[haspopup]:translate-y-px [&_svg:not([class*='size-'])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all outline-none select-none [&_svg]:pointer-events-none [&_svg]:shrink-0 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-disabled:pointer-events-none data-disabled:opacity-50 hover:bg-muted hover:text-foreground dark:hover:bg-muted/50 aria-expanded:bg-muted aria-expanded:text-foreground size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg absolute top-2 right-2"
+  "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 border border-transparent bg-clip-padding text-sm font-medium focus-visible:ring-3 aria-invalid:ring-3 active:not-aria-[haspopup]:scale-[0.97] [&_svg:not([class*='size-'])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-[color,background-color,border-color,box-shadow,scale] duration-150 ease-out outline-none select-none [&_svg]:pointer-events-none [&_svg]:shrink-0 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-disabled:pointer-events-none data-disabled:opacity-50 hover:bg-muted hover:text-foreground dark:hover:bg-muted/50 aria-expanded:bg-muted aria-expanded:text-foreground size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg absolute top-2 right-2"
 
 export const dialogTitleClass = 'text-base leading-none font-medium font-heading'
 

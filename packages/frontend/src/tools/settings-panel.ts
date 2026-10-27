@@ -62,7 +62,7 @@ export const settingsPanel = (h: HtmlBuilder<Message>, model: Model): Html => {
       h.div(
         [
           h.Class(
-            cn('flex flex-col gap-6 p-4 max-lg:pt-0', model.settingsOpen ? '' : 'max-lg:hidden'),
+            cn('enter-fade flex flex-col gap-6 p-4 max-lg:pt-0', model.settingsOpen ? '' : 'max-lg:hidden'),
           ),
         ],
         [

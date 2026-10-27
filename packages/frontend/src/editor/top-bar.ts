@@ -27,7 +27,7 @@ export const topBar = (
   return h.header(
     [
       h.Class(
-        'pointer-events-none absolute inset-x-0 top-0 z-20 flex h-16 items-center gap-6 px-6',
+        'enter-fade pointer-events-none absolute inset-x-0 top-0 z-20 flex h-16 items-center gap-6 px-6',
       ),
     ],
     [
@@ -78,7 +78,7 @@ const modeToggle = (h: HtmlBuilder<EditorMessage>, mode: Model['mode']): Html =>
     return h.button(
       [
         h.Class(
-          `grid h-8 w-10 place-items-center rounded-full transition-colors ${
+          `grid h-8 w-10 place-items-center rounded-full transition-colors duration-150 ${
             active ? 'bg-accent-soft text-accent' : 'text-dim hover:text-ink'
           }`,
         ),
@@ -105,7 +105,7 @@ type ActionConfig = Readonly<{
 }>
 
 const baseActionClass = (disabled: boolean) =>
-  `flex h-8 items-center gap-2 rounded-full px-3 text-[10px] uppercase tracking-[0.1em] transition-colors ${
+  `flex h-8 items-center gap-2 rounded-full px-3 text-[10px] uppercase tracking-[0.1em] transition-colors duration-150 ${
     disabled ? 'opacity-30' : 'hover:bg-s2 hover:text-ink'
   }`
 
@@ -149,7 +149,7 @@ const iconButton = (
   h.button(
     [
       h.Class(
-        `grid h-8 w-8 place-items-center rounded-full transition-colors ${
+        `grid h-8 w-8 place-items-center rounded-full transition-colors duration-150 ${
           config.isDisabled ? 'opacity-30' : 'text-muted hover:bg-s2 hover:text-ink'
         }`,
       ),

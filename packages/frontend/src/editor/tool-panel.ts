@@ -53,7 +53,7 @@ export const toolPanel = (
   return h.aside(
     [
       h.Class(
-        `${open ? 'flex' : 'hidden'} absolute inset-x-0 bottom-[72px] z-30 max-h-[70dvh] w-full flex-col overflow-y-auto rounded-t-[18px] bg-s1 p-2 shadow-[0_-24px_48px_-20px_var(--mat-shadow-a)] lg:bottom-auto lg:left-6 lg:right-auto lg:top-1/2 lg:z-20 lg:-translate-y-1/2 lg:flex lg:max-h-none lg:w-[52px] lg:flex-none lg:overflow-visible lg:rounded-[18px] lg:bg-transparent lg:p-0 lg:shadow-none`,
+        `${open ? 'enter-sheet flex' : 'hidden'} absolute inset-x-0 bottom-[72px] z-30 max-h-[70dvh] w-full flex-col overflow-y-auto rounded-t-[18px] bg-s1 p-2 shadow-[0_-24px_48px_-20px_var(--mat-shadow-a)] lg:bottom-auto lg:left-6 lg:right-auto lg:top-1/2 lg:z-20 lg:-translate-y-1/2 lg:flex lg:max-h-none lg:w-[52px] lg:flex-none lg:overflow-visible lg:rounded-[18px] lg:bg-transparent lg:p-0 lg:shadow-none`,
       ),
       h.AriaLabel('Adjustment tools'),
     ],
@@ -61,7 +61,7 @@ export const toolPanel = (
       h.nav(
         [
           h.Class(
-            'surface flex flex-col gap-1 p-1.5 max-lg:gap-0.5 max-lg:rounded-none max-lg:bg-transparent max-lg:p-0 max-lg:shadow-none',
+            'surface enter-fade flex flex-col gap-1 p-1.5 max-lg:gap-0.5 max-lg:rounded-none max-lg:bg-transparent max-lg:p-0 max-lg:shadow-none',
           ),
         ],
         LAYER_TYPES_ORDER.flatMap((type, index) => [
@@ -190,7 +190,7 @@ const toolCard = (
   return h.div(
     [
       h.Class(
-        'surface pointer-events-none absolute left-full top-0 z-50 ml-3 hidden w-56 p-3 text-left lg:block',
+        'surface enter-side pointer-events-none absolute left-full top-0 z-50 ml-3 hidden w-56 p-3 text-left lg:block',
       ),
       h.DataAttribute('testid', 'tool-tooltip'),
     ],

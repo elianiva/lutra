@@ -172,13 +172,13 @@ const dropOverlay = (h: HtmlBuilder<Message>, tab: Tab): Html =>
   h.div(
     [
       h.Class(
-        'pointer-events-none fixed inset-3 z-50 flex flex-col items-center justify-center gap-3 rounded-[24px] bg-bg/80 shadow-[inset_0_0_0_2px_var(--mat-accent)] backdrop-blur-sm',
+        'enter-fade pointer-events-none fixed inset-3 z-50 flex flex-col items-center justify-center gap-3 rounded-[24px] bg-bg/80 shadow-[inset_0_0_0_2px_var(--mat-accent)] backdrop-blur-sm',
       ),
       h.DataAttribute('drop-overlay', 'true'),
     ],
     [
       h.span(
-        [h.Class('pill grid size-16 place-items-center text-accent')],
+        [h.Class('pill enter-pop grid size-16 place-items-center text-accent')],
         [icon(h, Drop, 'Drop images', 28)],
       ),
       h.p(

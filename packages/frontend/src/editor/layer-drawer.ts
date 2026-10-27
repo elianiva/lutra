@@ -88,7 +88,7 @@ const mixerSwatches = (
           onClick: onSelect(index),
           size: 'icon-xs',
           variant: 'ghost',
-          className: `size-5 shrink-0 rounded-full p-0 ${
+          className: `size-5 shrink-0 rounded-full p-0 transition-shadow duration-150 ${
             index === active ? 'ring-2 ring-ink' : 'ring-1 ring-transparent hover:ring-dim'
           }`,
           attributes: [
@@ -263,7 +263,7 @@ export const layerDrawer = (
   return h.aside(
     [
       h.Class(
-        `${open ? 'flex' : 'hidden'} absolute inset-x-0 bottom-[72px] z-30 max-h-[70dvh] w-full flex-col overflow-y-auto rounded-t-[18px] bg-s1 shadow-[0_-24px_48px_-20px_var(--mat-shadow-a)] lg:bottom-auto lg:left-auto lg:right-6 lg:top-20 lg:z-20 lg:max-h-[calc(100dvh-128px)] lg:w-[328px] lg:flex-none lg:overflow-y-auto lg:rounded-none lg:bg-transparent lg:shadow-none`,
+        `${open ? 'enter-sheet flex' : 'hidden'} absolute inset-x-0 bottom-[72px] z-30 max-h-[70dvh] w-full flex-col overflow-y-auto rounded-t-[18px] bg-s1 shadow-[0_-24px_48px_-20px_var(--mat-shadow-a)] lg:bottom-auto lg:left-auto lg:right-6 lg:top-20 lg:z-20 lg:max-h-[calc(100dvh-128px)] lg:w-[328px] lg:flex-none lg:overflow-y-auto lg:rounded-none lg:bg-transparent lg:shadow-none`,
       ),
       h.AriaLabel('Selected adjustment'),
     ],
@@ -298,7 +298,7 @@ const parameterPanel = (
   const ui = LAYER_UI[layer.type]
   const stepper = stepperConfig(panel)
   return h.div(
-    [h.Class('flex flex-col')],
+    [h.Class('enter-fade flex flex-col')],
     [
       h.div(
         [h.Class('flex flex-col gap-2 px-4 pb-3 pt-4')],
@@ -385,7 +385,7 @@ const stepperButton = (
       variant: 'ghost',
       size: 'icon-xs',
       className:
-        'grid size-[26px] place-items-center rounded-[8px] bg-s2 text-dim hover:bg-s3 hover:text-ink',
+        'grid size-[26px] place-items-center rounded-[8px] bg-s2 text-dim transition-colors duration-150 hover:bg-s3 hover:text-ink',
       attributes: [h.AriaLabel(label)],
     },
     [icon(h, Icon, label, 14)],
@@ -423,7 +423,7 @@ const moveButton = (
       variant: 'ghost',
       size: 'icon-xs',
       className:
-        'grid size-7 place-items-center rounded-[8px] bg-s2 text-dim hover:bg-s3 hover:text-ink disabled:opacity-30',
+        'grid size-7 place-items-center rounded-[8px] bg-s2 text-dim transition-colors duration-150 hover:bg-s3 hover:text-ink disabled:opacity-30',
       attributes: [h.AriaLabel(label)],
     },
     [icon(h, Icon, label, 13)],
@@ -542,7 +542,7 @@ const footerButton = (
 
 const emptyPanel = (h: HtmlBuilder<EditorMessage>) =>
   h.div(
-    [h.Class('flex flex-col items-start gap-4 p-4')],
+    [h.Class('enter-fade flex flex-col items-start gap-4 p-4')],
     [
       h.div(
         [h.Class('flex w-full items-baseline justify-between gap-2')],

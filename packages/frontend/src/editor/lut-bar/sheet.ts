@@ -129,7 +129,7 @@ export const lutSheet = (
                 h.Alt(entry.name),
                 h.Loading('lazy'),
                 h.Class(
-                  `aspect-square w-full rounded-lg object-cover transition-all duration-100 ${
+                  `aspect-square w-full rounded-lg object-cover transition-[opacity,translate,box-shadow] duration-150 ease-out ${
                     selected
                       ? 'opacity-100 shadow-[0_0_0_2px_var(--mat-accent),0_8px_20px_-8px_var(--mat-halo)]'
                       : 'opacity-70 group-hover:-translate-y-0.5 group-hover:opacity-100 group-hover:shadow-[0_8px_18px_-8px_var(--mat-shadow-a)]'

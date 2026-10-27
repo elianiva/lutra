@@ -18,10 +18,10 @@ export const switchSizeKeys = ['default', 'sm'] as const
 export type SwitchSize = (typeof switchSizeKeys)[number]
 
 export const switchClass =
-  'data-checked:border-accent data-checked:bg-accent data-unchecked:border-border-strong data-unchecked:bg-panel-alt shrink-0 rounded-none border focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 relative inline-flex h-5 w-9 items-center transition-colors outline-none data-disabled:cursor-not-allowed data-disabled:opacity-50'
+  'data-checked:border-accent data-checked:bg-accent data-unchecked:border-border-strong data-unchecked:bg-panel-alt shrink-0 rounded-none border focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 relative inline-flex h-5 w-9 items-center transition-colors duration-200 outline-none data-disabled:cursor-not-allowed data-disabled:opacity-50'
 
 export const switchThumbClass =
-  'bg-muted data-checked:bg-ink data-unchecked:bg-muted size-3 rounded-none data-checked:translate-x-4 data-unchecked:translate-x-0.5 pointer-events-none block transition-transform'
+  'bg-muted data-checked:bg-ink data-unchecked:bg-muted size-3 rounded-none data-checked:translate-x-4 data-unchecked:translate-x-0.5 pointer-events-none block transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]'
 
 export const switchLabelClass =
   'text-sm font-medium leading-none group-data-[disabled]/field:cursor-not-allowed group-data-[disabled]/field:opacity-70'

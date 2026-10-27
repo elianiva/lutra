@@ -87,7 +87,7 @@ const readyToastView = (ready: boolean, h: HtmlBuilder<AppMessage>): Html =>
         [
           h.OnClick(OfflineMessage.OfflineReadyDismissed()),
           h.Class(
-            'surface fixed inset-x-4 bottom-20 z-50 cursor-pointer md:bottom-4 px-4 py-3 text-sm text-ink md:inset-x-auto md:right-6 md:w-64',
+            'surface enter-rise fixed inset-x-4 bottom-20 z-50 cursor-pointer md:bottom-4 px-4 py-3 text-sm text-ink md:inset-x-auto md:right-6 md:w-64',
           ),
         ],
         ['Offline ready — Lutra works without a connection'],
@@ -206,7 +206,7 @@ const offlineCardImpl = (offline: Model['offline'], h: HtmlBuilder<AppMessage>):
     )
   const progress = h.div(
     [h.Class('h-1 w-full bg-border-strong')],
-    [h.div([h.Class('h-full bg-accent'), h.Style({ width: `${pct}%` })], [])],
+    [h.div([h.Class('h-full bg-accent transition-[width] duration-300 ease-out'), h.Style({ width: `${pct}%` })], [])],
   )
   const counters = h.div(
     [h.Class('text-xs text-muted tnum')],

@@ -23,7 +23,7 @@ export const previewDialog = (h: HtmlBuilder<Message>, model: Model): Html => {
             ? []
             : [
                 dialogH.div(
-                  [dialogH.Class('grid gap-3 p-3 sm:grid-cols-2')],
+                  [dialogH.Class('stagger grid gap-3 p-3 sm:grid-cols-2')],
                   [
                     figure(dialogH, 'Original', item.sourceUrl, [
                       `${done.result.sourceWidth} × ${done.result.sourceHeight}`,

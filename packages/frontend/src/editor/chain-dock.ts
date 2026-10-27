@@ -35,7 +35,7 @@ const rowView = (
     [
       h.Key(layer.id),
       h.Class(
-        `relative flex items-center gap-2 rounded-[8px] px-1.5 py-1.5 text-left transition-colors lg:w-full ${
+        `enter-row relative flex items-center gap-2 rounded-[8px] px-1.5 py-1.5 text-left transition-colors duration-150 lg:w-full ${
           active ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-s2 hover:text-ink'
         }`,
       ),
@@ -106,7 +106,7 @@ export const chainDock = (h: HtmlBuilder<EditorMessage>, slice: ChainDockSlice):
     [
       // It hugs its rows and sits beside the print, not stretched to the
       // frame's height: a short chain is a short rack.
-      h.Class('surface flex flex-none flex-col py-2 lg:w-[212px] lg:self-start'),
+      h.Class('surface enter-rise flex flex-none flex-col py-2 lg:w-[212px] lg:self-start'),
       h.AriaLabel('Edit chain'),
       h.DataAttribute('testid', 'chain-dock'),
       h.DataAttribute('keep-selection', ''),
