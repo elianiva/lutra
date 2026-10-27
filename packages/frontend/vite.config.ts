@@ -6,6 +6,14 @@ import tailwindcss from '@tailwindcss/vite'
 
 const here = import.meta.dirname
 
+// Cross-origin isolation turns on FlashRaw's multithreaded wasm build
+// (SharedArrayBuffer). The app loads nothing cross-origin, so require-corp
+// costs nothing. Mirrored in public/_headers for the deployed app.
+const isolationHeaders = {
+  'Cross-Origin-Embedder-Policy': 'require-corp',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+}
+
 export default defineConfig({
   optimizeDeps: {
     // flashraw resolves its .wasm via new URL(..., import.meta.url)
@@ -22,6 +30,8 @@ export default defineConfig({
   // DevTools: the plugin serves its MCP relay at /__foldkit/devtools-mcp and
   // publishes a token-protected address to a per-user registry, which the
   // `foldkit-devtools` MCP server discovers. No fixed port to keep in sync.
+  server: { headers: isolationHeaders },
+  preview: { headers: isolationHeaders },
   worker: { format: 'es' },
   plugins: [foldkit(), tailwindcss()],
   resolve: {

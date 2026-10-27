@@ -7,6 +7,14 @@
 # entry.ts), and these rules keep the edge from caching them either. The
 # platform default (max-age=0, must-revalidate) would work, but explicit
 # beats implicit for the one file a stale cache breaks offline updates on.
+# Cross-origin isolation: FlashRaw's multithreaded RAW decode needs
+# SharedArrayBuffer, which browsers expose only to isolated pages. The app
+# loads nothing cross-origin, so require-corp breaks nothing. Keep in step
+# with `isolationHeaders` in vite.config.ts.
+/*
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Opener-Policy: same-origin
+
 /sw.js
   Cache-Control: no-cache
 
