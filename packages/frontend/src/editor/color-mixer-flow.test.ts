@@ -3,6 +3,9 @@ import {
   Command,
   Mount,
   click,
+  hover,
+  inside,
+  testId,
   given,
   role,
   scene,
@@ -194,10 +197,16 @@ describe('Color Mixer view', () => {
       given(loaded()),
       ...stageMounts,
       sceneExpect(role('button', { name: 'Add Color Mixer adjustment' })).toExist(),
-      sceneExpect(
-        text('Adjusts hue, saturation, and brightness of one color range at a time.'),
-      ).toExist(),
-      sceneExpect(text('Recolor a single tone — sky, skin, grass — and leave the rest.')).toExist(),
+      hover(role('button', { name: 'Add Color Mixer adjustment' })),
+      inside(
+        testId('tool-tooltip'),
+        sceneExpect(
+          text('Adjusts hue, saturation, and brightness of one color range at a time.'),
+        ).toExist(),
+        sceneExpect(
+          text('Recolor a single tone — sky, skin, grass — and leave the rest.'),
+        ).toExist(),
+      ),
       Command.expectNone(),
     )
   })

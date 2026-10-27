@@ -234,10 +234,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
   return Match.value(message).pipe(
     Match.withReturnType<UpdateReturn>(),
     Match.tagsExhaustive({
-      ToggledMobileSheet: ({ sheet }) => ({
-        model: { ...model, mobileSheet: model.mobileSheet === sheet ? null : sheet, phase },
-      }),
-
       ToggledMode: () => {
         const mode = model.mode === 'dark' ? 'light' : 'dark'
         return { model: { ...model, mode, phase }, commands: [SetTheme({ mode })] }
@@ -247,6 +243,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
       ToggledPalette: () => ({
         model: { ...model, paletteOpen: !model.paletteOpen, paletteQuery: '', phase },
       }),
+      ChangedPaletteGroup: ({ group }) => ({ model: { ...model, paletteGroup: group, phase } }),
       ChangedPaletteQuery: ({ query }) => ({ model: { ...model, paletteQuery: query, phase } }),
 
       CanvasRegistered: () =>
@@ -324,7 +321,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           layerCreationError: null,
           saveStatus: { _tag: 'idle' },
           lutThumbs: {},
-          mobileSheet: null,
           presentPending: false,
           pendingPresent: null,
         })
@@ -378,7 +374,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             bins: null,
             compareSplitAt: 0.5,
             previewLut: null,
-            mobileSheet: null,
             attachedEdit: null,
             saveStatus: { _tag: 'idle' },
             lutThumbs: {},
@@ -410,7 +405,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           activeMixerColor: {},
           previewLut: null,
           compareSplitAt: 0.5,
-          mobileSheet: null,
           attachedEdit: { id, source },
           saveStatus: { _tag: 'idle' },
           lutThumbs: {},
@@ -480,7 +474,6 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           model: {
             ...model,
             layerCreationError: null,
-            mobileSheet: 'layers',
             paletteOpen: false,
             paletteQuery: '',
             phase,
@@ -496,8 +489,8 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         const { layer } = phase
         let next: Model = {
           ...model,
+          inspectorDismissed: false,
           layerCreationError: null,
-          mobileSheet: 'layers',
           phase,
           previewLut: null,
         }
@@ -531,6 +524,7 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         return renderNow({
           ...model,
           chain: [...model.chain, from.layer],
+          inspectorDismissed: true,
           phase,
           previewLut: null,
         })
@@ -599,7 +593,13 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
           return { model }
         }
         return {
-          model: { ...model, lutBarOpen: false, mobileSheet: 'layers', phase, previewLut: null },
+          model: {
+            ...model,
+            inspectorDismissed: false,
+            lutBarOpen: false,
+            phase,
+            previewLut: null,
+          },
         }
       },
       RemovedLayer: ({ id }) => {

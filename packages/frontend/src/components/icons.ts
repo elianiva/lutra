@@ -31,18 +31,6 @@ export const ModeLight: IconNode = [
   { d: 'M12 3v2M12 19v2M3 12h2M19 12h2M7 7L5.5 5.5M17 17l1.5 1.5M17 7l1.5-1.5M7 17l-1.5 1.5' },
 ]
 
-/** Mobile tab · Adjustments */
-export const PanelAdjust: IconNode = [
-  { d: 'M3 7h3.5M11.5 7H21M3 17h9.5M17.5 17H21' },
-  { d: 'M8 4h2Q11.5 4 11.5 5.5v3Q11.5 10 10 10h-2Q6.5 10 6.5 8.5v-3Q6.5 4 8 4z' },
-  { d: 'M14 14h2Q17.5 14 17.5 15.5v3Q17.5 20 16 20h-2Q12.5 20 12.5 18.5v-3Q12.5 14 14 14z' },
-]
-
-/** Mobile tab · Inspector, layer chain */
-export const PanelLayers: IconNode = [
-  { d: 'M12 3l9 4.5-9 4.5-9-4.5zM3 12l9 4.5 9-4.5M3 16.5l9 4.5 9-4.5' },
-]
-
 /** Settings disclosure */
 export const Expand: IconNode = [{ d: 'M6 9l6 6 6-6' }]
 

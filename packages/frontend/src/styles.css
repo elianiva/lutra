@@ -104,6 +104,9 @@
 }
 
 @theme {
+  /* the phone layout ends at 480px: `lg:` is the app's "not a phone" */
+  --breakpoint-lg: 30rem;
+
   /* surfaces */
   --color-bg: var(--mat-bg);
   --color-s1: var(--mat-s1);
@@ -306,14 +309,16 @@ body {
  */
 .print-stage {
   aspect-ratio: var(--ar, 0.8);
-  height: min(calc(100dvh - 300px), calc((100vw - 780px) / var(--ar, 0.8)));
+  height: min(calc(100dvh - 230px), max(160px, calc((100vw - 780px) / var(--ar, 0.8))));
   max-width: 100%;
   margin-inline: auto;
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 479px) {
   .print-stage {
-    height: min(calc(100dvh - 320px), calc((100vw - 56px) / var(--ar, 0.8)));
+    /* width-driven: the card hugs the photo, not the readout below it */
+    width: min(calc(100vw - 32px), calc((100dvh - 250px) * var(--ar, 0.8)));
+    height: auto;
   }
 }
 
@@ -551,18 +556,42 @@ button:not(:disabled):active,
 .stagger > * {
   animation: rise-in 300ms var(--ease-out) both;
 }
-.stagger > :nth-child(1) { animation-delay: 0ms; }
-.stagger > :nth-child(2) { animation-delay: 40ms; }
-.stagger > :nth-child(3) { animation-delay: 80ms; }
-.stagger > :nth-child(4) { animation-delay: 120ms; }
-.stagger > :nth-child(5) { animation-delay: 160ms; }
-.stagger > :nth-child(6) { animation-delay: 200ms; }
-.stagger > :nth-child(7) { animation-delay: 240ms; }
-.stagger > :nth-child(8) { animation-delay: 280ms; }
-.stagger > :nth-child(9) { animation-delay: 320ms; }
-.stagger > :nth-child(10) { animation-delay: 360ms; }
-.stagger > :nth-child(11) { animation-delay: 400ms; }
-.stagger > :nth-child(12) { animation-delay: 440ms; }
+.stagger > :nth-child(1) {
+  animation-delay: 0ms;
+}
+.stagger > :nth-child(2) {
+  animation-delay: 40ms;
+}
+.stagger > :nth-child(3) {
+  animation-delay: 80ms;
+}
+.stagger > :nth-child(4) {
+  animation-delay: 120ms;
+}
+.stagger > :nth-child(5) {
+  animation-delay: 160ms;
+}
+.stagger > :nth-child(6) {
+  animation-delay: 200ms;
+}
+.stagger > :nth-child(7) {
+  animation-delay: 240ms;
+}
+.stagger > :nth-child(8) {
+  animation-delay: 280ms;
+}
+.stagger > :nth-child(9) {
+  animation-delay: 320ms;
+}
+.stagger > :nth-child(10) {
+  animation-delay: 360ms;
+}
+.stagger > :nth-child(11) {
+  animation-delay: 400ms;
+}
+.stagger > :nth-child(12) {
+  animation-delay: 440ms;
+}
 
 /* the loading dots breathe */
 @keyframes breathe {
@@ -600,11 +629,10 @@ button:not(:disabled):active,
    because on desktop the same panels are static floating surfaces */
 @keyframes sheet-up {
   from {
-    opacity: 0;
-    transform: translateY(24px);
+    transform: translateY(100%);
   }
 }
-@media (max-width: 1023px) {
+@media (max-width: 479px) {
   .enter-sheet {
     animation: sheet-up 260ms var(--ease-drawer) both;
   }

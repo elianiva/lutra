@@ -59,11 +59,6 @@ const CatalogEntry = S.Struct({
 export const Catalog = S.Array(CatalogEntry)
 export type Catalog = typeof Catalog.Type
 
-// mobile (bottom sheets + tab bar, docs/adr/0010-editor-ui.md)
-
-export const MobileSheet = S.Union([S.Literal('tools'), S.Literal('layers')])
-export type MobileSheet = typeof MobileSheet.Type
-
 export const CompareMode = S.Literals(['off', 'toggle', 'split', 'side-by-side'])
 export type CompareMode = typeof CompareMode.Type
 
@@ -129,8 +124,6 @@ export const EditorMessage = defineMessageUnion({
     offsetY: S.Number,
   },
 
-  ToggledMobileSheet: { sheet: MobileSheet },
-
   SelectedTool: {
     type: S.Literals(LAYER_TYPES),
   },
@@ -173,6 +166,7 @@ export const EditorMessage = defineMessageUnion({
   ThemeApplied: {},
   ToggledPalette: {},
   ChangedPaletteQuery: { query: S.String },
+  ChangedPaletteGroup: { group: S.String },
 
   // LUT bar (bottom filmstrip picker, docs/adr/0002-lut-library)
 

@@ -48,6 +48,8 @@ export const Model = Schema.Struct({
   // The add-adjustment palette (docs/adr/0013-materials): an overlay, not a panel.
   paletteOpen: Schema.Boolean,
   paletteQuery: Schema.String,
+  // Phone only: the palette shows one category per tab.
+  paletteGroup: Schema.String,
   // LUT layer) — never touches the chain or the machine (docs/adr/0010-editor-ui
   previewLut: Schema.NullOr(LutIdSchema),
   // category at render.
@@ -63,9 +65,9 @@ export const Model = Schema.Struct({
   compareMode: CompareMode,
   compareSplitAt: Schema.Number,
   compareToggleBefore: Schema.Boolean,
-  // Which bottom sheet is open on mobile (docs/adr/0010-editor-ui.md): under the `lg`
-  // hidden.
-  mobileSheet: Schema.NullOr(Schema.Union([Schema.Literal('tools'), Schema.Literal('layers')])),
+  // Phone only: Apply closes the inspector sheet while the committed layer
+  // stays selected. Selecting a layer or starting a draft raises it again.
+  inspectorDismissed: Schema.Boolean,
   // while pending so the GPU queue never backs up (the in-flight render
   renderPending: Schema.Boolean,
   presentPending: Schema.Boolean,
@@ -99,12 +101,13 @@ export const initialModel = (): Model => ({
   lastRender: null,
   mode: readMode(),
   paletteOpen: false,
+  paletteGroup: 'Light',
   paletteQuery: '',
+  inspectorDismissed: false,
   lutDownloads: {},
   lutRecents: [],
   lutTab: 'recents',
   lutThumbs: {},
-  mobileSheet: null,
   offlineLutNotice: null,
   placeholderUrl: null,
   offsetX: 0,

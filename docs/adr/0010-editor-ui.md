@@ -24,4 +24,4 @@ No native `confirm()`. Friction is proportional to recoverability: Edit deletion
 
 ## Responsive & touch
 
-One view tree with responsive classes — **no viewport state in the model**, so jsdom scene tests keep finding every element. Below desktop: canvas-first column, panels collapse to bottom sheets toggled by a tab bar, and picking a tool flips to the working sheet. Touch: pinch zoom about the live midpoint, double-tap fit ↔ 2×, `touch-none` stage, larger coarse-pointer hit targets. Chrome-safe shell: `100dvh` height tracking, safe-area insets.
+One view tree with responsive classes — **no viewport state in the model**, so jsdom scene tests keep finding every element. Below desktop: canvas-first column; the palette and the inspector are bottom sheets driven by the selection (no tab bar; superseded in part by 0013). Touch: pinch zoom about the live midpoint, double-tap fit ↔ 2×, `touch-none` stage, larger coarse-pointer hit targets. Chrome-safe shell: `100dvh` height tracking, safe-area insets.

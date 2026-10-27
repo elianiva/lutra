@@ -1,5 +1,6 @@
 import { type Html, type HtmlBuilder, createKeyedLazy } from 'foldkit/html'
-import { icon } from '../components/icon'
+import { icon, type IconNode } from '../components/icon'
+import { AddAdjustment } from '../components/icons'
 import { LAYER_UI, LAYER_TYPES_ORDER } from './layer-meta'
 import { EditorMessage } from './message'
 import type { Model } from './model'
@@ -12,8 +13,9 @@ import type { LayerType } from '@lutra/engine'
  * the two-line copy — the labels live in the card, not in the rail, so the
  * rail stays narrow enough to float.
  *
- * Below `lg` the same component renders as the tools sheet: full-width rows
- * with the icon, the name and the copy, because a touch device has no hover.
+ * Below 480px (`lg`) the rail is not drawn: a touch device has no hover, and the
+ * chain rack's `Add` row opens the palette, which lists every tool with its
+ * copy.
  *
  * The rail is disabled until an image is loaded and while a draft is open
  * (the phase machine owns the real gate; this mirrors it so the buttons read
@@ -44,7 +46,6 @@ export const toolPanel = (
   catalogError: Model['catalogError'],
   phase: Model['phase'],
   hoveredTool: Model['hoveredTool'],
-  open: boolean,
 ) => {
   const editable = canPickTool(phase)
   const lutEnabled = catalog !== null
@@ -52,18 +53,12 @@ export const toolPanel = (
   const error = catalogError === null ? null : catalogError.message
   return h.aside(
     [
-      h.Class(
-        `${open ? 'enter-sheet flex' : 'hidden'} absolute inset-x-0 bottom-[72px] z-30 max-h-[70dvh] w-full flex-col overflow-y-auto rounded-t-[18px] bg-s1 p-2 shadow-[0_-24px_48px_-20px_var(--mat-shadow-a)] lg:bottom-auto lg:left-6 lg:right-auto lg:top-1/2 lg:z-20 lg:-translate-y-1/2 lg:flex lg:max-h-none lg:w-[52px] lg:flex-none lg:overflow-visible lg:rounded-[18px] lg:bg-transparent lg:p-0 lg:shadow-none`,
-      ),
+      h.Class('absolute left-6 top-1/2 z-20 hidden w-[52px] -translate-y-1/2 flex-col lg:flex'),
       h.AriaLabel('Adjustment tools'),
     ],
     [
       h.nav(
-        [
-          h.Class(
-            'surface enter-fade flex flex-col gap-1 p-1.5 max-lg:gap-0.5 max-lg:rounded-none max-lg:bg-transparent max-lg:p-0 max-lg:shadow-none',
-          ),
-        ],
+        [h.Class('surface enter-fade flex flex-col gap-1 p-1.5')],
         LAYER_TYPES_ORDER.flatMap((type, index) => [
           lazyTool(type, toolButton, [
             type,
@@ -76,7 +71,7 @@ export const toolPanel = (
           ])!,
           // group seams: Look | Light | Color | Film | Optics
           ...(index === 0 || index === 5 || index === 8 || index === 10
-            ? [h.div([h.Class('seam mx-2 my-1 hidden lg:block')], [])]
+            ? [h.div([h.Class('seam mx-2 my-1')], [])]
             : []),
         ]),
       ),
@@ -110,10 +105,8 @@ const toolButtonImpl = (
       h.button(
         [
           h.Class(
-            `group relative flex w-full items-center gap-3 rounded-[12px] px-4 py-2.5 text-left transition-colors max-lg:flex-col max-lg:items-start max-lg:gap-1 lg:h-[38px] lg:justify-center lg:px-0 lg:py-0 ${
-              disabled
-                ? 'cursor-not-allowed opacity-35'
-                : 'text-muted hover:bg-s2 hover:text-ink lg:hover:bg-s2'
+            `group relative flex h-[38px] w-full items-center justify-center rounded-[12px] transition-colors ${
+              disabled ? 'cursor-not-allowed opacity-35' : 'text-muted hover:bg-s2 hover:text-ink'
             }`,
           ),
           h.OnClick(EditorMessage.SelectedTool({ type })),
@@ -126,43 +119,12 @@ const toolButtonImpl = (
           h.Key(type),
         ],
         [
-          h.span(
-            [h.Class('flex items-center gap-3')],
-            [
-              h.span([h.Class('flex w-4 flex-none justify-center')], [icon(h, ui.icon, ui.label)]),
-              h.span([h.Class('flex-1 text-[13px] lg:hidden')], [ui.label]),
-            ],
-          ),
-          ...(status === null
-            ? [
-                h.span(
-                  [h.Class('hidden text-[10px] leading-snug text-dim max-lg:block')],
-                  [ui.description],
-                ),
-                h.span(
-                  [h.Class('hidden text-[10px] leading-snug text-dim max-lg:block')],
-                  [ui.when],
-                ),
-              ]
-            : [
-                h.span(
-                  [h.Class('hidden text-[10px] leading-snug text-dim max-lg:block')],
-                  [status],
-                ),
-              ]),
-          ...(count > 0
-            ? [h.span([h.Class('hidden text-[10px] text-dim max-lg:block')], [`×${String(count)}`])]
-            : []),
-          ...(count > 0
-            ? [h.span([h.Class('max-lg:block hidden text-[10px] text-dim')], [`×${String(count)}`])]
-            : []),
+          icon(h, ui.icon, ui.label),
           ...(count > 0
             ? [
                 h.span(
                   [
-                    h.Class(
-                      'absolute right-1 top-1 hidden size-1.5 rounded-full bg-accent lg:block',
-                    ),
+                    h.Class('absolute right-1 top-1 size-1.5 rounded-full bg-accent'),
                     h.AriaLabel(`In your edit: ${String(count)}`),
                     h.DataAttribute('testid', 'in-edit-badge'),
                   ],
@@ -190,7 +152,7 @@ const toolCard = (
   return h.div(
     [
       h.Class(
-        'surface enter-side pointer-events-none absolute left-full top-0 z-50 ml-3 hidden w-56 p-3 text-left lg:block',
+        'surface enter-side pointer-events-none absolute left-full top-0 z-50 ml-3 w-56 p-3 text-left',
       ),
       h.DataAttribute('testid', 'tool-tooltip'),
     ],
@@ -233,4 +195,54 @@ const groupOf = (type: LayerType): string => {
     return 'Film'
   }
   return 'Optics'
+}
+
+/** Tools pinned to the phone dock: the ones reached for most. */
+const PINNED: readonly LayerType[] = ['lut', 'exposure', 'contrast', 'saturation']
+
+/**
+ * The phone dock: the rail's phone counterpart, a pill along the bottom edge
+ * with the pinned tools and an `All` button that opens the palette grid.
+ * Below `lg` only.
+ */
+export const toolDock = (
+  h: HtmlBuilder<EditorMessage>,
+  catalog: Model['catalog'],
+  phase: Model['phase'],
+): Html => {
+  const editable = canPickTool(phase)
+  const dockButton = (label: string, Icon: IconNode, message: EditorMessage, disabled: boolean) =>
+    h.button(
+      [
+        h.Class(
+          `grid h-11 flex-1 place-items-center rounded-full transition-colors ${
+            disabled ? 'cursor-not-allowed opacity-35' : 'text-muted active:bg-s2 active:text-ink'
+          }`,
+        ),
+        h.OnClick(message),
+        ...(disabled ? [h.Disabled(true)] : []),
+        h.AriaLabel(label),
+        h.Key(label),
+      ],
+      [icon(h, Icon, label, 20)],
+    )
+  return h.nav(
+    [
+      h.Class(
+        'surface enter-fade absolute inset-x-4 bottom-4 z-20 flex items-center gap-1 rounded-full p-1.5 pb-[max(6px,env(safe-area-inset-bottom))] lg:hidden',
+      ),
+      h.AriaLabel('Quick tools'),
+    ],
+    [
+      ...PINNED.map((type) =>
+        dockButton(
+          `Quick add ${LAYER_UI[type].label}`,
+          LAYER_UI[type].icon,
+          EditorMessage.SelectedTool({ type }),
+          !editable || (type === 'lut' && catalog === null),
+        ),
+      ),
+      dockButton('All adjustments', AddAdjustment, EditorMessage.ToggledPalette(), !editable),
+    ],
+  )
 }

@@ -5,7 +5,6 @@ import { button } from '@/components/ui/button'
 import { EditorMessage } from './message'
 import { ErrorState, hasImage } from './phase'
 import { canvasRef, registerCanvas } from '../gpu/canvas-ref'
-import { LAYER_UI, lutName } from './layer-meta'
 import { chainDock } from './chain-dock'
 import { viewBar } from './frame-bar'
 import { MountElementError } from '../errors'
@@ -193,13 +192,19 @@ export const PanZoom = Mount.defineStream('PanZoom', {
           }
           state.touched = true
           pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
-          press =
-            pointers.size === 1 &&
+          const onControl =
             e.target instanceof Element &&
-            e.target.closest('button, a, input, select, textarea, label, [data-keep-selection]') ===
+            e.target.closest('button, a, input, select, textarea, label, [data-keep-selection]') !==
               null
-              ? { x: e.clientX, y: e.clientY, onCanvas: true }
-              : null
+          if (onControl && pointers.size === 1) {
+            // A press on a control is the control's: capturing the pointer for
+            // a pan would retarget its click to the stage (the rack's Add row
+            // did nothing on touch).
+            pointers.delete(e.pointerId)
+            press = null
+            return
+          }
+          press = pointers.size === 1 ? { x: e.clientX, y: e.clientY, onCanvas: true } : null
           if (pointers.size === 1) {
             const now = performance.now()
             if (
@@ -554,26 +559,6 @@ const errorStage = (h: HtmlBuilder<EditorMessage>, error: string) =>
     ],
   )
 
-/** The print's plate label: what this frame is, never invented metadata. */
-const plateLabel = (model: CanvasStageModel): readonly [string, string] => {
-  const dims =
-    model.source.width > 0 && model.source.height > 0
-      ? `${String(model.source.width)} × ${String(model.source.height)}`
-      : 'No source'
-  return ['Print', dims]
-}
-
-/** The serif caption under the print: the film look and the chain length. */
-const printCaption = (model: CanvasStageModel) => {
-  const lut = model.chain.find((layer) => layer.type === 'lut')
-  const count = model.chain.length
-  return {
-    name: lut === undefined ? 'No film look' : lutName(model.catalog, lut.lutId),
-    strength: lut === undefined ? null : LAYER_UI.lut.formatValue(lut),
-    chain: count === 0 ? 'Empty chain' : `${String(count)} layer${count === 1 ? '' : 's'}`,
-  }
-}
-
 /** The content aspect: side-by-side shows two frames side by side. */
 const contentRatio = (model: CanvasStageModel): number => {
   const width = model.compareMode === 'side-by-side' ? model.source.width * 2 : model.source.width
@@ -597,24 +582,15 @@ const mount = (
   content: Html,
   ratio: number,
 ): Html => {
-  const [plate, dims] = plateLabel(model)
-  const { name: lookName, strength, chain: chainLine } = printCaption(model)
-  const hasChain = model.chain.length > 0 || model.phase._tag === 'Drafting'
   return h.div(
     [h.Class('flex flex-col items-stretch gap-3 lg:flex-row lg:items-start lg:gap-3')],
     [
       h.figure(
         [
-          h.Class(
-            'surface relative m-0 flex w-fit max-w-full flex-col p-5 pb-3 max-lg:p-3 max-lg:pb-2',
-          ),
+          h.Class('surface relative m-0 flex w-fit max-w-full flex-col p-3 max-lg:p-2'),
           h.AriaLabel('Print preview'),
         ],
         [
-          h.figcaption(
-            [h.Class('micro flex items-baseline justify-between gap-4 pb-3')],
-            [h.span([], [plate]), h.span([h.Class('tnum font-mono')], [dims])],
-          ),
           h.div(
             [
               h.Class('print-stage relative overflow-hidden rounded-[8px] bg-[var(--mat-stage)]'),
@@ -622,30 +598,14 @@ const mount = (
             ],
             [content],
           ),
-          h.figcaption(
-            [h.Class('mt-3 flex items-baseline justify-between gap-4')],
-            [
-              h.span(
-                [h.Class('flex items-baseline gap-2')],
-                [
-                  h.span([h.Class('serif text-base italic leading-none text-ink')], [lookName]),
-                  ...(strength === null ? [] : [h.span([h.Class('label')], [strength])]),
-                ],
-              ),
-              h.span([h.Class('micro tnum font-mono')], [chainLine]),
-            ],
-          ),
           viewBar(h, {
-            scale: model.scale,
             compareMode: model.compareMode,
             phase: model.phase,
             bins: model.bins,
           }),
         ],
       ),
-      ...(hasChain
-        ? [chainDock(h, { chain: model.chain, phase: model.phase, catalog: model.catalog })]
-        : []),
+      chainDock(h, { chain: model.chain, phase: model.phase, catalog: model.catalog }),
     ],
   )
 }
@@ -700,12 +660,12 @@ const loadedStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel, rat
 export const canvasStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel) => {
   const ratio = contentRatio(model)
   const loaded = hasImage(model.phase)
-  // On a phone the top bar and the tab bar float over the stage, so the
-  // stage box keeps clear of both: the print and its rack fit between them.
+  // On a phone the top bar floats over the stage, so the stage box keeps
+  // clear of it; the inspector sheet rises over the stage's lower half.
   return h.div(
     [
       h.Class(
-        'absolute inset-x-0 top-0 bottom-0 flex items-center justify-center overflow-hidden max-lg:top-[64px] max-lg:bottom-[68px]',
+        'absolute inset-x-0 top-0 bottom-0 flex items-center justify-center overflow-hidden max-lg:top-[64px]',
       ),
     ],
     [

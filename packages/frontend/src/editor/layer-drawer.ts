@@ -48,6 +48,7 @@ export type InspectorSlice = Pick<
   | 'lutDownloads'
   | 'online'
   | 'offlineLutNotice'
+  | 'inspectorDismissed'
 >
 
 const num = (layer: Layer, key: FieldKey): number => numField(layer, key)
@@ -248,12 +249,12 @@ const panelOf = (slice: InspectorSlice): Panel => {
  *
  * A draft has the same shape as a committed layer, with Cancel / Apply in the
  * footer instead of the layer actions, so the transaction stays visible.
+ *
+ * Below 480px (`lg`) it is a bottom sheet that exists only while a layer or a draft is
+ * selected and not dismissed: it rises when you tap a row or pick a tool, and a tap on the print
+ * (or the grabber) dismisses it, and so does Apply. The empty inspector is desktop-only.
  */
-export const layerDrawer = (
-  h: HtmlBuilder<EditorMessage>,
-  slice: InspectorSlice,
-  open: boolean,
-) => {
+export const layerDrawer = (h: HtmlBuilder<EditorMessage>, slice: InspectorSlice) => {
   const panel = panelOf(slice)
   const rowSlice: LayerRowSlice = {
     catalog: slice.catalog,
@@ -263,15 +264,16 @@ export const layerDrawer = (
   return h.aside(
     [
       h.Class(
-        `${open ? 'enter-sheet flex' : 'hidden'} absolute inset-x-0 bottom-[72px] z-30 max-h-[70dvh] w-full flex-col overflow-y-auto rounded-t-[18px] bg-s1 shadow-[0_-24px_48px_-20px_var(--mat-shadow-a)] lg:bottom-auto lg:left-auto lg:right-6 lg:top-20 lg:z-20 lg:max-h-[calc(100dvh-128px)] lg:w-[328px] lg:flex-none lg:overflow-y-auto lg:rounded-none lg:bg-transparent lg:shadow-none`,
+        `${panel.kind === 'empty' || slice.inspectorDismissed ? 'max-lg:invisible max-lg:translate-y-full max-lg:[transition-property:translate,visibility] max-lg:[transition-delay:0s,300ms]' : 'max-lg:translate-y-0'} max-lg:transition-transform max-lg:duration-300 max-lg:ease-[cubic-bezier(0.32,0.72,0,1)] absolute inset-x-0 bottom-0 z-30 flex max-h-[62dvh] flex-col lg:inset-x-auto lg:bottom-auto lg:right-6 lg:top-20 lg:z-20 lg:max-h-[calc(100dvh-128px)] lg:w-[328px] lg:overflow-y-auto`,
       ),
+      h.DataAttribute('keep-selection', ''),
       h.AriaLabel('Selected adjustment'),
     ],
     [
       h.div(
         [
           h.Class(
-            'surface flex w-full flex-col overflow-hidden rounded-t-[18px] lg:mt-3 lg:rounded-[18px]',
+            'surface flex min-h-0 w-full flex-col overflow-y-auto pb-[env(safe-area-inset-bottom)] max-lg:rounded-b-none max-lg:rounded-t-[22px] lg:mt-3 lg:overflow-hidden lg:rounded-[18px] lg:pb-0',
           ),
           h.AriaLabel(
             panel.kind === 'empty'
@@ -280,6 +282,7 @@ export const layerDrawer = (
           ),
         ],
         [
+          grabber(h),
           panel.kind === 'empty' ? emptyPanel(h) : parameterPanel(h, slice, rowSlice, panel),
           panelFooter(h, panel),
         ],
@@ -287,6 +290,17 @@ export const layerDrawer = (
     ],
   )
 }
+
+/** The sheet's grabber: a tap dismisses it. Mobile only. */
+const grabber = (h: HtmlBuilder<EditorMessage>): Html =>
+  h.button(
+    [
+      h.Class('grid h-6 w-full flex-none place-items-center lg:hidden'),
+      h.OnClick(EditorMessage.DeselectedAll()),
+      h.AriaLabel('Close adjustment'),
+    ],
+    [h.span([h.Class('h-1 w-9 rounded-full bg-dim/40')], [])],
+  )
 
 const parameterPanel = (
   h: HtmlBuilder<EditorMessage>,
@@ -473,7 +487,7 @@ const context = (
   }
   return [
     h.div(
-      [h.Class('well mx-3 mb-3 flex flex-col gap-2 p-3')],
+      [h.Class('well mx-3 mb-3 flex flex-col gap-2 p-3 max-lg:hidden')],
       [
         h.p([h.Class('text-[11px] leading-snug text-muted')], [ui.description]),
         h.p([h.Class('text-[10px] leading-snug text-dim')], [ui.when]),

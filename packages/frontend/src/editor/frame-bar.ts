@@ -11,7 +11,7 @@ import type { Model } from './model'
  * frame — it reads or changes what the frame shows — so it is drawn inside
  * the print card and travels with the print when the stage pans or zooms.
  */
-export type ViewBarSlice = Pick<Model, 'scale' | 'compareMode' | 'phase' | 'bins'>
+export type ViewBarSlice = Pick<Model, 'compareMode' | 'phase' | 'bins'>
 
 const COMPARE_MODES: readonly {
   readonly mode: CompareMode
@@ -117,7 +117,6 @@ const lumaReadout = (h: HtmlBuilder<EditorMessage>, bins: Model['bins']): Html =
   h.div(
     [h.Class('flex min-w-0 flex-1 items-center gap-2.5')],
     [
-      h.span([h.Class('micro flex-none')], ['Luma']),
       h.div(
         [h.Class('relative h-[18px] min-w-0 flex-1 max-w-[168px]')],
         [lumaCurve(bins, h), h.div([h.Class('seam absolute inset-x-0 bottom-0')], [])],
@@ -131,13 +130,13 @@ export const viewBar = (h: HtmlBuilder<EditorMessage>, slice: ViewBarSlice): Htm
     slice.phase._tag === 'Selected' ||
     slice.phase._tag === 'Drafting'
   return h.div(
-    [h.Class('mt-3 flex items-center justify-between gap-4')],
+    // w-0 + min-w-full: the bar takes the print's width but never widens it
+    [h.Class('mt-3 flex w-0 min-w-full items-center justify-between gap-4')],
     [
       lumaReadout(h, slice.bins),
       h.div(
         [h.Class('flex flex-none items-center gap-2')],
         [
-          h.span([h.Class('micro tnum font-mono')], [`${String(Math.round(slice.scale * 100))}%`]),
           h.div(
             [h.Class('flex items-center gap-0.5'), h.AriaLabel('Compare modes')],
             COMPARE_MODES.map(({ mode, label, icon: Icon }) =>

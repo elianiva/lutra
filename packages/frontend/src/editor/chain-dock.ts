@@ -15,8 +15,9 @@ import type { Layer } from '@lutra/engine'
  * bottom. The selected row carries the accent wash; a draft hangs off the end
  * of the rack; the last row adds. An empty chain draws no rack at all.
  *
- * Below `lg` the rack lies under the print at full width, because a phone has
- * no room for a column.
+ * Below 480px (`lg`) the rack lies under the print at full width, because a phone has
+ * no room for a column. Its `Add` row is desktop-only: a phone adds from the
+ * bottom dock (tool-panel.ts).
  */
 export type ChainDockSlice = Pick<Model, 'chain' | 'phase' | 'catalog'>
 
@@ -35,7 +36,7 @@ const rowView = (
     [
       h.Key(layer.id),
       h.Class(
-        `enter-row relative flex items-center gap-2 rounded-[8px] px-1.5 py-1.5 text-left transition-colors duration-150 lg:w-full ${
+        `enter-row relative flex items-center gap-2 rounded-[8px] px-1.5 py-1.5 text-left transition-colors duration-150 max-lg:py-2.5 lg:w-full ${
           active ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-s2 hover:text-ink'
         }`,
       ),
@@ -102,11 +103,16 @@ const draftRowView = (layer: Layer, index: number, h: HtmlBuilder<EditorMessage>
 export const chainDock = (h: HtmlBuilder<EditorMessage>, slice: ChainDockSlice): Html => {
   const selectedId = slice.phase._tag === 'Selected' ? slice.phase.layerId : null
   const drafting = slice.phase._tag === 'Drafting'
+  const empty = slice.chain.length === 0 && !drafting
   return h.div(
     [
       // It hugs its rows and sits beside the print, not stretched to the
       // frame's height: a short chain is a short rack.
-      h.Class('surface enter-rise flex flex-none flex-col py-2 lg:w-[212px] lg:self-start'),
+      h.Class(
+        `surface enter-rise flex flex-none flex-col py-2 lg:w-[212px] lg:self-start ${
+          empty ? 'hidden' : ''
+        }`,
+      ),
       h.AriaLabel('Edit chain'),
       h.DataAttribute('testid', 'chain-dock'),
       h.DataAttribute('keep-selection', ''),
@@ -152,12 +158,12 @@ export const chainDock = (h: HtmlBuilder<EditorMessage>, slice: ChainDockSlice):
       // last row of the rack, so "where do layers come from" and "where does
       // this chain end" are the same place (docs/adr/0013-materials).
       h.div(
-        [h.Class('mt-1 px-2 pt-1')],
+        [h.Class('mt-1 px-2 pt-1 max-lg:hidden')],
         [
           h.button(
             [
               h.Class(
-                'flex w-full items-center gap-2 rounded-[8px] px-1.5 py-1.5 text-muted transition-colors hover:bg-s2 hover:text-ink',
+                'flex w-full items-center gap-2 rounded-[8px] px-1.5 py-1.5 text-muted transition-colors hover:bg-s2 hover:text-ink max-lg:py-2.5',
               ),
               h.OnClick(EditorMessage.ToggledPalette()),
               h.AriaLabel('Add adjustment'),

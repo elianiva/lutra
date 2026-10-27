@@ -206,7 +206,15 @@ const offlineCardImpl = (offline: Model['offline'], h: HtmlBuilder<AppMessage>):
     )
   const progress = h.div(
     [h.Class('h-1 w-full bg-border-strong')],
-    [h.div([h.Class('h-full bg-accent transition-[width] duration-300 ease-out'), h.Style({ width: `${pct}%` })], [])],
+    [
+      h.div(
+        [
+          h.Class('h-full bg-accent transition-[width] duration-300 ease-out'),
+          h.Style({ width: `${pct}%` }),
+        ],
+        [],
+      ),
+    ],
   )
   const counters = h.div(
     [h.Class('text-xs text-muted tnum')],

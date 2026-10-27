@@ -64,7 +64,10 @@ export const view = Submodel.defineView<Model, GalleryMessage>((model, h) => {
 const notice = (message: string | null, h: HtmlBuilder<GalleryMessage>) =>
   message === null
     ? null
-    : h.div([h.Class('enter-fade border-b border-border bg-panel px-4 py-1 text-xs text-accent')], [message])
+    : h.div(
+        [h.Class('enter-fade border-b border-border bg-panel px-4 py-1 text-xs text-accent')],
+        [message],
+      )
 
 const gridBody = (
   h: HtmlBuilder<GalleryMessage>,
@@ -80,7 +83,10 @@ const gridBody = (
   })
 
 const spinner = (h: HtmlBuilder<GalleryMessage>) =>
-  h.div([h.Class('breathe flex flex-1 items-center justify-center text-sm text-muted')], ['Loading…'])
+  h.div(
+    [h.Class('breathe flex flex-1 items-center justify-center text-sm text-muted')],
+    ['Loading…'],
+  )
 
 const dropOverlay = (h: HtmlBuilder<GalleryMessage>, active: boolean): Html =>
   active
@@ -114,7 +120,11 @@ const emptyState = (h: HtmlBuilder<GalleryMessage>) =>
     ],
     [
       h.div(
-        [h.Class('well enter-rise flex w-[min(420px,100%)] flex-col items-center gap-3 p-6 text-center')],
+        [
+          h.Class(
+            'well enter-rise flex w-[min(420px,100%)] flex-col items-center gap-3 p-6 text-center',
+          ),
+        ],
         [
           h.p([h.Class('text-sm text-ink')], ['No saved edits yet.']),
           h.button(
@@ -160,7 +170,11 @@ const hoverReveal =
 
 const gridTiles = (h: HtmlBuilder<GalleryMessage>, summaries: readonly EditSummary[]) =>
   h.div(
-    [h.Class('stagger grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-4 max-sm:grid-cols-2')],
+    [
+      h.Class(
+        'stagger grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-4 max-sm:grid-cols-2',
+      ),
+    ],
     [newEditTile(h), ...summaries.map((summary) => lazyTile(summary.id, tileView, [summary, h])!)],
   )
 

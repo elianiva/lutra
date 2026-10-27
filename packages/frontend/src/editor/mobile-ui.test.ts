@@ -10,7 +10,6 @@ import {
   expect as sceneExpect,
 } from 'foldkit/scene'
 import { LutId } from '@lutra/engine'
-import { EditId } from '@lutra/store'
 import { MockImageBitmap } from '../vitest-setup'
 import { RenderHandle } from '../gpu/backend'
 import { initialModel } from './model'
@@ -44,104 +43,12 @@ const stubHandle = () =>
     generation: 0,
   })
 
-const editId = () => EditId('11111111-1111-4111-8111-111111111111')
-
 /** A model in the Idle phase with a loaded image and the catalog. */
 const loaded = () => ({
   ...initialModel(),
   catalog,
   phase: Idle(),
   source: { bitmap: new MockImageBitmap(200, 150), error: null, height: 150, width: 200 },
-})
-
-// update flow (docs/adr/0010-editor-ui.md)
-
-describe('mobile bottom sheets', () => {
-  it('starts closed', () => {
-    expect(initialModel().mobileSheet).toBeNull()
-  })
-
-  it('ToggledMobileSheet opens the tapped sheet', () => {
-    const { model } = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'tools' }))
-    expect(model.mobileSheet).toBe('tools')
-  })
-
-  it('tapping the active tab closes the sheet', () => {
-    const { model: opened } = update(
-      loaded(),
-      EditorMessage.ToggledMobileSheet({ sheet: 'layers' }),
-    )
-    const { model } = update(opened, EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
-    expect(model.mobileSheet).toBeNull()
-  })
-
-  it('tapping the other tab switches the sheet', () => {
-    const { model: opened } = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'tools' }))
-    const { model } = update(opened, EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
-    expect(model.mobileSheet).toBe('layers')
-  })
-
-  it('picking a tool follows the draft to the Layers sheet', () => {
-    const { model } = selectTool(loaded(), 'exposure')
-    expect(model.phase._tag).toBe('Drafting')
-    expect(model.mobileSheet).toBe('layers')
-  })
-
-  it('selecting a layer opens the Layers sheet', () => {
-    const { model: withDraft } = selectTool(loaded(), 'exposure')
-    const { model: committed } = update(withDraft, EditorMessage.ConfirmedDraft())
-    const layer = committed.chain[0]
-    if (!layer) {
-      throw new Error('fixture: expected a committed layer')
-    }
-    const { model } = update(committed, EditorMessage.SelectedLayer({ id: layer.id }))
-    expect(model.mobileSheet).toBe('layers')
-  })
-
-  it('a new image closes the sheets', () => {
-    const { model: withSheet } = update(
-      loaded(),
-      EditorMessage.ToggledMobileSheet({ sheet: 'layers' }),
-    )
-    const { model } = update(
-      withSheet,
-      EditorMessage.ImageDecoded({
-        bitmap: new MockImageBitmap(200, 150),
-        height: 150,
-        source: new Uint8Array([1]),
-        width: 200,
-      }),
-    )
-    expect(model.mobileSheet).toBeNull()
-  })
-
-  it('ClearedImage closes the sheets', () => {
-    const { model: withSheet } = update(
-      loaded(),
-      EditorMessage.ToggledMobileSheet({ sheet: 'layers' }),
-    )
-    const { model } = update(withSheet, EditorMessage.ClearedImage())
-    expect(model.mobileSheet).toBeNull()
-  })
-
-  it('EditLoaded closes the sheets', () => {
-    const { model: withSheet } = update(
-      loaded(),
-      EditorMessage.ToggledMobileSheet({ sheet: 'tools' }),
-    )
-    const { model } = update(
-      withSheet,
-      EditorMessage.EditLoaded({
-        bitmap: new MockImageBitmap(200, 150),
-        chain: [],
-        height: 150,
-        id: editId(),
-        source: new Uint8Array([9]),
-        width: 200,
-      }),
-    )
-    expect(model.mobileSheet).toBeNull()
-  })
 })
 
 const sceneConfig = { update, view } as const
@@ -159,61 +66,61 @@ const resolveRender = () => [
   ),
 ]
 
-describe('mobile tab bar view', () => {
-  it('renders the Adjustments and Inspector tabs', () => {
+describe('mobile editor', () => {
+  it('has no bottom tab bar', () => {
     scene(
       sceneConfig,
       given(loaded()),
       ...stageMounts,
-      sceneExpect(role('button', { name: 'Adjustments' })).toExist(),
-      sceneExpect(role('button', { name: 'Inspector' })).toExist(),
-      // Adding lives on the rack's own Add row, not in the tab bar.
-      sceneExpect(role('button', { name: 'Add' })).not.toExist(),
+      sceneExpect(role('button', { name: 'Adjustments' })).not.toExist(),
+      sceneExpect(role('button', { name: 'Inspector' })).not.toExist(),
       Command.expectNone(),
     )
   })
 
-  it('the Inspector tab is the palette-free way into the selected layer', () => {
-    const { model } = update(loaded(), EditorMessage.ToggledMobileSheet({ sheet: 'layers' }))
-    scene(
-      sceneConfig,
-      given(model),
-      ...stageMounts,
-      sceneExpect(role('button', { name: 'Inspector' })).toHaveAttr('aria-pressed', 'true'),
-      Command.expectNone(),
-    )
-  })
-
-  it('clicking a tab toggles the sheet (aria-pressed mirrors the state)', () => {
+  it('the bottom dock pins quick tools and opens the full palette', () => {
     scene(
       sceneConfig,
       given(loaded()),
       ...stageMounts,
-      click(role('button', { name: 'Adjustments' })),
-      sceneExpect(role('button', { name: 'Adjustments' })).toHaveAttr('aria-pressed', 'true'),
-      click(role('button', { name: 'Adjustments' })),
-      sceneExpect(role('button', { name: 'Adjustments' })).toHaveAttr('aria-pressed', 'false'),
+      sceneExpect(role('button', { name: 'Quick add LUT' })).toExist(),
+      sceneExpect(role('button', { name: 'Quick add Exposure' })).toExist(),
+      click(role('button', { name: 'All adjustments' })),
+      sceneExpect(label('Add an adjustment')).toExist(),
       Command.expectNone(),
     )
   })
 
-  it('picking a tool from the sheet flips it to the Inspector (the draft sliders)', () => {
+  it('picking a tool from the palette raises the draft sheet; its grabber dismisses it', () => {
     scene(
       sceneConfig,
       given(loaded()),
       ...stageMounts,
-      click(role('button', { name: 'Adjustments' })),
+      click(role('button', { name: 'All adjustments' })),
       click(role('button', { name: 'Add Exposure adjustment' })),
       Command.resolve(
         CreateLayer,
         EditorMessage.LayerCreated({ layer: createTestLayer('exposure') }),
       ),
       ...resolveRender(),
-      sceneExpect(role('button', { name: 'Adjustments' })).toHaveAttr('aria-pressed', 'false'),
-      sceneExpect(role('button', { name: 'Inspector' })).toHaveAttr('aria-pressed', 'true'),
-      // The draft row with its sliders is in the Layers sheet.
       sceneExpect(label('Exposure draft')).toExist(),
+      click(role('button', { name: 'Close adjustment' })),
+      ...resolveRender(),
+      sceneExpect(label('Exposure draft')).not.toExist(),
       Command.expectNone(),
     )
+  })
+
+  it('Apply closes the sheet but keeps the layer selected; selecting it again reopens', () => {
+    const { model: drafting } = selectTool(loaded(), 'exposure')
+    const { model: applied } = update(drafting, EditorMessage.ConfirmedDraft())
+    expect(applied.inspectorDismissed).toBe(true)
+    expect(applied.phase._tag).toBe('Selected')
+    const layer = applied.chain[0]
+    if (!layer) {
+      throw new Error('fixture: expected a committed layer')
+    }
+    const { model: reselected } = update(applied, EditorMessage.SelectedLayer({ id: layer.id }))
+    expect(reselected.inspectorDismissed).toBe(false)
   })
 })

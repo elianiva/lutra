@@ -89,7 +89,7 @@ const resolveRender = () => [
 ]
 
 describe('tool panel cards', () => {
-  it('renders every tool as a card with its two copy lines', () => {
+  it('renders every tool as a card with its tooltip copy', () => {
     scene(
       sceneConfig,
       given(loaded()),
@@ -108,37 +108,8 @@ describe('tool panel cards', () => {
       sceneExpect(role('button', { name: 'Add Vignette adjustment' })).toExist(),
       sceneExpect(role('button', { name: 'Add Chromatic Aberration adjustment' })).toExist(),
       sceneExpect(role('button', { name: 'Add Clarity adjustment' })).toExist(),
-      // The description block: what it does + when to use it.
-      sceneExpect(text('Brightens or darkens the whole photo.')).toExist(),
-      sceneExpect(text("Fix a photo that's too dark or too bright.")).toExist(),
-      sceneExpect(text('Deepens shadows and lifts highlights.')).toExist(),
-      sceneExpect(text('Make a flat photo punchier, or soften it.')).toExist(),
-      sceneExpect(text('Lightens or darkens the darkest areas.')).toExist(),
-      sceneExpect(text('Pull detail out of underexposed shadows.')).toExist(),
-      sceneExpect(text('Lightens or darkens the brightest areas.')).toExist(),
-      sceneExpect(text('Recover blown-out skies and bright spots.')).toExist(),
-      sceneExpect(
-        text('Shapes brightness across the whole range with a draggable curve.'),
-      ).toExist(),
-      sceneExpect(text('Bend the tones — an S-curve, lifted blacks, or a custom grade.')).toExist(),
-      sceneExpect(text('Shifts the color cast: warm or cool, green or magenta.')).toExist(),
-      sceneExpect(text('Use it to fix an odd cast or set a mood.')).toExist(),
-      sceneExpect(text('Controls how vivid the colors are.')).toExist(),
-      sceneExpect(text('Make colors pop, or pull back for a faded look.')).toExist(),
-      sceneExpect(
-        text('Adjusts hue, saturation, and brightness of one color range at a time.'),
-      ).toExist(),
-      sceneExpect(text('Recolor a single tone — sky, skin, grass — and leave the rest.')).toExist(),
-      sceneExpect(text('Luminance-aware film grain with stock-specific character.')).toExist(),
-      sceneExpect(text('Give the photo texture, like classic film.')).toExist(),
-      sceneExpect(text("Darkens or brightens the photo's edges.")).toExist(),
-      sceneExpect(text('Focus the center, or add a vintage frame.')).toExist(),
-      sceneExpect(text('Splits red and blue at the edges, like an old lens.')).toExist(),
-      sceneExpect(text('Add a touch of analog imperfection.')).toExist(),
-      sceneExpect(text('Adds punch to textures and fine detail.')).toExist(),
-      sceneExpect(text('Make surfaces pop, or go softer and dreamy.')).toExist(),
-      // Desktop is an icon rail: hovering a card opens its custom tooltip
-      // with the copy (the visible block above is the mobile sheet's).
+      // The rail is an icon column: hovering a card opens its tooltip with the
+      // copy; phones reach the same copy through the palette.
       hover(role('button', { name: 'Add Exposure adjustment' })),
       inside(
         testId('tool-tooltip'),
@@ -152,8 +123,11 @@ describe('tool panel cards', () => {
         sceneExpect(text("Fix a photo that's too dark or too bright.")).toBeAbsent(),
       ),
       // With the catalog loaded, the LUT card shows its copy and is enabled.
-      sceneExpect(text('Applies the look of a classic film stock.')).toExist(),
-      sceneExpect(text('Give your photo instant analog character.')).toExist(),
+      hover(role('button', { name: 'Add LUT adjustment' })),
+      inside(
+        testId('tool-tooltip'),
+        sceneExpect(text('Applies the look of a classic film stock.')).toExist(),
+      ),
       sceneExpect(role('button', { name: 'Add LUT adjustment' })).toBeEnabled(),
       Command.expectNone(),
     )
@@ -169,7 +143,6 @@ describe('tool panel cards', () => {
         role('button', { name: 'Add Exposure adjustment' }),
         sceneExpect(testId('in-edit-badge')).toExist(),
       ),
-      sceneExpect(text('×2')).toExist(),
       // …tools not in the chain carry no badge.
       inside(
         role('button', { name: 'Add Contrast adjustment' }),
@@ -190,7 +163,6 @@ describe('tool panel cards', () => {
         role('button', { name: 'Add Vignette adjustment' }),
         sceneExpect(testId('in-edit-badge')).toExist(),
       ),
-      sceneExpect(text('×1')).toExist(),
       Command.expectNone(),
     )
   })
@@ -200,7 +172,8 @@ describe('tool panel cards', () => {
       sceneConfig,
       given({ ...loaded(), catalog: null }),
       ...stageMounts,
-      sceneExpect(text('Loading LUTs…')).toExist(),
+      hover(role('button', { name: 'Add LUT adjustment' })),
+      inside(testId('tool-tooltip'), sceneExpect(text('Loading LUTs…')).toExist()),
       sceneExpect(role('button', { name: 'Add LUT adjustment' })).toBeDisabled(),
       Command.expectNone(),
     )
@@ -215,10 +188,10 @@ describe('tool panel cards', () => {
         catalogError: new LutLoadError({ message: 'Failed to load luts/film_luts.json: HTTP 500' }),
       }),
       ...stageMounts,
-      sceneExpect(text('LUTs unavailable')).toExist(),
       hover(role('button', { name: 'Add LUT adjustment' })),
       inside(
         testId('tool-tooltip'),
+        sceneExpect(text('LUTs unavailable')).toExist(),
         sceneExpect(text('Failed to load luts/film_luts.json: HTTP 500')).toExist(),
       ),
       sceneExpect(role('button', { name: 'Add LUT adjustment' })).toBeDisabled(),

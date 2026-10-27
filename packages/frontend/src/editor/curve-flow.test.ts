@@ -3,6 +3,9 @@ import {
   Command,
   Mount,
   click,
+  hover,
+  inside,
+  testId,
   given,
   role,
   scene,
@@ -188,10 +191,16 @@ describe('Tone Curve view', () => {
       given(loaded()),
       ...stageMounts,
       sceneExpect(role('button', { name: 'Add Tone Curve adjustment' })).toExist(),
-      sceneExpect(
-        text('Shapes brightness across the whole range with a draggable curve.'),
-      ).toExist(),
-      sceneExpect(text('Bend the tones — an S-curve, lifted blacks, or a custom grade.')).toExist(),
+      hover(role('button', { name: 'Add Tone Curve adjustment' })),
+      inside(
+        testId('tool-tooltip'),
+        sceneExpect(
+          text('Shapes brightness across the whole range with a draggable curve.'),
+        ).toExist(),
+        sceneExpect(
+          text('Bend the tones — an S-curve, lifted blacks, or a custom grade.'),
+        ).toExist(),
+      ),
       Command.expectNone(),
     )
   })

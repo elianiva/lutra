@@ -1,17 +1,14 @@
 import { type Html, type HtmlBuilder, createLazy } from 'foldkit/html'
-import { PanelAdjust, PanelLayers } from '../components/icons'
-import type { IconNode } from '../components/icon'
 import { Submodel } from 'foldkit'
 import { hasImage } from './phase'
 import type { Model } from './model'
 import { topBar } from './top-bar'
-import { toolPanel } from './tool-panel'
+import { toolDock, toolPanel } from './tool-panel'
 import { layerDrawer } from './layer-drawer'
 import { canvasStage } from './canvas-stage'
 import { palette } from './palette'
 import * as ExportDialog from '../export-dialog'
 import { EditorMessage } from './message'
-import { icon } from '../components/icon'
 
 // lazy islands (ADR 0006)
 // Each island is memoized by the slice references it reads (editor uses
@@ -20,9 +17,9 @@ import { icon } from '../components/icon'
 const lazyTopBar = createLazy()
 const lazyRail = createLazy()
 const lazyStage = createLazy()
+const lazyDock = createLazy()
 const lazyInspector = createLazy()
 const lazyPalette = createLazy()
-const lazyMobileTabBar = createLazy()
 const lazyExportDialog = createLazy()
 
 const topBarView = (
@@ -39,9 +36,14 @@ const railView = (
   catalogError: Model['catalogError'],
   phase: Model['phase'],
   hoveredTool: Model['hoveredTool'],
-  toolsOpen: boolean,
   h: HtmlBuilder<EditorMessage>,
-): Html => toolPanel(h, chain, catalog, catalogError, phase, hoveredTool, toolsOpen)
+): Html => toolPanel(h, chain, catalog, catalogError, phase, hoveredTool)
+
+const dockView = (
+  catalog: Model['catalog'],
+  phase: Model['phase'],
+  h: HtmlBuilder<EditorMessage>,
+): Html => toolDock(h, catalog, phase)
 
 const stageView = (
   source: Model['source'],
@@ -84,37 +86,37 @@ const inspectorView = (
   lutDownloads: Model['lutDownloads'],
   online: boolean,
   offlineLutNotice: Model['offlineLutNotice'],
-  layersOpen: boolean,
+  inspectorDismissed: boolean,
   h: HtmlBuilder<EditorMessage>,
 ): Html =>
-  layerDrawer(
-    h,
-    {
-      chain,
-      phase,
-      catalog,
-      activeFieldIndex,
-      activeMixerColor,
-      previewLut,
-      lutTab,
-      lutRecents,
-      lutThumbs,
-      lutDownloads,
-      online,
-      offlineLutNotice,
-    },
-    layersOpen,
-  )
+  layerDrawer(h, {
+    chain,
+    phase,
+    catalog,
+    activeFieldIndex,
+    activeMixerColor,
+    previewLut,
+    lutTab,
+    lutRecents,
+    lutThumbs,
+    lutDownloads,
+    online,
+    offlineLutNotice,
+    inspectorDismissed,
+  })
 
 const paletteView = (
   paletteOpen: boolean,
   paletteQuery: string,
+  paletteGroup: string,
   chain: Model['chain'],
   catalog: Model['catalog'],
   catalogError: Model['catalogError'],
   phase: Model['phase'],
   h: HtmlBuilder<EditorMessage>,
-): Html => palette(h, { paletteOpen, paletteQuery, chain, catalog, catalogError, phase }) ?? h.empty
+): Html =>
+  palette(h, { paletteOpen, paletteQuery, paletteGroup, chain, catalog, catalogError, phase }) ??
+  h.empty
 
 const exportDialogView = (dialog: Model['exportDialog'], h: HtmlBuilder<EditorMessage>): Html =>
   ExportDialog.exportDialogView(h, dialog, (message) =>
@@ -159,9 +161,9 @@ const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
         model.catalogError,
         model.phase,
         model.hoveredTool,
-        model.mobileSheet === 'tools',
         h,
       ]),
+      lazyDock(dockView, [model.catalog, model.phase, h]),
       lazyInspector(inspectorView, [
         model.chain,
         model.phase,
@@ -175,57 +177,20 @@ const layout = (h: HtmlBuilder<EditorMessage>, model: Model) => {
         model.lutDownloads,
         model.online,
         model.offlineLutNotice,
-        model.mobileSheet === 'layers',
+        model.inspectorDismissed,
         h,
       ]),
       lazyPalette(paletteView, [
         model.paletteOpen,
         model.paletteQuery,
+        model.paletteGroup,
         model.chain,
         model.catalog,
         model.catalogError,
         model.phase,
         h,
       ]),
-      lazyMobileTabBar(mobileTabBarView, [model.mobileSheet, h]),
       lazyExportDialog(exportDialogView, [model.exportDialog, h]),
-    ],
-  )
-}
-
-const mobileTabBarView = (mobileSheet: Model['mobileSheet'], h: HtmlBuilder<EditorMessage>): Html =>
-  mobileTabBarImpl(mobileSheet, h)
-
-const mobileTabBarImpl = (mobileSheet: Model['mobileSheet'], h: HtmlBuilder<EditorMessage>) => {
-  const panelTab = (label: string, Icon: IconNode, active: boolean, onClick: () => EditorMessage) =>
-    h.button(
-      [
-        h.Class(
-          `flex flex-1 items-center justify-center gap-2 rounded-full py-2 text-[10px] uppercase tracking-[0.1em] transition-colors duration-150 ${
-            active ? 'bg-s2 text-ink' : 'text-dim'
-          }`,
-        ),
-        h.OnClick(onClick()),
-        h.AriaPressed(String(active)),
-        h.AriaLabel(label),
-        h.Key(label),
-      ],
-      [icon(h, Icon, label, 14), h.span([], [label])],
-    )
-  return h.nav(
-    [
-      h.Class(
-        'enter-sheet absolute inset-x-3 bottom-3 z-30 flex items-center gap-1 rounded-full bg-s1 p-1 pb-[max(4px,env(safe-area-inset-bottom))] shadow-[0_12px_28px_-12px_var(--mat-shadow-a)] lg:hidden',
-      ),
-      h.AriaLabel('Editor panels'),
-    ],
-    [
-      panelTab('Adjustments', PanelAdjust, mobileSheet === 'tools', () =>
-        EditorMessage.ToggledMobileSheet({ sheet: 'tools' }),
-      ),
-      panelTab('Inspector', PanelLayers, mobileSheet === 'layers', () =>
-        EditorMessage.ToggledMobileSheet({ sheet: 'layers' }),
-      ),
     ],
   )
 }
