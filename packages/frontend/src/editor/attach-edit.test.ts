@@ -21,6 +21,7 @@ describe('attached edit load (gallery → /edit/:id)', () => {
     const { commands = [] } = init(editorRoute)
     const names = commands.map((c) => c.name)
     expect(names).toContain('LoadEdit')
+    expect(names).toContain('LoadEditPlaceholder')
     expect(names).toContain('LoadCatalog')
     expect(names).toContain('LoadExportSettings')
     expect(names).toContain('LoadLutRecents')
@@ -34,6 +35,35 @@ describe('attached edit load (gallery → /edit/:id)', () => {
   it('informRouteChanged re-fires LoadEdit for a route change onto an Edit', () => {
     const { commands = [] } = informRouteChanged(initialModel(), editorRoute)
     expect(commands.map((c) => c.name)).toContain('LoadEdit')
+  })
+
+  it('the saved thumbnail shows while the source decodes, and is released when the edit lands', () => {
+    const waiting = update(initialModel(), EditorMessage.EditPlaceholderReady({ url: 'blob:thumb' }))
+    expect(waiting.model.placeholderUrl).toBe('blob:thumb')
+
+    const loaded = update(
+      waiting.model,
+      EditorMessage.EditLoaded({
+        bitmap: bitmap(),
+        chain: [],
+        height: 480,
+        id: id(),
+        source: new Uint8Array([9]),
+        width: 640,
+      }),
+    )
+    expect(loaded.model.placeholderUrl).toBeNull()
+    expect(loaded.commands?.map((c) => c.name)).toContain('RevokeLutThumbs')
+  })
+
+  it('a placeholder that arrives after the decode is revoked, not shown', () => {
+    const loaded = { ...initialModel(), phase: Idle() }
+    const { model, commands = [] } = update(
+      loaded,
+      EditorMessage.EditPlaceholderReady({ url: 'blob:late' }),
+    )
+    expect(model.placeholderUrl).toBeNull()
+    expect(commands.map((c) => c.name)).toEqual(['RevokeLutThumbs'])
   })
 
   it('EditLoaded seeds the chain + source bitmap and lands Idle, then renders', () => {

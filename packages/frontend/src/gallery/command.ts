@@ -4,7 +4,7 @@ import { pushUrl } from 'foldkit/navigation'
 import { pageUrl } from '../components/nav-pill'
 import type { StoreError } from '@lutra/store'
 import { EditStore, EditIdSchema, Edit, EditId, newEditId } from '@lutra/store'
-import { decodeImage, isRawFile, RAW_EXTENSIONS } from '../lib/decode-image'
+import { decodeThumbnailSource, isRawFile, RAW_EXTENSIONS } from '../lib/decode-image'
 import { ImageDecodeError, ThumbnailEncodeError } from '../errors'
 import { type Mode, persistMode } from '../theme'
 import { GalleryMessage } from './message'
@@ -85,7 +85,7 @@ const thumbnailBytes = (
           cause,
           message: `failed to decode the picked photo: ${String(cause)}`,
         }),
-      try: async () => await decodeImage(file),
+      try: async () => await decodeThumbnailSource(file),
     })
     try {
       const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height))

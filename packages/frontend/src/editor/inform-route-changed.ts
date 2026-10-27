@@ -10,7 +10,7 @@ import { EditorMessage } from './message'
 import type { Model } from './model'
 import type { AppRoute } from '../route'
 import * as ExportDialog from '../export-dialog'
-import { LoadCatalog, LoadEdit, LoadLutRecents } from './command'
+import { LoadCatalog, LoadEdit, LoadEditPlaceholder, LoadLutRecents } from './command'
 
 type Resource =
   | GpuBackend
@@ -42,6 +42,6 @@ export const informRouteChanged = (model: Model, route: AppRoute): RouteChangedR
     ),
   ]
   const boot = [LoadCatalog(), ...settings, LoadLutRecents()]
-  const commands = route._tag === 'Editor' ? [LoadEdit({ id: route.editId }), ...boot] : boot
+  const commands = route._tag === 'Editor' ? [LoadEditPlaceholder({ id: route.editId }), LoadEdit({ id: route.editId }), ...boot] : boot
   return { model, commands }
 }

@@ -146,6 +146,34 @@ export const DecodeImage = Command.define('DecodeImage', {
 })
 
 /**
+ * The attached Edit's saved thumbnail, as a blob URL for the stage to show
+ * while `LoadEdit` decodes the source. Reads the summaries (thumbnails, no
+ * source bytes), so it returns long before the decode does. A missing
+ * thumbnail or a store failure means no placeholder, not an error.
+ */
+export const LoadEditPlaceholder = Command.define('LoadEditPlaceholder', {
+  args: { id: EditIdSchema },
+  execute: ({ id }) =>
+    Effect.gen(function* () {
+      const store = yield* EditStore
+      const summaries = yield* store.list()
+      const summary = summaries.find((entry) => entry.id === id)
+      if (summary === undefined || summary.thumbnail.byteLength === 0) {
+        return EditorMessage.EditPlaceholderReady({ url: null })
+      }
+      // SAFETY: the store hands back bytes over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
+      // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, typescript/consistent-type-assertions -- SAFETY: documented BlobPart boundary
+      const blob = new Blob([summary.thumbnail as BlobPart], { type: 'image/jpeg' })
+      return EditorMessage.EditPlaceholderReady({ url: URL.createObjectURL(blob) })
+    }).pipe(
+      Effect.catchTag('StoreError', () =>
+        Effect.succeed(EditorMessage.EditPlaceholderReady({ url: null })),
+      ),
+    ),
+  messages: [EditorMessage.EditPlaceholderReady],
+})
+
+/**
  * Load the Edit attached to this editor route (`/edit/:id`) and decode its
  * source bytes, so the editor seeds exactly what a freshly picked photo
  * would — an opened Edit reuses the existing Idle phase (CONTEXT.md

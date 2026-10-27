@@ -11,7 +11,7 @@ import type { AppRoute } from '../route'
 import { initialModel } from './model'
 import type { Model } from './model'
 import { EditorMessage } from './message'
-import { LoadCatalog, LoadEdit, LoadLutRecents } from './command'
+import { LoadCatalog, LoadEdit, LoadEditPlaceholder, LoadLutRecents } from './command'
 
 type Resource =
   | GpuBackend
@@ -38,6 +38,6 @@ export const init = (route: AppRoute): InitReturn => {
     ),
   ]
   const boot = [LoadCatalog(), ...settings, LoadLutRecents()]
-  const commands = route._tag === 'Editor' ? [LoadEdit({ id: route.editId }), ...boot] : boot
+  const commands = route._tag === 'Editor' ? [LoadEditPlaceholder({ id: route.editId }), LoadEdit({ id: route.editId }), ...boot] : boot
   return { model: initialModel(), commands }
 }

@@ -103,6 +103,9 @@ export const EditorMessage = defineMessageUnion({
   EditLoadFailed: {
     error: S.Union([EditNotFoundError, StoreError, ImageDecodeError]),
   },
+  // The attached Edit's saved thumbnail as a blob URL (null when it has none),
+  // shown while the source decodes. A RAW decode takes long enough to see.
+  EditPlaceholderReady: { url: S.NullOr(S.String) },
   CatalogLoaded: { catalog: Catalog },
   CatalogFailed: { error: LutLoadError },
   // Root-owned facts delegated into the editor (docs/adr/0007-offline): the root's

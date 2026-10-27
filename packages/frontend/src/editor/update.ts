@@ -17,7 +17,7 @@ import {
   SaveEdit,
   SetTheme,
 } from './command'
-import { editorMachine } from './phase'
+import { editorMachine, hasImage } from './phase'
 import { LAYER_UI } from '../editor/layer-meta'
 import { lutTarget } from './lut-bar'
 import { visibleEntries } from './lut-bar/catalog'
@@ -34,6 +34,12 @@ export type UpdateReturn = Update.ReturnWithOutMessage<
   EditorOutMessage,
   GpuBackend | LutStore | CanvasRef | ImageEncoder | KeyValueStore | EditStore | LutThumbnailer
 >
+
+/** Every blob URL the model owns that a new image replaces: LUT thumbnails and the load placeholder. */
+const releasedUrls = (model: Model): string[] => [
+  ...Object.values(model.lutThumbs),
+  ...(model.placeholderUrl === null ? [] : [model.placeholderUrl]),
+]
 
 const ensureFieldIndex = (index: Record<LayerId, number>, layerId: LayerId) =>
   index[layerId] === undefined ? { ...index, [layerId]: 0 } : index
@@ -333,6 +339,17 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
         }
         return { model: { ...model, phase, source: { ...model.source, error } } }
       },
+      EditPlaceholderReady: ({ url }) => {
+        if (url === null) {
+          return { model }
+        }
+        // The decode may have won the race, or a newer route load already
+        // holds a placeholder: this one has nowhere to go.
+        if (hasImage(model.phase) || model.placeholderUrl !== null) {
+          return { model, commands: [RevokeLutThumbs({ urls: [url] })] }
+        }
+        return { model: { ...model, placeholderUrl: url } }
+      },
       ClearedImage: () => {
         // Free the decoded bitmap when the image is cleared.
         if (model.source.bitmap) {
@@ -342,10 +359,11 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             void 0
           }
         }
-        const urls = Object.values(model.lutThumbs)
+        const urls = releasedUrls(model)
         return {
           model: {
             ...model,
+            placeholderUrl: null,
             phase,
             source: { bitmap: null, error: null, height: 0, width: 0 },
             chain: [],
@@ -380,9 +398,10 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             void 0
           }
         }
-        const urls = Object.values(model.lutThumbs)
+        const urls = releasedUrls(model)
         const { model: next, commands = [] } = renderNow({
           ...model,
+          placeholderUrl: null,
           phase,
           chain,
           source: { bitmap, error: null, height, width },
@@ -414,8 +433,10 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             activeMixerColor: {},
             chain: [],
             phase,
+            placeholderUrl: null,
             source: { ...model.source, error },
           },
+          commands: model.placeholderUrl === null ? [] : [RevokeLutThumbs({ urls: [model.placeholderUrl] })],
         }
       },
 

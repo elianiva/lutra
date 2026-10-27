@@ -20,6 +20,7 @@ export type CanvasStageModel = Pick<
   | 'compareMode'
   | 'compareSplitAt'
   | 'phase'
+  | 'placeholderUrl'
   | 'chain'
   | 'catalog'
   | 'bins'
@@ -483,6 +484,19 @@ const splitDivider = (h: HtmlBuilder<EditorMessage>, model: CanvasStageModel): H
 /** The placeholder frame before an image is loaded: a 4:5 print. */
 const PLACEHOLDER_RATIO = 0.8
 
+/** The saved thumbnail, softened, while the attached Edit's source decodes. */
+const placeholderStage = (h: HtmlBuilder<EditorMessage>, url: string) =>
+  h.div(
+    [h.Class('flex h-full w-full items-center justify-center'), h.AriaLabel('Loading photo')],
+    [
+      h.img([
+        h.Src(url),
+        h.Alt(''),
+        h.Class('breathe max-h-full max-w-full object-contain blur-sm'),
+      ]),
+    ],
+  )
+
 const emptyStage = (h: HtmlBuilder<EditorMessage>) =>
   h.div(
     [
@@ -707,7 +721,11 @@ export const canvasStage = (h: HtmlBuilder<EditorMessage>, model: CanvasStageMod
                     Match.when(S.is(ErrorState), () =>
                       errorStage(h, model.source.error?.message ?? 'Unknown error'),
                     ),
-                    Match.orElse(() => emptyStage(h)),
+                    Match.orElse(() =>
+                      model.placeholderUrl === null
+                        ? emptyStage(h)
+                        : placeholderStage(h, model.placeholderUrl),
+                    ),
                   ),
                   PLACEHOLDER_RATIO,
                 ),

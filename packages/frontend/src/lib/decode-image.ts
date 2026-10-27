@@ -79,6 +79,22 @@ export const rawPreview = async (blob: Blob): Promise<Blob | null> => {
 }
 
 /**
+ * A bitmap good enough for a small thumbnail: a RAW file's embedded JPEG
+ * (instant) or, failing that, the full decode.
+ */
+export const decodeThumbnailSource = async (file: File): Promise<ImageBitmap> => {
+  const preview = isRawFile(file) ? await rawPreview(file) : null
+  if (preview !== null) {
+    try {
+      return await createImageBitmap(preview)
+    } catch {
+      // an undecodable preview falls through to the full decode
+    }
+  }
+  return await decodeImage(file)
+}
+
+/**
  * A URL an `<img>` can show for a picked file: the file itself, or the
  * embedded JPEG for a RAW file. Falls back to the file when RAW has no preview.
  */
