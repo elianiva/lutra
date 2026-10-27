@@ -4,7 +4,12 @@ import { pushUrl } from 'foldkit/navigation'
 import { pageUrl } from '../components/nav-pill'
 import type { StoreError } from '@lutra/store'
 import { EditStore, EditIdSchema, Edit, EditId, newEditId } from '@lutra/store'
-import { decodeThumbnailSource, isRawFile, RAW_EXTENSIONS, warmRawDecoder } from '../lib/decode-image'
+import {
+  decodeThumbnailSource,
+  isRawFile,
+  RAW_EXTENSIONS,
+  warmRawDecoder,
+} from '../lib/decode-image'
 import { ImageDecodeError, ThumbnailEncodeError } from '../errors'
 import { type Mode, persistMode } from '../theme'
 import { GalleryMessage } from './message'

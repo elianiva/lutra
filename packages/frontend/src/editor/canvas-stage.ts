@@ -500,7 +500,9 @@ const placeholderStage = (h: HtmlBuilder<EditorMessage>, url: string) =>
 const emptyStage = (h: HtmlBuilder<EditorMessage>) =>
   h.div(
     [
-      h.Class('stagger flex h-full w-full flex-col items-center justify-center gap-3 text-xs text-muted'),
+      h.Class(
+        'stagger flex h-full w-full flex-col items-center justify-center gap-3 text-xs text-muted',
+      ),
       h.AllowDrop(),
       h.OnDropFiles((files) => {
         const file = files[0]

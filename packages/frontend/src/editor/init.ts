@@ -38,6 +38,9 @@ export const init = (route: AppRoute): InitReturn => {
     ),
   ]
   const boot = [LoadCatalog(), ...settings, LoadLutRecents()]
-  const commands = route._tag === 'Editor' ? [LoadEditPlaceholder({ id: route.editId }), LoadEdit({ id: route.editId }), ...boot] : boot
+  const commands =
+    route._tag === 'Editor'
+      ? [LoadEditPlaceholder({ id: route.editId }), LoadEdit({ id: route.editId }), ...boot]
+      : boot
   return { model: initialModel(), commands }
 }

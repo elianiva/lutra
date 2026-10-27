@@ -38,7 +38,10 @@ describe('attached edit load (gallery → /edit/:id)', () => {
   })
 
   it('the saved thumbnail shows while the source decodes, and is released when the edit lands', () => {
-    const waiting = update(initialModel(), EditorMessage.EditPlaceholderReady({ url: 'blob:thumb' }))
+    const waiting = update(
+      initialModel(),
+      EditorMessage.EditPlaceholderReady({ url: 'blob:thumb' }),
+    )
     expect(waiting.model.placeholderUrl).toBe('blob:thumb')
 
     const loaded = update(

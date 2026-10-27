@@ -1,59 +1,59 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-
-const { poolDecode, poolPreview, poolTerminate, createWorkerPool } = vi.hoisted(() => {
-  const decode = vi.fn()
-  const preview = vi.fn()
-  const terminate = vi.fn()
-  return {
-    createWorkerPool: vi.fn(() => ({
-      getCapabilities: async () => ({}),
-      open: async () => ({ close: vi.fn(), decode, metadata: { height: 4000, width: 6000 }, preview }),
-      terminate,
-    })),
-    poolDecode: decode,
-    poolPreview: preview,
-    poolTerminate: terminate,
-  }
-})
-vi.mock('flashraw/worker', () => ({ createWorkerPool }))
-
-import { decodeImage, isBrowserFormat, rawPreview } from './decode-image'
+import { createImageDecoder, isBrowserFormat } from './decode-image'
+import type { RawEngine, RawPreview, RawSession } from './raw-engine'
 
 // decodeImage routes by the bytes' magic number first and the file name
 // second, and surfaces the browser decoder's error whichever order ran
-// (docs/adr/0008-raw-decode). FlashRaw and createImageBitmap are stubbed: this
-// pins the routing, not the decoders.
+// (docs/adr/0008-raw-decode). The RAW engine and createImageBitmap are
+// doubles: this pins the routing, not the decoders.
 
 const JPEG = [0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 const TIFF = [0x49, 0x49, 0x2a, 0x00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 const ftyp = (brand: string): number[] => [
-  0, 0, 0, 0x18, ...'ftyp'.split('').map((c) => c.charCodeAt(0)),
-  ...brand.split('').map((c) => c.charCodeAt(0)), 0, 0, 0, 0,
+  0,
+  0,
+  0,
+  0x18,
+  ...'ftyp'.split('').map((c) => c.charCodeAt(0)),
+  ...brand.split('').map((c) => c.charCodeAt(0)),
+  0,
+  0,
+  0,
+  0,
 ]
 
 const bytes = (data: number[]) => new Uint8Array(data)
-const browserBitmap = { kind: 'browser' }
-const rawBitmap = { kind: 'raw' }
-const createImageBitmapMock = vi.fn()
-class MockImageData {
+
+class FakeImageData {
   constructor(
-    readonly data: unknown,
+    readonly data: Uint8ClampedArray,
     readonly width: number,
     readonly height: number,
   ) {}
 }
 
+const browserBitmap = { kind: 'browser' }
+const rawBitmap = { kind: 'raw' }
+const createImageBitmapMock = vi.fn<(input: Blob | FakeImageData) => Promise<object>>()
+
+const rgba8 = vi.fn<RawSession['rgba8']>()
+const preview = vi.fn<() => Promise<RawPreview | null>>()
+const engine: RawEngine = {
+  warm: vi.fn(),
+  withSession: async (_blob, use) =>
+    await use({ preview, rgba8, size: { height: 4000, width: 6000 } }),
+}
+const { decodeImage, rawPreview } = createImageDecoder(engine)
+
 beforeEach(() => {
-  poolDecode.mockReset()
-  poolPreview.mockReset()
-  poolTerminate.mockReset()
-  createWorkerPool.mockClear()
+  rgba8.mockReset()
+  preview.mockReset()
   createImageBitmapMock.mockReset()
   vi.stubGlobal('createImageBitmap', createImageBitmapMock)
-  vi.stubGlobal('ImageData', MockImageData)
-  poolDecode.mockResolvedValue({ data: new Uint8ClampedArray(4), width: 1, height: 1 })
-  createImageBitmapMock.mockImplementation(async (input: unknown) =>
-    input instanceof MockImageData ? rawBitmap : browserBitmap,
+  vi.stubGlobal('ImageData', FakeImageData)
+  rgba8.mockResolvedValue({ data: new Uint8ClampedArray(4), height: 1, width: 1 })
+  createImageBitmapMock.mockImplementation(async (input) =>
+    input instanceof FakeImageData ? rawBitmap : browserBitmap,
   )
 })
 
@@ -67,10 +67,10 @@ describe('isBrowserFormat', () => {
 })
 
 describe('decodeImage', () => {
-  it('decodes a JPEG with the browser and never loads FlashRaw', async () => {
+  it('decodes a JPEG with the browser and never opens FlashRaw', async () => {
     const result = await decodeImage(new File([bytes(JPEG)], 'a.jpg'))
     expect(result).toBe(browserBitmap)
-    expect(poolDecode).not.toHaveBeenCalled()
+    expect(rgba8).not.toHaveBeenCalled()
   })
 
   it('tries FlashRaw first for non-browser bytes, even without a file name', async () => {
@@ -80,80 +80,35 @@ describe('decodeImage', () => {
   })
 
   it('tries FlashRaw first for a RAW file name, then falls back to the browser', async () => {
-    poolDecode.mockRejectedValue(new Error('raw failed'))
+    rgba8.mockRejectedValue(new Error('raw failed'))
     const result = await decodeImage(new File([bytes(JPEG)], 'renamed.dng'))
-    expect(poolDecode).toHaveBeenCalledTimes(1)
+    expect(rgba8).toHaveBeenCalledTimes(1)
     expect(result).toBe(browserBitmap)
   })
 
   it('surfaces the browser error when both decoders fail', async () => {
-    poolDecode.mockRejectedValue(new Error('raw failed'))
+    rgba8.mockRejectedValue(new Error('raw failed'))
     createImageBitmapMock.mockRejectedValue(new Error('browser failed'))
     await expect(decodeImage(new Blob([bytes(JPEG)]))).rejects.toThrow('browser failed')
     await expect(decodeImage(new Blob([bytes(TIFF)]))).rejects.toThrow('browser failed')
   })
-})
 
-describe('decodeImage preview size', () => {
   it('uses the half-size demosaic only when the sensor has twice the pixels the caller keeps', async () => {
     const file = new File([bytes(TIFF)], 'a.cr3')
     await decodeImage(file) // no target: full size
     await decodeImage(file, { longEdge: 2048 }) // 6000 >= 4096: half size
     await decodeImage(file, { longEdge: 4000 }) // 6000 < 8000: full size
-    expect(poolDecode.mock.calls.map(([options]) => options.demosaic)).toEqual([
-      'bilinear',
-      'half-size',
-      'bilinear',
-    ])
+    expect(rgba8.mock.calls.map(([halfSize]) => halfSize)).toEqual([false, true, false])
   })
 })
 
 describe('rawPreview', () => {
   it('returns the embedded JPEG, or null when there is none or it is not a JPEG', async () => {
-    poolPreview.mockResolvedValueOnce({ data: bytes(JPEG), mimeType: 'image/jpeg' })
+    preview.mockResolvedValueOnce({ data: bytes(JPEG), mimeType: 'image/jpeg' })
     expect((await rawPreview(new Blob([bytes(TIFF)])))?.type).toBe('image/jpeg')
-    poolPreview.mockResolvedValueOnce(null)
+    preview.mockResolvedValueOnce(null)
     expect(await rawPreview(new Blob([bytes(TIFF)]))).toBeNull()
-    poolPreview.mockResolvedValueOnce({ data: bytes(JPEG), mimeType: 'image/tiff' })
+    preview.mockResolvedValueOnce({ data: bytes(JPEG), mimeType: 'image/tiff' })
     expect(await rawPreview(new Blob([bytes(TIFF)]))).toBeNull()
-  })
-})
-
-describe('worker pool lifetime', () => {
-  it('terminates the pool after it has been idle and builds a fresh one on the next decode', async () => {
-    // A fresh module: earlier tests left a pool (and its idle timer) behind.
-    vi.resetModules()
-    const { decodeImage: freshDecodeImage } = await import('./decode-image')
-    vi.useFakeTimers()
-    try {
-      await freshDecodeImage(new Blob([bytes(TIFF)]))
-      await freshDecodeImage(new Blob([bytes(TIFF)]))
-      expect(createWorkerPool).toHaveBeenCalledTimes(1)
-      expect(poolTerminate).not.toHaveBeenCalled()
-
-      await vi.advanceTimersByTimeAsync(30_000)
-      expect(poolTerminate).toHaveBeenCalledTimes(1)
-
-      await freshDecodeImage(new Blob([bytes(TIFF)]))
-      expect(createWorkerPool).toHaveBeenCalledTimes(2)
-    } finally {
-      await vi.runAllTimersAsync()
-      vi.useRealTimers()
-    }
-  })
-
-  it('warming starts the worker before any decode and lets it idle out', async () => {
-    vi.resetModules()
-    const { warmRawDecoder } = await import('./decode-image')
-    vi.useFakeTimers()
-    try {
-      warmRawDecoder()
-      expect(createWorkerPool).toHaveBeenCalledTimes(1)
-      await vi.advanceTimersByTimeAsync(30_000)
-      expect(poolTerminate).toHaveBeenCalledTimes(1)
-    } finally {
-      await vi.runAllTimersAsync()
-      vi.useRealTimers()
-    }
   })
 })

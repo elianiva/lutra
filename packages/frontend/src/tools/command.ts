@@ -14,7 +14,17 @@ import { ImageWorkers } from './pipeline/pool'
 import { Settings, extensionFor } from './settings'
 import { Mode, persistMode } from '@/theme'
 
-const ACCEPT = ['image/*', '.jpg', '.jpeg', '.png', '.webp', '.avif', '.heic', '.heif', ...RAW_EXTENSIONS]
+const ACCEPT = [
+  'image/*',
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.webp',
+  '.avif',
+  '.heic',
+  '.heif',
+  ...RAW_EXTENSIONS,
+]
 
 const mimeFor = (format: Settings['format']) => `image/${format}`
 

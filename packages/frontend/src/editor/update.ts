@@ -436,7 +436,10 @@ export const update = (model: Model, message: EditorMessage): UpdateReturn => {
             placeholderUrl: null,
             source: { ...model.source, error },
           },
-          commands: model.placeholderUrl === null ? [] : [RevokeLutThumbs({ urls: [model.placeholderUrl] })],
+          commands:
+            model.placeholderUrl === null
+              ? []
+              : [RevokeLutThumbs({ urls: [model.placeholderUrl] })],
         }
       },
 

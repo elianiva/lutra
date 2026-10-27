@@ -197,8 +197,8 @@ export const LoadEdit = Command.define('LoadEdit', {
       const edit = maybeEdit.value
       const nativeBitmap = yield* Effect.tryPromise({
         // SAFETY: the store hands back image bytes over a transferred ArrayBuffer; TS cannot express that, so the BlobPart cast is the documented boundary.
-        // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, typescript/consistent-type-assertions -- SAFETY: documented BlobPart boundary
         try: async () =>
+          // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, typescript/consistent-type-assertions -- SAFETY: documented BlobPart boundary
           await decodeImage(new Blob([edit.source as BlobPart]), { longEdge: PREVIEW_LONG_EDGE }),
         catch: (cause) =>
           new ImageDecodeError({

@@ -42,6 +42,9 @@ export const informRouteChanged = (model: Model, route: AppRoute): RouteChangedR
     ),
   ]
   const boot = [LoadCatalog(), ...settings, LoadLutRecents()]
-  const commands = route._tag === 'Editor' ? [LoadEditPlaceholder({ id: route.editId }), LoadEdit({ id: route.editId }), ...boot] : boot
+  const commands =
+    route._tag === 'Editor'
+      ? [LoadEditPlaceholder({ id: route.editId }), LoadEdit({ id: route.editId }), ...boot]
+      : boot
   return { model, commands }
 }
