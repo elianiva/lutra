@@ -1,5 +1,6 @@
 // Rasterizes public/icons/icon.svg into the manifest icon set (192, 512,
-// maskable 512, apple-touch 180) and the iOS launch screens (the
+// apple-touch 180; maskable 512 comes from icon-maskable.svg, whose mark sits
+// inside the maskable safe zone) and the iOS launch screens (the
 // apple-touch-startup-image set: the app tile centered on the near-black
 // background, at every current iPhone/iPad portrait size) with
 // @resvg/resvg-js. The PNGs are committed so the build pipeline needs no
@@ -105,14 +106,15 @@ export const splashSvg = (svg: string, w: number, h: number): string => {
 
 const run = async (): Promise<void> => {
   const svg = await readFile(path.join(icons, 'icon.svg'), 'utf-8')
+  const maskable = await readFile(path.join(icons, 'icon-maskable.svg'), 'utf-8')
   const sizes = [
-    ['icon-192.png', 192],
-    ['icon-512.png', 512],
-    ['icon-maskable-512.png', 512],
-    ['apple-touch-icon.png', 180],
+    ['icon-192.png', svg, 192],
+    ['icon-512.png', svg, 512],
+    ['icon-maskable-512.png', maskable, 512],
+    ['apple-touch-icon.png', svg, 180],
   ] as const
-  for (const [name, size] of sizes) {
-    const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: size } })
+  for (const [name, source, size] of sizes) {
+    const resvg = new Resvg(source, { fitTo: { mode: 'width', value: size } })
     await writeFile(path.join(icons, name), resvg.render().asPng())
     console.log(`${name} (${size}px) written`)
   }

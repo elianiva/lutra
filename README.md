@@ -1,8 +1,27 @@
-# Lutra
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/wordmark-dark.svg">
+    <img alt="Lutra" src="docs/brand/wordmark-light.svg" width="360">
+  </picture>
+</p>
+
+<p align="center">Film simulation color grading, entirely in your browser.</p>
 
 A color-grading app for film simulation. Web-first, client-side only — all image processing runs locally via WebGPU shaders. Your photos never leave your browser.
 
 It's a monorepo with a few packages under `packages/`. Everything is built with Effect (v4 beta) and follows a TEA architecture via [foldkit](https://github.com/foldkit/foldkit).
+
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center"><a href="docs/screenshots/gallery-dark.png"><img src="docs/screenshots/gallery-dark.png" alt="Gallery in dark mode" width="400"></a><br><sub>Gallery, dark</sub></td>
+    <td align="center"><a href="docs/screenshots/gallery-light.png"><img src="docs/screenshots/gallery-light.png" alt="Gallery in light mode" width="400"></a><br><sub>Gallery, light</sub></td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2"><a href="docs/screenshots/tools.png"><img src="docs/screenshots/tools.png" alt="Batch resize and compress tools" width="400"></a><br><sub>Tools</sub></td>
+  </tr>
+</table>
 
 ## Packages
 
@@ -72,6 +91,14 @@ pnpm infra:deploy
 - Shader bodies are hand-ported from SkSL to WGSL (no transpilation layer)
 - The LUT library is vendored — 296 film-emulation `.cube` files mirrored from G'MIC film color presets
 - Tests are written alongside each workstream, not as a separate phase
+
+## Brand
+
+<img src="packages/frontend/public/icons/icon.svg" alt="Lutra app icon" width="96" align="right">
+
+The wordmark is [Michroma](https://fonts.google.com/specimen/Michroma) (SIL Open Font License) capitals outlined to paths. The L carries four film perforations, and the A is an open Λ whose crossbar is replaced by a single red sprocket hole. The app icon, favicon, and navigation pill use the L on its own, in a heavier cut that stays legible at 16 px. The editor's top bar shows the full wordmark.
+
+The SVGs are in `docs/brand/`: the wordmark and mark, each in a dark, light, and single-color version. The app icons are in `packages/frontend/public/icons/`. After you change `icon.svg` or `icon-maskable.svg`, run `bun scripts/build-icons.ts` to regenerate the PNG icons and iOS splash screens.
 
 ## License
 

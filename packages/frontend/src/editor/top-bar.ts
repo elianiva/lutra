@@ -1,6 +1,7 @@
 import type { Html, HtmlBuilder } from 'foldkit/html'
 import { Check, CopyPlus, Download, Eclipse, Sun } from 'lucide'
 import { icon } from '../components/icon'
+import { wordmark } from '../components/wordmark'
 import { EditorMessage } from './message'
 import type { Model } from './model'
 
@@ -30,7 +31,7 @@ export const topBar = (
       ),
     ],
     [
-      h.h1([h.Class('flex-none text-xs font-semibold tracking-[0.34em] text-signal')], ['LUTRA']),
+      h.h1([h.Class('flex-none text-ink')], [wordmark(h, 'block h-3 w-auto sm:h-4')]),
       documentLine(h, attachedEdit),
       h.div(
         [h.Class('pointer-events-auto ml-auto flex items-center gap-3')],

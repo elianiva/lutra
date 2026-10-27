@@ -2,6 +2,7 @@ import type { Html, HtmlBuilder } from 'foldkit/html'
 import { Eclipse, LayoutGrid, Sun, Wrench } from 'lucide'
 import type { Mode } from '../theme'
 import { icon } from './icon'
+import { mark } from './wordmark'
 
 /** The site's pages. Each is its own document, so moving between them is a page load. */
 export type Page = 'edits' | 'tools'
@@ -51,12 +52,8 @@ export const navPill = <M>(
     ],
     [
       h.span(
-        [
-          h.Class(
-            'mx-1 grid h-8 w-8 place-items-center rounded-[10px] bg-accent-soft font-bold text-signal',
-          ),
-        ],
-        ['L'],
+        [h.Class('mx-1 grid h-8 w-8 place-items-center rounded-[10px] bg-accent-soft text-ink')],
+        [mark(h, 'block h-4 w-auto')],
       ),
       h.span([h.Class('seam-v mx-1.5 h-4')], []),
       ...PAGES.map(({ page, label, glyph }) =>
