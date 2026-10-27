@@ -23,22 +23,6 @@ class Website extends Cloudflare.Website.Vite<Website>()('lutra', {
   },
 }) {}
 
-// imgutils: the batch compressor and collage maker. A fixed worker name keeps
-// it on its workers.dev URL, `imgutils.<account-subdomain>.workers.dev`. It
-// reuses the engine's encoder and the editor's material tokens, so both are in
-// the rebuild hash.
-class Imgutils extends Cloudflare.Website.Vite<Imgutils>()('imgutils', {
-  rootDir: 'packages/imgutils',
-  name: 'imgutils',
-  memo: {
-    include: ['**/*', '../../packages/engine/src/**', '../../packages/frontend/src/materials.css'],
-    lockfile: true,
-  },
-  assets: {
-    runWorkerFirst: false,
-  },
-}) {}
-
 export type WebsiteEnv = Cloudflare.InferEnv<typeof Website>
 
 export default Alchemy.Stack(
@@ -49,11 +33,9 @@ export default Alchemy.Stack(
   },
   Effect.gen(function* () {
     const website = yield* Website
-    const imgutils = yield* Imgutils
 
     return {
       url: website.url,
-      imgutilsUrl: imgutils.url,
     }
   }),
 )

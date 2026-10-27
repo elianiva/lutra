@@ -51,6 +51,9 @@ export const GalleryMessage = defineMessageUnion({
   FilesPasted: { files: S.Array(S.instanceOf(File)) },
 
   ToggledMode: {},
+  /** The pill's other page (docs/adr/0014-tools): a separate document, so a page load. */
+  PageRequested: { page: S.Literals(['edits', 'tools']) },
+  PageOpened: {},
   ThemeApplied: {},
 
   GotDeleteDialogMessage: {

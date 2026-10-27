@@ -1,7 +1,7 @@
 import { DateTime } from 'effect'
 import { Submodel, AsyncData } from 'foldkit'
 import { type Html, type HtmlBuilder, createLazy, createKeyedLazy } from 'foldkit/html'
-import { Eclipse, LayoutGrid, Plus, Sun, Upload, X } from 'lucide'
+import { Plus, Upload, X } from 'lucide'
 import { button } from '@/components/ui/button'
 import { GalleryMessage } from './message'
 import type { Model } from './model'
@@ -9,6 +9,7 @@ import type { EditSummary, StoreError } from '@lutra/store'
 import { deleteDialogView } from './delete-dialog'
 import { thumbnailUrl } from '../thumbnail-url'
 import { icon } from '../components/icon'
+import { navPill } from '../components/nav-pill'
 
 /**
  * The Gallery Submodel's view (docs/adr/0006-frontend-architecture). Branded via `defineView` so it
@@ -25,7 +26,13 @@ const lazyPill = createLazy()
 const lazyNotice = createLazy()
 const lazyTile = createKeyedLazy()
 
-const pillView = (mode: Model['mode'], h: HtmlBuilder<GalleryMessage>): Html => pill(h, mode)
+const pillView = (mode: Model['mode'], h: HtmlBuilder<GalleryMessage>): Html =>
+  navPill(h, {
+    current: 'edits',
+    mode,
+    onToggleMode: GalleryMessage.ToggledMode(),
+    onNavigate: (page) => GalleryMessage.PageRequested({ page }),
+  })
 const noticeView = (message: string | null, h: HtmlBuilder<GalleryMessage>): Html =>
   notice(message, h)
 
@@ -78,62 +85,6 @@ const header = (
       h.span([h.Class('ml-auto text-[11px] text-dim')], ['Drop or paste a photo']),
     ],
   )
-
-/** The floating navigation: logo, the current page, and the appearance switch
- *  (docs/adr/0013-materials). Bottom-centre so the grid keeps the full width. */
-const pill = (h: HtmlBuilder<GalleryMessage>, mode: Model['mode']): Html => {
-  const modeSegment = (target: 'dark' | 'light', label: string, Icon: typeof Sun) =>
-    h.button(
-      [
-        h.Class(
-          `grid h-7 w-7 place-items-center rounded-full transition-colors ${
-            mode === target ? 'bg-accent text-accent-ink' : 'text-dim hover:text-ink'
-          }`,
-        ),
-        h.OnClick(GalleryMessage.ToggledMode()),
-        h.AriaLabel(`${label} appearance`),
-        h.AriaPressed(String(mode === target)),
-        h.Title(`${label} appearance`),
-      ],
-      [icon(h, Icon, label, 14)],
-    )
-  return h.nav(
-    [
-      h.Class(
-        'surface-raised absolute bottom-5 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full! p-1.5',
-      ),
-      h.AriaLabel('Navigation'),
-    ],
-    [
-      h.span(
-        [
-          h.Class(
-            'mx-1 grid h-8 w-8 place-items-center rounded-[10px] bg-accent-soft font-bold text-signal',
-          ),
-        ],
-        ['L'],
-      ),
-      h.span([h.Class('seam-v mx-1.5 h-4')], []),
-      h.span(
-        [
-          h.Class(
-            'flex h-9 items-center gap-2 rounded-full bg-s2 px-4 text-[11px] uppercase tracking-[0.1em] text-ink',
-          ),
-          h.AriaCurrent('page'),
-        ],
-        [icon(h, LayoutGrid, 'Edits', 15), 'Edits'],
-      ),
-      h.span([h.Class('seam-v mx-1.5 h-4')], []),
-      h.div(
-        [
-          h.Class('well flex items-center gap-0.5 rounded-full! p-[3px]'),
-          h.AriaLabel('Appearance'),
-        ],
-        [modeSegment('light', 'Light', Sun), modeSegment('dark', 'Dark', Eclipse)],
-      ),
-    ],
-  )
-}
 
 const gridBody = (
   h: HtmlBuilder<GalleryMessage>,

@@ -2,12 +2,12 @@ import { Runtime } from 'foldkit'
 import { Message } from './message'
 import { Model, initialModel } from './model'
 import { ImageWorkersLive } from './pipeline/pool'
-import { applyMode, readMode } from './theme'
+import { applyMode, readMode } from '@/theme'
 import { update } from './update'
 import { view } from './view'
 
 /**
- * imgutils: batch resize, frame and compress photos, or compose a collage.
+ * The tools page: batch resize, frame and compress photos, or compose a collage.
  * Everything runs in this browser — decode, resize and encode happen in a
  * pool of workers; nothing is uploaded.
  */

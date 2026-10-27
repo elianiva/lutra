@@ -15,7 +15,7 @@ import type { EditSummary as EditSummaryRecord } from '@lutra/store'
 import { editList, initialModel } from './model'
 import { update } from './update'
 import { view } from './view'
-import { OpenPhoto } from './command'
+import { OpenPage, OpenPhoto } from './command'
 import { GalleryMessage, GalleryOutMessage, PhotoCreateError } from './message'
 import { ImageDecodeError } from '../errors'
 
@@ -189,5 +189,16 @@ describe('gallery: opening several photos at once', () => {
     )
     expect(model.grid._tag).toBe('Idle')
     expect(model.notice).toContain('could not be opened')
+  })
+
+  it('the pill opens the tools page', () => {
+    scene(
+      config,
+      given(initialModel()),
+      click(selector('nav[aria-label="Navigation"] button:not([aria-pressed])')),
+      Command.expectHas(OpenPage),
+      Command.resolve(OpenPage, GalleryMessage.PageOpened()),
+      expectNoOutMessage(),
+    )
   })
 })

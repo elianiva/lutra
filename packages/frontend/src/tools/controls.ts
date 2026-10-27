@@ -2,7 +2,7 @@ import type { Html, HtmlBuilder } from 'foldkit/html'
 import { cn } from '@/lib/utils'
 
 /**
- * The form controls imgutils shares across both modes, drawn with the Lutra
+ * The form controls the tools share across both modes, drawn with the Lutra
  * materials (docs/adr/0013-materials): grouped choices sit in a recessed
  * `well`, the selected one lifts out in the accent, and nothing draws an
  * outline.

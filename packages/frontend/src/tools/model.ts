@@ -4,10 +4,10 @@ import * as Dialog from '@/components/ui/dialog'
 import { Adjust } from './collage/layout'
 import { CollageRatio } from './geometry'
 import { Settings, defaultSettings } from './settings'
-import { Mode } from './theme'
+import { Mode } from '@/theme'
 
 /**
- * The imgutils model. Two modes share one settings record:
+ * The tools model. Two modes share one settings record:
  *
  * - **Single** turns each dropped photo into one framed, compressed output.
  *   Every item walks a small machine: Working → Done | Failed. A settings

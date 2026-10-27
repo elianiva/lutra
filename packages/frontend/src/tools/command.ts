@@ -1,6 +1,8 @@
 import { Effect, Option, Schema as S } from 'effect'
 import { Command, File as FoldkitFile } from 'foldkit'
 import { zipSync } from 'fflate'
+import { load } from 'foldkit/navigation'
+import { pageUrl } from '@/components/nav-pill'
 import { Adjust, Template } from './collage/layout'
 import { isImageFile, outputFileName, timestamp, uniqueName } from './format'
 import { CollageRatio } from './geometry'
@@ -9,7 +11,7 @@ import { Item, Slot } from './model'
 import type { Result } from './model'
 import { ImageWorkers } from './pipeline/pool'
 import { Settings, extensionFor } from './settings'
-import { Mode, persistMode } from './theme'
+import { Mode, persistMode } from '@/theme'
 
 const ACCEPT = ['image/*', '.jpg', '.jpeg', '.png', '.webp', '.avif', '.heic', '.heif']
 
@@ -112,7 +114,7 @@ export const DownloadZip = Command.define('DownloadZip', {
       const zip = zipSync(archive, { level: 0 })
       yield* saveBlob(
         new Blob([zip], { type: 'application/zip' }),
-        `imgutils-${timestamp(new Date())}.zip`,
+        `lutra-tools-${timestamp(new Date())}.zip`,
       )
       return Message.ZipSaved()
     }),
@@ -223,4 +225,11 @@ export const SaveCollage = Command.define('SaveCollage', {
       ),
     ),
   messages: [Message.CollageSaved, Message.CollageSaveFailed],
+})
+
+/** Open another page of the site from the pill: a separate document, so a page load. */
+export const OpenPage = Command.define('OpenPage', {
+  args: { page: S.Literals(['edits', 'tools']) },
+  execute: ({ page }) => load(pageUrl(page)).pipe(Effect.as(Message.PageOpened())),
+  messages: [Message.PageOpened],
 })

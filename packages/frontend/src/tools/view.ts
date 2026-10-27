@@ -1,7 +1,8 @@
 import type { Document, Html, HtmlBuilder } from 'foldkit/html'
-import { Archive, Eclipse, ImagePlus, RefreshCw, Sun, Upload } from 'lucide'
+import { Archive, ImagePlus, RefreshCw, Upload } from 'lucide'
 import { icon } from '@/components/icon'
-import { pillButton } from '@/components/controls'
+import { navPill } from '@/components/nav-pill'
+import { pillButton } from '@/tools/controls'
 import { cn } from '@/lib/utils'
 import { collageView } from './collage/view'
 import { formatBytes } from './format'
@@ -13,13 +14,14 @@ import { singleView } from './single/view'
 import { reprocessTargets } from './update'
 
 /**
- * The imgutils shell, in the Lutra materials (docs/adr/0013-materials): the
- * wordmark, the mode tabs and the actions float in a header with no rule;
+ * The tools shell, in the Lutra materials (docs/adr/0013-materials): the mode
+ * tabs and the actions float in a header with no rule, the site's pill floats
+ * at the bottom;
  * the settings panel floats at the left; the workspace takes the rest. Below
  * `lg` the panel collapses and the actions dock to the bottom edge.
  */
 export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
-  title: 'imgutils',
+  title: 'Tools — Lutra',
   body: h.div(
     [
       h.Class('relative flex min-h-full flex-col bg-bg text-ink'),
@@ -35,8 +37,8 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
         [
           h.Class(
             cn(
-              'flex flex-1 flex-col gap-5 px-3 pb-6 sm:px-6 lg:flex-row lg:items-start lg:gap-6',
-              model.tab === 'single' ? 'max-lg:pb-24' : '',
+              'flex flex-1 flex-col gap-5 px-3 pb-28 sm:px-6 lg:flex-row lg:items-start lg:gap-6',
+              model.tab === 'single' ? 'max-lg:pb-44' : '',
             ),
           ),
         ],
@@ -45,6 +47,12 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
           model.tab === 'single' ? singleView(h, model) : collageView(h, model),
         ],
       ),
+      navPill(h, {
+        current: 'tools',
+        mode: model.mode,
+        onToggleMode: Message.ToggledMode(),
+        onNavigate: (page) => Message.PageRequested({ page }),
+      }),
       previewDialog(h, model),
       model.dragOver ? dropOverlay(h, model.tab) : null,
     ],
@@ -63,15 +71,11 @@ const header = (h: HtmlBuilder<Message>, model: Model): Html =>
   h.header(
     [h.Class('flex h-16 flex-none items-center gap-3 px-3 sm:gap-6 sm:px-6')],
     [
-      h.h1(
-        [h.Class('flex-none text-xs font-semibold tracking-[0.34em] text-signal')],
-        ['IMGUTILS'],
-      ),
       tabs(h, model.tab),
       h.p([h.Class('micro tnum hidden font-mono xl:block')], [summary(model)]),
       h.div(
         [h.Class('ml-auto flex items-center gap-3')],
-        [modeToggle(h, model.mode), model.tab === 'single' ? actions(h, model) : null],
+        [model.tab === 'single' ? actions(h, model) : null],
       ),
     ],
   )
@@ -98,29 +102,6 @@ const tabs = (h: HtmlBuilder<Message>, active: Tab): Html =>
     ),
   )
 
-const modeToggle = (h: HtmlBuilder<Message>, mode: Model['mode']): Html => {
-  const segment = (target: Model['mode'], text: string, glyph: typeof Sun) =>
-    h.button(
-      [
-        h.Type('button'),
-        h.Class(
-          cn(
-            'grid h-8 w-9 place-items-center rounded-full transition-colors',
-            mode === target ? 'bg-accent-soft text-accent' : 'text-dim hover:text-ink',
-          ),
-        ),
-        h.OnClick(Message.ToggledMode()),
-        h.AriaLabel(`${text} appearance`),
-        h.AriaPressed(String(mode === target)),
-      ],
-      [icon(h, glyph, text, 16)],
-    )
-  return h.div(
-    [h.Class('surface hidden h-10 items-center gap-0.5 p-1 sm:flex'), h.AriaLabel('Appearance')],
-    [segment('dark', 'Dark', Eclipse), segment('light', 'Light', Sun)],
-  )
-}
-
 /** The batch actions. They float in the header, and dock to the bottom on a phone. */
 const actions = (h: HtmlBuilder<Message>, model: Model): Html => {
   const targets = reprocessTargets(model.items)
@@ -130,7 +111,7 @@ const actions = (h: HtmlBuilder<Message>, model: Model): Html => {
   return h.div(
     [
       h.Class(
-        'surface flex h-10 items-center gap-0.5 p-1 max-lg:fixed max-lg:inset-x-3 max-lg:bottom-3 max-lg:z-30 max-lg:h-12 max-lg:justify-between max-lg:rounded-full',
+        'surface flex h-10 items-center gap-0.5 p-1 max-lg:fixed max-lg:inset-x-3 max-lg:bottom-22 max-lg:z-30 max-lg:h-12 max-lg:justify-between max-lg:rounded-full',
       ),
     ],
     [

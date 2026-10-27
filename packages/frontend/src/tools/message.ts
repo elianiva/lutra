@@ -10,6 +10,8 @@ export const Message = defineMessageUnion({
   ToggledMode: {},
   CompletedPersistMode: {},
   ToggledSettings: {},
+  PageRequested: { page: S.Literals(['edits', 'tools']) },
+  PageOpened: {},
   ChangedSettings: { settings: Settings },
 
   // Single mode

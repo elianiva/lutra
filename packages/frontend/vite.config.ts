@@ -7,8 +7,18 @@ import tailwindcss from '@tailwindcss/vite'
 const here = import.meta.dirname
 
 export default defineConfig({
+  // Two pages: the editor at `/`, and the tools (batch compressor, collage
+  // maker) at `/tools/` (docs/adr/0014-tools).
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(here, 'index.html'),
+        tools: path.resolve(here, 'tools/index.html'),
+      },
+    },
+  },
   optimizeDeps: {
-    entries: ['src/entry.ts'],
+    entries: ['src/entry.ts', 'src/tools/entry.ts'],
     // NOTE: @lutra/engine is intentionally NOT in `include`. It is a
     // build-less workspace package aliased to its TS source above, so
     // Vite transforms it on the fly. Pre-bundling it here would cache a

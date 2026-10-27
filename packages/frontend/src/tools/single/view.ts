@@ -1,7 +1,7 @@
 import { type Html, type HtmlBuilder, createKeyedLazy } from 'foldkit/html'
 import { ImageUp } from 'lucide'
 import { icon } from '@/components/icon'
-import { pillButton } from '@/components/controls'
+import { pillButton } from '@/tools/controls'
 import { cn } from '@/lib/utils'
 import { outputName } from '../command'
 import { formatBytes } from '../format'

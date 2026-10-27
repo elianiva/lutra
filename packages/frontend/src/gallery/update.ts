@@ -3,7 +3,7 @@ import { Command, Update } from 'foldkit'
 import * as Dialog from '@/components/ui/dialog'
 import type { EditStore, EditSummary } from '@lutra/store'
 import { GalleryMessage, GalleryOutMessage, PhotoCreateError } from './message'
-import { AddFiles, DeleteEdit, ListEdits, OpenPhoto, SetTheme } from './command'
+import { AddFiles, DeleteEdit, ListEdits, OpenPage, OpenPhoto, SetTheme } from './command'
 import type { Model } from './model'
 import { editList } from './model'
 
@@ -106,6 +106,8 @@ export const update = (model: Model, message: GalleryMessage): UpdateReturn =>
         return { model: { ...model, mode }, commands: [SetTheme({ mode })] }
       },
       ThemeApplied: () => ({ model }),
+      PageRequested: ({ page }) => ({ model, commands: [OpenPage({ page })] }),
+      PageOpened: () => ({ model }),
       GotDeleteDialogMessage: ({ message }) => {
         const { model: dialog, commands: dialogCommands = [] } = Dialog.update(
           model.deleteDialog,

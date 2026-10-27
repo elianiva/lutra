@@ -9,10 +9,3 @@ services:
     portal:
       title: Lutra
       description: Needs WebGPU — launch Chrome with --enable-unsafe-webgpu --enable-unsafe-swiftshader (see AGENTS.md).
-  imgutils:
-    command: pnpm exec vite --host 0.0.0.0 --port "$PORT" --strictPort
-    cwd: packages/imgutils
-    health: /
-    review: true
-    portal:
-      title: imgutils

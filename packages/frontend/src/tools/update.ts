@@ -15,6 +15,7 @@ import {
 import type { Template } from './collage/layout'
 import {
   DownloadZip,
+  OpenPage,
   PersistMode,
   PickCollageFiles,
   PickFiles,
@@ -191,6 +192,8 @@ export const update = (model: Model, message: Message): UpdateReturn =>
         return { model: { ...model, mode }, commands: [PersistMode({ mode })] }
       },
       CompletedPersistMode: () => ({ model }),
+      PageRequested: ({ page }) => ({ model, commands: [OpenPage({ page })] }),
+      PageOpened: () => ({ model }),
       ToggledSettings: () => ({ model: { ...model, settingsOpen: !model.settingsOpen } }),
       ChangedSettings: ({ settings }) => ({
         model: { ...model, settings, items: markStale(model.items) },

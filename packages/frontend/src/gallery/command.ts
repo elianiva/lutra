@@ -1,5 +1,7 @@
 import { Array, DateTime, Effect, Schema as S } from 'effect'
 import { Command, File as FoldkitFile } from 'foldkit'
+import { load } from 'foldkit/navigation'
+import { pageUrl } from '../components/nav-pill'
 import type { StoreError } from '@lutra/store'
 import { EditStore, EditIdSchema, Edit, EditId, newEditId } from '@lutra/store'
 import { ImageDecodeError, ThumbnailEncodeError } from '../errors'
@@ -266,4 +268,14 @@ export const SetTheme = Command.define('SetTheme', {
   execute: ({ mode }: { mode: Mode }) =>
     persistMode(mode).pipe(Effect.as(GalleryMessage.ThemeApplied())),
   messages: [GalleryMessage.ThemeApplied],
+})
+
+/**
+ * Open another page of the site from the pill (docs/adr/0014-tools). The tools
+ * page is its own document, not a route of this app, so it is a full load.
+ */
+export const OpenPage = Command.define('OpenPage', {
+  args: { page: S.Literals(['edits', 'tools']) },
+  execute: ({ page }) => load(pageUrl(page)).pipe(Effect.as(GalleryMessage.PageOpened())),
+  messages: [GalleryMessage.PageOpened],
 })

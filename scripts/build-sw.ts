@@ -56,6 +56,7 @@ const run = async (): Promise<void> => {
   // (docs/adr/0007-offline).
   const precache = [
     '/index.html',
+    '/tools/index.html',
     '/manifest.webmanifest',
     ...icons.map((file) => `/icons/${file}`),
     ...assets.map((file) => `/assets/${file}`),
