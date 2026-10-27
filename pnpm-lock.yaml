@@ -162,6 +162,70 @@ importers:
         specifier: ^5.0.5
         version: 5.0.5(@types/node@26.6.5)(@vitest/browser-preview@5.0.5)(@vitest/ui@5.0.5)(happy-dom@21.0.4)(vite@8.3.5(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1))
 
+  packages/imgutils:
+    dependencies:
+      '@foldkit/ui':
+        specifier: ^0.169.0
+        version: 0.169.0(effect@4.0.6)(foldkit@0.169.0(@effect/platform-browser@4.0.0(effect@4.0.6))(effect@4.0.6))
+      '@fontsource/chakra-petch':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/jetbrains-mono':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@jsquash/resize':
+        specifier: ^2.1.1
+        version: 2.1.1
+      '@lutra/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@tailwindcss/vite':
+        specifier: ^4.3.3
+        version: 4.3.3(vite@8.3.5(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1))
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
+      effect:
+        specifier: 4.0.6
+        version: 4.0.6
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
+      foldkit:
+        specifier: ^0.169.0
+        version: 0.169.0(@effect/platform-browser@4.0.0(effect@4.0.6))(effect@4.0.6)
+      lucide:
+        specifier: ^1.61.0
+        version: 1.61.0
+      tailwind-merge:
+        specifier: ^3.7.0
+        version: 3.7.0
+      tailwindcss:
+        specifier: ^4.3.3
+        version: 4.3.3
+    devDependencies:
+      '@foldkit/devtools':
+        specifier: ^0.169.0
+        version: 0.169.0(@effect/platform-browser@4.0.0(effect@4.0.6))(@foldkit/ui@0.169.0(effect@4.0.6)(foldkit@0.169.0(@effect/platform-browser@4.0.0(effect@4.0.6))(effect@4.0.6)))(effect@4.0.6)(foldkit@0.169.0(@effect/platform-browser@4.0.0(effect@4.0.6))(effect@4.0.6))
+      '@foldkit/vite-plugin':
+        specifier: ^0.28.0
+        version: 0.28.0(effect@4.0.6)(foldkit@0.169.0(@effect/platform-browser@4.0.0(effect@4.0.6))(effect@4.0.6))(redis@6.2.1)(vite@8.3.5(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1))
+      happy-dom:
+        specifier: ^21.0.4
+        version: 21.0.4
+      tw-animate-css:
+        specifier: ^1.4.0
+        version: 1.4.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: ^8.3.5
+        version: 8.3.5(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1)
+      vitest:
+        specifier: ^5.0.5
+        version: 5.0.5(@types/node@26.6.5)(@vitest/browser-preview@5.0.5)(@vitest/ui@5.0.5)(happy-dom@21.0.4)(vite@8.3.5(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1))
+
   packages/store:
     dependencies:
       '@effect/platform-browser':
@@ -364,6 +428,11 @@ packages:
     resolution: {integrity: sha512-hO9Kqc91dq7SLBCagxlr2RDSTbp7/urqjfxNitSNaaOyKIsUr85llsADT/rS6H85ezOsGf2vSP5y1Qk0kQWLCg==}
     peerDependencies:
       effect: ^4.0.5
+
+  '@effect/platform-browser@4.0.0':
+    resolution: {integrity: sha512-OHo7EPpF3RVPiI+mjoU9yd05LdCdKPjzDXqs5wRgF9CsdVvwN76B0zgt54DxPUcvMYri1tVJOtLCVnK0tRkNQQ==}
+    peerDependencies:
+      effect: ^4.0.0
 
   '@effect/platform-browser@4.0.6':
     resolution: {integrity: sha512-i4bf1+FlUnZypqK0pQ5cq46KhroTgqFGktFn2WorwIk+yc+RuZO6qsF+Sk6lY5uHwdHTOLGMlnlXSJ8u1UG42g==}
@@ -3072,6 +3141,10 @@ snapshots:
       '@distilled.cloud/core': 1.0.0-rc.17(effect@4.0.6)
       effect: 4.0.6
 
+  '@effect/platform-browser@4.0.0(effect@4.0.6)':
+    dependencies:
+      effect: 4.0.6
+
   '@effect/platform-browser@4.0.6(effect@4.0.6)':
     dependencies:
       effect: 4.0.6
@@ -3153,6 +3226,14 @@ snapshots:
       - utf-8-validate
       - zod
 
+  '@foldkit/devtools@0.169.0(@effect/platform-browser@4.0.0(effect@4.0.6))(@foldkit/ui@0.169.0(effect@4.0.6)(foldkit@0.169.0(@effect/platform-browser@4.0.0(effect@4.0.6))(effect@4.0.6)))(effect@4.0.6)(foldkit@0.169.0(@effect/platform-browser@4.0.0(effect@4.0.6))(effect@4.0.6))':
+    dependencies:
+      '@effect/platform-browser': 4.0.0(effect@4.0.6)
+      '@foldkit/ui': 0.169.0(effect@4.0.6)(foldkit@0.169.0(@effect/platform-browser@4.0.0(effect@4.0.6))(effect@4.0.6))
+      clsx: 2.1.1
+      effect: 4.0.6
+      foldkit: 0.169.0(@effect/platform-browser@4.0.0(effect@4.0.6))(effect@4.0.6)
+
   '@foldkit/devtools@0.169.0(@effect/platform-browser@4.0.6(effect@4.0.6))(@foldkit/ui@0.169.0(effect@4.0.6)(foldkit@0.169.0(@effect/platform-browser@4.0.6(effect@4.0.6))(effect@4.0.6)))(effect@4.0.6)(foldkit@0.169.0(@effect/platform-browser@4.0.6(effect@4.0.6))(effect@4.0.6))':
     dependencies:
       '@effect/platform-browser': 4.0.6(effect@4.0.6)
@@ -3167,11 +3248,32 @@ snapshots:
     transitivePeerDependencies:
       - effect
 
+  '@foldkit/ui@0.169.0(effect@4.0.6)(foldkit@0.169.0(@effect/platform-browser@4.0.0(effect@4.0.6))(effect@4.0.6))':
+    dependencies:
+      '@floating-ui/dom': 1.8.0
+      effect: 4.0.6
+      foldkit: 0.169.0(@effect/platform-browser@4.0.0(effect@4.0.6))(effect@4.0.6)
+
   '@foldkit/ui@0.169.0(effect@4.0.6)(foldkit@0.169.0(@effect/platform-browser@4.0.6(effect@4.0.6))(effect@4.0.6))':
     dependencies:
       '@floating-ui/dom': 1.8.0
       effect: 4.0.6
       foldkit: 0.169.0(@effect/platform-browser@4.0.6(effect@4.0.6))(effect@4.0.6)
+
+  '@foldkit/vite-plugin@0.28.0(effect@4.0.6)(foldkit@0.169.0(@effect/platform-browser@4.0.0(effect@4.0.6))(effect@4.0.6))(redis@6.2.1)(vite@8.3.5(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1))':
+    dependencies:
+      '@effect/platform-node': 4.0.0(effect@4.0.6)(redis@6.2.1)
+      '@effect/platform-node-shared': 4.0.0(effect@4.0.6)
+      effect: 4.0.6
+      foldkit: 0.169.0(@effect/platform-browser@4.0.0(effect@4.0.6))(effect@4.0.6)
+      magic-string: 1.4.3
+      vite: 8.3.5(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1)
+      vitefu: 1.1.3(vite@8.3.5(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1))
+      ws: 8.22.0
+    transitivePeerDependencies:
+      - bufferutil
+      - redis
+      - utf-8-validate
 
   '@foldkit/vite-plugin@0.28.0(effect@4.0.6)(foldkit@0.169.0(@effect/platform-browser@4.0.6(effect@4.0.6))(effect@4.0.6))(redis@6.2.1)(vite@8.3.5(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1))':
     dependencies:
@@ -4316,6 +4418,12 @@ snapshots:
       - supports-color
 
   flatted@3.4.4: {}
+
+  foldkit@0.169.0(@effect/platform-browser@4.0.0(effect@4.0.6))(effect@4.0.6):
+    dependencies:
+      '@effect/platform-browser': 4.0.0(effect@4.0.6)
+      effect: 4.0.6
+      parse5: 8.0.1
 
   foldkit@0.169.0(@effect/platform-browser@4.0.6(effect@4.0.6))(effect@4.0.6):
     dependencies:
