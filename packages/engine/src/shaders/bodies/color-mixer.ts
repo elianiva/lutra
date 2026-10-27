@@ -51,13 +51,15 @@ export const overlapWeight = (h: number, left: number, right: number): number =>
 }
 
 /**
- * Per-degree hue deltas (vec4: hue°, saturation, luminance, unused) for
- * hues 0..359. Every range edge sits on a whole degree and the weights are
- * linear between edges, so interpolating adjacent entries reproduces the
- * per-pixel weighting exactly — the shader does one lookup instead of
- * eight range weights.
+ * Hue deltas (vec4: hue°, saturation, luminance, unused) every
+ * `HUE_TABLE_STEP` degrees. Every ramp breakpoint (range edge ±
+ * MIX_OVERLAP) is a multiple of 5°, and each range is wider than its two
+ * ramps, so the weights are linear between table entries: interpolating
+ * adjacent entries reproduces the per-pixel weighting exactly. The shader
+ * does one lookup instead of eight range weights.
  */
-const HUE_TABLE_SIZE = 360
+const HUE_TABLE_STEP = 5
+const HUE_TABLE_SIZE = 360 / HUE_TABLE_STEP
 
 export const renderColorMixer: BodyRenderer = (i) => ({
   derived: {
@@ -69,7 +71,8 @@ export const renderColorMixer: BodyRenderer = (i) => ({
         range: r,
         saturation: field(`${r.key}Saturation`),
       }))
-      for (let h = 0; h < HUE_TABLE_SIZE; h++) {
+      for (let k = 0; k < HUE_TABLE_SIZE; k++) {
+        const h = k * HUE_TABLE_STEP
         let hue = 0
         let saturation = 0
         let luminance = 0
@@ -79,7 +82,9 @@ export const renderColorMixer: BodyRenderer = (i) => ({
           saturation += d.saturation * w
           luminance += d.luminance * w
         }
-        table.set([hue * 90, saturation, luminance], h * 4)
+        table[k * 4] = hue * 90
+        table[k * 4 + 1] = saturation
+        table[k * 4 + 2] = luminance
       }
       return table
     },
@@ -137,11 +142,12 @@ fn mixerHslToRgb(hsl: vec3<f32>) -> vec3<f32> {
   let hsl = mixerRgbToHsl(srgb);
   if (hsl.y > 0.001) {
     let h = hsl.x;
-    let k = u32(floor(h)) % ${HUE_TABLE_SIZE}u;
+    let t = h / ${HUE_TABLE_STEP}.0;
+    let k = u32(floor(t)) % ${HUE_TABLE_SIZE}u;
     let d = mix(
       u_params.l${i}_derived[k],
       u_params.l${i}_derived[(k + 1u) % ${HUE_TABLE_SIZE}u],
-      h - floor(h),
+      t - floor(t),
     );
     let dHue = d.x;
     let dSaturation = d.y;
