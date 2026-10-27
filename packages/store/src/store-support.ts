@@ -74,17 +74,14 @@ export const tableCrud = <Table extends IndexedDbTable.AnyWithProps, Summary>({
     })
     const rows: IndexedDbQueryBuilder.IndexedDbQuery.SelectType<Table>[] = []
     for (const key of keys) {
-      const row = yield* table
-        .select()
-        .equals(key as never)
-        .pipe(Effect.option)
+      // SAFETY: the key came from this table's own getAllKeys, so it is a valid key for its index; the builder's key type is not expressible for a generic table.
+      // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion
+      const equalsKey = key as never
+      const row = yield* table.select().equals(equalsKey).pipe(Effect.option)
       if (Option.isSome(row)) {
         rows.push(...row.value)
       } else {
-        yield* table
-          .delete()
-          .equals(key as never)
-          .pipe(Effect.ignore)
+        yield* table.delete().equals(equalsKey).pipe(Effect.ignore)
       }
     }
     return rows
