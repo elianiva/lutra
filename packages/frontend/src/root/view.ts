@@ -87,7 +87,7 @@ const readyToastView = (ready: boolean, h: HtmlBuilder<AppMessage>): Html =>
         [
           h.OnClick(OfflineMessage.OfflineReadyDismissed()),
           h.Class(
-            'surface fixed inset-x-4 bottom-4 z-50 cursor-pointer px-4 py-3 text-sm text-ink md:inset-x-auto md:right-6 md:w-64',
+            'surface fixed inset-x-4 bottom-20 z-50 cursor-pointer md:bottom-4 px-4 py-3 text-sm text-ink md:inset-x-auto md:right-6 md:w-64',
           ),
         ],
         ['Offline ready — Lutra works without a connection'],
@@ -175,6 +175,9 @@ export const view = (model: Model, h: HtmlBuilder<AppMessage>): Document => {
 // housekeeping, the editor is for grading.
 const offlineCardImpl = (offline: Model['offline'], h: HtmlBuilder<AppMessage>): Html => {
   // offline passed as slice for lazy === check
+  if (offline.cardDismissed) {
+    return null
+  }
   const pct = offline.total > 0 ? Math.round((offline.downloaded / offline.total) * 100) : 0
   const frame = (content: readonly Html[]) =>
     h.div(
@@ -183,10 +186,23 @@ const offlineCardImpl = (offline: Model['offline'], h: HtmlBuilder<AppMessage>):
         // width instead of floating in the corner; `md:` restores the
         // fixed-width corner float.
         h.Class(
-          'surface fixed inset-x-4 bottom-4 z-50 px-4 py-3 md:inset-x-auto md:right-6 md:w-64',
+          'surface fixed inset-x-4 bottom-20 z-50 px-4 py-3 md:inset-x-auto md:right-6 md:bottom-4 md:w-64',
         ),
       ],
-      content,
+      [
+        h.button(
+          [
+            h.Type('button'),
+            h.Class(
+              'absolute right-2 top-2 grid h-6 w-6 place-items-center text-muted hover:text-ink',
+            ),
+            h.AriaLabel('Dismiss offline notice'),
+            h.OnClick(OfflineMessage.OfflineCardDismissed()),
+          ],
+          ['×'],
+        ),
+        ...content,
+      ],
     )
   const progress = h.div(
     [h.Class('h-1 w-full bg-border-strong')],

@@ -256,6 +256,9 @@ export const update = (model: Model, message: AppMessage): UpdateReturn => {
       StoragePersisted: ({ persisted }) => ({
         model: modifyFields(model, { offline: (o) => ({ ...o, persisted }) }),
       }),
+      OfflineCardDismissed: () => ({
+        model: modifyFields(model, { offline: (o) => ({ ...o, cardDismissed: true }) }),
+      }),
       OfflineReadyDismissed: () => ({
         model: modifyFields(model, { offline: (o) => ({ ...o, readyToast: false }) }),
       }),

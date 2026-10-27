@@ -16,7 +16,7 @@ const PAGES = [
 ] as const
 
 const tabClass =
-  'z-10 h-9 gap-2 rounded-full px-4 text-[11px] uppercase tracking-[0.1em] text-muted hover:text-ink data-selected:bg-transparent data-selected:text-ink dark:text-muted dark:hover:text-ink dark:data-selected:border-transparent dark:data-selected:bg-transparent dark:data-selected:text-ink'
+  'z-10 h-9 gap-1.5 rounded-full px-3 sm:gap-2 sm:px-4 text-[11px] uppercase tracking-[0.1em] text-muted hover:text-ink data-selected:bg-transparent data-selected:text-ink dark:text-muted dark:hover:text-ink dark:data-selected:border-transparent dark:data-selected:bg-transparent dark:data-selected:text-ink'
 
 /**
  * The floating navigation (docs/adr/0013-materials): logo, the site's pages,
@@ -52,7 +52,7 @@ export const navPill = <M>(
   return h.nav(
     [
       h.Class(
-        'surface-raised fixed bottom-5 left-1/2 z-40 flex [view-transition-name:nav] -translate-x-1/2 items-center gap-1.5 rounded-full! p-1.5',
+        'surface-raised fixed inset-x-0 bottom-5 z-40 mx-auto flex w-fit max-w-[calc(100vw-1rem)] [view-transition-name:nav] items-center gap-1.5 rounded-full! p-1.5',
       ),
       h.AriaLabel('Navigation'),
     ],

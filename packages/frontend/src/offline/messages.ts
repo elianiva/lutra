@@ -48,6 +48,7 @@ export const OfflineMessage = defineMessageUnion({
     persisted: S.Boolean,
   },
   OfflineReadyDismissed: {},
+  OfflineCardDismissed: {},
 })
 export type OfflineMessage = typeof OfflineMessage.Type
 

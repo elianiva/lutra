@@ -25,6 +25,7 @@ export const Offline = S.Struct({
   total: S.Number,
   persisted: S.NullOr(S.Boolean),
   readyToast: S.Boolean,
+  cardDismissed: S.Boolean,
 })
 export type Offline = typeof Offline.Type
 
@@ -39,6 +40,7 @@ export const initialOffline = (): Offline => {
     online: globalThis.navigator === undefined ? true : navigator.onLine,
     persisted: null,
     phase: Idle(),
+    cardDismissed: false,
     readyToast: false,
     saveData: globalThis.navigator === undefined ? false : connection?.saveData === true,
     total: 0,
