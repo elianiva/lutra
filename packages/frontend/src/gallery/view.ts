@@ -1,7 +1,7 @@
 import { DateTime } from 'effect'
 import { Submodel, AsyncData } from 'foldkit'
 import { type Html, type HtmlBuilder, createLazy, createKeyedLazy } from 'foldkit/html'
-import { Plus, Upload, X } from 'lucide'
+import { AddPhoto, Drop, Remove } from '../components/icons'
 import { button } from '@/components/ui/button'
 import { GalleryMessage } from './message'
 import type { Model } from './model'
@@ -98,7 +98,7 @@ const dropOverlay = (h: HtmlBuilder<GalleryMessage>, active: boolean): Html =>
                 'flex h-16 w-16 items-center justify-center rounded-full border-2 border-accent bg-panel text-accent',
               ),
             ],
-            [icon(h, Upload, 'Drop photos', 28)],
+            [icon(h, Drop, 'Drop photos', 28)],
           ),
           h.p([h.Class('text-sm font-semibold tracking-wide text-accent')], ['Drop photos to add']),
           h.p([h.Class('text-xs text-muted')], ['Release to add them to your gallery']),
@@ -173,7 +173,7 @@ const newEditTile = (h: HtmlBuilder<GalleryMessage>) =>
       h.AriaLabel('Open a photo to start a new edit'),
     ],
     [
-      icon(h, Plus, 'New edit', 22),
+      icon(h, AddPhoto, 'New edit', 22),
       h.span([h.Class('text-xs')], ['New edit']),
       h.span([h.Class('text-[10px]')], ['Open, drop or paste']),
     ],
@@ -235,7 +235,7 @@ const tile = (h: HtmlBuilder<GalleryMessage>, summary: EditSummary) =>
                     h.DataAttribute('delete-edit-id', summary.id),
                   ],
                 },
-                [icon(h, X, 'Delete saved edit')],
+                [icon(h, Remove, 'Delete saved edit')],
                 h,
               ),
             ],

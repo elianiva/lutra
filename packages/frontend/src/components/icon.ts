@@ -1,7 +1,12 @@
-import type { IconNode } from 'lucide'
 import type { HtmlBuilder } from 'foldkit/html'
-import { Match } from 'effect'
 
+/** One stroked path; `transform` is only for the rotated spanner. */
+export type IconNode = ReadonlyArray<Readonly<{ d: string; transform?: string }>>
+
+/**
+ * Draws a Lutra icon (see `icons.ts`): outline only, one stroke width, flat
+ * ends and sharp joins, in the current text colour.
+ */
 export const icon = <Message>(
   h: HtmlBuilder<Message>,
   node: IconNode,
@@ -17,22 +22,19 @@ export const icon = <Message>(
       h.Attribute('fill', 'none'),
       h.Attribute('stroke', 'currentColor'),
       h.Attribute('stroke-width', '2'),
-      h.Attribute('stroke-linecap', 'round'),
-      h.Attribute('stroke-linejoin', 'round'),
+      h.Attribute('stroke-linecap', 'butt'),
+      h.Attribute('stroke-linejoin', 'miter'),
+      h.Attribute('stroke-miterlimit', '2'),
       h.AriaLabel(label),
       h.Class('shrink-0'),
     ],
-    node.map(([tag, properties]) => {
-      const attributes = Object.entries(properties).map(([name, value]) =>
-        h.Attribute(name, String(value)),
-      )
-      return Match.value(tag).pipe(
-        Match.when('circle', () => h.circle(attributes, [])),
-        Match.when('line', () => h.line(attributes, [])),
-        Match.when('path', () => h.path(attributes, [])),
-        Match.when('polyline', () => h.polyline(attributes, [])),
-        Match.when('rect', () => h.rect(attributes, [])),
-        Match.orElse(() => null),
-      )
-    }),
+    node.map(({ d, transform }) =>
+      h.path(
+        [
+          h.Attribute('d', d),
+          ...(transform === undefined ? [] : [h.Attribute('transform', transform)]),
+        ],
+        [],
+      ),
+    ),
   )

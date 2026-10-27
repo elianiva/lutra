@@ -1,6 +1,6 @@
 import type { Html, HtmlBuilder } from 'foldkit/html'
-import { Check, CopyPlus, Download, Eclipse, Sun } from 'lucide'
-import { icon } from '../components/icon'
+import { Export, ModeDark, ModeLight, Save, SaveCopy } from '../components/icons'
+import { icon, type IconNode } from '../components/icon'
 import { wordmark } from '../components/wordmark'
 import { EditorMessage } from './message'
 import type { Model } from './model'
@@ -41,15 +41,15 @@ export const topBar = (
             [h.Class('surface flex h-10 items-center gap-0.5 p-1')],
             [
               saveStatusText(h, saveStatus),
-              textButton(h, 'Save as', CopyPlus, EditorMessage.SaveAsRequested(), {
+              textButton(h, 'Save as', SaveCopy, EditorMessage.SaveAsRequested(), {
                 isDisabled: !hasImage || saving || attachedId === null,
                 iconOnlyOnSmall: true,
                 hideOnSmall: true,
               }),
-              iconButton(h, 'Export image', Download, EditorMessage.ExportRequested(), {
+              iconButton(h, 'Export image', Export, EditorMessage.ExportRequested(), {
                 isDisabled: !hasImage,
               }),
-              textButton(h, 'Save', Check, EditorMessage.SaveRequested(), {
+              textButton(h, 'Save', Save, EditorMessage.SaveRequested(), {
                 isDisabled: !hasImage || saving,
                 primary: true,
                 label: saving ? 'Saving…' : 'Save',
@@ -73,7 +73,7 @@ const documentLine = (h: HtmlBuilder<EditorMessage>, attachedEdit: Model['attach
   )
 
 const modeToggle = (h: HtmlBuilder<EditorMessage>, mode: Model['mode']): Html => {
-  const segment = (target: 'dark' | 'light', label: string, Icon: typeof Sun) => {
+  const segment = (target: 'dark' | 'light', label: string, Icon: IconNode) => {
     const active = mode === target
     return h.button(
       [
@@ -92,7 +92,7 @@ const modeToggle = (h: HtmlBuilder<EditorMessage>, mode: Model['mode']): Html =>
   }
   return h.div(
     [h.Class('surface flex h-10 items-center gap-0.5 p-1'), h.AriaLabel('Appearance')],
-    [segment('dark', 'Dark', Eclipse), segment('light', 'Light', Sun)],
+    [segment('dark', 'Dark', ModeDark), segment('light', 'Light', ModeLight)],
   )
 }
 
@@ -112,7 +112,7 @@ const baseActionClass = (disabled: boolean) =>
 const textButton = (
   h: HtmlBuilder<EditorMessage>,
   label: string,
-  Icon: typeof Check,
+  Icon: IconNode,
   onClick: EditorMessage,
   config: ActionConfig,
 ): Html =>
@@ -142,7 +142,7 @@ const textButton = (
 const iconButton = (
   h: HtmlBuilder<EditorMessage>,
   label: string,
-  Icon: typeof Download,
+  Icon: IconNode,
   onClick: EditorMessage,
   config: ActionConfig,
 ): Html =>

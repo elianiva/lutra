@@ -1,10 +1,20 @@
 import { Option, pipe } from 'effect'
 import { type Html, type HtmlBuilder } from 'foldkit/html'
-import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronUp, Eye, EyeOff, Trash2, X } from 'lucide'
-import type { IconNode } from 'lucide'
+import {
+  Apply,
+  Cancel,
+  Delete,
+  Hide,
+  MoveDown,
+  MoveUp,
+  Show,
+  StepDown,
+  StepUp,
+} from '../components/icons'
+
 import { button } from '@/components/ui/button'
 import { lutraRangeRow } from '@/components/lutra-range-row'
-import { icon } from '../components/icon'
+import { icon, type IconNode } from '../components/icon'
 import {
   LAYER_UI,
   MIXER_COLORS,
@@ -325,8 +335,8 @@ const parameterPanel = (
                     h.div(
                       [h.Class('flex gap-1')],
                       [
-                        stepperButton(h, 'Increase', ChevronUp, stepper(1)),
-                        stepperButton(h, 'Decrease', ChevronDown, stepper(-1)),
+                        stepperButton(h, 'Increase', StepUp, stepper(1)),
+                        stepperButton(h, 'Decrease', StepDown, stepper(-1)),
                       ],
                     ),
                   ]),
@@ -388,11 +398,11 @@ const positionRow = (h: HtmlBuilder<EditorMessage>, slice: InspectorSlice, index
   return h.div(
     [h.Class('flex items-center justify-between gap-2 px-4 pb-4')],
     [
-      moveButton(h, 'Move up', ArrowUp, index === 0, () =>
+      moveButton(h, 'Move up', MoveUp, index === 0, () =>
         EditorMessage.ReorderedLayer({ from: index, to: index - 1 }),
       ),
       h.span([h.Class('micro tnum')], [`Position ${String(index + 1)} of ${String(total)}`]),
-      moveButton(h, 'Move down', ArrowDown, index === total - 1, () =>
+      moveButton(h, 'Move down', MoveDown, index === total - 1, () =>
         EditorMessage.ReorderedLayer({ from: index, to: index + 1 }),
       ),
     ],
@@ -480,8 +490,8 @@ const panelFooter = (h: HtmlBuilder<EditorMessage>, panel: Panel): Html => {
     return h.div(
       [h.Class('flex gap-1.5 px-3 pb-3')],
       [
-        footerButton(h, 'Cancel draft', X, EditorMessage.CancelledDraft(), false, 'Cancel'),
-        footerButton(h, 'Apply adjustment', Check, EditorMessage.ConfirmedDraft(), true, 'Apply'),
+        footerButton(h, 'Cancel draft', Cancel, EditorMessage.CancelledDraft(), false, 'Cancel'),
+        footerButton(h, 'Apply adjustment', Apply, EditorMessage.ConfirmedDraft(), true, 'Apply'),
       ],
     )
   }
@@ -491,7 +501,7 @@ const panelFooter = (h: HtmlBuilder<EditorMessage>, panel: Panel): Html => {
       footerButton(
         h,
         panel.layer.visible ? 'Hide layer' : 'Show layer',
-        panel.layer.visible ? Eye : EyeOff,
+        panel.layer.visible ? Hide : Show,
         EditorMessage.ToggledLayerVisibility({ id: panel.layer.id }),
         false,
         null,
@@ -499,7 +509,7 @@ const panelFooter = (h: HtmlBuilder<EditorMessage>, panel: Panel): Html => {
       footerButton(
         h,
         'Delete layer',
-        Trash2,
+        Delete,
         EditorMessage.RemovedLayer({ id: panel.layer.id }),
         false,
         null,

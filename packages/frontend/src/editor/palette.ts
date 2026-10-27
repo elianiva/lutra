@@ -1,6 +1,6 @@
 import { Option } from 'effect'
 import { type Html, type HtmlBuilder } from 'foldkit/html'
-import { Search } from 'lucide'
+import { Search } from '../components/icons'
 import { icon } from '../components/icon'
 import { LAYER_UI, LAYER_TYPES_ORDER } from './layer-meta'
 import { EditorMessage } from './message'

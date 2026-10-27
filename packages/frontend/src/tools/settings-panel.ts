@@ -1,5 +1,5 @@
 import type { Html, HtmlBuilder } from 'foldkit/html'
-import { ChevronDown, Lock, LockOpen } from 'lucide'
+import { Expand, Lock, Unlock } from '../components/icons'
 import { EXPORT_FORMATS, RESIZE_METHODS } from '@lutra/engine'
 import { icon } from '@/components/icon'
 import { colorInput, field, group, label, numberInput, segmented } from '@/tools/controls'
@@ -55,7 +55,7 @@ export const settingsPanel = (h: HtmlBuilder<Message>, model: Model): Html => {
           h.span([h.Class('micro font-semibold')], ['Settings']),
           h.span(
             [h.Class(cn('text-dim transition-transform', model.settingsOpen ? 'rotate-180' : ''))],
-            [icon(h, ChevronDown, 'Toggle settings', 16)],
+            [icon(h, Expand, 'Toggle settings', 16)],
           ),
         ],
       ),
@@ -200,7 +200,7 @@ const sizeFields = (h: HtmlBuilder<Message>, settings: Settings, single: boolean
           ),
           h.OnClick(change(settings, { height: locked ? (derived ?? settings.width) : null })),
         ],
-        [icon(h, locked ? Lock : LockOpen, locked ? 'Locked' : 'Unlocked', 14)],
+        [icon(h, locked ? Lock : Unlock, locked ? 'Locked' : 'Unlocked', 14)],
       ),
       h.div(
         [h.Class('min-w-0 flex-1')],

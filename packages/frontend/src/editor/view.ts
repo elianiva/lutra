@@ -1,6 +1,6 @@
 import { type Html, type HtmlBuilder, createLazy } from 'foldkit/html'
-import { Layers as LayersIcon, SlidersHorizontal } from 'lucide'
-import type { IconNode } from 'lucide'
+import { PanelAdjust, PanelLayers } from '../components/icons'
+import type { IconNode } from '../components/icon'
 import { Submodel } from 'foldkit'
 import { hasImage } from './phase'
 import type { Model } from './model'
@@ -217,10 +217,10 @@ const mobileTabBarImpl = (mobileSheet: Model['mobileSheet'], h: HtmlBuilder<Edit
       h.AriaLabel('Editor panels'),
     ],
     [
-      panelTab('Adjustments', SlidersHorizontal, mobileSheet === 'tools', () =>
+      panelTab('Adjustments', PanelAdjust, mobileSheet === 'tools', () =>
         EditorMessage.ToggledMobileSheet({ sheet: 'tools' }),
       ),
-      panelTab('Inspector', LayersIcon, mobileSheet === 'layers', () =>
+      panelTab('Inspector', PanelLayers, mobileSheet === 'layers', () =>
         EditorMessage.ToggledMobileSheet({ sheet: 'layers' }),
       ),
     ],

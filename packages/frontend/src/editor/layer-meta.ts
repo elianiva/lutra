@@ -1,19 +1,19 @@
-import type { IconNode } from 'lucide'
+import type { IconNode } from '../components/icon'
 import {
-  Activity,
-  Aperture,
-  Boxes,
-  CircleDot,
+  ChromaticAberration,
+  Clarity,
+  ColorMixer,
   Contrast,
-  Droplet,
-  Eclipse,
-  Eye,
-  Flame,
-  Palette,
-  Shirt,
-  Sparkles,
-  Sun,
-} from 'lucide'
+  Exposure,
+  Grain,
+  Highlights,
+  Lut,
+  Saturation,
+  Shadows,
+  ToneCurve,
+  Vignette,
+  WhiteBalance,
+} from '../components/icons'
 import {
   FieldKey,
   isCurveNeutral,
@@ -132,7 +132,7 @@ const GRAIN_PROFILES = [
 /**
  * Frontend-only metadata keyed by `LayerType`. The engine `LayerEntry`
  * owns the truth about min/max/default and the shader body; this lives
- * beside it to add the lucide icon and the value formatters (formats are
+ * beside it to add the icon and the value formatters (formats are
  * a presentation concern, not an engine one).
  */
 export const LAYER_UI = {
@@ -140,7 +140,7 @@ export const LAYER_UI = {
     description: 'Splits red and blue at the edges, like an old lens.',
     fields: { amount: { format: formatSigned, label: 'CHROMATIC ABERRATION' } },
     formatValue: (l) => formatSigned(numField(l, FieldKey('amount'))),
-    icon: CircleDot,
+    icon: ChromaticAberration,
     label: 'Chromatic Aberration',
     toggled: false,
     when: 'Add a touch of analog imperfection.',
@@ -149,14 +149,14 @@ export const LAYER_UI = {
     description: 'Adds punch to textures and fine detail.',
     fields: { amount: { format: formatSigned, label: 'CLARITY' } },
     formatValue: (l) => formatSigned(numField(l, FieldKey('amount'))),
-    icon: Flame,
+    icon: Clarity,
     label: 'Clarity',
     toggled: false,
     when: 'Make surfaces pop, or go softer and dreamy.',
   },
   colorMixer: {
     label: 'Color Mixer',
-    icon: Droplet,
+    icon: ColorMixer,
     toggled: false,
     fields: Object.fromEntries(
       MIXER_COLORS.flatMap((color) =>
@@ -196,7 +196,7 @@ export const LAYER_UI = {
     description: 'Brightens or darkens the whole photo.',
     fields: { stops: { format: formatEV, label: 'EXPOSURE' } },
     formatValue: (l) => formatEV(numField(l, FieldKey('stops'))),
-    icon: Sun,
+    icon: Exposure,
     label: 'Exposure',
     toggled: false,
     when: "Fix a photo that's too dark or too bright.",
@@ -217,7 +217,7 @@ export const LAYER_UI = {
       const prof = GRAIN_PROFILES[Math.round(numField(l, FieldKey('profile')))]?.name ?? 'Medium'
       return amt === 0 ? 'Off' : `${prof} · ${formatPercent(amt)}`
     },
-    icon: Shirt,
+    icon: Grain,
     label: 'Grain',
     toggled: false,
     when: 'Give the photo texture, like classic film.',
@@ -226,14 +226,14 @@ export const LAYER_UI = {
     description: 'Lightens or darkens the brightest areas.',
     fields: { amount: { format: formatSigned, label: 'HIGHLIGHTS' } },
     formatValue: (l) => formatSigned(numField(l, FieldKey('amount'))),
-    icon: Sparkles,
+    icon: Highlights,
     label: 'Highlights',
     toggled: false,
     when: 'Recover blown-out skies and bright spots.',
   },
   lut: {
     label: 'LUT',
-    icon: Boxes,
+    icon: Lut,
     toggled: false,
     fields: { amount: { format: formatPercent, label: 'STRENGTH' } },
     formatValue: (l) => formatPercent(numField(l, FieldKey('amount'))),
@@ -244,7 +244,7 @@ export const LAYER_UI = {
     description: 'Controls how vivid the colors are.',
     fields: { amount: { format: formatSigned, label: 'SATURATION' } },
     formatValue: (l) => formatSigned(numField(l, FieldKey('amount'))),
-    icon: Palette,
+    icon: Saturation,
     label: 'Saturation',
     toggled: false,
     when: 'Make colors pop, or pull back for a faded look.',
@@ -253,14 +253,14 @@ export const LAYER_UI = {
     description: 'Lightens or darkens the darkest areas.',
     fields: { amount: { format: formatSigned, label: 'SHADOWS' } },
     formatValue: (l) => formatSigned(numField(l, FieldKey('amount'))),
-    icon: Eclipse,
+    icon: Shadows,
     label: 'Shadows',
     toggled: false,
     when: 'Pull detail out of underexposed shadows.',
   },
   toneCurve: {
     label: 'Tone Curve',
-    icon: Activity,
+    icon: ToneCurve,
     toggled: false,
     fields: Object.fromEntries(
       Array.from({ length: 5 }, (_, i) => [
@@ -280,7 +280,7 @@ export const LAYER_UI = {
     },
     formatValue: (l) =>
       `A ${formatSigned(numField(l, FieldKey('amount')))} · ${formatPercent(numField(l, FieldKey('size')))}`,
-    icon: Aperture,
+    icon: Vignette,
     label: 'Vignette',
     toggled: true,
     when: 'Focus the center, or add a vintage frame.',
@@ -293,7 +293,7 @@ export const LAYER_UI = {
     },
     formatValue: (l) =>
       `${wbK(numField(l, FieldKey('temp')))} K · ${formatSigned(numField(l, FieldKey('tint')))}`,
-    icon: Eye,
+    icon: WhiteBalance,
     label: 'White Balance',
     toggled: true,
     when: 'Use it to fix an odd cast or set a mood.',

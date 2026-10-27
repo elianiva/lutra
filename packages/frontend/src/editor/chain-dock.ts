@@ -1,5 +1,5 @@
 import { type Html, type HtmlBuilder, createKeyedLazy } from 'foldkit/html'
-import { Plus } from 'lucide'
+import { AddAdjustment } from '../components/icons'
 import { icon } from '../components/icon'
 import { LAYER_UI } from './layer-meta'
 import { EditorMessage } from './message'
@@ -165,7 +165,7 @@ export const chainDock = (h: HtmlBuilder<EditorMessage>, slice: ChainDockSlice):
               h.DataAttribute('testid', 'chain-add'),
             ],
             [
-              icon(h, Plus, 'Add adjustment', 12),
+              icon(h, AddAdjustment, 'Add adjustment', 12),
               h.span([h.Class('min-w-0 flex-1 truncate text-left text-[11px]')], ['Add']),
               // a phone has no ⌘K
               h.span([h.Class('max-lg:hidden flex-none font-mono text-[8px] text-dim')], ['⌘K']),

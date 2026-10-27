@@ -1,6 +1,6 @@
 import { Option } from 'effect'
 import type { Html, HtmlBuilder } from 'foldkit/html'
-import { ArrowLeft, ArrowRight, Plus, RotateCcw, Shuffle, X } from 'lucide'
+import { AddPhoto, MoveLeft, MoveRight, Reset, Remove, Shuffle } from '../../components/icons'
 import { icon } from '@/components/icon'
 import { field, group, label, numberInput, pillButton, segmented } from '@/tools/controls'
 import { rangeRow } from '@/tools/range-row'
@@ -176,7 +176,7 @@ const emptyCell = (h: HtmlBuilder<Message>, index: number): Html =>
     ],
     [
       h.span([h.Class('font-mono text-sm tnum')], [String(index + 1).padStart(2, '0')]),
-      icon(h, Plus, 'Add photo', 14),
+      icon(h, AddPhoto, 'Add photo', 14),
     ],
   )
 
@@ -251,7 +251,7 @@ const controls = (h: HtmlBuilder<Message>, collage: Collage, settings: Settings)
           [h.Class('flex flex-wrap items-center gap-1')],
           [
             pillButton(h, {
-              label: [icon(h, Plus, 'Add', 14), 'Add photos'],
+              label: [icon(h, AddPhoto, 'Add', 14), 'Add photos'],
               onClick: Message.CollageAddRequested(),
               primary: true,
             }),
@@ -383,7 +383,7 @@ const thumb = (
           slot === null
             ? h.span(
                 [h.Class('grid size-full place-items-center text-dim')],
-                [icon(h, Plus, 'Add', 14)],
+                [icon(h, AddPhoto, 'Add', 14)],
               )
             : h.img([
                 h.Src(slot.url),
@@ -412,7 +412,7 @@ const thumb = (
               h.AriaLabel(`Remove photo ${index + 1}`),
               h.OnClick(Message.RemovedCell({ index })),
             ],
-            [icon(h, X, 'Remove', 10)],
+            [icon(h, Remove, 'Remove', 10)],
           ),
     ],
   )
@@ -459,19 +459,19 @@ const selectedGroup = (h: HtmlBuilder<Message>, collage: Collage): Html => {
       [h.Class('flex items-center gap-1')],
       [
         pillButton(h, {
-          label: [icon(h, ArrowLeft, 'Move left', 14)],
+          label: [icon(h, MoveLeft, 'Move left', 14)],
           ariaLabel: 'Move photo one cell earlier',
           onClick: Message.MovedSelected({ direction: -1 }),
           isDisabled: disabled || collage.selected === 0,
         }),
         pillButton(h, {
-          label: [icon(h, ArrowRight, 'Move right', 14)],
+          label: [icon(h, MoveRight, 'Move right', 14)],
           ariaLabel: 'Move photo one cell later',
           onClick: Message.MovedSelected({ direction: 1 }),
           isDisabled: disabled || collage.selected >= collage.slots.length - 1,
         }),
         pillButton(h, {
-          label: [icon(h, RotateCcw, 'Reset', 14), 'Reset'],
+          label: [icon(h, Reset, 'Reset', 14), 'Reset'],
           onClick: Message.ResetView(),
           isDisabled: disabled,
           className: 'ml-auto',

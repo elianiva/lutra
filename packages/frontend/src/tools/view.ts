@@ -1,6 +1,6 @@
 import { Submodel } from 'foldkit'
 import type { Html, HtmlBuilder } from 'foldkit/html'
-import { Archive, ImagePlus, RefreshCw, Upload } from 'lucide'
+import { AddPhoto, Drop, Reprocess, Zip } from '../components/icons'
 import { icon } from '@/components/icon'
 import { navPill } from '@/components/nav-pill'
 import * as Tabs from '@/components/ui/tabs'
@@ -137,7 +137,7 @@ const actions = (h: HtmlBuilder<Message>, model: Model): Html => {
         ? null
         : pillButton(h, {
             label: [
-              icon(h, RefreshCw, 'Reprocess', 14),
+              icon(h, Reprocess, 'Reprocess', 14),
               `${stale ? 'Reprocess' : 'Retry'} ${targets.length}`,
             ],
             onClick: Message.ReprocessRequested(),
@@ -146,7 +146,7 @@ const actions = (h: HtmlBuilder<Message>, model: Model): Html => {
           }),
       pillButton(h, {
         label: [
-          icon(h, Archive, 'Download zip', 14),
+          icon(h, Zip, 'Download zip', 14),
           h.span([h.Class('max-sm:hidden')], ['Download .zip']),
           h.span([h.Class('sm:hidden')], ['Zip']),
         ],
@@ -160,7 +160,7 @@ const actions = (h: HtmlBuilder<Message>, model: Model): Html => {
         isDisabled: model.items.length === 0,
       }),
       pillButton(h, {
-        label: [icon(h, ImagePlus, 'Add', 14), 'Add images'],
+        label: [icon(h, AddPhoto, 'Add', 14), 'Add images'],
         onClick: Message.AddRequested(),
         primary: true,
       }),
@@ -179,7 +179,7 @@ const dropOverlay = (h: HtmlBuilder<Message>, tab: Tab): Html =>
     [
       h.span(
         [h.Class('pill grid size-16 place-items-center text-accent')],
-        [icon(h, Upload, 'Drop images', 28)],
+        [icon(h, Drop, 'Drop images', 28)],
       ),
       h.p(
         [h.Class('text-sm font-semibold tracking-wide text-accent')],

@@ -1,7 +1,7 @@
 import { Effect, Queue, Stream } from 'effect'
 import { Mount } from 'foldkit'
 import type { HtmlBuilder } from 'foldkit/html'
-import { RotateCcw } from 'lucide'
+import { Reset } from '../components/icons'
 import { button } from '@/components/ui/button'
 import { icon } from '../components/icon'
 import { curvePointsOf, isCurveNeutral } from '@lutra/engine'
@@ -181,7 +181,7 @@ export const toneCurveWidget = (h: HtmlBuilder<EditorMessage>, layer: Layer) => 
                     className: 'grid place-items-center',
                     attributes: [h.AriaLabel('Reset curve')],
                   },
-                  [icon(h, RotateCcw, 'Reset curve')],
+                  [icon(h, Reset, 'Reset curve')],
                   h,
                 ),
               ]),

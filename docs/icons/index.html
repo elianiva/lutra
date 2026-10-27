@@ -1,0 +1,1288 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Lutra icons</title>
+    <style>
+      :root {
+        --bg: #e4e4e1;
+        --s1: #f5f5f3;
+        --ink: #141414;
+        --muted: #5a5a58;
+        --rim: rgba(255, 255, 255, 0.9);
+      }
+      :root[data-mode='dark'] {
+        --bg: #0e0e0e;
+        --s1: #181818;
+        --ink: #ecebe8;
+        --muted: #9a9a96;
+        --rim: rgba(255, 255, 255, 0.06);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          14px/1.4 'Chakra Petch',
+          system-ui,
+          sans-serif;
+        padding: 32px;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        max-width: 900px;
+        margin: 0 auto 16px;
+      }
+      .h {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0;
+      }
+      button {
+        font: inherit;
+        background: var(--s1);
+        color: var(--ink);
+        border: 0;
+        padding: 8px 16px;
+        box-shadow:
+          inset 0 1px var(--rim),
+          0 1px 2px rgba(0, 0, 0, 0.2);
+        cursor: pointer;
+      }
+      ul {
+        max-width: 900px;
+        margin: 0 auto 24px;
+        padding: 12px 16px;
+        list-style: none;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 24px;
+        background: var(--s1);
+        color: var(--muted);
+        font-size: 12px;
+        box-shadow: inset 0 1px var(--rim);
+      }
+      table {
+        border-collapse: separate;
+        border-spacing: 0 4px;
+        max-width: 900px;
+        width: 100%;
+        margin: 0 auto;
+      }
+      thead th {
+        position: sticky;
+        top: 0;
+        background: var(--bg);
+        text-align: left;
+        padding: 8px 12px;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        z-index: 1;
+      }
+      tr.sec th {
+        padding: 24px 12px 8px;
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+        text-align: left;
+        background: none;
+      }
+      tbody th {
+        background: var(--s1);
+        text-align: left;
+        padding: 8px 12px;
+        font-weight: 500;
+        width: 300px;
+      }
+      tbody th small {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      code {
+        font:
+          12px 'JetBrains Mono',
+          ui-monospace,
+          monospace;
+      }
+      td {
+        background: var(--s1);
+        padding: 8px 12px;
+        box-shadow: inset 0 1px var(--rim);
+      }
+      td svg {
+        vertical-align: middle;
+        margin-right: 20px;
+      }
+      td small {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .i {
+        fill: none;
+        stroke: currentColor;
+      }
+      .lu {
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .lt {
+        stroke-width: 2;
+        stroke-linecap: butt;
+        stroke-linejoin: miter;
+        stroke-miterlimit: 2;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="h">
+        <svg viewBox="8 -4 100 108" width="40" height="43" fill="currentColor">
+          <path d="M104.17 100L12.5 100L12.5 0L25 0L25 89.58L104.17 89.58L104.17 100" />
+          <rect x="33" y="66" width="12" height="14" rx="2.5" />
+          <rect x="51" y="66" width="12" height="14" rx="2.5" />
+          <rect x="69" y="66" width="12" height="14" rx="2.5" />
+          <rect x="87" y="66" width="12" height="14" rx="2.5" />
+        </svg>
+        <h1>Lutra icons — 49</h1>
+      </div>
+      <button
+        onclick="
+          document.documentElement.dataset.mode =
+            document.documentElement.dataset.mode === 'dark' ? 'light' : 'dark'
+        "
+      >
+        Light / dark
+      </button>
+    </header>
+    <ul>
+      <li>24 grid, strokes on 3–21</li>
+      <li>Stroke 2, butt caps, mitre joins</li>
+      <li>2 min gap</li>
+      <li>Outline only, one colour</li>
+      <li>Corners are wordmark curves, no circular arcs</li>
+    </ul>
+    <table>
+      <thead>
+        <tr>
+          <th>Icon · used for</th>
+          <th>Lucide (was)</th>
+          <th>Lutra</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="sec">
+          <th colspan="3">Navigation</th>
+        </tr>
+        <tr>
+          <th><code>edits</code><small>Gallery page · the saved edits</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <rect width="7" height="7" x="3" y="3" rx="1" />
+              <rect width="7" height="7" x="14" y="3" rx="1" />
+              <rect width="7" height="7" x="14" y="14" rx="1" />
+              <rect width="7" height="7" x="3" y="14" rx="1" /></svg
+            ><small>LayoutGrid</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M7 7V6Q7 3 10 3h8Q21 3 21 6v8Q21 17 18 17h-1" />
+              <path d="M6 7h8Q17 7 17 10v8Q17 21 14 21h-8Q3 21 3 18v-8Q3 7 6 7z" />
+              <path d="M3 18l4-4 3 3 2-2 5 5" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M7 7V6Q7 3 10 3h8Q21 3 21 6v8Q21 17 18 17h-1" />
+              <path d="M6 7h8Q17 7 17 10v8Q17 21 14 21h-8Q3 21 3 18v-8Q3 7 6 7z" />
+              <path d="M3 18l4-4 3 3 2-2 5 5" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M7 7V6Q7 3 10 3h8Q21 3 21 6v8Q21 17 18 17h-1" />
+              <path d="M6 7h8Q17 7 17 10v8Q17 21 14 21h-8Q3 21 3 18v-8Q3 7 6 7z" />
+              <path d="M3 18l4-4 3 3 2-2 5 5" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>tools</code><small>Tools page · batch, collage, single</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path
+                d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"
+              /></svg
+            ><small>Wrench</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path
+                transform="rotate(45 12 12)"
+                d="M7 3h3v4h4V3h3v6Q17 12 14 12v7Q14 21 12 21Q10 21 10 19v-7Q7 12 7 9z"
+              /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path
+                transform="rotate(45 12 12)"
+                d="M7 3h3v4h4V3h3v6Q17 12 14 12v7Q14 21 12 21Q10 21 10 19v-7Q7 12 7 9z"
+              /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path
+                transform="rotate(45 12 12)"
+                d="M7 3h3v4h4V3h3v6Q17 12 14 12v7Q14 21 12 21Q10 21 10 19v-7Q7 12 7 9z"
+              />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>mode-dark</code><small>Appearance · dark</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 2a7 7 0 1 0 10 10" /></svg
+            ><small>Eclipse</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M10 4Q4 4 4 12Q4 20 12 20Q18 20 20 14Q11 14 10 4z" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M10 4Q4 4 4 12Q4 20 12 20Q18 20 20 14Q11 14 10 4z" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M10 4Q4 4 4 12Q4 20 12 20Q18 20 20 14Q11 14 10 4z" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>mode-light</code><small>Appearance · light</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2" />
+              <path d="M12 20v2" />
+              <path d="m4.93 4.93 1.41 1.41" />
+              <path d="m17.66 17.66 1.41 1.41" />
+              <path d="M2 12h2" />
+              <path d="M20 12h2" />
+              <path d="m6.34 17.66-1.41 1.41" />
+              <path d="m19.07 4.93-1.41 1.41" /></svg
+            ><small>Sun</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M12 8Q16 8 16 12Q16 16 12 16Q8 16 8 12Q8 8 12 8z" />
+              <path
+                d="M12 3v2M12 19v2M3 12h2M19 12h2M7 7L5.5 5.5M17 17l1.5 1.5M17 7l1.5-1.5M7 17l-1.5 1.5"
+              /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M12 8Q16 8 16 12Q16 16 12 16Q8 16 8 12Q8 8 12 8z" />
+              <path
+                d="M12 3v2M12 19v2M3 12h2M19 12h2M7 7L5.5 5.5M17 17l1.5 1.5M17 7l1.5-1.5M7 17l-1.5 1.5"
+              /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M12 8Q16 8 16 12Q16 16 12 16Q8 16 8 12Q8 8 12 8z" />
+              <path
+                d="M12 3v2M12 19v2M3 12h2M19 12h2M7 7L5.5 5.5M17 17l1.5 1.5M17 7l1.5-1.5M7 17l-1.5 1.5"
+              />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>panel-adjust</code><small>Mobile tab · Adjustments</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M10 5H3" />
+              <path d="M12 19H3" />
+              <path d="M14 3v4" />
+              <path d="M16 17v4" />
+              <path d="M21 12h-9" />
+              <path d="M21 19h-5" />
+              <path d="M21 5h-7" />
+              <path d="M8 10v4" />
+              <path d="M8 12H3" /></svg
+            ><small>SlidersHorizontal</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M3 7h3.5M11.5 7H21M3 17h9.5M17.5 17H21" />
+              <path d="M8 4h2Q11.5 4 11.5 5.5v3Q11.5 10 10 10h-2Q6.5 10 6.5 8.5v-3Q6.5 4 8 4z" />
+              <path
+                d="M14 14h2Q17.5 14 17.5 15.5v3Q17.5 20 16 20h-2Q12.5 20 12.5 18.5v-3Q12.5 14 14 14z"
+              /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M3 7h3.5M11.5 7H21M3 17h9.5M17.5 17H21" />
+              <path d="M8 4h2Q11.5 4 11.5 5.5v3Q11.5 10 10 10h-2Q6.5 10 6.5 8.5v-3Q6.5 4 8 4z" />
+              <path
+                d="M14 14h2Q17.5 14 17.5 15.5v3Q17.5 20 16 20h-2Q12.5 20 12.5 18.5v-3Q12.5 14 14 14z"
+              /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M3 7h3.5M11.5 7H21M3 17h9.5M17.5 17H21" />
+              <path d="M8 4h2Q11.5 4 11.5 5.5v3Q11.5 10 10 10h-2Q6.5 10 6.5 8.5v-3Q6.5 4 8 4z" />
+              <path
+                d="M14 14h2Q17.5 14 17.5 15.5v3Q17.5 20 16 20h-2Q12.5 20 12.5 18.5v-3Q12.5 14 14 14z"
+              />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>panel-layers</code><small>Mobile tab · Inspector, layer chain</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path
+                d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"
+              />
+              <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" />
+              <path
+                d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"
+              /></svg
+            ><small>Layers</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M12 3l9 4.5-9 4.5-9-4.5zM3 12l9 4.5 9-4.5M3 16.5l9 4.5 9-4.5" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M12 3l9 4.5-9 4.5-9-4.5zM3 12l9 4.5 9-4.5M3 16.5l9 4.5 9-4.5" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M12 3l9 4.5-9 4.5-9-4.5zM3 12l9 4.5 9-4.5M3 16.5l9 4.5 9-4.5" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>expand</code><small>Settings disclosure</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" /></svg
+            ><small>ChevronDown</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M6 9l6 6 6-6" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M6 9l6 6 6-6" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </td>
+        </tr>
+        <tr class="sec">
+          <th colspan="3">Photos and files</th>
+        </tr>
+        <tr>
+          <th><code>add-photo</code><small>New edit · add photos · add images</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M16 5h6" />
+              <path d="M19 2v6" />
+              <path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5" />
+              <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+              <circle cx="9" cy="9" r="2" /></svg
+            ><small>ImagePlus</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path
+                d="M12 4H7Q4 4 4 7v10Q4 20 7 20h10Q20 20 20 17v-5M4 17l5-5 4 4 2-2 5 5M18 3v6M15 6h6"
+              /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path
+                d="M12 4H7Q4 4 4 7v10Q4 20 7 20h10Q20 20 20 17v-5M4 17l5-5 4 4 2-2 5 5M18 3v6M15 6h6"
+              /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path
+                d="M12 4H7Q4 4 4 7v10Q4 20 7 20h10Q20 20 20 17v-5M4 17l5-5 4 4 2-2 5 5M18 3v6M15 6h6"
+              />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>drop</code><small>Drag-and-drop overlay</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M12 3v12" />
+              <path d="m17 8-5-5-5 5" />
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /></svg
+            ><small>Upload</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M3 8V3h5M16 3h5V8M21 16v5h-5M8 21h-5v-5" />
+              <path d="M12 7v8M8.5 11.5L12 15l3.5-3.5" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M3 8V3h5M16 3h5V8M21 16v5h-5M8 21h-5v-5" />
+              <path d="M12 7v8M8.5 11.5L12 15l3.5-3.5" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M3 8V3h5M16 3h5V8M21 16v5h-5M8 21h-5v-5" />
+              <path d="M12 7v8M8.5 11.5L12 15l3.5-3.5" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>export</code><small>Export image</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M12 15V3" />
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <path d="m7 10 5 5 5-5" /></svg
+            ><small>Download</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M4 14v3Q4 20 7 20h10Q20 20 20 17v-3M12 4v11M7 10l5 5 5-5" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M4 14v3Q4 20 7 20h10Q20 20 20 17v-3M12 4v11M7 10l5 5 5-5" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M4 14v3Q4 20 7 20h10Q20 20 20 17v-3M12 4v11M7 10l5 5 5-5" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>zip</code><small>Download .zip</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <rect width="20" height="5" x="2" y="3" rx="1" />
+              <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+              <path d="M10 12h4" /></svg
+            ><small>Archive</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M3 4h18v4H3z" />
+              <path d="M5 8v9Q5 20 8 20h8Q19 20 19 17V8" />
+              <path d="M12 11v6M9 14l3 3 3-3" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M3 4h18v4H3z" />
+              <path d="M5 8v9Q5 20 8 20h8Q19 20 19 17V8" />
+              <path d="M12 11v6M9 14l3 3 3-3" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M3 4h18v4H3z" />
+              <path d="M5 8v9Q5 20 8 20h8Q19 20 19 17V8" />
+              <path d="M12 11v6M9 14l3 3 3-3" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>reprocess</code><small>Reprocess · retry</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+              <path d="M21 3v5h-5" />
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+              <path d="M8 16H3v5" /></svg
+            ><small>RefreshCw</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M4 11V8Q4 5 7 5h12M16 2l3 3-3 3M20 13v3Q20 19 17 19H5M8 16l-3 3 3 3" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M4 11V8Q4 5 7 5h12M16 2l3 3-3 3M20 13v3Q20 19 17 19H5M8 16l-3 3 3 3" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M4 11V8Q4 5 7 5h12M16 2l3 3-3 3M20 13v3Q20 19 17 19H5M8 16l-3 3 3 3" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>shuffle</code><small>Collage · shuffle photos</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="m18 14 4 4-4 4" />
+              <path d="m18 2 4 4-4 4" />
+              <path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22" />
+              <path d="M2 6h1.972a4 4 0 0 1 3.6 2.2" />
+              <path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45" /></svg
+            ><small>Shuffle</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M3 7h4l10 10h4M3 17h4l3-3M14 10l3-3h4M18 4l3 3-3 3M18 14l3 3-3 3" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M3 7h4l10 10h4M3 17h4l3-3M14 10l3-3h4M18 4l3 3-3 3M18 14l3 3-3 3" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M3 7h4l10 10h4M3 17h4l3-3M14 10l3-3h4M18 4l3 3-3 3M18 14l3 3-3 3" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>move-left</code><small>Collage · move photo earlier</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="m12 19-7-7 7-7" />
+              <path d="M19 12H5" /></svg
+            ><small>ArrowLeft</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M19 12H5M11 6l-6 6 6 6" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M19 12H5M11 6l-6 6 6 6" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M19 12H5M11 6l-6 6 6 6" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>move-right</code><small>Collage · move photo later</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M5 12h14" />
+              <path d="m12 5 7 7-7 7" /></svg
+            ><small>ArrowRight</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M5 12h14M13 6l6 6-6 6" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M5 12h14M13 6l6 6-6 6" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>lock</code><small>Tools · height follows the frame</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg
+            ><small>Lock</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M8 11h8Q19 11 19 14v4Q19 21 16 21h-8Q5 21 5 18v-4Q5 11 8 11z" />
+              <path d="M8 11V7Q8 3 12 3Q16 3 16 7v4M12 15v2" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M8 11h8Q19 11 19 14v4Q19 21 16 21h-8Q5 21 5 18v-4Q5 11 8 11z" />
+              <path d="M8 11V7Q8 3 12 3Q16 3 16 7v4M12 15v2" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M8 11h8Q19 11 19 14v4Q19 21 16 21h-8Q5 21 5 18v-4Q5 11 8 11z" />
+              <path d="M8 11V7Q8 3 12 3Q16 3 16 7v4M12 15v2" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>unlock</code><small>Tools · height is set by hand</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 9.9-1" /></svg
+            ><small>LockOpen</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M8 11h8Q19 11 19 14v4Q19 21 16 21h-8Q5 21 5 18v-4Q5 11 8 11z" />
+              <path d="M8 11V7Q8 3 12 3Q16 3 16 6M12 15v2" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M8 11h8Q19 11 19 14v4Q19 21 16 21h-8Q5 21 5 18v-4Q5 11 8 11z" />
+              <path d="M8 11V7Q8 3 12 3Q16 3 16 6M12 15v2" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M8 11h8Q19 11 19 14v4Q19 21 16 21h-8Q5 21 5 18v-4Q5 11 8 11z" />
+              <path d="M8 11V7Q8 3 12 3Q16 3 16 6M12 15v2" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>remove</code><small>Remove photo · delete saved edit</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" /></svg
+            ><small>X</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </td>
+        </tr>
+        <tr class="sec">
+          <th colspan="3">Edit actions</th>
+        </tr>
+        <tr>
+          <th><code>save</code><small>Save edit</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M20 6 9 17l-5-5" /></svg
+            ><small>Check</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M4 7Q4 4 7 4h9l4 4v9Q20 20 17 20H7Q4 20 4 17zM8 4v4h7V4M8 20v-6h8v6" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M4 7Q4 4 7 4h9l4 4v9Q20 20 17 20H7Q4 20 4 17zM8 4v4h7V4M8 20v-6h8v6" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M4 7Q4 4 7 4h9l4 4v9Q20 20 17 20H7Q4 20 4 17zM8 4v4h7V4M8 20v-6h8v6" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>save-copy</code><small>Save as a new edit</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <line x1="15" x2="15" y1="12" y2="18" />
+              <line x1="12" x2="18" y1="15" y2="15" />
+              <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+              <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg
+            ><small>CopyPlus</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M12 9h6Q21 9 21 12v6Q21 21 18 21h-6Q9 21 9 18v-6Q9 9 12 9z" />
+              <path d="M15 9V7Q15 4 12 4H7Q4 4 4 7v6Q4 16 7 16h2M15 12.5v5M12.5 15h5" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M12 9h6Q21 9 21 12v6Q21 21 18 21h-6Q9 21 9 18v-6Q9 9 12 9z" />
+              <path d="M15 9V7Q15 4 12 4H7Q4 4 4 7v6Q4 16 7 16h2M15 12.5v5M12.5 15h5" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M12 9h6Q21 9 21 12v6Q21 21 18 21h-6Q9 21 9 18v-6Q9 9 12 9z" />
+              <path d="M15 9V7Q15 4 12 4H7Q4 4 4 7v6Q4 16 7 16h2M15 12.5v5M12.5 15h5" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>apply</code><small>Apply adjustment</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M20 6 9 17l-5-5" /></svg
+            ><small>Check</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M5 12l5 5 9-9" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M5 12l5 5 9-9" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M5 12l5 5 9-9" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>cancel</code><small>Cancel draft</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" /></svg
+            ><small>X</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>add-adjustment</code><small>Add adjustment · ⌘K</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M5 12h14" />
+              <path d="M12 5v14" /></svg
+            ><small>Plus</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>search</code><small>Adjustment palette search</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="m21 21-4.34-4.34" />
+              <circle cx="11" cy="11" r="8" /></svg
+            ><small>Search</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M11 4Q18 4 18 11Q18 18 11 18Q4 18 4 11Q4 4 11 4z" />
+              <path d="M16.5 16.5L21 21" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M11 4Q18 4 18 11Q18 18 11 18Q4 18 4 11Q4 4 11 4z" />
+              <path d="M16.5 16.5L21 21" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M11 4Q18 4 18 11Q18 18 11 18Q4 18 4 11Q4 4 11 4z" />
+              <path d="M16.5 16.5L21 21" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>reset</code><small>Reset curve · reset collage view</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" /></svg
+            ><small>RotateCcw</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M5 11V9Q5 5 9 5h6Q19 5 19 9v6Q19 19 15 19H9Q5 19 5 15v-1M2 8l3 3 3-3" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M5 11V9Q5 5 9 5h6Q19 5 19 9v6Q19 19 15 19H9Q5 19 5 15v-1M2 8l3 3 3-3" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M5 11V9Q5 5 9 5h6Q19 5 19 9v6Q19 19 15 19H9Q5 19 5 15v-1M2 8l3 3 3-3" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>show</code><small>Layer is hidden — show it</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path
+                d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"
+              />
+              <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" />
+              <path
+                d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"
+              />
+              <path d="m2 2 20 20" /></svg
+            ><small>EyeOff</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M12 6Q21 6 21 12Q21 18 12 18Q3 18 3 12Q3 6 12 6z" />
+              <path d="M12 9Q15 9 15 12Q15 15 12 15Q9 15 9 12Q9 9 12 9z" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M12 6Q21 6 21 12Q21 18 12 18Q3 18 3 12Q3 6 12 6z" />
+              <path d="M12 9Q15 9 15 12Q15 15 12 15Q9 15 9 12Q9 9 12 9z" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M12 6Q21 6 21 12Q21 18 12 18Q3 18 3 12Q3 6 12 6z" />
+              <path d="M12 9Q15 9 15 12Q15 15 12 15Q9 15 9 12Q9 9 12 9z" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>hide</code><small>Layer is shown — hide it</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path
+                d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
+              />
+              <circle cx="12" cy="12" r="3" /></svg
+            ><small>Eye</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M12 6Q21 6 21 12Q21 18 12 18Q3 18 3 12Q3 6 12 6z" />
+              <path d="M5 5l14 14" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M12 6Q21 6 21 12Q21 18 12 18Q3 18 3 12Q3 6 12 6z" />
+              <path d="M5 5l14 14" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M12 6Q21 6 21 12Q21 18 12 18Q3 18 3 12Q3 6 12 6z" />
+              <path d="M5 5l14 14" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>delete</code><small>Delete layer</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M10 11v6" />
+              <path d="M14 11v6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+              <path d="M3 6h18" />
+              <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg
+            ><small>Trash2</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M4 7h16M9 7V4h6v3M6 7v11Q6 21 9 21h6Q18 21 18 18V7M10 11v6M14 11v6" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M4 7h16M9 7V4h6v3M6 7v11Q6 21 9 21h6Q18 21 18 18V7M10 11v6M14 11v6" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M4 7h16M9 7V4h6v3M6 7v11Q6 21 9 21h6Q18 21 18 18V7M10 11v6M14 11v6" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>move-up</code><small>Layer earlier in chain</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="m5 12 7-7 7 7" />
+              <path d="M12 19V5" /></svg
+            ><small>ArrowUp</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M12 19V5M6 11l6-6 6 6" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M12 19V5M6 11l6-6 6 6" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M12 19V5M6 11l6-6 6 6" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>move-down</code><small>Layer later in chain</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M12 5v14" />
+              <path d="m19 12-7 7-7-7" /></svg
+            ><small>ArrowDown</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M12 5v14M6 13l6 6 6-6" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M12 5v14M6 13l6 6 6-6" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M12 5v14M6 13l6 6 6-6" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>step-up</code><small>Value stepper · increase</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="m18 15-6-6-6 6" /></svg
+            ><small>ChevronUp</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M6 15l6-6 6 6" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M6 15l6-6 6 6" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M6 15l6-6 6 6" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>step-down</code><small>Value stepper · decrease</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" /></svg
+            ><small>ChevronDown</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M6 9l6 6 6-6" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M6 9l6 6 6-6" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </td>
+        </tr>
+        <tr class="sec">
+          <th colspan="3">Compare modes</th>
+        </tr>
+        <tr>
+          <th><code>compare-off</code><small>Compare off · the edited image</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path
+                d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"
+              />
+              <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" />
+              <path
+                d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"
+              />
+              <path d="m2 2 20 20" /></svg
+            ><small>EyeOff</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M12 4H7Q4 4 4 7v10Q4 20 7 20h10Q20 20 20 17v-5M4 17l5-5 4 4 2-2 5 5" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M12 4H7Q4 4 4 7v10Q4 20 7 20h10Q20 20 20 17v-5M4 17l5-5 4 4 2-2 5 5" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M12 4H7Q4 4 4 7v10Q4 20 7 20h10Q20 20 20 17v-5M4 17l5-5 4 4 2-2 5 5" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>compare-peek</code><small>Toggle · peek at the original</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path
+                d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
+              />
+              <circle cx="12" cy="12" r="3" /></svg
+            ><small>Eye</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M12 6Q21 6 21 12Q21 18 12 18Q3 18 3 12Q3 6 12 6z" />
+              <path d="M12 9Q15 9 15 12Q15 15 12 15Q9 15 9 12Q9 9 12 9z" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M12 6Q21 6 21 12Q21 18 12 18Q3 18 3 12Q3 6 12 6z" />
+              <path d="M12 9Q15 9 15 12Q15 15 12 15Q9 15 9 12Q9 9 12 9z" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M12 6Q21 6 21 12Q21 18 12 18Q3 18 3 12Q3 6 12 6z" />
+              <path d="M12 9Q15 9 15 12Q15 15 12 15Q9 15 9 12Q9 9 12 9z" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>compare-wipe</code><small>Split · drag the divider</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <rect width="18" height="18" x="3" y="3" rx="2" />
+              <path d="M12 3v18" /></svg
+            ><small>Columns2</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M6 5h12Q21 5 21 8v8Q21 19 18 19h-12Q3 19 3 16v-8Q3 5 6 5z" />
+              <path d="M12 5v14M8.5 10l-2 2 2 2M15.5 10l2 2-2 2" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M6 5h12Q21 5 21 8v8Q21 19 18 19h-12Q3 19 3 16v-8Q3 5 6 5z" />
+              <path d="M12 5v14M8.5 10l-2 2 2 2M15.5 10l2 2-2 2" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M6 5h12Q21 5 21 8v8Q21 19 18 19h-12Q3 19 3 16v-8Q3 5 6 5z" />
+              <path d="M12 5v14M8.5 10l-2 2 2 2M15.5 10l2 2-2 2" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>compare-side</code><small>Side by side</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M12 2v20" />
+              <path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3" />
+              <path d="M8 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3" /></svg
+            ><small>SquareSplitHorizontal</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M6 5h1Q10 5 10 8v8Q10 19 7 19h-1Q3 19 3 16v-8Q3 5 6 5z" />
+              <path d="M17 5h1Q21 5 21 8v8Q21 19 18 19h-1Q14 19 14 16v-8Q14 5 17 5z" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M6 5h1Q10 5 10 8v8Q10 19 7 19h-1Q3 19 3 16v-8Q3 5 6 5z" />
+              <path d="M17 5h1Q21 5 21 8v8Q21 19 18 19h-1Q14 19 14 16v-8Q14 5 17 5z" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M6 5h1Q10 5 10 8v8Q10 19 7 19h-1Q3 19 3 16v-8Q3 5 6 5z" />
+              <path d="M17 5h1Q21 5 21 8v8Q21 19 18 19h-1Q14 19 14 16v-8Q14 5 17 5z" />
+            </svg>
+          </td>
+        </tr>
+        <tr class="sec">
+          <th colspan="3">Layer types</th>
+        </tr>
+        <tr>
+          <th><code>exposure</code><small>Exposure · stops</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2" />
+              <path d="M12 20v2" />
+              <path d="m4.93 4.93 1.41 1.41" />
+              <path d="m17.66 17.66 1.41 1.41" />
+              <path d="M2 12h2" />
+              <path d="M20 12h2" />
+              <path d="m6.34 17.66-1.41 1.41" />
+              <path d="m19.07 4.93-1.41 1.41" /></svg
+            ><small>Sun</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M6 3h12Q21 3 21 6v12Q21 21 18 21h-12Q3 21 3 18v-12Q3 3 6 3z" />
+              <path d="M20 4L4 20M6 8h4M8 6v4M14 16h4" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M6 3h12Q21 3 21 6v12Q21 21 18 21h-12Q3 21 3 18v-12Q3 3 6 3z" />
+              <path d="M20 4L4 20M6 8h4M8 6v4M14 16h4" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M6 3h12Q21 3 21 6v12Q21 21 18 21h-12Q3 21 3 18v-12Q3 3 6 3z" />
+              <path d="M20 4L4 20M6 8h4M8 6v4M14 16h4" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>contrast</code><small>Contrast</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 18a6 6 0 0 0 0-12v12z" /></svg
+            ><small>Contrast</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M12 3Q21 3 21 12Q21 21 12 21Q3 21 3 12Q3 3 12 3z" />
+              <path d="M12 3v18" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M12 3Q21 3 21 12Q21 21 12 21Q3 21 3 12Q3 3 12 3z" />
+              <path d="M12 3v18" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M12 3Q21 3 21 12Q21 21 12 21Q3 21 3 12Q3 3 12 3z" />
+              <path d="M12 3v18" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>shadows</code><small>Shadows · the shaded side</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 2a7 7 0 1 0 10 10" /></svg
+            ><small>Eclipse</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M12 3Q21 3 21 12Q21 21 12 21Q3 21 3 12Q3 3 12 3z" />
+              <path d="M3.2 12.5Q12 19 20.8 12.5" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M12 3Q21 3 21 12Q21 21 12 21Q3 21 3 12Q3 3 12 3z" />
+              <path d="M3.2 12.5Q12 19 20.8 12.5" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M12 3Q21 3 21 12Q21 21 12 21Q3 21 3 12Q3 3 12 3z" />
+              <path d="M3.2 12.5Q12 19 20.8 12.5" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>highlights</code><small>Highlights · specular glint</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path
+                d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"
+              />
+              <path d="M20 2v4" />
+              <path d="M22 4h-4" />
+              <circle cx="4" cy="20" r="2" /></svg
+            ><small>Sparkles</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M12 3Q12 12 21 12Q12 12 12 21Q12 12 3 12Q12 12 12 3z" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M12 3Q12 12 21 12Q12 12 12 21Q12 12 3 12Q12 12 12 3z" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M12 3Q12 12 21 12Q12 12 12 21Q12 12 3 12Q12 12 12 3z" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>white-balance</code><small>White balance · temperature, tint</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path
+                d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
+              />
+              <circle cx="12" cy="12" r="3" /></svg
+            ><small>Eye</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path
+                d="M10 13V5.5Q10 3 12 3Q14 3 14 5.5V13Q17 14 17 17.5Q17 21 14 21H10Q7 21 7 17.5Q7 14 10 13z"
+              /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path
+                d="M10 13V5.5Q10 3 12 3Q14 3 14 5.5V13Q17 14 17 17.5Q17 21 14 21H10Q7 21 7 17.5Q7 14 10 13z"
+              /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path
+                d="M10 13V5.5Q10 3 12 3Q14 3 14 5.5V13Q17 14 17 17.5Q17 21 14 21H10Q7 21 7 17.5Q7 14 10 13z"
+              />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>color-mixer</code><small>Color mixer · RGB channels</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path
+                d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"
+              /></svg
+            ><small>Droplet</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M9 4Q14 4 14 9Q14 14 9 14Q4 14 4 9Q4 4 9 4z" />
+              <path d="M15 4Q20 4 20 9Q20 14 15 14Q10 14 10 9Q10 4 15 4z" />
+              <path d="M12 10Q17 10 17 15Q17 20 12 20Q7 20 7 15Q7 10 12 10z" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M9 4Q14 4 14 9Q14 14 9 14Q4 14 4 9Q4 4 9 4z" />
+              <path d="M15 4Q20 4 20 9Q20 14 15 14Q10 14 10 9Q10 4 15 4z" />
+              <path d="M12 10Q17 10 17 15Q17 20 12 20Q7 20 7 15Q7 10 12 10z" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M9 4Q14 4 14 9Q14 14 9 14Q4 14 4 9Q4 4 9 4z" />
+              <path d="M15 4Q20 4 20 9Q20 14 15 14Q10 14 10 9Q10 4 15 4z" />
+              <path d="M12 10Q17 10 17 15Q17 20 12 20Q7 20 7 15Q7 10 12 10z" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>saturation</code><small>Saturation</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path
+                d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"
+              />
+              <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
+              <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
+              <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
+              <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" /></svg
+            ><small>Palette</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M12 3L18 11Q19 13 19 15Q19 21 12 21Q5 21 5 15Q5 13 6 11z" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M12 3L18 11Q19 13 19 15Q19 21 12 21Q5 21 5 15Q5 13 6 11z" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M12 3L18 11Q19 13 19 15Q19 21 12 21Q5 21 5 15Q5 13 6 11z" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>tone-curve</code><small>Tone curve</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path
+                d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"
+              /></svg
+            ><small>Activity</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M4 4v16h16M4 20Q12 20 12 12Q12 4 20 4" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M4 4v16h16M4 20Q12 20 12 12Q12 4 20 4" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M4 4v16h16M4 20Q12 20 12 12Q12 4 20 4" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>lut</code><small>LUT · colour cube</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path
+                d="M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z"
+              />
+              <path d="m7 16.5-4.74-2.85" />
+              <path d="m7 16.5 5-3" />
+              <path d="M7 16.5v5.17" />
+              <path
+                d="M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z"
+              />
+              <path d="m17 16.5-5-3" />
+              <path d="m17 16.5 4.74-2.85" />
+              <path d="M17 16.5v5.17" />
+              <path
+                d="M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8Z"
+              />
+              <path d="M12 8 7.26 5.15" />
+              <path d="m12 8 4.74-2.85" />
+              <path d="M12 13.5V8" /></svg
+            ><small>Boxes</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>grain</code><small>Film grain</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path
+                d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"
+              /></svg
+            ><small>Shirt</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M5 6h2M11 4h2M17 7h2M8 11h2M14 12h2M4 16h2M10 17h2M17 17h2" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M5 6h2M11 4h2M17 7h2M8 11h2M14 12h2M4 16h2M10 17h2M17 17h2" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M5 6h2M11 4h2M17 7h2M8 11h2M14 12h2M4 16h2M10 17h2M17 17h2" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>vignette</code><small>Vignette</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <path d="m14.31 8 5.74 9.94" />
+              <path d="M9.69 8h11.48" />
+              <path d="m7.38 12 5.74-9.94" />
+              <path d="M9.69 16 3.95 6.06" />
+              <path d="M14.31 16H2.83" />
+              <path d="m16.62 12-5.74 9.94" /></svg
+            ><small>Aperture</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M6 5h12Q21 5 21 8v8Q21 19 18 19h-12Q3 19 3 16v-8Q3 5 6 5z" />
+              <path d="M12 9Q17 9 17 12Q17 15 12 15Q7 15 7 12Q7 9 12 9z" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M6 5h12Q21 5 21 8v8Q21 19 18 19h-12Q3 19 3 16v-8Q3 5 6 5z" />
+              <path d="M12 9Q17 9 17 12Q17 15 12 15Q7 15 7 12Q7 9 12 9z" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M6 5h12Q21 5 21 8v8Q21 19 18 19h-12Q3 19 3 16v-8Q3 5 6 5z" />
+              <path d="M12 9Q17 9 17 12Q17 15 12 15Q7 15 7 12Q7 9 12 9z" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th>
+            <code>chromatic-aberration</code><small>Chromatic aberration · channel offset</small>
+          </th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <circle cx="12" cy="12" r="1" />
+              <circle cx="12" cy="12" r="10" /></svg
+            ><small>CircleDot</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M9 6Q15 6 15 12Q15 18 9 18Q3 18 3 12Q3 6 9 6z" />
+              <path d="M15 6Q21 6 21 12Q21 18 15 18Q9 18 9 12Q9 6 15 6z" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M9 6Q15 6 15 12Q15 18 9 18Q3 18 3 12Q3 6 9 6z" />
+              <path d="M15 6Q21 6 21 12Q21 18 15 18Q9 18 9 12Q9 6 15 6z" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M9 6Q15 6 15 12Q15 18 9 18Q3 18 3 12Q3 6 9 6z" />
+              <path d="M15 6Q21 6 21 12Q21 18 15 18Q9 18 9 12Q9 6 15 6z" />
+            </svg>
+          </td>
+        </tr>
+        <tr>
+          <th><code>clarity</code><small>Clarity · local contrast</small></th>
+          <td>
+            <svg class="i lu" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path
+                d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"
+              /></svg
+            ><small>Flame</small>
+          </td>
+          <td>
+            <svg class="i lt" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M12 3l9 9-9 9-9-9zM12 9l3 3-3 3-3-3z" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M12 3l9 9-9 9-9-9zM12 9l3 3-3 3-3-3z" /></svg
+            ><svg class="i lt" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
+              <path d="M12 3l9 9-9 9-9-9zM12 9l3 3-3 3-3-3z" />
+            </svg>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </body>
+</html>

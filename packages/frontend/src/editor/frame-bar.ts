@@ -1,7 +1,6 @@
 import { type Html, type HtmlBuilder } from 'foldkit/html'
-import { Columns2, Eye, EyeOff, SquareSplitHorizontal } from 'lucide'
-import type { IconNode } from 'lucide'
-import { icon } from '../components/icon'
+import { CompareOff, ComparePeek, CompareSide, CompareWipe } from '../components/icons'
+import { icon, type IconNode } from '../components/icon'
 import { EditorMessage } from './message'
 import type { CompareMode } from './message'
 import type { Model } from './model'
@@ -19,10 +18,10 @@ const COMPARE_MODES: readonly {
   readonly label: string
   readonly icon: IconNode
 }[] = [
-  { icon: EyeOff, label: 'Off', mode: 'off' },
-  { icon: Eye, label: 'Toggle', mode: 'toggle' },
-  { icon: Columns2, label: 'Split', mode: 'split' },
-  { icon: SquareSplitHorizontal, label: 'Side by side', mode: 'side-by-side' },
+  { icon: CompareOff, label: 'Off', mode: 'off' },
+  { icon: ComparePeek, label: 'Toggle', mode: 'toggle' },
+  { icon: CompareWipe, label: 'Split', mode: 'split' },
+  { icon: CompareSide, label: 'Side by side', mode: 'side-by-side' },
 ]
 
 const compareButton = (

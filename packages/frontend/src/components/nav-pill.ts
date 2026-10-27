@@ -1,5 +1,6 @@
 import type { Html, HtmlBuilder } from 'foldkit/html'
-import { Eclipse, LayoutGrid, Sun, Wrench } from 'lucide'
+import type { IconNode } from './icon'
+import { Edits, ModeDark, ModeLight, Tools } from './icons'
 import type { Mode } from '../theme'
 import { cn } from '@/lib/utils'
 import { icon } from './icon'
@@ -10,8 +11,8 @@ import { mark } from './wordmark'
 export type Page = 'edits' | 'tools'
 
 const PAGES = [
-  { page: 'edits', label: 'Edits', glyph: LayoutGrid },
-  { page: 'tools', label: 'Tools', glyph: Wrench },
+  { page: 'edits', label: 'Edits', glyph: Edits },
+  { page: 'tools', label: 'Tools', glyph: Tools },
 ] as const
 
 const tabClass =
@@ -32,7 +33,7 @@ export const navPill = <M>(
     onNavigate: (page: Page) => M
   }>,
 ): Html => {
-  const modeSegment = (target: Mode, label: string, glyph: typeof Sun) =>
+  const modeSegment = (target: Mode, label: string, glyph: IconNode) =>
     h.button(
       [
         h.Type('button'),
@@ -97,7 +98,7 @@ export const navPill = <M>(
           h.Class('well flex items-center gap-0.5 rounded-full! p-[3px]'),
           h.AriaLabel('Appearance'),
         ],
-        [modeSegment('light', 'Light', Sun), modeSegment('dark', 'Dark', Eclipse)],
+        [modeSegment('light', 'Light', ModeLight), modeSegment('dark', 'Dark', ModeDark)],
       ),
     ],
   )
