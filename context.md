@@ -14,7 +14,7 @@ The web application. Owns the WebGPU pipeline setup (device, bind groups, comput
 The persistence seam. Owns the **Edit** / **Edit summary** schemas, the **Edit store** service contract (save/load/list/delete), and the browser's IndexedDB `EditStoreLive` implementation (docs/adr/0005-storage). A server/account-side `EditStoreLive` swaps in behind the same seam. Depends on `@lutra/engine` (for the `Layer` schema); the frontend consumes both engine and store.
 
 **Raw decoder** (`flashraw`):
-The npm package that decodes RAW files (docs/adr/0008-raw-decode): a Rust decoder compiled to WebAssembly (`FlashRaw.open`/`metadata`/`preview`/`decode`/`close`, with a worker pool). The app owns the **RAW decode** settings and the **Raw decode error**; the frontend depends on the package directly.
+The npm package that decodes RAW files (docs/adr/0008-raw-decode): a Rust decoder compiled to WebAssembly (`FlashRaw.open`/`metadata`/`preview`/`decode`/`close`, with a worker pool). The app reaches it through the **Raw engine** seam. The app owns the **RAW decode** settings and the **Raw decode error**; the frontend depends on the package directly.
 
 **Frontend structure** (`@lutra/frontend`):
 A **root Submodel** owns the top-level `route` and one Submodel per route arm. **Gallery** is a thin Submodel (list of **Edit summaries**); **Editor** is a Submodel hosting the existing editor (phase machine, chain, draft, render, export). Route-driven state lives in the Submodel: each exposes `init(route)` (cold load) and `informRouteChanged(route)` (navigation) calling the shared route-firing Commands, so reload and in-app navigation behave identically. Editor Messages wrap as `GotEditorMessage`, Gallery as `GotGalleryMessage` (docs/adr/0006-frontend-architecture).
@@ -123,6 +123,9 @@ _Avoid_: reusing the engine's `GpuError`/`EncodeError` — storage failures are 
 The tagged error a failed image load raises — reading a picked file's bytes, decoding it into an `ImageBitmap`, or decoding a saved **Edit**'s source bytes. One concept whether the browser API failed or the file is corrupt: the user-visible failure is the same — the image cannot be opened. It surfaces in the editor's **error stage** and the gallery's photo-create failure.
 _Avoid_: plain `Error` (the pre-taxonomy slop), "invalid image" (implies the file is at fault when a plain read can fail too).
 
+**Raw engine**:
+The app's seam over the **Raw decoder** (`raw-engine.ts`, docs/adr/0008-raw-decode): open a file, read its size, decode to 16-bit sRGB (full or half-size), pull the **embedded JPEG preview**, always close. Two implementations — a one-worker pool for the page and an inline decoder for the tools' workers — plus test doubles.
+
 **Raw decode error**:
 The tagged error a failed **RAW decode** raises — FlashRaw rejected the file, the wasm decode failed (unsupported compression, corrupt data, out-of-memory). A distinct defect class from **Image decode error** (a different mechanism, docs/adr/0006-frontend-architecture): after a raw failure the pick flow retries the browser decode once, and the user-visible failure stays "the image cannot be opened" — the raw error rides the cause chain (docs/adr/0008-raw-decode).
 _Avoid_: reusing `ImageDecodeError` for wasm failures — the tags exist so the failure set stays discriminable.
@@ -141,11 +144,11 @@ _Avoid_: reusing `EncodeError` — the thumbnail pipeline is a different mechani
 ### RAW files
 
 **RAW decode**:
-The full-resolution conversion of a RAW file's sensor data into a displayable image: unpack, black/white normalization, as-shot white balance, demosaic, camera color matrix, sRGB encode (FlashRaw in wasm, docs/adr/0008-raw-decode). Runs in the editor's `Loading` phase behind an indeterminate loading state, with the **embedded JPEG preview** as the placeholder.
+The conversion of a RAW file's sensor data into a displayable image: unpack, black/white normalization, as-shot white balance, demosaic, camera color matrix, sRGB encode (FlashRaw in wasm, docs/adr/0008-raw-decode). Full resolution, except that the editor's preview decode uses a half-size demosaic when the sensor has at least twice the pixels the preview keeps; the result is also kept as linear half-floats for the GPU. Runs in the editor's `Loading` phase behind an indeterminate loading state, with the **embedded JPEG preview** as the placeholder.
 _Avoid_: "import", "convert" (the mobile app's platform transcode is a different, lesser thing — it lands on the embedded thumbnail).
 
 **Embedded JPEG preview**:
-The camera-rendered JPEG inside a RAW file — the instant placeholder for the gallery tile and the editor's Loading phase while the **RAW decode** runs. Not a substitute for the decode: 8-bit, camera tone curve, often small. The **LUT preview thumbnails** for RAW sources use a decode-derived preview instead, so the bar matches the editor's rendering.
+The camera-rendered JPEG inside a RAW file — the instant placeholder for the gallery tile and the editor's Loading phase while the **RAW decode** runs. Not a substitute for the decode: 8-bit, camera tone curve, often small. The **LUT preview thumbnails** for RAW sources are cut from the decoded source instead, so the bar matches the editor's rendering.
 _Avoid_: "thumbnail" on its own (the gallery's thumbnail is the graded **Edit summary** image).
 
 **As-shot white balance**:

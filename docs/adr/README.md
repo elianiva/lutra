@@ -11,7 +11,7 @@ Durable architectural context only — what we decided, why, and what it constra
 | 0005 | [Storage](0005-storage.md)                             | @lutra/store package, self-contained records on IndexedDB                                  |
 | 0006 | [Frontend architecture](0006-frontend-architecture.md) | Root submodel + route arms, error taxonomy, component pattern, view memoization discipline |
 | 0007 | [Offline support](0007-offline.md)                     | Page-driven fill, dumb service worker, cache lifetimes                                     |
-| 0008 | [RAW decode](0008-raw-decode.md)                       | FlashRaw wasm decoder, decode settings, licensing posture                                 |
+| 0008 | [RAW decode](0008-raw-decode.md)                       | FlashRaw wasm decoder, `RawEngine` seam, decode settings, routing, licensing posture       |
 | 0010 | [Editor & gallery UI conventions](0010-editor-ui.md)   | Compare presentation rule, tool panel, destructive actions, multi-select, responsive/touch |
 | 0011 | [Depth of field](0011-depth-of-field.md)               | Focal-plane depth blur layer — focal-plane model, layer shape                              |
 | 0012 | [Property testing](0012-property-testing.md)           | Effect `Arbitrary` derivation, schema-owned bounds, generation budgets                     |

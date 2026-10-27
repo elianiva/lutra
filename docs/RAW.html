@@ -496,10 +496,10 @@
 
       <p>
         The algorithm Lutra uses is <strong>bilinear</strong> interpolation, the one FlashRaw
-        (&sect;7) ships: each missing value is the average of the nearest sites that measured it.
-        It is the simplest reconstruction and the fastest, which is what lets the decoder fuse
-        demosaicing with white balance and color conversion in a single pass. Edge-aware
-        algorithms such as AHD look at the structure of the neighborhood first and interpolate
+        (&sect;7) ships: each missing value is the average of the nearest sites that measured it. It
+        is the simplest reconstruction and the fastest, which is what lets the decoder fuse
+        demosaicing with white balance and color conversion in a single pass. Edge-aware algorithms
+        such as AHD look at the structure of the neighborhood first and interpolate
         <em>along</em> edges; they are slower, and FlashRaw does not offer them.
       </p>
 
@@ -667,22 +667,26 @@
         <em>plausibly, insultingly wrong</em> — colors that are recognizable but desaturated and
         shifted, skin tones that look muddy, the classic &ldquo;washed-out RAW&rdquo; complaint. The
         fix is not a filter; it is the matrix that was in the file all along. Lutra applies it
-        always (<code>useCameraMatrix: 3</code>, which means &ldquo;always,&rdquo; not &ldquo;only
-        when a white balance is applied&rdquo;). There is no creative upside to skipping it — the
-        artistic control lives in the layers, not in decode-level omission.
+        always — it is part of FlashRaw's single decode pass, with no switch to turn it off. There
+        is no creative upside to skipping it — the artistic control lives in the layers, not in
+        decode-level omission.
       </p>
 
       <h2>6 · What Lutra does when you open a RAW file</h2>
 
       <p>
         Everything above is the general science. Here is the specific machinery. When you pick a RAW
-        file, Lutra routes it by <em>sniffing</em> the file's magic bytes and extension — a RAW file
-        is, structurally, a TIFF-family container, so the sniff is cheap and reliable. The flow:
+        file, Lutra routes it by the file's extension and its first bytes. A file named like RAW, or
+        whose first bytes are not a format the browser decodes (JPEG, PNG, GIF, WebP, BMP,
+        AVIF/HEIC), goes to FlashRaw first; anything else goes to the browser first, with FlashRaw
+        as the fallback. A saved Edit's source has no file name, so its bytes decide. If both fail,
+        the browser's error is the one reported. The flow:
       </p>
 
       <div class="flow">
         <div class="box">
-          <span class="t">Pick / drop</span><span class="s">sniff: RAW magic + extension?</span>
+          <span class="t">Pick / drop</span
+          ><span class="s">RAW extension or non-browser bytes?</span>
         </div>
         <div class="arrow">&rarr;</div>
         <div class="box">
@@ -693,13 +697,14 @@
         </div>
         <div class="arrow">&rarr;</div>
         <div class="box loop">
-          <span class="t">Decode worker</span
-          ><span class="s">FlashRaw in wasm (&sect;7)</span>
+          <span class="t">Decode worker</span><span class="s">FlashRaw in wasm (&sect;7)</span>
         </div>
         <div class="arrow">&rarr;</div>
         <div class="box">
           <span class="t">Source bitmap</span
-          ><span class="s">16-bit linear pixels uploaded to the GPU, 8-bit bitmap for the rest</span>
+          ><span class="s"
+            >16-bit linear pixels uploaded to the GPU, 8-bit bitmap for the rest</span
+          >
         </div>
         <div class="arrow">&rarr;</div>
         <div class="box">
@@ -732,42 +737,43 @@
 
       <p>
         <strong>The output is a 16-bit sRGB image.</strong> The decode runs steps 2&ndash;7 of
-        &sect;3 — including the tone encode — and emits <em>sRGB-encoded, 16-bit</em> pixels. The app
-        keeps them in two forms. An 8-bit <code>ImageBitmap</code> is what the rest of the app
+        &sect;3 — including the tone encode — and emits <em>sRGB-encoded, 16-bit</em> pixels. The
+        app keeps them in two forms. An 8-bit <code>ImageBitmap</code> is what the rest of the app
         reads, exactly as for a JPEG. The same pixels, linearized to half-floats, are registered
         against that bitmap, and the GPU backend uploads them to an <code>rgba16float</code> texture
         as the source of the grading chain, so the first pass starts from sensor precision instead
         of 8 bits. The engine never knows the difference: its pass 0 reads linear light either way
-        (architecture.html &sect;4). Scaling to the preview size is done once, on the CPU, in linear
-        light. A 16-bit decode clips highlights at white; the camera's extra highlight range is not
-        used.</p>
+        (architecture.html &sect;4). The editor asks for the preview size
+        (<code>PREVIEW_LONG_EDGE</code>, 2048&nbsp;px): the decode is area-averaged to it once, on
+        the CPU, in linear light, so the bitmap and the half-floats both match the GPU textures.
+        When the sensor has at least twice that many pixels along its long edge, FlashRaw is asked
+        for its half-size demosaic, which is cheaper and still covers the target. Export asks for no
+        size and gets the full-resolution decode. A 16-bit decode clips highlights at white; the
+        camera's extra highlight range is not used.
+      </p>
 
       <div class="callout">
         <span class="h">Why not decode to linear light directly?</span> The 16-bit pixels are
         uploaded as linear half-floats, but the decode itself is sRGB-encoded, and that is
-        deliberate. FlashRaw's sRGB 16-bit output is already oriented and clipped to display range, and
-        the engine's passes read linear light either way, so nothing in the engine changes. A linear
-        working space throughout (tone-mapped highlight rolloff would need one) remains a future
-        step (docs/adr/0008-raw-decode).
+        deliberate. FlashRaw's sRGB 16-bit output is already oriented and clipped to display range,
+        and the engine's passes read linear light either way, so nothing in the engine changes. A
+        linear working space throughout (tone-mapped highlight rolloff would need one) remains a
+        future step (docs/adr/0008-raw-decode).
       </div>
 
       <h3>6.1 · The previews: tiles, placeholders, and the LUT bar</h3>
 
       <p>
-        The one place the embedded JPEG's camera-rendering shows through is the
+        The one place the embedded JPEG's camera-rendering would show through is the
         <strong>LUT bar</strong> — the filmstrip of &ldquo;your photo under every LUT.&rdquo; Its
-        thumbnails are generated from a small preview of the user's photo (LUT.html &sect;5,
-        docs/adr/0002-lut-library), and for RAW files that preview must come from the
-        <em>decode</em>, not the embedded JPEG: the embedded JPEG carries the camera's tone curve
-        (typically brighter), while the decode is deliberately un-brightened (<code
-          >noAutoBright</code
-        >
-        — the camera's recorded levels, used as-is, so the Exposure layer owns brightness). A LUT
-        thumb based on the embedded JPEG would show the film look on a visibly brighter image than
-        the editor actually renders — the bar's whole promise is &ldquo;see it on your photo, as it
-        will look.&rdquo; So the decode worker derives a small (~1024&times;1024) sRGB preview from
-        the full decode itself, and the filmstrip consumes that. Gallery tiles and the loading
-        placeholder, which are placeholders by nature, use the embedded JPEG directly.
+        thumbnails are cut from the editor's decoded source bitmap (LUT.html &sect;5,
+        docs/adr/0002-lut-library), never from the embedded JPEG: the embedded JPEG carries the
+        camera's tone curve (typically brighter), while the decode applies no brightening, so the
+        Exposure layer owns brightness. A LUT thumb based on the embedded JPEG would show the film
+        look on a visibly brighter image than the editor actually renders — the bar's whole promise
+        is &ldquo;see it on your photo, as it will look.&rdquo; Gallery tiles and
+        <code>&lt;img&gt;</code> previews, which are placeholders by nature, use the embedded JPEG
+        directly.
       </p>
 
       <h3>6.2 · The engine contract, in one sentence</h3>
@@ -783,13 +789,17 @@
       <h3>6.3 · Memory, and the file's second life</h3>
 
       <p>
-        A 24-megapixel decode occupies roughly 192&nbsp;MB as linear RGBA half-floats (plus 96&nbsp;MB for the 8-bit bitmap) in memory
-        before upload, and the worker's wasm heap grows to accommodate it — within the
-        browser's ~2&nbsp;GB wasm ceiling up to very large sensors. Closing the image closes the
-        decoder handle and releases the heap. The original file bytes also live on, untouched, as the Edit's <code>source</code> —
-        an Edit row is now commonly 25&ndash;100&nbsp;MB, which IndexedDB handles fine (a
-        storage-persistence request at first save guards against eviction; per-edit size has always
-        been part of the Edit summary, context.md).
+        The editor decodes to preview size, so its source is a few megabytes. Export decodes at full
+        resolution: a 24-megapixel decode holds the 16-bit RGB frame (~144&nbsp;MB), then roughly
+        192&nbsp;MB as linear RGBA half-floats plus 96&nbsp;MB for the 8-bit bitmap, and the
+        worker's wasm heap grows to accommodate it — within the browser's ~2&nbsp;GB wasm ceiling up
+        to very large sensors. Each decode opens a FlashRaw handle and closes it when done; the pool
+        worker is terminated after 30&nbsp;s idle, which releases the heap. The batch tools decode
+        inline in their own image workers instead of the pool. The original file bytes also live on,
+        untouched, as the Edit's <code>source</code> — an Edit row is now commonly
+        25&ndash;100&nbsp;MB, which IndexedDB handles fine (a storage-persistence request at first
+        save guards against eviction; per-edit size has always been part of the Edit summary,
+        context.md).
       </p>
 
       <h2>7 · The decoder: FlashRaw in your browser</h2>
@@ -809,8 +819,8 @@
 
       <ul>
         <li>
-          <strong>Memory safety.</strong> The parsers of untrusted files are memory-safe Rust,
-          with bounds-checked parsing and allocation limits.
+          <strong>Memory safety.</strong> The parsers of untrusted files are memory-safe Rust, with
+          bounds-checked parsing and allocation limits.
         </li>
         <li>
           <strong>Speed.</strong> Every codec decodes on several cores, and RAW to RGB runs as a
@@ -905,8 +915,9 @@
         <em>already-demosaiced</em> RGB — three values per pixel, no mosaic — but still linear
         (un-tonemapped) and still carrying the calibration metadata. iPhone ProRAW (12&nbsp;MP) is
         exactly this: the file is already a &ldquo;photo,&rdquo; missing only the color matrix and
-        tone curve. Lutra gives linear DNGs no special treatment: if FlashRaw decodes them, they work; if a file fails, the failure is an honest, readable
-        error. The 48&nbsp;MP ProRAW variant, by contrast, is a normal Bayer DNG.
+        tone curve. Lutra gives linear DNGs no special treatment: if FlashRaw decodes them, they
+        work; if a file fails, the failure is an honest, readable error. The 48&nbsp;MP ProRAW
+        variant, by contrast, is a normal Bayer DNG.
       </p>
 
       <p>
@@ -927,9 +938,10 @@
                          // for the GPU and as an 8-bit bitmap for everything else
 colorSpace: 'srgb'       // sRGB primaries and the sRGB curve — inverted exactly by
                          // the engine's pass-0 srgbToLinear (architecture.html &sect;4)
-demosaic: 'bilinear'     // full resolution, always (&sect;2)
-exposure: 0              // no brightening — the camera's recorded levels, as-is;
-                         // the Exposure layer owns brightness</code></pre>
+demosaic: 'bilinear'     // full resolution (&sect;2); 'half-size' when the sensor has
+                         // at least 2&times; the pixels the caller keeps (the editor preview)
+                         // no exposure, black-point or white-point options are passed:
+                         // the camera's recorded levels, as-is; the Exposure layer owns brightness</code></pre>
 
       <table>
         <tr>
@@ -951,17 +963,16 @@ exposure: 0              // no brightening — the camera's recorded levels, as-
         </tr>
         <tr>
           <td>Memory</td>
-          <td>~192 MB linear + ~96 MB 8-bit per 24 MP</td>
+          <td>~192 MB linear + ~96 MB 8-bit per 24 MP, at full-resolution export only</td>
           <td>
-            released when the decoder handle closes; wasm32's ~2 GB ceiling bounds very large sensors
+            released when the decoder handle closes and the idle pool terminates; wasm32's ~2 GB
+            ceiling bounds very large sensors
           </td>
         </tr>
         <tr>
           <td>Wasm</td>
           <td>~750 KiB (brotli)</td>
-          <td>
-            shipped by the <code>flashraw</code> npm package; loads in the background
-          </td>
+          <td>shipped by the <code>flashraw</code> npm package; loads in the background</td>
         </tr>
         <tr>
           <td>Preview latency</td>
@@ -978,8 +989,8 @@ exposure: 0              // no brightening — the camera's recorded levels, as-
         </tr>
         <tr>
           <td>Demosaic</td>
-          <td>Bilinear</td>
-          <td>the demosaic FlashRaw ships (&sect;2)</td>
+          <td>Bilinear; half-size for large sensors in the preview</td>
+          <td>the only full demosaic FlashRaw ships (&sect;2)</td>
         </tr>
         <tr>
           <td>License</td>
@@ -991,8 +1002,8 @@ exposure: 0              // no brightening — the camera's recorded levels, as-
       <footer class="fineprint">
         <p class="sans">
           Lutra &mdash; a color-grading app for film simulation. The RAW pipeline's design
-          decisions: docs/adr/0008-raw-decode. The surrounding render pipeline is documented
-          in <code>docs/architecture.html</code>; the LUT layer and its filmstrip previews in
+          decisions: docs/adr/0008-raw-decode. The surrounding render pipeline is documented in
+          <code>docs/architecture.html</code>; the LUT layer and its filmstrip previews in
           <code>docs/LUT.html</code>. The vocabulary (&ldquo;RAW decode,&rdquo; &ldquo;embedded JPEG
           preview,&rdquo; &ldquo;as-shot white balance,&rdquo; &hellip;) lives in
           <code>context.md</code>.
