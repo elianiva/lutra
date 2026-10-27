@@ -6,6 +6,7 @@ const { poolDecode, poolPreview, poolTerminate, createWorkerPool } = vi.hoisted(
   const terminate = vi.fn()
   return {
     createWorkerPool: vi.fn(() => ({
+      getCapabilities: async () => ({}),
       open: async () => ({ close: vi.fn(), decode, preview }),
       terminate,
     })),
@@ -121,6 +122,21 @@ describe('worker pool lifetime', () => {
 
       await freshDecodeImage(new Blob([bytes(TIFF)]))
       expect(createWorkerPool).toHaveBeenCalledTimes(2)
+    } finally {
+      await vi.runAllTimersAsync()
+      vi.useRealTimers()
+    }
+  })
+
+  it('warming starts the worker before any decode and lets it idle out', async () => {
+    vi.resetModules()
+    const { warmRawDecoder } = await import('./decode-image')
+    vi.useFakeTimers()
+    try {
+      warmRawDecoder()
+      expect(createWorkerPool).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(poolTerminate).toHaveBeenCalledTimes(1)
     } finally {
       await vi.runAllTimersAsync()
       vi.useRealTimers()

@@ -28,7 +28,7 @@ import {
 import { EditorMessage, PresentState } from './message'
 import { type Mode, persistMode } from '../theme'
 import { ENGINE_REGISTRY } from '../editor/layer-meta'
-import { decodeImage, RAW_EXTENSIONS } from '../lib/decode-image'
+import { decodeImage, RAW_EXTENSIONS, warmRawDecoder } from '../lib/decode-image'
 import { previewDimensions, toPreviewBitmap } from '../gpu/preview'
 
 export const createLayerFor = (type: LayerType) => createLayer(type, ENGINE_REGISTRY)
@@ -87,7 +87,10 @@ export const CreateLayer = Command.define('CreateLayer', {
  * `FilePickCancelled`.
  */
 export const PickImageFile = Command.define('PickImageFile', {
-  execute: FoldkitFile.select(['image/*', '.jpg', '.jpeg', '.png', '.webp', '.avif', ...RAW_EXTENSIONS]).pipe(
+  execute: Effect.sync(warmRawDecoder).pipe(
+    Effect.andThen(
+      FoldkitFile.select(['image/*', '.jpg', '.jpeg', '.png', '.webp', '.avif', ...RAW_EXTENSIONS]),
+    ),
     Effect.map(
       Option.match({
         onNone: () => EditorMessage.FilePickCancelled(),

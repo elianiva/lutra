@@ -39,6 +39,20 @@ const releasePool = (): void => {
   }
 }
 
+/**
+ * Start the decoder's worker and compile its wasm ahead of the first RAW
+ * decode. Call it when the user opens a file picker: the dialog gives the
+ * download and compile seconds to finish, so the first decode starts hot.
+ * Holds the pool like a decode does, so an unused warm-up also idles out.
+ */
+export const warmRawDecoder = (): void => {
+  if (inWorker) {
+    return
+  }
+  const warmed = acquirePool()
+  void warmed.getCapabilities().then(releasePool, releasePool)
+}
+
 /** The tools' image workers decode inline; the main thread uses a worker pool. */
 const inWorker = typeof window === 'undefined'
 
