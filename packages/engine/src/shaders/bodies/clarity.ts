@@ -9,9 +9,11 @@ import type { BodyRenderer } from '../types'
 // Unsharp-mask formulation: detail = color - avg; positive amount
 // enhances it (structure pops), negative flattens it. The midtone mask
 // keeps the effect off deep blacks and blown highlights where halos
-// read as artifacts. Radius is fixed at 4 px — a true wide-radius
-// clarity would need a separable blur or mip pyramid; this is the
-// neighbor-sampling version the multi-pass pipeline enables.
+// read as artifacts. Radius is 4 px at preview resolution, scaled by
+// `u_pixelScale` so an export at native resolution covers the same part
+// of the image as the preview — a true wide-radius clarity would need a
+// separable blur or mip pyramid; this is the neighbor-sampling version
+// the multi-pass pipeline enables.
 //
 // Uses textureSampleLevel with an explicit LOD: textureSample is
 // fragment-stage only (implicit derivatives), and compute stages must
@@ -22,7 +24,7 @@ export const renderClarity: BodyRenderer = (i) => ({
 // clarity (local contrast)
 {
   let uv = (vec2<f32>(coord) + vec2<f32>(0.5)) / u_resolution;
-  let s = vec2<f32>(4.0) / u_resolution;
+  let s = vec2<f32>(4.0 * u_pixelScale) / u_resolution;
   let avg = (color
     + textureSampleLevel(srcTex, samp, uv + vec2<f32>(-s.x, 0.0), 0.0).rgb
     + textureSampleLevel(srcTex, samp, uv + vec2<f32>(s.x, 0.0), 0.0).rgb

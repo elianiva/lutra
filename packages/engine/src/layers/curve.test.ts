@@ -197,24 +197,33 @@ describe('curve body renderer', () => {
   const bodySourceOf = (source: string | BodySource): BodySource =>
     Schema.is(Schema.String)(source) ? { stmts: source } : source
 
-  it('emits the monotone cubic Hermite spline evaluator and per-channel application', () => {
+  it('derives the Fritsch–Carlson tangents on the CPU', () => {
+    const tangentsOf = (ys: readonly number[]) => {
+      const xs = [0, 0.25, 0.5, 0.75, 1]
+      const derived = bodySourceOf(renderToneCurve(0)).derived!
+      const fields: Record<string, number> = {}
+      xs.forEach((x, n) => {
+        fields[`p${n}x`] = x
+        fields[`p${n}y`] = ys[n]!
+      })
+      return [...derived.compute((key) => fields[key]!)].slice(0, 3)
+    }
+    const close = (actual: number[], expected: number[]) =>
+      actual.forEach((v, k) => expect(v).toBeCloseTo(expected[k]!, 5))
+    // Identity: every secant slope is 1.
+    close(tangentsOf([0, 0.25, 0.5, 0.75, 1]), [1, 1, 1])
+    // S-curve: secants 0.4, 1.6, 1.6, 0.4 → harmonic means 0.64, 1.6, 0.64.
+    close(tangentsOf([0, 0.1, 0.5, 0.9, 1]), [0.64, 1.6, 0.64])
+    // A secant sign change flattens the tangent at that point.
+    close(tangentsOf([0, 0.5, 0.2, 0.6, 1]), [0, 0, 1.6])
+  })
+
+  it('evaluates the spline per channel with the derived tangents', () => {
     const source = bodySourceOf(renderToneCurve(0))
-    const stmts = source.stmts
-    const helpers = source.helpers ?? ''
-    expect(stmts).toContain(
-      'curveTangents(l0_p0x, l0_p0y, l0_p1x, l0_p1y, l0_p2x, l0_p2y, l0_p3x, l0_p3y, l0_p4x, l0_p4y)',
-    )
-    expect(stmts).toContain('curveSpline(srgb.r,')
-    expect(stmts).toContain('curveSpline(srgb.g,')
-    expect(stmts).toContain('curveSpline(srgb.b,')
-    expect(helpers).toContain('fn curveTangents(')
-    expect(helpers).toContain('fn curveSpline(')
-    expect(helpers).toContain('fn curveSrgbToLinear(')
-    expect(helpers).toContain('fn curveLinearToSrgb(')
-    // The body must be self-contained: no dependency on the pass template's
-    // srgbToLinear/linearToSrgb (a middle-of-chain curve pass has neither).
-    expect(stmts).not.toContain('srgbToLinear(')
-    expect(helpers).not.toContain('fn srgbToLinear')
+    expect(source.stmts).toContain('let tangents = u_params.l0_derived[0].xyz;')
+    for (const channel of ['r', 'g', 'b']) {
+      expect(source.stmts).toContain(`curveSpline(srgb.${channel},`)
+    }
   })
 
   it('a second layer at index 2 namespaces its uniforms with l2_', () => {

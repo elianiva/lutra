@@ -1,7 +1,7 @@
 import { Effect } from 'effect'
-import { GpuError } from '@lutra/engine'
+import { GpuError, HISTOGRAM_BINS } from '@lutra/engine'
 
-export const HISTOGRAM_BINS = 256
+export { HISTOGRAM_BINS }
 export const HISTOGRAM_SLOTS = 3
 
 export type SlotState =

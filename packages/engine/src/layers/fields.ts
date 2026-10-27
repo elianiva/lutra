@@ -19,9 +19,12 @@ export const readField = (layer: Layer, key: FieldKey): LayerFieldValue | undefi
   return record[key]
 }
 
+const isNumber = Schema.is(Schema.Number)
+const isString = Schema.is(Schema.String)
+
 /** True when the field value is a number (the numeric-param contract). */
 export const isFieldNumber = (value: LayerFieldValue | undefined): value is number =>
-  Schema.is(Schema.Number)(value)
+  isNumber(value)
 
 /** Read a numeric field; NaN when absent or non-numeric. */
 export const numField = (layer: Layer, key: FieldKey): number => {
@@ -31,7 +34,7 @@ export const numField = (layer: Layer, key: FieldKey): number => {
 
 /** True when the field value is a string (the string-field contract). */
 export const isFieldString = (value: LayerFieldValue | undefined): value is string =>
-  Schema.is(Schema.String)(value)
+  isString(value)
 
 /** Read a string field; '' when absent or non-string. */
 export const strField = (layer: Layer, key: FieldKey): string => {

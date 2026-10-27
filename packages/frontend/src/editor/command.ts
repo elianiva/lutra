@@ -28,7 +28,7 @@ import {
 import { EditorMessage, PresentState } from './message'
 import { type Mode, persistMode } from '../theme'
 import { ENGINE_REGISTRY } from '../editor/layer-meta'
-import { toPreviewBitmap } from '../gpu/preview'
+import { previewDimensions, toPreviewBitmap } from '../gpu/preview'
 
 export const createLayerFor = (type: LayerType) => createLayer(type, ENGINE_REGISTRY)
 
@@ -300,6 +300,12 @@ export const LoadCatalog = Command.define('LoadCatalog', {
 })
 
 /**
+ * Seed for the grain noise (`u_frame`). Fixed, so an edit never reshuffles
+ * the grain and the export shows the grain the preview showed.
+ */
+const GRAIN_SEED = 0
+
+/**
  * Render the current chain (plus an optional draft appended last) through
  * WebGPU straight into the center-stage canvas. `stamp` is the model revision
  * at dispatch time so a render that arrives after a newer mutation can be
@@ -340,7 +346,7 @@ export const RenderChain = Command.define('RenderChain', {
       }
 
       const luts = yield* resolveLuts(chain)
-      const request = yield* createRenderRequest(chain, ENGINE_REGISTRY, bitmap, stamp, luts)
+      const request = yield* createRenderRequest(chain, ENGINE_REGISTRY, bitmap, GRAIN_SEED, luts)
       const backend = yield* GpuBackend
       const handle = yield* backend.execute(request, canvas.value, present)
       return EditorMessage.RenderedFrame({ handle, stamp })
@@ -454,7 +460,20 @@ export const SnapshotForExport = Command.define('SnapshotForExport', {
           },
         })
         try {
-          const request = yield* createRenderRequest(chain, ENGINE_REGISTRY, nativeBitmap, 0, luts)
+          // Pixel-sized effects scale by native/preview so the export matches
+          // the preview the user graded on.
+          const preview = previewDimensions(nativeBitmap.width, nativeBitmap.height)
+          const pixelScale =
+            Math.max(nativeBitmap.width, nativeBitmap.height) /
+            Math.max(preview.width, preview.height)
+          const request = yield* createRenderRequest(
+            chain,
+            ENGINE_REGISTRY,
+            nativeBitmap,
+            GRAIN_SEED,
+            luts,
+            pixelScale,
+          )
           const canvas = document.createElement('canvas')
           canvas.width = nativeBitmap.width
           canvas.height = nativeBitmap.height

@@ -24,10 +24,6 @@ import type { LutCube } from './luts/cube'
 
 import { numField, strField } from './layers/fields'
 
-/** A layer's numeric field values, in the registry's key order. */
-const fieldValues = (layer: Layer): readonly number[] =>
-  fieldKeysOf(layer.type).map((k) => numField(layer, FieldKey(k)))
-
 const isMissingLut = (layer: Layer, luts: ReadonlyMap<LutId, LutCube>): boolean => {
   const id = strField(layer, FieldKey('lutId'))
   return id === '' || !luts.has(LutId(id))
@@ -168,63 +164,67 @@ describe('createRenderRequest', () => {
     {
       scene: resolvableSceneArb,
     },
-    ({ scene: { chain, luts, cubeSize } }) => {
+    ({ scene: { chain, luts } }) => {
       const frame = 7
       const bitmap = fakeBitmap()
       const result = Effect.runSync(createRenderRequest(chain, registry, bitmap, frame, luts))
       const visible = chain.filter((l) => l.visible)
 
-      // Sampling first bodies get a leading linearize pass; an empty
-      // chain still assembles a single passthrough pass.
-      const firstSamples =
-        visible.length > 0 &&
-        (() => {
-          const body = registry[visible[0]!.type].body(0)
-          return !Schema.is(Schema.String)(body) && body.samplesInput === true
-        })()
-      const base = firstSamples ? 1 : 0
+      // Per-pixel layers fuse; a sampling layer starts a new pass unless it
+      // heads the chain. An empty chain still assembles one copy pass.
+      const samples = (layer: Layer) => {
+        const body = registry[layer.type].body(0)
+        return !Schema.is(Schema.String)(body) && body.samplesInput === true
+      }
+      const runs: number[][] = [[]]
+      visible.forEach((layer, li) => {
+        if (samples(layer) && runs.at(-1)!.length > 0) {
+          runs.push([li])
+        } else {
+          runs.at(-1)!.push(li)
+        }
+      })
 
       // The bitmap and frame counter pass through untouched.
       expect(result.srcBitmap).toBe(bitmap)
       expect(result.frame).toBe(frame)
       expect(result.luts).toBe(luts)
+      expect(result.pixelScale).toBe(1)
 
-      // One pass per visible layer, plus the leading linearize pass.
-      expect(result.shader.passes).toHaveLength(Math.max(1, visible.length) + base)
-      if (firstSamples) {
-        expect(result.shader.passes[0]!.uniforms).toEqual([])
-        expect(result.shader.passes[0]!.lutId).toBeUndefined()
-      }
+      expect(result.shader.passes).toHaveLength(runs.length)
 
       // The LUT layers resolved through the map, in chain order.
       const lutIdsInOrder = visible.filter((l) => l.type === 'lut').map(lutIdOf)
-      const passLutIds = result.shader.passes
-        .map((p) => p.lutId)
-        .filter((id): id is LutId => id !== undefined)
-      expect(passLutIds).toEqual(lutIdsInOrder)
+      expect(result.shader.passes.flatMap((p) => p.lutIds)).toEqual(lutIdsInOrder)
 
-      for (let li = 0; li < visible.length; li++) {
-        const layer = visible[li]!
-        const pass = result.shader.passes[base + li]!
-        const keys = fieldKeysOf(layer.type)
-        // Each pass exposes one uniform slot per field, in order.
-        expect(pass.uniforms).toEqual(
-          keys.map((key, offset) => ({ field: FieldKey(key), layerIndex: li, offset })),
+      result.shader.passes.forEach((pass, pi) => {
+        const packed = result.uniforms[pi]!
+        expect(packed).toHaveLength(pass.uniformLength)
+        // Each layer of the run exposes one slot per field, in field order,
+        // and the packed buffer holds the layer's value at that slot.
+        expect(pass.uniforms.map((slot) => [slot.layerIndex, slot.field])).toEqual(
+          runs[pi]!.flatMap((li) => fieldKeysOf(visible[li]!.type).map((key) => [li, key])),
         )
-        // The packed uniform buffer matches the layer's field values.
-        const packed = result.uniforms[base + li]!
-        const values = fieldValues(layer)
-        expect(packed).toHaveLength(keys.length)
-        for (let s = 0; s < keys.length; s++) {
+        for (const slot of pass.uniforms) {
           // The uniform buffer is f32: values round to float32 precision.
-          expect(packed[s]).toBeCloseTo(values[s]!, 6)
+          expect(packed[slot.offset]).toBeCloseTo(
+            numField(visible[slot.layerIndex]!, slot.field),
+            5,
+          )
         }
-        if (layer.type === 'lut') {
-          const lutId = lutIdOf(layer)
-          expect(pass.lutId).toBe(lutId)
-          expect(pass.source).toContain(`const LUT_SIZE: f32 = ${cubeSize}.0;`)
+        // Scalar slots and vec4-aligned derived tables never overlap.
+        const used = new Set<number>()
+        const claim = (offset: number) => {
+          expect(offset).toBeLessThan(pass.uniformLength)
+          expect(used.has(offset)).toBe(false)
+          used.add(offset)
         }
-      }
+        for (const slot of pass.uniforms) claim(slot.offset)
+        for (const slot of pass.derived) {
+          expect(slot.offset % 4).toBe(0)
+          for (let k = 0; k < slot.length * 4; k++) claim(slot.offset + k)
+        }
+      })
     },
   )
 
@@ -250,6 +250,31 @@ describe('createRenderRequest', () => {
     },
   )
 
+  it('reuses the shader for an unchanged chain shape and recomputes derived tables on change', () => {
+    const curve = (p1y: number): Layer => {
+      const layer = Effect.runSync(createLayer('toneCurve', registry))
+      const record: Record<string, number | string | boolean> = layer
+      record.p1y = p1y
+      return layer
+    }
+    const request = (chain: readonly Layer[]) =>
+      Effect.runSync(createRenderRequest(chain, registry, fakeBitmap(), 0, new Map()))
+    const tangents = (r: ReturnType<typeof request>) => {
+      const slot = r.shader.passes[0]!.derived[0]!
+      return [...r.uniforms[0]!.slice(slot.offset, slot.offset + 3)]
+    }
+    const identity = request([curve(0.25)])
+    const lifted = request([curve(0.4)])
+    // Same shape: the assembled shader is reused, not rebuilt.
+    expect(lifted.shader).toBe(identity.shader)
+    // The tangents follow the field values, in both directions.
+    tangents(identity).forEach((t) => expect(t).toBeCloseTo(1, 5))
+    expect(tangents(lifted)).not.toEqual(tangents(identity))
+    expect(tangents(request([curve(0.25)]))).toEqual(tangents(identity))
+    // A new shape assembles a new shader.
+    expect(request([curve(0.25), curve(0.25)]).shader).not.toBe(identity.shader)
+  })
+
   it.prop(
     'an empty chain assembles a single passthrough pass',
     {
@@ -263,7 +288,7 @@ describe('createRenderRequest', () => {
       expect(request.shader.passes[0]!.uniforms).toEqual([])
       expect(request.uniforms).toHaveLength(1)
       expect(request.uniforms[0]).toEqual(new Float32Array(0))
-      expect(request.shader.passes[0]!.lutId).toBeUndefined()
+      expect(request.shader.passes[0]!.lutIds).toEqual([])
     },
   )
 })

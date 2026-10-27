@@ -20,71 +20,58 @@ fn hermiteBasis(s: f32) -> vec4<f32> {
 }
 `
 
+/**
+ * Fritsch–Carlson monotone tangents at the three interior points of the
+ * 5-point curve. They depend only on the control points, so they are
+ * computed once per render on the CPU (a derived uniform) rather than per
+ * pixel.
+ */
+export const curveTangents = (
+  xs: readonly number[],
+  ys: readonly number[],
+): FritschCarlsonTangents => {
+  const e = 1e-5
+  const s = [0, 1, 2, 3].map((k) => (ys[k + 1]! - ys[k]!) / Math.max(xs[k + 1]! - xs[k]!, e))
+  const harmonic = (a: number, b: number) => (a * b <= 0 ? 0 : (2 * a * b) / (a + b))
+  let t1 = harmonic(s[0]!, s[1]!)
+  let t2 = harmonic(s[1]!, s[2]!)
+  let t3 = harmonic(s[2]!, s[3]!)
+  const a1 = Math.abs(s[1]!) > e ? t1 / s[1]! : 0
+  const b1 = Math.abs(s[1]!) > e ? t2 / s[1]! : 0
+  const sum1 = a1 * a1 + b1 * b1
+  if (sum1 > 9) {
+    const tau = 3 / Math.sqrt(sum1)
+    t1 = tau * a1 * s[1]!
+    t2 = tau * b1 * s[1]!
+  }
+  const a2 = Math.abs(s[2]!) > e ? t2 / s[2]! : 0
+  const b2 = Math.abs(s[2]!) > e ? t3 / s[2]! : 0
+  const sum2 = a2 * a2 + b2 * b2
+  if (sum2 > 9) {
+    const tau = 3 / Math.sqrt(sum2)
+    t2 = tau * a2 * s[2]!
+    t3 = tau * b2 * s[2]!
+  }
+  return { t1, t2, t3 }
+}
+
+const POINTS = [0, 1, 2, 3, 4] as const
+
 export const renderToneCurve: BodyRenderer = (i) => {
-  const params = Array.from({ length: 5 }, (_, n) => `l${i}_p${n}x, l${i}_p${n}y`).join(', ')
+  const params = POINTS.map((n) => `l${i}_p${n}x, l${i}_p${n}y`).join(', ')
   return {
+    derived: {
+      compute: (field) => {
+        const { t1, t2, t3 } = curveTangents(
+          POINTS.map((n) => field(`p${n}x`)),
+          POINTS.map((n) => field(`p${n}y`)),
+        )
+        return new Float32Array([t1, t2, t3, 0])
+      },
+      length: 1,
+    },
     helpers: `
-fn curveSrgbToLinear(c: vec3<f32>) -> vec3<f32> {
-  let lo = c / 12.92;
-  let hi = pow((c + 0.055) / 1.055, vec3<f32>(2.4));
-  return select(lo, hi, c > vec3<f32>(0.04045));
-}
-
-fn curveLinearToSrgb(c: vec3<f32>) -> vec3<f32> {
-  let lo = c * 12.92;
-  let hi = 1.055 * pow(c, vec3<f32>(1.0 / 2.4)) - 0.055;
-  return select(lo, hi, c > vec3<f32>(0.0031308));
-}
 ${HERMITE_BASIS_WGSL}
-fn curveTangents(x0: f32, y0: f32, x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32, x4: f32, y4: f32) -> vec3<f32> {
-  let e = 1e-5;
-  let s0 = (y1 - y0) / max(x1 - x0, e);
-  let s1 = (y2 - y1) / max(x2 - x1, e);
-  let s2 = (y3 - y2) / max(x3 - x2, e);
-  let s3 = (y4 - y3) / max(x4 - x3, e);
-
-  var t1: f32;
-  if (s0 * s1 <= 0.0) {
-    t1 = 0.0;
-  } else {
-    t1 = (2.0 * s0 * s1) / (s0 + s1);
-  }
-
-  var t2: f32;
-  if (s1 * s2 <= 0.0) {
-    t2 = 0.0;
-  } else {
-    t2 = (2.0 * s1 * s2) / (s1 + s2);
-  }
-
-  var t3: f32;
-  if (s2 * s3 <= 0.0) {
-    t3 = 0.0;
-  } else {
-    t3 = (2.0 * s2 * s3) / (s2 + s3);
-  }
-
-  let a1 = select(0.0, t1 / s1, abs(s1) > e);
-  let b1 = select(0.0, t2 / s1, abs(s1) > e);
-  let sum1 = a1 * a1 + b1 * b1;
-  if (sum1 > 9.0) {
-    let tau = 3.0 / sqrt(sum1);
-    t1 = tau * a1 * s1;
-    t2 = tau * b1 * s1;
-  }
-
-  let a2 = select(0.0, t2 / s2, abs(s2) > e);
-  let b2 = select(0.0, t3 / s2, abs(s2) > e);
-  let sum2 = a2 * a2 + b2 * b2;
-  if (sum2 > 9.0) {
-    let tau = 3.0 / sqrt(sum2);
-    t2 = tau * a2 * s2;
-    t3 = tau * b2 * s2;
-  }
-
-  return vec3<f32>(t1, t2, t3);
-}
-
 fn curveSpline(t: f32, x0: f32, y0: f32, x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32, x4: f32, y4: f32, tangents: vec3<f32>) -> f32 {
   let e = 1e-5;
   if (t <= x0) { return y0; }
@@ -118,9 +105,9 @@ fn curveSpline(t: f32, x0: f32, y0: f32, x1: f32, y1: f32, x2: f32, y2: f32, x3:
     stmts: `
 {
   let c = clamp(color, vec3<f32>(0.0), vec3<f32>(1.0));
-  let srgb = curveLinearToSrgb(c);
-  let tangents = curveTangents(${params});
-  color = curveSrgbToLinear(vec3<f32>(
+  let srgb = linearToSrgb(c);
+  let tangents = u_params.l${i}_derived[0].xyz;
+  color = srgbToLinear(vec3<f32>(
     curveSpline(srgb.r, ${params}, tangents),
     curveSpline(srgb.g, ${params}, tangents),
     curveSpline(srgb.b, ${params}, tangents),

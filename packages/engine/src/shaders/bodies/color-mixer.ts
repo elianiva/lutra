@@ -19,8 +19,6 @@ export const RANGES = [
   { key: 'magenta', left: 285, right: 330 },
 ] as const satisfies readonly MixerRange[]
 
-const CHANNELS = ['Hue', 'Saturation', 'Luminance'] as const
-
 export const wrapHueForRange = (
   h: number,
   left: number,
@@ -52,40 +50,42 @@ export const overlapWeight = (h: number, left: number, right: number): number =>
   return rampIn * rampOut
 }
 
-/** The normalized slider field name for a range + channel (redHue, ...). */
-const field = (range: (typeof RANGES)[number], channel: (typeof CHANNELS)[number]) =>
-  `${range.key}${channel}`
+/**
+ * Per-degree hue deltas (vec4: hue°, saturation, luminance, unused) for
+ * hues 0..359. Every range edge sits on a whole degree and the weights are
+ * linear between edges, so interpolating adjacent entries reproduces the
+ * per-pixel weighting exactly — the shader does one lookup instead of
+ * eight range weights.
+ */
+const HUE_TABLE_SIZE = 360
 
-export const renderColorMixer: BodyRenderer = (i) => {
-  const weights = RANGES.map(
-    (r) =>
-      `  let w${r.key[0]!.toUpperCase()}${r.key.slice(1)} = mixerWeight(h, ${r.left}.0, ${r.right}.0);`,
-  ).join('\n')
-
-  const sums = CHANNELS.map((channel) => {
-    const suffix = channel === 'Hue' ? ' * 90.0' : ''
-    const terms = RANGES.map(
-      (r) => `l${i}_${field(r, channel)} * w${r.key[0]!.toUpperCase()}${r.key.slice(1)}`,
-    ).join(' + ')
-    return `    let d${channel} = (${terms})${suffix};`
-  }).join('\n')
-
-  return {
-    helpers: `
-const MIX_OVERLAP: f32 = ${MIX_OVERLAP}.0;
-
-fn mixerSrgbToLinear(c: vec3<f32>) -> vec3<f32> {
-  let lo = c / 12.92;
-  let hi = pow((c + 0.055) / 1.055, vec3<f32>(2.4));
-  return select(lo, hi, c > vec3<f32>(0.04045));
-}
-
-fn mixerLinearToSrgb(c: vec3<f32>) -> vec3<f32> {
-  let lo = c * 12.92;
-  let hi = 1.055 * pow(c, vec3<f32>(1.0 / 2.4)) - 0.055;
-  return select(lo, hi, c > vec3<f32>(0.0031308));
-}
-
+export const renderColorMixer: BodyRenderer = (i) => ({
+  derived: {
+    compute: (field) => {
+      const table = new Float32Array(HUE_TABLE_SIZE * 4)
+      const deltas = RANGES.map((r) => ({
+        hue: field(`${r.key}Hue`),
+        luminance: field(`${r.key}Luminance`),
+        range: r,
+        saturation: field(`${r.key}Saturation`),
+      }))
+      for (let h = 0; h < HUE_TABLE_SIZE; h++) {
+        let hue = 0
+        let saturation = 0
+        let luminance = 0
+        for (const d of deltas) {
+          const w = overlapWeight(h, d.range.left, d.range.right)
+          hue += d.hue * w
+          saturation += d.saturation * w
+          luminance += d.luminance * w
+        }
+        table.set([hue * 90, saturation, luminance], h * 4)
+      }
+      return table
+    },
+    length: HUE_TABLE_SIZE,
+  },
+  helpers: `
 fn mixerRgbToHsl(c: vec3<f32>) -> vec3<f32> {
   let maxc = max(c.r, max(c.g, c.b));
   let minc = min(c.r, min(c.g, c.b));
@@ -129,53 +129,29 @@ fn mixerHslToRgb(hsl: vec3<f32>) -> vec3<f32> {
   let m = hsl.z - c * 0.5;
   return rgb + vec3<f32>(m);
 }
-
-fn wrapHueForRange(h: f32, left: f32, right: f32) -> vec3<f32> {
-  var hh = h;
-  var ll = left;
-  var rr = right;
-  if (ll > rr) {
-    rr = right + 360.0;
-    if (hh < right + MIX_OVERLAP) { hh += 360.0; }
-  } else if (hh < ll - MIX_OVERLAP) {
-    hh += 360.0; ll += 360.0; rr += 360.0;
-  } else if (hh > rr + MIX_OVERLAP) {
-    hh -= 360.0; ll -= 360.0; rr -= 360.0;
-  }
-  return vec3<f32>(hh, ll, rr);
-}
-
-fn overlapWeight(h: f32, left: f32, right: f32) -> f32 {
-  let wrapped = wrapHueForRange(h, left, right);
-  let hh = wrapped.x; let ll = wrapped.y; let rr = wrapped.z;
-  let rampIn = clamp((hh - (ll - MIX_OVERLAP)) / (2.0 * MIX_OVERLAP), 0.0, 1.0);
-  let rampOut = clamp(((rr + MIX_OVERLAP) - hh) / (2.0 * MIX_OVERLAP), 0.0, 1.0);
-  return rampIn * rampOut;
-}
-
-fn mixerWeight(h: f32, left: f32, right: f32) -> f32 {
-  if (left > right && h >= right + MIX_OVERLAP && h < left - MIX_OVERLAP) {
-    return 0.0;
-  }
-  return overlapWeight(h, left, right);
-}
 `,
-    stmts: `
+  stmts: `
 {
   let c = clamp(color, vec3<f32>(0.0), vec3<f32>(1.0));
-  let srgb = mixerLinearToSrgb(c);
+  let srgb = linearToSrgb(c);
   let hsl = mixerRgbToHsl(srgb);
   if (hsl.y > 0.001) {
     let h = hsl.x;
-${weights}
-${sums}
+    let k = u32(floor(h)) % ${HUE_TABLE_SIZE}u;
+    let d = mix(
+      u_params.l${i}_derived[k],
+      u_params.l${i}_derived[(k + 1u) % ${HUE_TABLE_SIZE}u],
+      h - floor(h),
+    );
+    let dHue = d.x;
+    let dSaturation = d.y;
+    let dLuminance = d.z;
     var h2 = h + dHue;
     h2 = h2 - 360.0 * floor(h2 / 360.0);
     let s2 = clamp(hsl.y * (1.0 + dSaturation), 0.0, 1.0);
     let l2 = select(hsl.z * (1.0 + dLuminance), hsl.z + dLuminance * (1.0 - hsl.z), dLuminance >= 0.0);
-    color = mixerSrgbToLinear(mixerHslToRgb(vec3<f32>(h2, s2, l2)));
+    color = srgbToLinear(mixerHslToRgb(vec3<f32>(h2, s2, l2)));
   }
 }
 `,
-  }
-}
+})

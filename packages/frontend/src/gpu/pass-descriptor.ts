@@ -1,22 +1,13 @@
-import type { ChainPass, LutId } from '@lutra/engine'
+import type { ChainPass } from '@lutra/engine'
 
-export type PassDescriptor = {
-  readonly source: string
-  readonly lutId: LutId | undefined
-  readonly usesFrame: boolean
-  readonly usesSampler: boolean
-  readonly hasParams: boolean
+/**
+ * Bind-group cache key for one compute pass. Pass sources do not encode
+ * chain position (the same run of layers compiles to the same WGSL anywhere
+ * in the chain), so the key adds what the bind group pins: the input and
+ * output textures the pass's index selects, and the LUT cubes it binds.
+ */
+export const bindGroupCacheKey = (pass: ChainPass, index: number, isLast: boolean): string => {
+  const input = index === 0 ? 'source' : `ping${(index - 1) % 2}`
+  const output = isLast ? 'display' : `ping${index % 2}`
+  return `${input}>${output}|${pass.lutIds.join(',')}|${pass.source}`
 }
-
-export const toPassDescriptor = (pass: ChainPass): PassDescriptor => ({
-  hasParams: pass.uniforms.length > 0,
-  lutId: pass.lutId,
-  source: pass.source,
-  usesFrame: pass.usesFrame,
-  usesSampler: pass.usesSampler,
-})
-
-export const descriptorCacheKey = (d: PassDescriptor): string =>
-  d.lutId === undefined ? d.source : `${d.source}::lut:${d.lutId}`
-
-export const pipelineCacheKey = (d: PassDescriptor): string => d.source

@@ -6,8 +6,9 @@ import type { BodyRenderer } from '../types'
 // strongest at the corners), matching real lens CA. Direction is
 // computed in pixel space, so the split stays radial on any frame
 // shape. `srcTex` is this pass's input — always linear light (the
-// assembler inserts a linearize pass when this body runs first) — so
-// sampled channels are in the same transfer function as `color`.
+// source is read through an sRGB-decoding view, intermediates are
+// linear) — so sampled channels are in the same transfer function as
+// `color`.
 //
 // Channels are sampled with textureSampleLevel (bilinear, binding-5
 // sampler) at continuous sub-pixel offsets and replace the texel's own

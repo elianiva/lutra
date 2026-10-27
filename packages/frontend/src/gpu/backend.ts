@@ -1,11 +1,12 @@
 import { Context, Effect, Layer, Option, Ref } from 'effect'
-import { GpuError, WORKGROUP_SIZE } from '@lutra/engine'
+import { GpuError, LUT_BINDING_BASE, WORKGROUP_SIZE } from '@lutra/engine'
 import type { ChainPass, LutCube, RenderRequest } from '@lutra/engine'
 import { HISTOGRAM_BINS, HistogramRing, makeSlot } from './histogram-ring'
 import type { HistogramSlot } from './histogram-ring'
 import { presentModeToWgsl } from './present-mode'
 import type { ComparePresent } from './present-mode'
-import { descriptorCacheKey, pipelineCacheKey, toPassDescriptor } from './pass-descriptor'
+import { bindGroupCacheKey } from './pass-descriptor'
+import { toHalfFloats } from './half-float'
 import {
   canvasDimensionsEqual,
   canvasDimensionsOf,
@@ -30,17 +31,17 @@ interface GpuContext {
   readonly sampler: GPUSampler
   readonly swapFormat: GPUTextureFormat
   readonly blitPipeline: GPURenderPipeline
-  readonly histogramPipeline: GPUComputePipeline
 }
 
 export interface GpuBackendContract {
   /**
-   * Execute a render request: run the chain compute shader over the source
+   * Execute a render request: run the chain compute passes over the source
    * image, then blit the result straight onto the given canvas. The image
    * never leaves the GPU — no readback on the display path. Resolves with a
-   * `RenderHandle` when the submitted GPU work has completed, so callers can
-   * coalesce renders (one in flight at a time) without a CPU stall. The
-   * final blit applies the given compare presentation state.
+   * `RenderHandle` once the frame is submitted and the frame before it has
+   * completed, so at most two frames are on the GPU: the CPU prepares the
+   * next frame while the GPU runs this one. The final blit applies the
+   * given compare presentation state.
    */
   readonly execute: (
     request: RenderRequest,
@@ -144,35 +145,12 @@ fn fs(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
 
 const roundUp = (n: number, to: number) => Math.ceil(n / to) * to
 
-/**
- * Scatter-write histogram pass: bins the Rec.709 luma of every texel of the
- * final display texture (sRGB-encoded rgba8unorm) into 256 atomic u32 bins.
- * Full-resolution — every pixel counted exactly once, so clipping and
- * specular peaks are never averaged away by a reduction. Reads dstTex as a
- * plain texture (binding 0), writes the session's bins accumulator
- * (binding 1).
- */
-const HISTOGRAM_SOURCE = `
-@group(0) @binding(0) var srcTex: texture_2d<f32>;
-@group(0) @binding(1) var<storage, read_write> bins: array<atomic<u32>, 256>;
-
-@compute @workgroup_size(16, 16)
-fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
-  let size = textureDimensions(srcTex);
-  if (gid.x >= size.x || gid.y >= size.y) {
-    return;
-  }
-  let color = textureLoad(srcTex, vec2<i32>(gid.xy), 0);
-  let luma = dot(color.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
-  let bin = min(u32(luma * 256.0), 255u);
-  atomicAdd(&bins[bin], 1u);
-}
-`
-
 interface ComputeEntry {
   readonly paramsBuffer: GPUBuffer | null
   readonly bindGroup: GPUBindGroup
   readonly pipeline: GPUComputePipeline
+  /** Last render that used the entry; entries a render skips are evicted. */
+  lastUsed: number
 }
 
 /**
@@ -204,6 +182,13 @@ interface Session {
    */
   readonly srcBitmap: ImageBitmap
   readonly srcTex: GPUTexture
+  /**
+   * `srcTex` through an `rgba8unorm-srgb` view: loads and filtered samples
+   * return linear light decoded by the texture unit, so the first pass needs
+   * no decode math and no separate linearize pass. The blit's "before"
+   * image reads the plain view (sRGB bytes straight to the swapchain).
+   */
+  readonly srcLinearView: GPUTextureView
   readonly dstTex: GPUTexture
   /**
    * Ping-pong linear-light rgba16float intermediates. Layer passes read
@@ -213,21 +198,28 @@ interface Session {
    * straight to dstTex, saving ~366 MiB on a 6k empty chain.
    */
   intermediates: [GPUTexture, GPUTexture] | null
-  readonly resolutionBuffer: GPUBuffer
+  /** Per-render `FrameInfo` uniform: resolution, pixel scale, frame counter. */
+  readonly infoBuffer: GPUBuffer
+  /** Reused staging bytes for `infoBuffer`, viewed as f32 ×3 + u32. */
+  readonly infoData: ArrayBuffer
+  readonly infoFloats: Float32Array
+  readonly infoWords: Uint32Array
   /** Canvas-size uniform for the blit (u_canvas), written once at build. */
   readonly canvasSizeBuffer: GPUBuffer
-  readonly frameBuffer: GPUBuffer
   /** Compare presentation uniform (mode + split position), written per blit. */
   readonly presentBuffer: GPUBuffer
   readonly blitGroup: GPUBindGroup
-  /** Histogram bins accumulator (STORAGE | COPY_SRC) — the pass atomicAdds into this. */
+  /** Histogram bins accumulator (STORAGE | COPY_SRC) — the final pass atomicAdds into this. */
   readonly binsBuffer: GPUBuffer
-  /** 256 zeroes for the per-render accumulator reset (writeBuffer, 1KB). */
-  readonly binsZeros: Uint32Array
-  readonly histogramGroup: GPUBindGroup
   readonly histogramRing: HistogramRing
-  /** Per-pass-source params buffer + compute bind group (both reference session resources). */
-  readonly compute: Record<string, ComputeEntry>
+  /**
+   * Per-pass params buffer + compute bind group (both reference session
+   * resources), keyed by `bindGroupCacheKey`. Bounded: an entry no render
+   * used in the latest frame is destroyed.
+   */
+  readonly compute: Map<string, ComputeEntry>
+  /** Render counter for `ComputeEntry.lastUsed`. */
+  renders: number
 }
 
 /**
@@ -239,8 +231,11 @@ interface Session {
  *   `ensureSession`, read by `execute`; `snapshot` no longer reaches into
  *   the backend for "the last frame" — it reads the handle `execute`
  *   returned and the app passed along.
- * - `pipelineCache`: compute pipelines keyed by pass source (finite: one
- *   entry per distinct chain layout).
+ * - `pipelineCache`: compute pipeline promises keyed by pass source. Pass
+ *   sources do not depend on chain position, so the cache holds one entry
+ *   per distinct run of layer types.
+ * - `previousFrame`: completion of the latest submitted frame; `execute`
+ *   waits on it before returning, bounding the GPU queue at two frames.
  * - `lutTextures`: uploaded LUT cubes keyed by lutId. A cube is a property
  *   of the layer, not of the image, so entries survive session teardown;
  *   bounded by the vendored catalog.
@@ -249,10 +244,9 @@ export const GpuBackendLive = Layer.effect(
   GpuBackend,
   Effect.gen(function* () {
     const sessionRef = yield* Ref.make<Option.Option<Session>>(Option.none())
-    const pipelineCacheRef = yield* Ref.make<
-      Record<string, { readonly pipeline: GPUComputePipeline; readonly layout: GPUBindGroupLayout }>
-    >({})
+    const pipelineCacheRef = yield* Ref.make(new Map<string, Promise<GPUComputePipeline>>())
     const lutTexturesRef = yield* Ref.make(new Map<string, GPUTexture>())
+    const previousFrameRef = yield* Ref.make<Promise<void>>(Promise.resolve())
 
     const gpuCtxRef = yield* Ref.make<Option.Option<GpuContext>>(Option.none())
     const acquireGpu = Effect.gen(function* () {
@@ -294,6 +288,9 @@ export const GpuBackendLive = Layer.effect(
             }
             yield* Ref.set(sessionRef, Option.none())
             yield* Ref.set(gpuCtxRef, Option.none())
+            yield* Ref.set(pipelineCacheRef, new Map())
+            yield* Ref.set(lutTexturesRef, new Map())
+            yield* Ref.set(previousFrameRef, Promise.resolve())
           }),
         )
       })
@@ -310,12 +307,7 @@ export const GpuBackendLive = Layer.effect(
         primitive: { topology: 'triangle-list' },
         vertex: { entryPoint: 'vs', module: blitModule },
       })
-      const histogramModule = device.createShaderModule({ code: HISTOGRAM_SOURCE })
-      const histogramPipeline = device.createComputePipeline({
-        compute: { entryPoint: 'main', module: histogramModule },
-        layout: 'auto',
-      })
-      return { device, sampler, swapFormat, blitPipeline, histogramPipeline } as const
+      return { device, sampler, swapFormat, blitPipeline } as const
     })
     const getGpu = Effect.gen(function* () {
       const cached = yield* Ref.get(gpuCtxRef)
@@ -339,12 +331,12 @@ export const GpuBackendLive = Layer.effect(
         }
 
         const { size, data } = cube
-        // (16 bytes/texel, no conversion). Chrome's writeTexture f32→f16
-        // textures are not filterable in WebGPU — the shader body does its
-        // own trilinear via textureLoad instead of hardware sampling.
+        // rgba16float is filterable, so the LUT body takes one hardware
+        // trilinear sample. writeTexture copies bytes verbatim, so the f32
+        // cube data is converted to half-float bits first.
         const tex = device.createTexture({
           dimension: '3d',
-          format: 'rgba32float',
+          format: 'rgba16float',
           size: { depthOrArrayLayers: size, height: size, width: size },
           usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
         })
@@ -358,8 +350,8 @@ export const GpuBackendLive = Layer.effect(
         }
         device.queue.writeTexture(
           { texture: tex },
-          texels,
-          { bytesPerRow: size * 4 * 4, rowsPerImage: size },
+          toHalfFloats(texels),
+          { bytesPerRow: size * 4 * 2, rowsPerImage: size },
           { depthOrArrayLayers: size, height: size, width: size },
         )
 
@@ -383,13 +375,12 @@ export const GpuBackendLive = Layer.effect(
         s.intermediates[0].destroy()
         s.intermediates[1].destroy()
       }
-      s.resolutionBuffer.destroy()
+      s.infoBuffer.destroy()
       s.canvasSizeBuffer.destroy()
-      s.frameBuffer.destroy()
       s.presentBuffer.destroy()
       s.binsBuffer.destroy()
       s.histogramRing.destroy()
-      for (const entry of Object.values(s.compute)) {
+      for (const entry of s.compute.values()) {
         entry.paramsBuffer?.destroy()
       }
     }
@@ -445,7 +436,7 @@ export const GpuBackendLive = Layer.effect(
       height: number,
       srcBitmap: ImageBitmap,
     ): Session => {
-      const { device, sampler, swapFormat, blitPipeline, histogramPipeline } = gpu
+      const { device, sampler, swapFormat, blitPipeline } = gpu
       clampCanvasToDeviceLimits(device, canvas)
       const ctx = canvas.getContext('webgpu')
       if (!ctx) {
@@ -482,8 +473,10 @@ export const GpuBackendLive = Layer.effect(
               GPUTextureUsage.TEXTURE_BINDING |
               GPUTextureUsage.COPY_DST |
               GPUTextureUsage.RENDER_ATTACHMENT,
+            viewFormats: ['rgba8unorm-srgb'],
           }),
         )
+        const srcLinearView = srcTex.createView({ format: 'rgba8unorm-srgb' })
         device.queue.copyExternalImageToTexture(
           { flipY: false, source: srcBitmap },
           { texture: srcTex },
@@ -503,13 +496,12 @@ export const GpuBackendLive = Layer.effect(
 
         const intermediates: [GPUTexture, GPUTexture] | null = null
 
-        const resolutionBuffer = track(
+        const infoBuffer = track(
           device.createBuffer({
             size: 16,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
           }),
         )
-        device.queue.writeBuffer(resolutionBuffer, 0, new Float32Array([width, height]))
         const canvasSizeBuffer = track(
           device.createBuffer({
             size: 16,
@@ -521,19 +513,14 @@ export const GpuBackendLive = Layer.effect(
           0,
           new Float32Array([canvas.width, canvas.height]),
         )
-        const frameBuffer = track(
-          device.createBuffer({
-            size: 16,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-          }),
-        )
-
         const presentBuffer = track(
           device.createBuffer({
             size: 16,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
           }),
         )
+
+        const infoData = new ArrayBuffer(16)
 
         const blitGroup = device.createBindGroup({
           entries: [
@@ -554,13 +541,6 @@ export const GpuBackendLive = Layer.effect(
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
           }),
         )
-        const histogramGroup = device.createBindGroup({
-          entries: [
-            { binding: 0, resource: dstTex.createView() },
-            { binding: 1, resource: { buffer: binsBuffer } },
-          ],
-          layout: histogramPipeline.getBindGroupLayout(0),
-        })
         const histogramRing = new HistogramRing([
           makeSlot(
             track(
@@ -590,23 +570,25 @@ export const GpuBackendLive = Layer.effect(
 
         return {
           binsBuffer,
-          binsZeros: new Uint32Array(HISTOGRAM_BINS),
           blitGroup,
           canvas,
           canvasHeight: canvas.height,
           canvasSizeBuffer,
           canvasWidth: canvas.width,
-          compute: {},
+          compute: new Map(),
           ctx,
           dstTex,
-          frameBuffer,
           height,
-          histogramGroup,
           histogramRing,
+          infoBuffer,
+          infoData,
+          infoFloats: new Float32Array(infoData, 0, 3),
+          infoWords: new Uint32Array(infoData),
           intermediates,
           presentBuffer,
-          resolutionBuffer,
+          renders: 0,
           srcBitmap,
+          srcLinearView,
           srcTex,
           width,
         }
@@ -691,88 +673,108 @@ export const GpuBackendLive = Layer.effect(
       })
 
     /**
+     * Compile (or reuse) the pipeline for a pass source. Compilation is
+     * async, so it never stalls the main thread, and the in-flight promise is
+     * cached, so concurrent renders share one compile. A failed compile is
+     * dropped from the cache and surfaces as a GpuError.
+     */
+    const getPipeline = (
+      device: GPUDevice,
+      source: string,
+    ): Effect.Effect<GPUComputePipeline, GpuError> =>
+      Effect.gen(function* () {
+        const cache = yield* Ref.get(pipelineCacheRef)
+        let pending = cache.get(source)
+        if (!pending) {
+          pending = device.createComputePipelineAsync({
+            compute: { entryPoint: 'main', module: device.createShaderModule({ code: source }) },
+            layout: 'auto',
+          })
+          const compiling = pending
+          yield* Ref.update(pipelineCacheRef, (current) => new Map(current).set(source, compiling))
+        }
+        const compiling = pending
+        return yield* Effect.tryPromise({
+          catch: (cause) => new GpuError({ cause, message: 'Failed to compile shader pass' }),
+          try: async () => await compiling,
+        }).pipe(
+          Effect.tapError(() =>
+            Ref.update(pipelineCacheRef, (current) => {
+              const next = new Map(current)
+              next.delete(source)
+              return next
+            }),
+          ),
+        )
+      })
+
+    /**
      * Get (or lazily create) the pipeline + bind group for one compute pass.
-     * Cached per pass source; within a session the same pass source always
-     * binds the same src/dst pair, because the pass's position in the chain
-     * is fixed and its source encodes linearize/encode/dstFormat, which pin
-     * it to that position. LUT passes vary the bound 3D texture with the
-     * layer's lutId, so their cache key includes it.
+     * Pass sources do not encode chain position, so the bind group cache key
+     * adds the pass's input/output textures (`bindGroupCacheKey`) and its
+     * LUT cubes.
      */
     const getCompute = (
       gpu: GpuContext,
       s: Session,
       pass: ChainPass,
-      src: GPUTexture,
-      dst: GPUTexture,
+      index: number,
+      isLast: boolean,
       luts: ReadonlyMap<string, LutCube>,
     ): Effect.Effect<ComputeEntry, GpuError> =>
       Effect.gen(function* () {
         const { device, sampler } = gpu
-        const descriptor = toPassDescriptor(pass)
-        const cacheKey = descriptorCacheKey(descriptor)
-        const cached = s.compute[cacheKey]
+        const cacheKey = bindGroupCacheKey(pass, index, isLast)
+        const cached = s.compute.get(cacheKey)
         if (cached) {
           return cached
         }
 
-        const pipelines = yield* Ref.get(pipelineCacheRef)
-        const cachedPipeline = pipelines[pipelineCacheKey(descriptor)]
-        let compiled = cachedPipeline
-        if (!compiled) {
-          const module = device.createShaderModule({ code: descriptor.source })
-          const pipeline = device.createComputePipeline({
-            compute: { entryPoint: 'main', module },
-            layout: 'auto',
-          })
-          const built = {
-            layout: pipeline.getBindGroupLayout(0),
-            pipeline,
-          }
-          yield* Ref.update(pipelineCacheRef, (cache) => ({
-            ...cache,
-            [pipelineCacheKey(descriptor)]: built,
-          }))
-          compiled = built
-        }
+        const pipeline = yield* getPipeline(device, pass.source)
+        const src = index === 0 ? s.srcLinearView : s.intermediates![(index - 1) % 2]!.createView()
+        const dst = isLast ? s.dstTex : s.intermediates![index % 2]!
 
-        const paramsBuffer = descriptor.hasParams
-          ? device.createBuffer({
-              size: roundUp(pass.uniforms.length * 4, 16),
-              usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-            })
-          : null
+        const paramsBuffer =
+          pass.uniformLength > 0
+            ? device.createBuffer({
+                size: roundUp(pass.uniformLength * 4, 16),
+                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+              })
+            : null
 
         const entries: GPUBindGroupEntry[] = [
-          { binding: 0, resource: src.createView() },
+          { binding: 0, resource: src },
           { binding: 1, resource: dst.createView() },
-          { binding: 2, resource: { buffer: s.resolutionBuffer } },
+          { binding: 2, resource: { buffer: s.infoBuffer } },
         ]
-        if (descriptor.usesFrame) {
-          entries.push({ binding: 3, resource: { buffer: s.frameBuffer } })
-        }
         if (paramsBuffer) {
           entries.push({ binding: 4, resource: { buffer: paramsBuffer } })
         }
-        if (descriptor.usesSampler) {
+        if (pass.usesSampler) {
           entries.push({ binding: 5, resource: sampler })
         }
-        if (descriptor.lutId !== undefined) {
-          const cube = luts.get(descriptor.lutId)
+        if (isLast) {
+          entries.push({ binding: 6, resource: { buffer: s.binsBuffer } })
+        }
+        for (const [k, lutId] of pass.lutIds.entries()) {
+          const cube = luts.get(lutId)
           if (!cube) {
-            return yield* Effect.fail(
-              new GpuError({ message: `LUT cube missing for ${descriptor.lutId}` }),
-            )
+            paramsBuffer?.destroy()
+            return yield* Effect.fail(new GpuError({ message: `LUT cube missing for ${lutId}` }))
           }
-          const lutTex = yield* ensureLutTexture(device, descriptor.lutId, cube)
+          const lutTex = yield* ensureLutTexture(device, lutId, cube)
           entries.push({
-            binding: 6,
+            binding: LUT_BINDING_BASE + k,
             resource: lutTex.createView({ dimension: '3d' }),
           })
         }
 
-        const bindGroup = device.createBindGroup({ entries, layout: compiled.layout })
-        const entry: ComputeEntry = { bindGroup, paramsBuffer, pipeline: compiled.pipeline }
-        s.compute[cacheKey] = entry
+        const bindGroup = device.createBindGroup({
+          entries,
+          layout: pipeline.getBindGroupLayout(0),
+        })
+        const entry: ComputeEntry = { bindGroup, lastUsed: s.renders, paramsBuffer, pipeline }
+        s.compute.set(cacheKey, entry)
         return entry
       })
 
@@ -825,74 +827,81 @@ export const GpuBackendLive = Layer.effect(
           }
 
           const gpu = yield* getGpu
+          const { device } = gpu
           const s = yield* ensureSession(gpu, canvas, width, height, request.srcBitmap)
 
           const { passes } = request.shader
 
           if (passes.length > 1) {
-            ensureIntermediates(gpu.device, s)
+            ensureIntermediates(device, s)
           }
 
-          if (request.shader.usesFrame) {
-            gpu.device.queue.writeBuffer(s.frameBuffer, 0, new Uint32Array([request.frame >>> 0]))
-          }
-
-          const encoder = gpu.device.createCommandEncoder()
-
+          s.renders += 1
+          const computes: ComputeEntry[] = []
           for (let i = 0; i < passes.length; i++) {
-            const pass = passes[i]!
-            const src = i === 0 ? s.srcTex : s.intermediates![(i - 1) % 2]!
-            const dst = i === passes.length - 1 ? s.dstTex : s.intermediates![i % 2]!
-            const { paramsBuffer, bindGroup, pipeline } = yield* getCompute(
+            const entry = yield* getCompute(
               gpu,
               s,
-              pass,
-              src,
-              dst,
+              passes[i]!,
+              i,
+              i === passes.length - 1,
               request.luts,
             )
-
-            if (paramsBuffer) {
-              const paramsData = new Float32Array(roundUp(request.uniforms[i]!.length, 4))
-              paramsData.set(request.uniforms[i]!)
-              gpu.device.queue.writeBuffer(paramsBuffer, 0, paramsData)
+            entry.lastUsed = s.renders
+            computes.push(entry)
+          }
+          // Drop bind groups (and their params buffers) this chain no longer
+          // uses; submitted work keeps destroyed buffers alive until it ends.
+          for (const [key, entry] of s.compute) {
+            if (entry.lastUsed !== s.renders) {
+              entry.paramsBuffer?.destroy()
+              s.compute.delete(key)
             }
+          }
 
-            const computePass = encoder.beginComputePass()
-            computePass.setPipeline(pipeline)
-            computePass.setBindGroup(0, bindGroup)
+          s.infoFloats.set([width, height, request.pixelScale])
+          s.infoWords[3] = request.frame >>> 0
+          device.queue.writeBuffer(s.infoBuffer, 0, s.infoData)
+          for (const [i, entry] of computes.entries()) {
+            if (entry.paramsBuffer) {
+              device.queue.writeBuffer(entry.paramsBuffer, 0, request.uniforms[i]!)
+            }
+          }
+
+          const slot = yield* s.histogramRing.acquire()
+          const encoder = device.createCommandEncoder()
+          encoder.clearBuffer(s.binsBuffer)
+          // One compute pass: every dispatch is its own synchronization
+          // scope, so each pass still sees the previous pass's writes.
+          const computePass = encoder.beginComputePass()
+          for (const entry of computes) {
+            computePass.setPipeline(entry.pipeline)
+            computePass.setBindGroup(0, entry.bindGroup)
             computePass.dispatchWorkgroups(
               Math.ceil(width / WORKGROUP_SIZE),
               Math.ceil(height / WORKGROUP_SIZE),
               1,
             )
-            computePass.end()
           }
-
-          const slot = yield* s.histogramRing.acquire()
-          gpu.device.queue.writeBuffer(s.binsBuffer, 0, s.binsZeros)
-          const histogramPass = encoder.beginComputePass()
-          histogramPass.setPipeline(gpu.histogramPipeline)
-          histogramPass.setBindGroup(0, s.histogramGroup)
-          histogramPass.dispatchWorkgroups(
-            Math.ceil(width / WORKGROUP_SIZE),
-            Math.ceil(height / WORKGROUP_SIZE),
-            1,
-          )
-          histogramPass.end()
+          computePass.end()
           encoder.copyBufferToBuffer(s.binsBuffer, 0, slot.buffer, 0, HISTOGRAM_BINS * 4)
 
-          blit(gpu.device, gpu.blitPipeline, gpu.swapFormat, encoder, s, present)
+          blit(device, gpu.blitPipeline, gpu.swapFormat, encoder, s, present)
 
-          gpu.device.queue.submit([encoder.finish()])
+          device.queue.submit([encoder.finish()])
+          s.histogramRing.occupy(slot, slot.buffer.mapAsync(GPUMapMode.READ))
 
-          // Resolve only when the GPU has caught up — lets the caller keep at
+          // Keep at most two frames on the GPU: return once the previous
+          // frame has completed, so the caller builds the next frame while
+          // the GPU runs this one.
+          const previous = yield* Ref.getAndSet(
+            previousFrameRef,
+            device.queue.onSubmittedWorkDone(),
+          )
           yield* Effect.tryPromise({
             catch: (cause) => new GpuError({ cause, message: 'GPU work failed' }),
-            try: async () => await gpu.device.queue.onSubmittedWorkDone(),
+            try: async () => await previous,
           })
-
-          s.histogramRing.occupy(slot, slot.buffer.mapAsync(GPUMapMode.READ))
 
           return new RenderHandle(s.dstTex, s.width, s.height, slot, slot.generation)
         }).pipe(

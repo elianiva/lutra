@@ -1,7 +1,19 @@
-export { generateChainSource, WORKGROUP_SIZE, MissingLutReferenceError } from './chain-source'
-export type { ChainLayerInfo, ChainPass, ChainShader, UniformSlot } from './chain-source'
+export {
+  generateChainSource,
+  HISTOGRAM_BINS,
+  LUT_BINDING_BASE,
+  WORKGROUP_SIZE,
+  MissingLutReferenceError,
+} from './chain-source'
+export type {
+  ChainLayerInfo,
+  ChainPass,
+  ChainShader,
+  DerivedSlot,
+  UniformSlot,
+} from './chain-source'
 export { SRGB_TO_LINEAR } from './colorspace'
-export type { BodyRenderer, BodySource } from './types'
+export type { BodyRenderer, BodySource, DerivedUniform } from './types'
 
 export { renderExposure } from './bodies/exposure'
 export { renderContrast } from './bodies/contrast'

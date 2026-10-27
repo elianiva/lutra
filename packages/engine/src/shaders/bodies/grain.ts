@@ -72,8 +72,12 @@ fn grainSample(pos: vec2<f32>, frame: u32, grainSize: f32, blurAmt: f32) -> f32 
   return mix(fine, coarse, blurAmt);
 }
 `,
+  // Noise is evaluated in preview pixels (coord / u_pixelScale), so an
+  // export at native resolution has the same grain size relative to the
+  // image as the preview.
   stmts: `
 {
+  let gcoord = vec2<f32>(coord) / u_pixelScale;
   let prof = grainProfile(i32(l${i}_profile + 0.5));
 
   let manualSize = l${i}_size;
@@ -81,9 +85,9 @@ fn grainSample(pos: vec2<f32>, frame: u32, grainSize: f32, blurAmt: f32) -> f32 
 
   let f = 0.6667 * pow(0.15, baseSize);
 
-  let fine = grainSample(vec2<f32>(coord) * f, u_frame, baseSize, prof.blur);
+  let fine = grainSample(gcoord * f, u_frame, baseSize, prof.blur);
 
-  let coarse = grainSample(vec2<f32>(coord) * f * 0.667, u_frame + 7u, baseSize, prof.blur);
+  let coarse = grainSample(gcoord * f * 0.667, u_frame + 7u, baseSize, prof.blur);
 
   let n = mix(fine, coarse, 0.35);
 
@@ -99,8 +103,8 @@ fn grainSample(pos: vec2<f32>, frame: u32, grainSize: f32, blurAmt: f32) -> f32 
   if (chromaAmt > 0.001) {
     let chromaSize = baseSize * 0.56;  // 1/1.8 — coarser frequency
     let cf = 0.6667 * pow(0.15, chromaSize);
-    let cr = (grainNoise(vec2<f32>(coord) * cf + vec2<f32>(3.7, 11.3), u_frame + 31u) - 0.5) * 2.0;
-    let cb = (grainNoise(vec2<f32>(coord) * cf + vec2<f32>(7.1, 15.9), u_frame + 57u) - 0.5) * 2.0;
+    let cr = (grainNoise(gcoord * cf + vec2<f32>(3.7, 11.3), u_frame + 31u) - 0.5) * 2.0;
+    let cb = (grainNoise(gcoord * cf + vec2<f32>(7.1, 15.9), u_frame + 57u) - 0.5) * 2.0;
     color.r += cr * chromaAmt;
     color.b += cb * chromaAmt;
   }

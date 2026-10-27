@@ -1,11 +1,11 @@
 import { Effect, Schema } from 'effect'
 import { SRGB_TO_LINEAR } from './colorspace'
-import type { BodyRenderer, BodySource } from './types'
+import type { BodyRenderer, BodySource, DerivedUniform } from './types'
 import type { FieldKey, LutId } from '../brands'
 import type { LayerType } from '../layers/schemas'
 
 /**
- * The assembler hit a LUT pass whose layer carries no cube reference.
+ * The assembler hit a LUT layer that carries no cube reference.
  * `generateChainSource` reports this on its Effect error channel so callers
  * can compose the failure without a synchronous throw.
  */
@@ -24,72 +24,73 @@ export class MissingLutReferenceError extends Schema.TaggedError<MissingLutRefer
  */
 export const WORKGROUP_SIZE = 16
 
+/**
+ * Luma histogram bins accumulated by the final pass. One bin per
+ * invocation of a workgroup, so each invocation flushes exactly one
+ * workgroup-local bin to the global buffer.
+ */
+export const HISTOGRAM_BINS = WORKGROUP_SIZE * WORKGROUP_SIZE
+
+/**
+ * First binding of the per-pass LUT textures: the k-th LUT layer of a pass
+ * binds its 3D texture at `LUT_BINDING_BASE + k`.
+ */
+export const LUT_BINDING_BASE = 8
+
 /** Per-layer entry used by the assembler. */
 export interface ChainLayerInfo {
   readonly type: LayerType
   readonly body: BodyRenderer
   readonly fieldKeys: readonly FieldKey[]
-  /**
-   * LUT layers only: the cube reference. The id flows through to the
-   * pass so the frontend binds the right texture; the size is baked into
-   * the shader as the sampling coordinate scale.
-   */
-  readonly lut?: { readonly id: LutId; readonly size: number }
-}
-
-/** One compute pass: a single layer, or a pure linearize/copy step. */
-export interface ChainPass {
-  /** The complete WGSL source for this pass. */
-  readonly source: string
-  /**
-   * Flat list of uniform slot descriptors for this pass's layer, in the
-   * order they appear in the pass's uniform buffer. The frontend uses
-   * this to know which float slots to write when a parameter changes.
-   */
-  readonly uniforms: readonly UniformSlot[]
-  /**
-   * Whether this pass reads the frame counter (`u_frame`). With
-   * `layout: 'auto'` the pipeline only exposes bindings the shader
-   * statically uses, so the frontend must include the binding-3 entry
-   * (and allocate its buffer) only when this is true.
-   */
-  readonly usesFrame: boolean
-  /**
-   * Whether this pass uses a filtered sampler (binding 5) — e.g.
-   * clarity, which samples its input with `textureSampleLevel`.
-   * `textureLoad`-based bodies (chromatic aberration) do not set it.
-   */
-  readonly usesSampler: boolean
-  /**
-   * LUT layers only: the cube id this pass applies. The frontend binds
-   * the matching 3D texture (binding 6) and caches it keyed by this id.
-   */
+  /** LUT layers only: the cube the frontend binds as the layer's 3D texture. */
   readonly lutId?: LutId
 }
 
-/** Result of assembling a chain into an ordered list of WGSL compute passes. */
-export interface ChainShader {
-  /**
-   * Ordered compute passes. Pass 0 reads the source image (sRGB); every
-   * later pass reads the previous pass's output (linear light); the last
-   * pass encodes back to sRGB and writes the display texture.
-   */
-  readonly passes: readonly ChainPass[]
-  /**
-   * Whether any pass reads the frame counter (`u_frame`). The frontend
-   * writes the frame buffer once per render when this is true; only
-   * passes that statically use it get the binding-3 entry.
-   */
-  readonly usesFrame: boolean
-}
-
 export interface UniformSlot {
-  /** Layer index in the chain (0-based). */
+  /** Visible-layer index in the chain (0-based). */
   readonly layerIndex: number
   /** The field key on the layer (e.g. "stops", "amount"). */
   readonly field: FieldKey
   /** Offset into this pass's uniform buffer (in f32 slots). */
   readonly offset: number
+}
+
+export interface DerivedSlot extends DerivedUniform {
+  /** Visible-layer index in the chain (0-based). */
+  readonly layerIndex: number
+  /** Offset into this pass's uniform buffer (in f32 slots, 4-aligned). */
+  readonly offset: number
+}
+
+/**
+ * One compute pass: a run of layers fused into one shader. A pass starts
+ * at the chain head and at every layer that samples its input; every
+ * other layer is per-pixel and runs inside the current pass.
+ */
+export interface ChainPass {
+  /** The complete WGSL source for this pass. */
+  readonly source: string
+  /** Scalar uniform slots, one per field of every layer in the pass. */
+  readonly uniforms: readonly UniformSlot[]
+  /** CPU-derived uniform tables (vec4-aligned) of the pass's layers. */
+  readonly derived: readonly DerivedSlot[]
+  /** Length of the pass's uniform buffer in f32 slots (0 = no u_params). */
+  readonly uniformLength: number
+  /** Whether this pass uses the filtered sampler (binding 5). */
+  readonly usesSampler: boolean
+  /** LUT cubes of the pass, in binding order from `LUT_BINDING_BASE`. */
+  readonly lutIds: readonly LutId[]
+}
+
+/**
+ * Result of assembling a chain into an ordered list of WGSL compute passes.
+ * Pass 0 reads the source image through an sRGB-decoding view (linear
+ * light); every later pass reads the previous pass's rgba16float output
+ * (linear light); the last pass encodes to sRGB, writes the display
+ * texture, and accumulates the luma histogram (binding 6).
+ */
+export interface ChainShader {
+  readonly passes: readonly ChainPass[]
 }
 
 /**
@@ -101,245 +102,155 @@ function normalizeBody(render: string | BodySource): BodySource {
   return Schema.is(Schema.String)(render) ? { stmts: render } : render
 }
 
-/** Pure copy: reads the sRGB source texture and writes it unchanged. */
-function passthroughPass(): ChainPass {
-  const source = `
-@group(0) @binding(0) var srcTex: texture_2d<f32>;
-@group(0) @binding(1) var dstTex: texture_storage_2d<rgba8unorm, write>;
-@group(0) @binding(2) var<uniform> u_resolution: vec2<f32>;
+const roundUp4 = (n: number) => Math.ceil(n / 4) * 4
 
-@compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-  let coord = id.xy;
-  if (coord.x >= u32(u_resolution.x) || coord.y >= u32(u_resolution.y)) {
-    return;
+/** Assemble one fused pass from the given layers (chain indices). */
+function buildPass(
+  layers: readonly ChainLayerInfo[],
+  indices: readonly number[],
+  isLast: boolean,
+): ChainPass {
+  const uniforms: UniformSlot[] = []
+  const derived: DerivedSlot[] = []
+  const structFields: string[] = []
+  const aliases: string[] = []
+  const helpers = new Set<string>()
+  const lutIds: LutId[] = []
+  const lutDecls: string[] = []
+  const stmts: string[] = []
+  let usesSampler = false
+  let offset = 0
+  // Transfer function `color` is currently in. Pass input is linear.
+  let encoding: 'linear' | 'srgb' = 'linear'
+
+  for (const [local, li] of indices.entries()) {
+    const layer = layers[li]!
+    const body = normalizeBody(layer.body(local))
+    for (const field of layer.fieldKeys) {
+      uniforms.push({ field, layerIndex: li, offset })
+      structFields.push(`  l${local}_${field}: f32,`)
+      aliases.push(`  let l${local}_${field} = u_params.l${local}_${field};`)
+      offset++
+    }
+    if (body.derived) {
+      offset = roundUp4(offset)
+      derived.push({ ...body.derived, layerIndex: li, offset })
+      structFields.push(`  l${local}_derived: array<vec4<f32>, ${body.derived.length}>,`)
+      offset += body.derived.length * 4
+    }
+    if (body.helpers) {
+      helpers.add(body.helpers)
+    }
+    if (body.usesSampler || body.needsLut) {
+      usesSampler = true
+    }
+    if (body.needsLut) {
+      // Validated by generateChainSource before assembly.
+      lutIds.push(layer.lutId!)
+      lutDecls.push(
+        `@group(0) @binding(${LUT_BINDING_BASE + lutIds.length - 1}) var l${local}_lut: texture_3d<f32>;`,
+      )
+    }
+    // LUT bodies see sRGB-encoded color (the film cubes are authored in
+    // sRGB); every other body sees linear light.
+    const wants = body.needsLut ? 'srgb' : 'linear'
+    if (wants !== encoding) {
+      stmts.push(
+        wants === 'srgb'
+          ? '  color = linearToSrgb(clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)));'
+          : '  color = srgbToLinear(color);',
+      )
+      encoding = wants
+    }
+    stmts.push(body.stmts)
   }
-  var src = textureLoad(srcTex, coord, 0);
-  textureStore(dstTex, coord, src);
-}
-`
-  return { source, uniforms: [], usesFrame: false, usesSampler: false }
-}
 
-/**
- * Decodes the sRGB source texture into a linear-light rgba16float
- * intermediate. Inserted ahead of the first layer when that layer
- * samples its input texture (e.g. chromatic aberration): bodies always
- * see linear light, including at sampled offsets.
- */
-function linearizePass(): ChainPass {
-  const source = `
-@group(0) @binding(0) var srcTex: texture_2d<f32>;
-@group(0) @binding(1) var dstTex: texture_storage_2d<rgba16float, write>;
-@group(0) @binding(2) var<uniform> u_resolution: vec2<f32>;
+  const outExpr = isLast
+    ? encoding === 'srgb'
+      ? 'clamp(color, vec3<f32>(0.0), vec3<f32>(1.0))'
+      : 'linearToSrgb(clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)))'
+    : encoding === 'srgb'
+      ? 'srgbToLinear(color)'
+      : 'color'
 
-${SRGB_TO_LINEAR}
-
-@compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-  let coord = id.xy;
-  if (coord.x >= u32(u_resolution.x) || coord.y >= u32(u_resolution.y)) {
-    return;
-  }
-  var src = textureLoad(srcTex, coord, 0);
-  var color = srgbToLinear(src.rgb);
-  textureStore(dstTex, coord, vec4<f32>(color, src.a));
-}
-`
-  return { source, uniforms: [], usesFrame: false, usesSampler: false }
-}
-
-interface LayerPassOptions {
-  readonly body: string
-  /** Module-scope WGSL (functions) emitted ahead of the entry point. */
-  readonly helpers: string
-  readonly uniforms: readonly UniformSlot[]
-  /** Decode the pass input from sRGB (first layer, when nothing pre-linearized). */
-  readonly linearize: boolean
-  /** Encode the pass output to sRGB (last layer, writing the display texture). */
-  readonly encode: boolean
-  /** Body samples its pass input at neighbor offsets (linearize pass when first). */
-  readonly samplesInput: boolean
-  /** Body samples through the filtered sampler (declares binding 5). */
-  readonly needsSampler: boolean
-  /** Storage format of the pass output. */
-  readonly dstFormat: 'rgba8unorm' | 'rgba16float'
-}
-
-/**
- * One layer as a compute pass. The body operates on `color` (linear
- * light); the pass owns the colorspace transitions at its boundaries.
- */
-function layerPass({
-  body,
-  helpers,
-  uniforms,
-  linearize,
-  encode,
-  samplesInput: _samplesInput,
-  needsSampler,
-  dstFormat,
-}: LayerPassOptions): ChainPass {
-  const structFields = uniforms.map((u) => `  l${u.layerIndex}_${u.field}: f32,`).join('\n')
-  const structDef = uniforms.length > 0 ? `struct LayerParams {\n${structFields}\n}` : ''
-
-  // WGSL struct members are only in scope through the struct variable, but
-  const uniformAliases = uniforms
-    .map((u) => `  let l${u.layerIndex}_${u.field} = u_params.l${u.layerIndex}_${u.field};`)
-    .join('\n')
-
-  const usesFrame = body.includes('u_frame') || helpers.includes('u_frame')
-  // Structural flag, not WGSL text sniffing: a body that samples its
-  // input with `textureLoad` (chromatic aberration) still sets
-  const usesSampler = needsSampler
-  const colorspace = linearize || encode ? SRGB_TO_LINEAR : ''
-  const srcExpr = linearize ? 'srgbToLinear(src.rgb)' : 'src.rgb'
-  const outExpr = encode ? 'linearToSrgb(clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)))' : 'color'
-
-  const frameDecl = usesFrame ? '@group(0) @binding(3) var<uniform> u_frame: u32;\n' : ''
+  const uniformLength = roundUp4(offset)
+  const paramsDecl =
+    uniformLength > 0
+      ? `struct LayerParams {\n${structFields.join('\n')}\n}\n@group(0) @binding(4) var<uniform> u_params: LayerParams;\n`
+      : ''
   const samplerDecl = usesSampler ? '@group(0) @binding(5) var samp: sampler;\n' : ''
-  const paramsDecl =
-    uniforms.length > 0 ? '@group(0) @binding(4) var<uniform> u_params: LayerParams;\n' : ''
+  // The final pass bins the luma of the stored 8-bit value into
+  // workgroup-local counters, then each invocation flushes one bin, so
+  // global atomics drop from one per pixel to at most 256 per workgroup
+  // (about 5× faster than per-pixel global atomics on an Apple M1).
+  const histogramDecl = isLast
+    ? `@group(0) @binding(6) var<storage, read_write> bins: array<atomic<u32>, ${HISTOGRAM_BINS}>;
+var<workgroup> wgBins: array<atomic<u32>, ${HISTOGRAM_BINS}>;
+`
+    : ''
+  const histogramAccumulate = isLast
+    ? `
+    let stored = round(outColor * 255.0) / 255.0;
+    let luma = dot(stored, vec3<f32>(0.2126, 0.7152, 0.0722));
+    atomicAdd(&wgBins[min(u32(luma * ${HISTOGRAM_BINS}.0), ${HISTOGRAM_BINS - 1}u)], 1u);`
+    : ''
+
+  const histogramFlush = isLast
+    ? `
+  workgroupBarrier();
+  let count = atomicLoad(&wgBins[localIndex]);
+  if (count > 0u) {
+    atomicAdd(&bins[localIndex], count);
+  }`
+    : ''
 
   const source = `
-${structDef}
+struct FrameInfo {
+  resolution: vec2<f32>,
+  pixelScale: f32,
+  frame: u32,
+}
 
 @group(0) @binding(0) var srcTex: texture_2d<f32>;
-@group(0) @binding(1) var dstTex: texture_storage_2d<${dstFormat}, write>;
-@group(0) @binding(2) var<uniform> u_resolution: vec2<f32>;
-${frameDecl}${samplerDecl}${paramsDecl}
-${colorspace}
-${helpers}
+@group(0) @binding(1) var dstTex: texture_storage_2d<${isLast ? 'rgba8unorm' : 'rgba16float'}, write>;
+@group(0) @binding(2) var<uniform> u_info: FrameInfo;
+${paramsDecl}${samplerDecl}${histogramDecl}${lutDecls.join('\n')}
+${SRGB_TO_LINEAR}
+${[...helpers].join('\n')}
 @compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+fn main(
+  @builtin(global_invocation_id) id: vec3<u32>,
+  @builtin(local_invocation_index) localIndex: u32,
+) {
   let coord = id.xy;
-  if (coord.x >= u32(u_resolution.x) || coord.y >= u32(u_resolution.y)) {
-    return;
-  }
+  let u_resolution = u_info.resolution;
+  let u_pixelScale = u_info.pixelScale;
+  let u_frame = u_info.frame;
+  if (coord.x < u32(u_resolution.x) && coord.y < u32(u_resolution.y)) {
+    let src = textureLoad(srcTex, coord, 0);
+    var color = src.rgb;
+    let alpha = src.a;
 
-  var src = textureLoad(srcTex, coord, 0);
-  var color = ${srcExpr};
-  let alpha = src.a;
+${aliases.join('\n')}
+${stmts.join('\n')}
 
-${uniformAliases}
-${body}
-
-  let outColor = ${outExpr};
-  textureStore(dstTex, coord, vec4<f32>(outColor, alpha));
+    let outColor = ${outExpr};
+    textureStore(dstTex, coord, vec4<f32>(outColor, alpha));${histogramAccumulate}
+  }${histogramFlush}
 }
 `
 
-  return { source, uniforms, usesFrame, usesSampler }
-}
-
-interface LutPassOptions {
-  readonly body: string
-  /** Module-scope WGSL (functions) emitted ahead of the entry point. */
-  readonly helpers: string
-  readonly uniforms: readonly UniformSlot[]
-  /** The cube id (frontend binds the matching 3D texture). */
-  readonly lutId: LutId
-  /** Cube dimension; baked into the sampling coordinate scale. */
-  readonly lutSize: number
-  /**
-   * Pass reads the sRGB source texture directly — the input is already
-   * sRGB-encoded, so no linear→sRGB decode. False when the input is a
-   * linear intermediate (every LUT pass that is not first in the chain).
-   */
-  readonly inputIsSrgb: boolean
-  /**
-   * Pass writes the sRGB display texture — its output is already
-   * sRGB-encoded, so no sRGB→linear re-encode. False for LUT passes in
-   * the middle of the chain, whose output feeds linear passes.
-   */
-  readonly outputIsSrgb: boolean
-  /** Storage format of the pass output. */
-  readonly dstFormat: 'rgba8unorm' | 'rgba16float'
+  return { derived, lutIds, source, uniformLength, uniforms, usesSampler }
 }
 
 /**
- * A LUT layer as a compute pass. The LUT body operates on sRGB-encoded
- * values (the vendored film cubes are authored in sRGB space — see
- * docs/adr/0001-rendering-engine.md), so this pass inverts the usual
- * color-space boundaries: it decodes its linear input to sRGB before the
- * body and re-encodes the result back to linear after, unless one of the
- * two ends is already sRGB (source input / display output).
- */
-function lutPass({
-  body,
-  helpers,
-  uniforms,
-  lutId,
-  lutSize,
-  inputIsSrgb,
-  outputIsSrgb,
-  dstFormat,
-}: LutPassOptions): ChainPass {
-  const structFields = uniforms.map((u) => `  l${u.layerIndex}_${u.field}: f32,`).join('\n')
-  const structDef = uniforms.length > 0 ? `struct LayerParams {\n${structFields}\n}` : ''
-
-  const uniformAliases = uniforms
-    .map((u) => `  let l${u.layerIndex}_${u.field} = u_params.l${u.layerIndex}_${u.field};`)
-    .join('\n')
-
-  const usesFrame = body.includes('u_frame') || helpers.includes('u_frame')
-  const inputExpr = inputIsSrgb
-    ? 'src.rgb'
-    : 'linearToSrgb(clamp(src.rgb, vec3<f32>(0.0), vec3<f32>(1.0)))'
-  const outputExpr = outputIsSrgb ? 'color' : 'srgbToLinear(color)'
-  const colorspace = !inputIsSrgb || !outputIsSrgb ? SRGB_TO_LINEAR : ''
-
-  const frameDecl = usesFrame ? '@group(0) @binding(3) var<uniform> u_frame: u32;\n' : ''
-  const paramsDecl =
-    uniforms.length > 0 ? '@group(0) @binding(4) var<uniform> u_params: LayerParams;\n' : ''
-
-  // (textureLoad; 32-bit float textures are not filterable in WebGPU), so
-  const sizeConst = `const LUT_SIZE: f32 = ${lutSize}.0;`
-
-  const source = `
-${structDef}
-
-@group(0) @binding(0) var srcTex: texture_2d<f32>;
-@group(0) @binding(1) var dstTex: texture_storage_2d<${dstFormat}, write>;
-@group(0) @binding(2) var<uniform> u_resolution: vec2<f32>;
-${frameDecl}${paramsDecl}@group(0) @binding(6) var lutTex: texture_3d<f32>;
-
-${sizeConst}
-
-${colorspace}
-${helpers}
-@compute @workgroup_size(${WORKGROUP_SIZE}, ${WORKGROUP_SIZE})
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-  let coord = id.xy;
-  if (coord.x >= u32(u_resolution.x) || coord.y >= u32(u_resolution.y)) {
-    return;
-  }
-
-  var src = textureLoad(srcTex, coord, 0);
-  var color = ${inputExpr};
-  let alpha = src.a;
-
-${uniformAliases}
-${body}
-
-  let outColor = ${outputExpr};
-  textureStore(dstTex, coord, vec4<f32>(outColor, alpha));
-}
-`
-
-  return { lutId, source, uniforms, usesFrame, usesSampler: false }
-}
-
-/**
- * Generate the ordered WGSL compute passes for the given chain of
- * layers. Each layer runs as its own pass and reads the previous pass's
- * output, so texture-sampling bodies (chromatic aberration) sample the
- * accumulated result of earlier layers — not the source image. Passes
- * ping-pong through linear-light rgba16float intermediates; only the
- * final pass encodes to sRGB and writes the 8-bit display texture.
- *
- * When the first layer samples its input, a dedicated linearize pass is
- * inserted ahead of it so sampled texels are always linear light.
+ * Generate the ordered WGSL compute passes for the given chain of layers
+ * (docs/adr/0001-rendering-engine). Per-pixel layers fuse into one pass;
+ * a layer that samples its input (clarity, chromatic aberration) starts a
+ * new pass, so it reads the accumulated result of every earlier layer.
+ * Passes ping-pong through linear-light rgba16float intermediates; the
+ * last pass encodes to sRGB, writes the 8-bit display texture, and
+ * accumulates the histogram. An empty chain is one copy pass.
  *
  * Fails with `MissingLutReferenceError` when a LUT body has no cube
  * reference.
@@ -347,69 +258,25 @@ ${body}
 export const generateChainSource = Effect.fn('generateChainSource')(function* (
   layers: readonly ChainLayerInfo[],
 ) {
-  if (layers.length === 0) {
-    return { passes: [passthroughPass()], usesFrame: false }
-  }
-
-  const bodies = layers.map((layer, i) => normalizeBody(layer.body(i)))
-  // offsets, clarity in a 9-tap blur — both via textureSampleLevel).
-  // Declared structurally by the body, never sniffed from WGSL text.
-  const firstBodySamplesSource = bodies[0]!.samplesInput === true
-
-  const passes: ChainPass[] = []
-  if (firstBodySamplesSource) {
-    passes.push(linearizePass())
-  }
-
+  const runs: number[][] = [[]]
   for (let li = 0; li < layers.length; li++) {
     const layer = layers[li]!
-    const body = bodies[li]!
-    const uniforms: UniformSlot[] = []
-    let off = 0
-    for (const key of layer.fieldKeys) {
-      uniforms.push({ field: key, layerIndex: li, offset: off })
-      off++
+    const body = normalizeBody(layer.body(0))
+    if (body.needsLut && layer.lutId === undefined) {
+      return yield* Effect.fail(
+        new MissingLutReferenceError({
+          message: `LUT layer at index ${li} is missing its cube reference`,
+        }),
+      )
     }
-    const isLast = li === layers.length - 1
-    if (body.needsLut) {
-      const { lut } = layer
-      if (!lut) {
-        return yield* Effect.fail(
-          new MissingLutReferenceError({
-            message: `LUT layer at index ${li} is missing its cube reference`,
-          }),
-        )
-      }
-      passes.push(
-        lutPass({
-          body: body.stmts,
-          dstFormat: isLast ? 'rgba8unorm' : 'rgba16float',
-          helpers: body.helpers ?? '',
-          inputIsSrgb: li === 0 && !firstBodySamplesSource,
-          lutId: lut.id,
-          lutSize: lut.size,
-          outputIsSrgb: isLast,
-          uniforms,
-        }),
-      )
+    const current = runs.at(-1)!
+    if (body.samplesInput === true && current.length > 0) {
+      runs.push([li])
     } else {
-      passes.push(
-        layerPass({
-          body: body.stmts,
-          dstFormat: isLast ? 'rgba8unorm' : 'rgba16float',
-          encode: isLast,
-          helpers: body.helpers ?? '',
-          linearize: li === 0 && !firstBodySamplesSource,
-          needsSampler: body.usesSampler === true,
-          samplesInput: body.samplesInput === true,
-          uniforms,
-        }),
-      )
+      current.push(li)
     }
   }
 
-  return {
-    passes,
-    usesFrame: passes.some((p) => p.usesFrame),
-  }
+  const passes = runs.map((run, i) => buildPass(layers, run, i === runs.length - 1))
+  return { passes } satisfies ChainShader
 })

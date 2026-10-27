@@ -1,50 +1,35 @@
 import { describe, it, expect } from 'vitest'
-import { descriptorCacheKey, pipelineCacheKey, toPassDescriptor } from './pass-descriptor'
+import { LutId } from '@lutra/engine'
 import type { ChainPass } from '@lutra/engine'
+import { bindGroupCacheKey } from './pass-descriptor'
 
-const basePass = (overrides: Partial<ChainPass> = {}): ChainPass => ({
+const pass = (overrides: Partial<ChainPass> = {}): ChainPass => ({
+  derived: [],
+  lutIds: [],
   source: 'wgsl source',
+  uniformLength: 0,
   uniforms: [],
-  usesFrame: false,
   usesSampler: false,
   ...overrides,
 })
 
-describe('pass-descriptor', () => {
-  it('maps source without lut to cache key', () => {
-    const d = toPassDescriptor(basePass({ source: 'a' }))
-    expect(descriptorCacheKey(d)).toBe('a')
-    expect(pipelineCacheKey(d)).toBe('a')
+describe('bindGroupCacheKey', () => {
+  it('separates the same source bound at different chain positions', () => {
+    const keys = [
+      bindGroupCacheKey(pass(), 0, true),
+      bindGroupCacheKey(pass(), 0, false),
+      bindGroupCacheKey(pass(), 1, false),
+      bindGroupCacheKey(pass(), 2, false),
+      bindGroupCacheKey(pass(), 2, true),
+    ]
+    expect(new Set(keys).size).toBe(keys.length)
+    // Positions with the same ping-pong parity bind the same textures.
+    expect(bindGroupCacheKey(pass(), 1, false)).toBe(bindGroupCacheKey(pass(), 3, false))
   })
-  it('includes lutId in descriptor cache key', () => {
-    // SAFETY: test constructs ChainPass with string lutId; LutId is branded string, so string is assignable via never bridge in test.
-    // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, typescript/consistent-type-assertions -- SAFETY: branded LutId test value
-    const d = toPassDescriptor(basePass({ source: 'a', lutId: 'cube1' as never }))
-    expect(descriptorCacheKey(d)).toBe('a::lut:cube1')
-    expect(pipelineCacheKey(d)).toBe('a')
-  })
-  it('captures usesFrame/usesSampler/hasParams', () => {
-    const d = toPassDescriptor(
-      // SAFETY: test stubs a uniform field; FieldKey is branded string.
-      // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, typescript/consistent-type-assertions -- SAFETY: branded FieldKey test value
-      basePass({
-        // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, typescript/consistent-type-assertions -- SAFETY: branded FieldKey test value
-        uniforms: [{ field: 'x' as never, layerIndex: 0, offset: 0 }],
-        usesFrame: true,
-        usesSampler: true,
-      }),
-    )
-    expect(d.hasParams).toBe(true)
-    expect(d.usesFrame).toBe(true)
-    expect(d.usesSampler).toBe(true)
-  })
-  it('different lutIds produce different cache keys', () => {
-    // SAFETY: branded LutId test values via never bridge.
-    // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, typescript/consistent-type-assertions -- SAFETY: branded LutId test value
-    const a = toPassDescriptor(basePass({ source: 'src', lutId: 'a' as never }))
-    // SAFETY: branded LutId test values via never bridge.
-    // oxlint-disable-next-line consistent-type-assertions, no-unsafe-type-assertion, typescript/consistent-type-assertions -- SAFETY: branded LutId test value
-    const b = toPassDescriptor(basePass({ source: 'src', lutId: 'b' as never }))
-    expect(descriptorCacheKey(a)).not.toBe(descriptorCacheKey(b))
+
+  it('separates passes that bind different LUT cubes', () => {
+    const a = pass({ lutIds: [LutId('a.cube')] })
+    const b = pass({ lutIds: [LutId('b.cube')] })
+    expect(bindGroupCacheKey(a, 1, true)).not.toBe(bindGroupCacheKey(b, 1, true))
   })
 })

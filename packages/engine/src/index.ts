@@ -49,13 +49,16 @@ export type { LutCube } from './luts/cube'
 
 // The pure-JS mirror of the WGSL LUT pass body (docs/adr/0002-lut-library): per-photo
 // filmstrip previews render through this in the thumb worker, where the GPU
-// pipeline is not available. Exact match for a LUT-only chain (sRGB in,
-// sRGB out — no colorspace boundary).
+// pipeline is not available. Same texel mapping and trilinear weights as
+// the GPU body for a LUT-only chain; the GPU samples a half-float cube
+// with hardware filtering, so results agree to within rounding.
 export { applyLutCpu, cubeLayoutOf, cubeTexelIndex } from './luts/apply'
 export type { CubeLayout } from './luts/apply'
 
 export {
   generateChainSource,
+  HISTOGRAM_BINS,
+  LUT_BINDING_BASE,
   SRGB_TO_LINEAR,
   WORKGROUP_SIZE,
   MissingLutReferenceError,
