@@ -26,8 +26,8 @@ export const wordmark = <Message>(h: HtmlBuilder<Message>, className: string): H
     ],
   )
 
-/** The L on its own, in the app icon's heavier cut (stem 20, three larger
- *  perforations) so it stays legible at 16 px; the last perforation is red. */
+/** The L on its own in a heavier cut than the brand mark (stem 20, two larger
+ *  perforations) so it holds up at 16 px in the nav pill; the sprocket is red. */
 const MARK_INK =
   'M13 0H33V82H104V100H13ZM44.5 56H55.5Q58 56 58 58.5V71.5Q58 74 55.5 74H44.5Q42 74 42 71.5V58.5Q42 56 44.5 56ZM66.5 56H77.5Q80 56 80 58.5V71.5Q80 74 77.5 74H66.5Q64 74 64 71.5V58.5Q64 56 66.5 56Z'
 const MARK_SPROCKET =

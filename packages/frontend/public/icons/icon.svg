@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <!-- The app tile: the editor's near-black background with a panel inset,
-       and the wordmark's L carrying its film perforations; the last
-       perforation is the red accent. The heavier cut keeps it legible at 16 px. -->
-  <rect width="512" height="512" fill="#111111"/><rect x="28" y="28" width="456" height="456" rx="88" fill="#1f1f1f"/><g transform="translate(256 256) scale(2.5) translate(-58.5 -50)"><path d="M13 0 H33 V82 H104 V100 H13 Z" fill="#fafafa"/><rect x="42" y="56" width="16" height="18" rx="2.5" fill="#fafafa"/><rect x="64" y="56" width="16" height="18" rx="2.5" fill="#fafafa"/><rect x="86" y="56" width="16" height="18" rx="2.5" fill="#cc0000"/></g>
+       and the brand mark from docs/brand: the wordmark's L carrying three
+       perforations, the fourth its red signal sprocket. -->
+  <rect width="512" height="512" fill="#111111"/><rect x="28" y="28" width="456" height="456" rx="88" fill="#1f1f1f"/><g transform="translate(256 256) scale(2.8) translate(-58.335 -50)"><path d="M104.17 100L12.5 100L12.5 0L25 0L25 89.58L104.17 89.58L104.17 100" fill="#fafafa"/><rect x="33" y="66" width="12" height="14" rx="2.5" fill="#fafafa"/><rect x="51" y="66" width="12" height="14" rx="2.5" fill="#fafafa"/><rect x="69" y="66" width="12" height="14" rx="2.5" fill="#fafafa"/><rect x="87" y="66" width="12" height="14" rx="2.5" fill="#cc0000"/></g>
 </svg>

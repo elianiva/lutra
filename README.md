@@ -96,7 +96,7 @@ pnpm infra:deploy
 
 <img src="packages/frontend/public/icons/icon.svg" alt="Lutra app icon" width="96" align="right">
 
-The wordmark is [Michroma](https://fonts.google.com/specimen/Michroma) (SIL Open Font License) capitals outlined to paths. The L carries four film perforations, and the A is an open Λ whose crossbar is replaced by a single red sprocket hole. The app icon, favicon, and navigation pill use the L on its own, in a heavier cut that stays legible at 16 px. The editor's top bar shows the full wordmark.
+The wordmark is [Michroma](https://fonts.google.com/specimen/Michroma) (SIL Open Font License) capitals outlined to paths. The L carries four film perforations, and the A is an open Λ whose crossbar is replaced by a single red sprocket hole. The app icon and favicon use the mark as drawn; the navigation pill uses a heavier cut of the L that stays legible at 16 px. The editor's top bar shows the full wordmark.
 
 The SVGs are in `docs/brand/`: the wordmark and mark, each in a dark, light, and single-color version. The app icons are in `packages/frontend/public/icons/`. After you change `icon.svg` or `icon-maskable.svg`, run `bun scripts/build-icons.ts` to regenerate the PNG icons and iOS splash screens.
 
