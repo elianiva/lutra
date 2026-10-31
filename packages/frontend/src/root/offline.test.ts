@@ -4,6 +4,8 @@ import { Url } from 'foldkit'
 import { init } from './init'
 import { webGpuSupported } from '../gpu/capability'
 import { update } from './update'
+import { RootMessage } from './message'
+import { parseRoute } from '../route'
 import type { Model } from './model'
 import { Filling, Paused, Ready, QuotaError, Idle } from '../offline/machine'
 import { OfflineMessage } from '../offline/messages'
@@ -15,7 +17,8 @@ import { LutId } from '@lutra/engine'
 
 const lutA = LutId('luts/print/kodak_2393_cuspclip.cube')
 
-const galleryUrl = () => Option.getOrThrow(Url.fromString('https://lutra.test/'))
+const urlAt = (path: string) => Option.getOrThrow(Url.fromString(`https://lutra.test${path}`))
+const galleryUrl = () => urlAt('/app')
 
 const galleryModel = (): Model => init(webGpuSupported, galleryUrl()).model
 
@@ -37,6 +40,25 @@ describe('root: offline library', () => {
   it('init fires the auto-start command unless saveData is set', () => {
     const { commands = [] } = init(webGpuSupported, galleryUrl())
     expect(commands.map((c) => c.name)).toContain('StartOfflineFill')
+  })
+
+  it('init skips the auto-start on the landing page, and opening the app starts it', () => {
+    const { model, commands = [] } = init(webGpuSupported, urlAt('/'))
+    expect(model.route._tag).toBe('Landing')
+    expect(commands.map((c) => c.name)).not.toContain('StartOfflineFill')
+
+    const entered = update(model, RootMessage.ChangedRoute({ route: parseRoute(galleryUrl()) }))
+    expect(entered.model.route._tag).toBe('Gallery')
+    expect((entered.commands ?? []).map((c) => c.name)).toContain('StartOfflineFill')
+  })
+
+  it('routes the site under /app and leaves / to the landing page', () => {
+    expect(parseRoute(urlAt('/'))._tag).toBe('Landing')
+    expect(parseRoute(urlAt('/app'))._tag).toBe('Gallery')
+    expect(parseRoute(urlAt('/app/tools'))._tag).toBe('Tools')
+    expect(parseRoute(urlAt('/app/edit/11111111-1111-4111-8111-111111111111'))._tag).toBe('Editor')
+    expect(parseRoute(urlAt('/edit/11111111-1111-4111-8111-111111111111'))._tag).toBe('NotFound')
+    expect(parseRoute(urlAt('/tools'))._tag).toBe('NotFound')
   })
 
   it('init skips the auto-start on a saveData device', () => {

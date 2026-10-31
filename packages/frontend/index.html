@@ -5,8 +5,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta
       name="description"
-      content="Non-destructive film simulation color grading, fully offline."
+      content="Pick from 296 film looks, tune the grain and strength, and save. Lutra edits your photos in the browser: no upload, no account, works offline."
     />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://lutra.elianiva.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Lutra" />
+    <meta property="og:title" content="Lutra: make digital look like film" />
+    <meta
+      property="og:description"
+      content="Pick from 296 film looks, tune the grain and strength, and save. Lutra edits your photos in the browser: no upload, no account, works offline."
+    />
+    <meta property="og:url" content="https://lutra.elianiva.com/" />
+    <meta property="og:image" content="https://lutra.elianiva.com/og.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="A street photo with a Kodak Portra 400 film look next to the original, under the headline Make digital look like film."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Lutra: make digital look like film" />
+    <meta
+      name="twitter:description"
+      content="Pick from 296 film looks, tune the grain and strength, and save. Lutra edits your photos in the browser: no upload, no account, works offline."
+    />
+    <meta name="twitter:image" content="https://lutra.elianiva.com/og.jpg" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Lutra",
+        "url": "https://lutra.elianiva.com/",
+        "description": "Pick from 296 film looks, tune the grain and strength, and save. Lutra edits your photos in the browser: no upload, no account, works offline.",
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "Any modern browser with WebGPU",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
     <meta name="theme-color" content="#111111" />
     <link rel="stylesheet" href="/src/styles.css" />
     <link rel="manifest" href="/manifest.webmanifest" />
@@ -74,10 +111,18 @@
       media="screen and (device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)"
       href="/icons/splash-2048x2732.png"
     />
-    <title>Lutra — Film Simulation Color Grading</title>
+    <title>Lutra: make digital look like film</title>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <h1>Lutra: make digital look like film</h1>
+      <p>
+        Pick from 296 film looks, tune the grain and strength, and save. Lutra edits your photos in
+        the browser: no upload, no account, works offline. Lutra needs JavaScript and a browser with
+        WebGPU.
+      </p>
+    </noscript>
     <script type="module" blocking="render" src="./src/entry.ts"></script>
   </body>
 </html>

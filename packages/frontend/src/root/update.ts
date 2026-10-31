@@ -12,11 +12,12 @@ import type { ImageEncoder } from '@lutra/engine'
 import type { KeyValueStore } from 'effect/persistence/KeyValueStore'
 import { AppMessage, RootMessage } from './message'
 import type { Model } from './model'
-import { GalleryRoute, EditorRoute, ToolsRoute } from '../route'
+import { GalleryRoute, EditorRoute, LandingRoute, ToolsRoute } from '../route'
 import type { AppRoute } from '../route'
 import * as Gallery from '../gallery'
 import * as Editor from '../editor'
 import * as Tools from '../tools'
+import * as Landing from '../landing'
 import type { ImageWorkers } from '../tools/pipeline/pool'
 import { OfflineMessage } from '../offline/messages'
 import { offlineMachine } from '../offline/machine'
@@ -43,7 +44,7 @@ export type UpdateReturn = Update.Return<Model, AppMessage, Resource>
  *  Command is just the side effect that starts it. */
 const NavigateToEdit = Command.define('NavigateToEdit', {
   args: { id: EditIdSchema },
-  execute: ({ id }) => pushUrl(`/edit/${id}`).pipe(Effect.as(RootMessage.NavigatedTo())),
+  execute: ({ id }) => pushUrl(`/app/edit/${id}`).pipe(Effect.as(RootMessage.NavigatedTo())),
   messages: [RootMessage.NavigatedTo],
 })
 
@@ -129,7 +130,17 @@ const delegateToEditor = (model: Model, editorMessage: EditorMessage): UpdateRet
  */
 export const update = (model: Model, message: AppMessage): UpdateReturn => {
   if (message._tag === 'ChangedRoute') {
-    return applyRoute(model, message.route)
+    const next: UpdateReturn = applyRoute(model, message.route)
+    // Leaving the landing page for the app: the boot fill was skipped there,
+    // so start it now (idempotent, and still honouring saveData).
+    return S.is(LandingRoute)(model.route) &&
+      !S.is(LandingRoute)(message.route) &&
+      !model.offline.saveData
+      ? {
+          ...next,
+          commands: [...(next.commands ?? []), StartOfflineFill({ requirePersist: false })],
+        }
+      : next
   }
   return Match.value(message).pipe(
     Match.withReturnType<UpdateReturn>(),
@@ -178,6 +189,16 @@ export const update = (model: Model, message: AppMessage): UpdateReturn => {
         return {
           model: modifyFields(model, { tools: (_) => nextTools }),
           commands: Command.mapMessages(cmds, (m) => RootMessage.GotToolsMessage({ message: m })),
+        }
+      },
+      GotLandingMessage: ({ message: landingMessage }) => {
+        const { model: nextLanding, commands: cmds = [] } = Landing.update(
+          model.landing,
+          landingMessage,
+        )
+        return {
+          model: modifyFields(model, { landing: (_) => nextLanding }),
+          commands: Command.mapMessages(cmds, (m) => RootMessage.GotLandingMessage({ message: m })),
         }
       },
       NavigatedTo: () => ({ model }),

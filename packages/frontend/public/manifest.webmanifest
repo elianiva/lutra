@@ -3,7 +3,7 @@
   "name": "Lutra — Film Simulation Color Grading",
   "short_name": "Lutra",
   "description": "Non-destructive film simulation color grading. Works offline.",
-  "start_url": "/",
+  "start_url": "/app",
   "scope": "/",
   "display": "standalone",
   "background_color": "#111111",

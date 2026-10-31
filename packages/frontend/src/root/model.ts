@@ -3,11 +3,12 @@ import { AppRoute } from '../route'
 import { Model as GalleryModel } from '../gallery/model'
 import { Model as EditorModel } from '../editor/model'
 import { Model as ToolsModel } from '../tools/model'
+import { Model as LandingModel } from '../landing/model'
 import { Offline } from '../offline/model'
 import { WebGpuCapability } from '../gpu/capability'
 
 /**
- * The root's Model (docs/adr/0006-frontend-architecture): the current route plus the two Submodel
+ * The root's Model (docs/adr/0006-frontend-architecture): the current route plus the Submodel
  * slices it orchestrates. The root never reaches into the child slices
  * directly — it holds them, and every change flows through the child's
  * `update` via a `Got*Message` (or an `init`/`informRouteChanged` helper).
@@ -18,6 +19,7 @@ import { WebGpuCapability } from '../gpu/capability'
 export const Model = S.Struct({
   editor: EditorModel,
   gallery: GalleryModel,
+  landing: LandingModel,
   offline: Offline,
   route: AppRoute,
   tools: ToolsModel,

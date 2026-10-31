@@ -667,3 +667,136 @@ button:not(:disabled):active,
     animation-name: fade-in;
   }
 }
+
+/* ---------- landing page (landing/view.ts) ---------- */
+
+/* the film-name ticker: two identical rows, the track slides one row's width,
+ * then loops without a seam */
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* A ruled frame: hairline rails either side that follow you down the page
+ * (a sticky layer, so the scroll timelines below resolve against the page's own
+ * scroller), a hairline under each row, and a "+" where a rule meets a rail.
+ * Parts of the page deliberately cross it. */
+.lp-rails {
+  position: sticky;
+  top: 0;
+  z-index: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.lp-rails > div {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 100dvh;
+}
+
+.lp-rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--mat-fade);
+}
+
+/* a red pulse that travels the rail as you scroll: down the left, up the right */
+.lp-tick {
+  position: absolute;
+  left: -1px;
+  width: 2px;
+  height: 96px;
+  opacity: 0.45;
+  background: linear-gradient(transparent, var(--mat-accent), transparent);
+}
+
+@supports (animation-timeline: scroll()) {
+  .lp-tick {
+    animation: lp-tick-down linear both;
+    animation-timeline: scroll(nearest block);
+  }
+
+  .lp-tick[data-up] {
+    animation-name: lp-tick-up;
+  }
+
+  /* the square grid drifts by one cell over a section's pass through the viewport */
+  .lp-grid {
+    animation: lp-grid-drift linear both;
+    animation-timeline: view();
+    animation-range: cover;
+  }
+}
+
+@keyframes lp-tick-down {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(calc(100dvh - 96px));
+  }
+}
+
+@keyframes lp-tick-up {
+  from {
+    transform: translateY(calc(100dvh - 96px));
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes lp-grid-drift {
+  from {
+    background-position: center 0;
+  }
+  to {
+    background-position: center -96px;
+  }
+}
+
+.lp-row {
+  position: relative;
+  border-bottom: 1px solid var(--mat-fade);
+}
+
+.lp-row::before,
+.lp-row::after {
+  content: '+';
+  position: absolute;
+  bottom: -9px;
+  z-index: 30;
+  width: 17px;
+  height: 17px;
+  background: var(--mat-bg);
+  color: var(--mat-dim);
+  font: 14px/17px var(--font-mono);
+  text-align: center;
+}
+
+.lp-row::before {
+  left: -9px;
+}
+
+.lp-row::after {
+  right: -9px;
+}
+
+/* the square grid behind the hero and the closing call to action */
+.lp-grid {
+  background-image:
+    linear-gradient(var(--mat-fade) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mat-fade) 1px, transparent 1px);
+  background-size: 96px 96px;
+  background-position: center top;
+}
+
+/* fade the grid out toward the text it sits behind, so no boxes are needed */
+.lp-grid-fade {
+  -webkit-mask-image: linear-gradient(100deg, transparent 12%, #000 62%);
+  mask-image: linear-gradient(100deg, transparent 12%, #000 62%);
+}

@@ -9,11 +9,12 @@ import type { KeyValueStore } from 'effect/persistence/KeyValueStore'
 import type { EditStore } from '@lutra/store'
 import { AppMessage, RootMessage } from './message'
 import type { Model } from './model'
-import { GalleryRoute, EditorRoute, parseRoute } from '../route'
+import { GalleryRoute, EditorRoute, LandingRoute, parseRoute } from '../route'
 import * as Tools from '../tools'
 import type { ImageWorkers } from '../tools/pipeline/pool'
 import * as Gallery from '../gallery'
 import * as Editor from '../editor'
+import * as Landing from '../landing'
 import type { LutThumbnailer } from '../thumbs/worker-layer'
 import type { WebGpuCapability } from '../gpu/capability'
 import { initialOffline } from '../offline/model'
@@ -42,6 +43,7 @@ export type InitReturn = Update.Return<Model, AppMessage, Resource>
  *   Gallery → `Gallery.init` (fires `ListEdits` so the grid populates)
  *   Editor  → `Editor.init`  (fires the LUT catalog + export-settings loads)
  *   Tools   → none (its state is local until a photo is added)
+ *   Landing → none (pure view; the offline fill waits until the app opens)
  *   NotFound → none
  */
 export const init = (capability: WebGpuCapability, url: Url.Url): InitReturn => {
@@ -66,6 +68,7 @@ export const init = (capability: WebGpuCapability, url: Url.Url): InitReturn => 
     model: {
       editor,
       gallery,
+      landing: Landing.init(),
       offline,
       route,
       tools: Tools.init(),
@@ -75,8 +78,11 @@ export const init = (capability: WebGpuCapability, url: Url.Url): InitReturn => 
     // asked for reduced data usage — then the card's manual start button
     // is the only path in, and `start` stays idempotent for both. The
     // persist() request rides along ungated (a bonus, not a precondition).
-    commands: offline.saveData
-      ? commands
-      : [...commands, StartOfflineFill({ requirePersist: false })],
+    // The landing page skips it: a visitor who never opens the app should not
+    // download the library. Entering the app starts it (root update).
+    commands:
+      offline.saveData || S.is(LandingRoute)(route)
+        ? commands
+        : [...commands, StartOfflineFill({ requirePersist: false })],
   }
 }

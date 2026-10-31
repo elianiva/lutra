@@ -3,10 +3,11 @@ import { Match, Schema as S } from 'effect'
 import type { Model } from './model'
 import { AppMessage, RootMessage } from './message'
 import { OfflineMessage } from '../offline/messages'
-import { GalleryRoute, EditorRoute, ToolsRoute } from '../route'
+import { GalleryRoute, EditorRoute, LandingRoute, ToolsRoute } from '../route'
 import * as Gallery from '../gallery'
 import * as Editor from '../editor'
 import * as Tools from '../tools'
+import * as Landing from '../landing'
 import { button } from '@/components/ui/button'
 
 /**
@@ -34,6 +35,10 @@ const toGalleryParent = (
 const toEditorParent = (
   message: Parameters<typeof RootMessage.GotEditorMessage>[0]['message'],
 ): RootMessage => RootMessage.GotEditorMessage({ message })
+
+const toLandingParent = (
+  message: Parameters<typeof RootMessage.GotLandingMessage>[0]['message'],
+): RootMessage => RootMessage.GotLandingMessage({ message })
 
 const toToolsParent = (
   message: Parameters<typeof RootMessage.GotToolsMessage>[0]['message'],
@@ -102,10 +107,19 @@ const activeRouteView = (
   gallery: Model['gallery'],
   editor: Model['editor'],
   tools: Model['tools'],
+  landing: Model['landing'],
   h: HtmlBuilder<AppMessage>,
 ): Html =>
   Match.value(route).pipe(
     Match.withReturnType<Html>(),
+    Match.when(S.is(LandingRoute), () =>
+      h.submodel({
+        model: landing,
+        slotId: 'landing',
+        toParentMessage: toLandingParent,
+        view: Landing.view,
+      }),
+    ),
     Match.when(S.is(GalleryRoute), () =>
       h.submodel({
         model: gallery,
@@ -133,8 +147,13 @@ const activeRouteView = (
     Match.orElse(() => notFound(h)),
   )
 
+/** The landing page's document title: the one a search result shows. */
+const LANDING_TITLE = 'Lutra: make digital look like film'
+
 export const view = (model: Model, h: HtmlBuilder<AppMessage>): Document => {
-  if (!model.webgpu.supported) {
+  // The landing page is plain HTML and CSS: it renders without WebGPU. Only
+  // the app routes sit behind the capability gate.
+  if (!model.webgpu.supported && !S.is(LandingRoute)(model.route)) {
     return {
       body: lazyUnsupported(unsupportedScreenView, [model.webgpu, h])!,
       title: 'Lutra',
@@ -158,11 +177,12 @@ export const view = (model: Model, h: HtmlBuilder<AppMessage>): Document => {
           model.gallery,
           model.editor,
           model.tools,
+          model.landing,
           h,
         ])!,
       ],
     ),
-    title: 'Lutra',
+    title: S.is(LandingRoute)(model.route) ? LANDING_TITLE : 'Lutra',
   }
 }
 

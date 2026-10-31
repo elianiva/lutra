@@ -105,4 +105,4 @@ export const navPill = <M>(
 }
 
 /** Where each page lives on the site. */
-export const pageUrl = (page: Page): string => (page === 'tools' ? '/tools' : '/')
+export const pageUrl = (page: Page): string => (page === 'tools' ? '/app/tools' : '/app')
