@@ -16,21 +16,21 @@
     "vendor:luts": "bun scripts/vendor-luts.ts"
   },
   "dependencies": {
-    "@alchemy.run/cloudflare": "2.0.0-beta.84",
-    "@effect/platform-node": "4.0.6",
-    "alchemy": "2.0.0-beta.84",
-    "effect": "4.0.6"
+    "@alchemy.run/cloudflare": "2.0.0-beta.87",
+    "@effect/platform-node": "4.1.4",
+    "alchemy": "2.0.0-beta.87",
+    "effect": "4.1.4"
   },
   "devDependencies": {
-    "@foldkit/oxlint-plugin": "^0.15.3",
-    "@oxlint/plugins": "1.89.0",
+    "@foldkit/oxlint-plugin": "^0.15.4",
+    "@oxlint/plugins": "1.94.0",
     "@resvg/resvg-js": "^2.6.2",
     "@types/bun": "^1.4.4",
     "lefthook": "^2.2.2",
-    "oxlint": "1.89.0",
-    "turbo": "^2.11.10",
-    "typescript": "^7.0.2",
-    "vite-plus": "^1.4.0"
+    "oxlint": "1.94.0",
+    "tsrs": "7.1.0-beta.tsrs2",
+    "turbo": "^2.11.12",
+    "vite-plus": "^1.7.0"
   },
   "packageManager": "pnpm@11.18.0"
 }

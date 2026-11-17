@@ -1,21 +1,38 @@
 packages:
   - 'packages/*'
-# Foldkit pins `effect` to the exact 4.0.0 stable release. The 4.0.x patch
-# line is compatible (its packages only use stable Effect APIs), so track the
-# latest patch instead of freezing on 4.0.0 and let the peer check accept it.
-peerDependencyRules:
-  allowedVersions:
-    effect: '^4.0.0'
 allowBuilds:
   lefthook: true
   msgpackr-extract: true
   workerd: true
-# Alchemy publishes its provider packages in lockstep with the core package;
-# an exclude per package keeps a fresh beta installable before the
-# minimum-release-age window passes.
+# Versions published inside pnpm's minimum-release-age window. The lockfile
+# pins them exactly, so a fresh `pnpm install --frozen-lockfile` needs the
+# exclusion until they age out; drop an entry once the lockfile moves past it.
+# Alchemy also publishes its provider packages in lockstep with the core
+# package, so each of those needs its own entry.
 minimumReleaseAgeExclude:
-  - '@alchemy.run/cloudflare@2.0.0-beta.84'
-  - '@alchemy.run/cloudflare-runtime@2.0.0-beta.84'
-  - '@alchemy.run/floci@2.0.0-beta.84'
-  - '@alchemy.run/node-utils@2.0.0-beta.84'
-  - alchemy@2.0.0-beta.84
+  - '@alchemy.run/cloudflare@2.0.0-beta.87'
+  - '@alchemy.run/cloudflare-runtime@2.0.0-beta.87'
+  - '@alchemy.run/floci@2.0.0-beta.87'
+  - '@alchemy.run/node-utils@2.0.0-beta.87'
+  - alchemy@2.0.0-beta.87
+  - '@foldkit/devtools@0.171.0'
+  - '@foldkit/ui@0.171.0'
+  - '@foldkit/vite-plugin@0.29.1'
+  - foldkit@0.171.0
+  - '@turbo/darwin-64@2.11.12'
+  - '@turbo/darwin-arm64@2.11.12'
+  - '@turbo/linux-64@2.11.12'
+  - '@turbo/linux-arm64@2.11.12'
+  - '@turbo/windows-64@2.11.12'
+  - '@turbo/windows-arm64@2.11.12'
+  - turbo@2.11.12
+  - '@voidzero-dev/vite-plus-core@8.3.8000'
+  - '@voidzero-dev/vite-plus-darwin-arm64@1.7.0'
+  - '@voidzero-dev/vite-plus-darwin-x64@1.7.0'
+  - '@voidzero-dev/vite-plus-linux-arm64-gnu@1.7.0'
+  - '@voidzero-dev/vite-plus-linux-arm64-musl@1.7.0'
+  - '@voidzero-dev/vite-plus-linux-x64-gnu@1.7.0'
+  - '@voidzero-dev/vite-plus-linux-x64-musl@1.7.0'
+  - '@voidzero-dev/vite-plus-win32-arm64-msvc@1.7.0'
+  - '@voidzero-dev/vite-plus-win32-x64-msvc@1.7.0'
+  - vite-plus@1.7.0

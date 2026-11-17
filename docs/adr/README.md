@@ -18,3 +18,4 @@ Durable architectural context only — what we decided, why, and what it constra
 | 0013 | [Materials](0013-materials.md)                         | Borderless surface system, dark + light tokens, editor shell, spacing scale                 |
 | 0014 | [Tools](0014-tools.md)                                 | `/app/tools` page: shared codec and materials, worker pool, batch item machine, DOM collage |
 | 0015 | [Landing](0015-landing.md)                             | `/` landing page, app under `/app`, no WebGPU gate or offline fill on the landing page      |
+| 0016 | [Lint and type checking](0016-lint-and-typecheck.md)   | Oxlint + tsrs for lint and typecheck, one compiler, Vite+ version lockstep                  |

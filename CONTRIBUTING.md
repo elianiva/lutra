@@ -34,13 +34,13 @@ Check `docs/adr/` for architecture decisions — they are the permanent record.
 ```bash
 pnpm dev          # web app at http://localhost:5173
 pnpm fmt          # format (lefthook runs this on pre-commit)
-pnpm lint         # oxlint, type-aware
-pnpm typecheck
+pnpm lint         # oxlint, type-aware and type-checking via tsrs
+pnpm typecheck    # tsrs, one compiler run per package
 pnpm test
 pnpm build        # turbo build across packages
 ```
 
-Hooks (lefthook, installed via `pnpm prepare`): pre-commit runs `fmt` then `lint`; pre-push runs `build` + `typecheck`. CI runs format check, lint, typecheck, test. Deploy to Cloudflare via `pnpm infra:deploy` happens automatically on `master`.
+Lint and type checking share one compiler: Oxlint runs type-aware rules and TypeScript diagnostics through tsrs (docs/adr/0016-lint-and-typecheck), and `pnpm typecheck` runs the same tsrs compiler standalone. Hooks (lefthook, installed via `pnpm prepare`): pre-commit runs `fmt` then `lint`; pre-push runs `build` + `typecheck`. CI runs format check, lint, typecheck, test. Deploy to Cloudflare via `pnpm infra:deploy` happens automatically on `master`.
 
 ## Submitting
 

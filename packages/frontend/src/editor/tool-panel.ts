@@ -23,10 +23,7 @@ import type { LayerType } from '@lutra/engine'
  */
 const lazyTool = createKeyedLazy()
 
-const lutStatus = (
-  catalog: Model['catalog'],
-  catalogError: Model['catalogError'],
-): string | null =>
+const lutStatus = (catalog: Model['catalog'], catalogError: Model['catalogError']): string | null =>
   catalog === null ? (catalogError === null ? 'Loading LUTs…' : 'LUTs unavailable') : null
 
 const toolButton = (
