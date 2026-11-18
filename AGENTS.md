@@ -8,10 +8,10 @@
 
 ## Orbs
 
-- `.agents/setup` prepares a fresh orb: it checks the Node toolchain, installs `bun` when missing, and runs `pnpm install --frozen-lockfile`. Dependencies are already installed when a thread starts — do not reinstall them.
+- `.agents/setup` prepares a fresh orb: it checks the Node toolchain, installs `bun` when missing, raises `vm.overcommit_memory` so lint can reserve its arenas, and runs `pnpm install --frozen-lockfile`. Dependencies are already installed when a thread starts — do not reinstall them.
 - The dev server is declared in `.amp/services.yaml`. Start it with `amp orb services ensure` and share the portal URL it prints; never `nohup`, `&`, or a bare `pnpm dev` on port 5173, and never start it from `.agents/setup`.
 - Open the app in Chrome with `--enable-unsafe-webgpu --enable-unsafe-swiftshader` so the WebGPU gate passes. The main canvas stays black under SwiftShader: verify UI, state, and thumbnails, not the GPU render.
-- `pnpm lint` (`vp lint`) and `pnpm typecheck` (`tsrs --noEmit --fast`) both run the tsrs compiler, so a type error fails either gate (docs/adr/0016-lint-and-typecheck). In an orb, Oxlint's JS plugin host aborts with `panicked at ... oxc_allocator/src/pool/fixed_size.rs` because the sandbox's memory commit limit is smaller than the 4 GiB arena Oxlint reserves per lint thread. Fix the sandbox, not the config: `sudo sh -c 'echo 1 > /proc/sys/vm/overcommit_memory'`, then `pnpm lint` runs in seconds. Without sudo, use `pnpm typecheck` and `pnpm test` for local signal and let CI be the lint gate.
+- `pnpm lint` (`vp lint`) and `pnpm typecheck` (`tsrs --noEmit --fast`) both run the tsrs compiler, so a type error fails either gate (docs/adr/0016-lint-and-typecheck). In an orb, Oxlint's JS plugin host aborts with `panicked at ... oxc_allocator/src/pool/fixed_size.rs` because the sandbox's memory commit limit is smaller than the 4 GiB arena Oxlint reserves per lint thread. `.agents/setup` raises `vm.overcommit_memory` for this, but it is kernel state: if lint still aborts, run `sudo sh -c 'echo 1 > /proc/sys/vm/overcommit_memory'` once. Without sudo, use `pnpm typecheck` and `pnpm test` for local signal and let CI be the lint gate.
 
 ## Cursor Cloud specific instructions
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Prepares a fresh orb for Lutra: the pinned Node toolchain, bun (the frontend
-# build scripts shell out to it), and workspace dependencies from the lockfile.
+# build scripts shell out to it), the overcommit headroom lint needs, and
+# workspace dependencies from the lockfile.
 #
 # Idempotent and non-interactive: a warm snapshot re-runs this in seconds.
 # Long-lived processes belong in .amp/services.yaml, never here.
@@ -46,13 +47,34 @@ echo "pnpm $have_pnpm"
 
 step "bun"
 # pnpm build runs scripts/build-icons.ts and scripts/build-sw.ts through bun.
+# A snapshot keeps $HOME/.bun but a fresh shell may not have it on PATH, so
+# look there before downloading again (the same check .cursor/install.sh makes).
 if command -v bun >/dev/null 2>&1; then
   echo "bun $(bun --version)"
+elif [ -x "$HOME/.bun/bin/bun" ]; then
+  persist_path "$HOME/.bun/bin"
+  echo "bun $(bun --version) (restored $HOME/.bun/bin to PATH)"
 else
   echo "bun missing; installing into $HOME/.bun"
   curl -fsSL https://bun.sh/install | bash
   persist_path "$HOME/.bun/bin"
   bun --version
+fi
+
+step "lint address space"
+# Oxlint reserves a 4 GiB arena per lint thread and the sandbox's commit limit
+# rejects it until overcommit is permissive (docs/adr/0016), so `pnpm lint`
+# aborts without this. It is kernel state, not project state, so a snapshot
+# never carries it: every fresh orb needs it set again.
+overcommit=/proc/sys/vm/overcommit_memory
+if [ ! -r "$overcommit" ]; then
+  echo "no $overcommit here; skipping"
+elif [ "$(cat "$overcommit")" = 1 ]; then
+  echo "vm.overcommit_memory already 1"
+elif sudo -n sh -c "echo 1 > $overcommit" 2>/dev/null || printf 1 >"$overcommit" 2>/dev/null; then
+  echo "vm.overcommit_memory raised to 1"
+else
+  echo "warning: vm.overcommit_memory stays $(cat "$overcommit"); pnpm lint aborts here until it is 1 (see AGENTS.md)" >&2
 fi
 
 step "workspace dependencies"
